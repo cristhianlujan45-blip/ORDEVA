@@ -1,5 +1,6 @@
-// Corre dentro de «bash pruebas/correr.sh» las pruebas del SERVIDOR de suscripciones (PostgreSQL 16 real):
-// pruebas/servidor/suscripciones.test.js. No abre navegador.
+// Corre dentro de «bash pruebas/correr.sh» las pruebas del SERVIDOR (PostgreSQL 16 real), sin navegador:
+//   pruebas/servidor/suscripciones.test.js   suscripciones de Vento
+//   pruebas/servidor/daviplata.test.js       pagos con la API oficial «Pago con DaviPlata» (vento-pagos)
 // Si el equipo no tiene PostgreSQL instalado lo dice y no falla (las pruebas del navegador no lo necesitan).
 const { spawnSync } = require('child_process');
 const fs = require('fs');
@@ -23,5 +24,10 @@ if (!hayPostgres()) {
   console.log('RESULTADO 0 bien 0 mal (este equipo no tiene PostgreSQL: se omitieron las pruebas del servidor; instala PostgreSQL 16 o define VENTO_PG_URL)');
   process.exit(0);
 }
-const r = spawnSync(process.execPath, [path.join(__dirname, 'servidor', 'suscripciones.test.js')], { stdio: 'inherit', env: process.env, timeout: 220000 });
-process.exit(r.status === null ? 1 : r.status);
+let fallo = 0;
+for (const f of ['suscripciones.test.js', 'daviplata.test.js']) {
+  console.log('— servidor/' + f);
+  const r = spawnSync(process.execPath, [path.join(__dirname, 'servidor', f)], { stdio: 'inherit', env: process.env, timeout: 110000 });
+  if (r.status !== 0) fallo = 1;
+}
+process.exit(fallo);

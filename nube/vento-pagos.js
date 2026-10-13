@@ -1,14 +1,15 @@
 /* =====================================================================
    Vento · Pagos con Nequi y DaviPlata (lado de la app)
 
-   Núcleo:  Nequi / DaviPlata → integración autorizada (Wompi o Nequi Conecta) → Servidor Vento
+   Núcleo:  Nequi / DaviPlata → integración autorizada (Wompi, Nequi Conecta o la API Pago con DaviPlata) → Servidor Vento
             (Supabase Edge Function «vento-pagos») → base de datos → esta app → celulares autorizados.
 
    Esta parte:
    • Ajustes → 💜 Pagos: estado de Nequi y DaviPlata, asistente «Conectar», comprobaciones automáticas,
      URL de eventos, celulares autorizados, historial y avisos del celular (auxiliar).
    • Cuenta/mesa → «💜 Cobrar Nequi / DaviPlata»: link/QR de Wompi, cobro push o QR de Nequi, con el
-     estado en vivo. Cuando se aprueba, se registra solo en la cuenta (una sola vez aunque haya varios celulares).
+     estado en vivo, o «DaviPlata con código» (API oficial: le llega un código al celular del cliente y la caja
+     lo confirma). Cuando se aprueba, se registra solo en la cuenta (una sola vez aunque haya varios celulares).
    • Registro del celular (id + token seguro), latido, notificaciones push con la app cerrada.
    • Tiempo real (Supabase Realtime) + sincronización al reconectarse (los pagos quedan en el servidor).
    Sin Vento Nube configurada no hace nada: Vento sigue funcionando igual.
@@ -27,7 +28,13 @@
   function etiquetaMesa(m){ try{ return window.tableLabel ? window.tableLabel(m) : 'Mesa ' + m; }catch(e){ return 'Mesa ' + m; } }
   var METODO = { NEQUI: 'Nequi', DAVIPLATA: 'DaviPlata', CARD: 'Tarjeta', PSE: 'PSE', BANCOLOMBIA_TRANSFER: 'Bancolombia', BANCOLOMBIA_QR: 'QR Bancolombia', BANCOLOMBIA: 'Bancolombia', TRANSFERENCIA: 'Transferencia', 'BRE-B': 'Bre-B' };
   var nombreMetodo = function(m){ return METODO[String(m || '').toUpperCase()] || (m ? String(m).charAt(0) + String(m).slice(1).toLowerCase() : 'Pago digital'); };
+  // Quién verificó el pago (para los textos).
+  var entidad = function(p, largo){ return p.proveedor === 'nequi' ? (largo ? 'Nequi Conecta' : 'Nequi') : p.proveedor === 'daviplata' ? 'DaviPlata' : 'Wompi'; };
+  // Explicación de un cobro que no se pagó (DaviPlata deja el motivo final en «detalle»).
+  var nota = function(x){ return x.proveedor === 'daviplata' ? (x.detalle || x.ultimo_error) : (x.ultimo_error || x.detalle); };
   var ESTADO = { pendiente: '⏳ Esperando el pago', aprobado: '✅ Pagado', rechazado: '❌ Rechazado', anulado: '↩️ Anulado', error: '⚠️ Error', vencido: '⌛ Venció' };
+  // DaviPlata no respondió y no se sabe si cobró: nunca se muestra como un simple «Error» (el cajero cobraría otra vez).
+  var etiqueta = function(p){ return p.incierto && p.estado === 'error' ? '⚠️ Sin confirmar: revisa con el cliente' : (ESTADO[p.estado] || esc(p.estado)); };
 
   // ---------- Conexión con el servidor ----------
   var est = { servidor: null, version: null, resumen: null, info: null, dev: null, canal: null, ultimoSync: 0, revisando: false };
@@ -109,14 +116,14 @@
       x = g.lista.find(function(y){ return !y.srv && Number(y.monto) === Number(p.monto) && Math.abs((y.t || 0) - tp) < 3 * 60e3 && String(y.app || '').toUpperCase().replace('TRANSFERENCIA', '') === String(nombreMetodo(p.metodo)).toUpperCase().replace('TRANSFERENCIA', ''); });
       if(x){ x.srv = p.id; x._yaAvisado = true; return x; }
     }
-    var fuente = p.verificado ? 'Verificado por ' + (p.proveedor === 'nequi' ? 'Nequi Conecta' : 'Wompi') : (p.detalle || 'Aviso del celular');
+    var fuente = p.verificado ? 'Verificado por ' + entidad(p, true) + (p.aprobacion ? ' · N.º ' + p.aprobacion : '') : (p.detalle || 'Aviso del celular');
     if(!x){
       x = { id: id, srv: p.id, t: Date.parse(p.aprobado_en || p.actualizado_en || p.creado_en) || Date.now(), monto: Number(p.monto), app: nombreMetodo(p.metodo), de: p.pagador || '', mesa: p.mesa ? (isNaN(+p.mesa) ? p.mesa : +p.mesa) : null,
         estado: p.confianza === 'revisar' ? 'revisar' : p.confianza === 'falso' ? 'falso' : 'app', fuente: fuente, txt: (p.referencia || '').slice(0, 60) };
       g.lista.unshift(x); g.lista = g.lista.slice(0, 200);
     } else if(x.estado === 'revisar' && p.confianza === 'ok'){ x.estado = 'ok'; }
     if(p.aplicado_en && !x.aplicado) x.aplicado = p.aplicado_mesa ? (isNaN(+p.aplicado_mesa) ? p.aplicado_mesa : +p.aplicado_mesa) : true;
-    if(p.estado === 'anulado') x.estado = 'falso', x.fuente = 'Anulado por ' + (p.proveedor === 'nequi' ? 'Nequi' : 'Wompi');
+    if(p.estado === 'anulado') x.estado = 'falso', x.fuente = 'Anulado por ' + entidad(p);
     return x;
   }
 
@@ -256,6 +263,12 @@
     '.vp-qr{display:grid;place-items:center;margin:12px auto;background:#fff;padding:12px;border-radius:16px;width:max-content;max-width:100%}' +
     '.vp-monto{font:800 34px/1.2 var(--font-main);text-align:center;margin:6px 0}.vp-estado{text-align:center;font-weight:800;font-size:17px;margin:10px 0}' +
     '.vp-btn-cuenta{width:100%;margin:8px 0 4px;padding:12px;border-radius:14px;border:1px solid #7c3aed;background:color-mix(in srgb,#7c3aed 14%,transparent);color:inherit;font:700 15px var(--font-main);cursor:pointer}' +
+    '.vp-opc[hidden]{display:none}.vp-nw{white-space:nowrap}' +
+    '.vp-doc{display:grid;grid-template-columns:96px 1fr;gap:8px}.vp-doc select,.vp-doc input{font-size:18px;min-height:48px}' +
+    '.vp-grande{width:100%;min-height:52px;margin-top:12px;font-size:16px}' +
+    '.vp-otp{width:100%;box-sizing:border-box;font:800 34px/1.2 ui-monospace,monospace;letter-spacing:.35em;text-align:center;padding:12px 6px;min-height:64px}' +
+    '.vp-prueba{margin:10px 0 0;padding:10px 12px;border-radius:12px;border:1px dashed #f5a524;font-size:14px;display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}' +
+    '.vp-form input[type=file]{font-size:13px}.vp-ayuda{display:block;color:var(--ink-soft);font-size:12px;margin-top:3px}' +
     '@keyframes vpGira{to{transform:rotate(360deg)}}.vp-gira{display:inline-block;animation:vpGira 1.2s linear infinite}';
   document.head.appendChild(st);
 
@@ -272,8 +285,9 @@
   function saldoMesa(id){ try{ return Math.max(0, tableTotal(id) - tablePaid(id)); }catch(e){ return 0; } }
   window.ventoPagosCobrar = function(mesa, monto){
     var n = negocio(); if(!n) return toast('Conecta Vento Nube y los pagos en Ajustes → 💜 Pagos.');
-    var r = est.resumen || {}, wompi = r.nequi && r.nequi.via && r.nequi.via.indexOf('Wompi') >= 0 || r.daviplata && r.daviplata.estado === 'conectado';
-    var nequiDirecto = r.nequi && r.nequi.via && r.nequi.via.indexOf('Nequi Conecta') >= 0;
+    var r = est.resumen || {}, por = function(x, v){ return !!(x && x.via && x.via.indexOf(v) >= 0); };
+    var wompi = por(r.nequi, 'Wompi') || por(r.daviplata, 'Wompi');
+    var nequiDirecto = por(r.nequi, 'Nequi Conecta'), daviApi = por(r.daviplata, 'API DaviPlata');
     var ov = ventana('vpCobroOv');
     monto = Math.round(monto != null ? monto : (mesa != null ? saldoMesa(mesa) : 0));
     ov.innerHTML = '<div class="modal vp-modal"><h2>💜 Cobrar con Nequi o DaviPlata</h2>' +
@@ -283,7 +297,8 @@
       (wompi ? '<button type="button" data-c="link">🔗 Link / QR de pago<small>El cliente escanea y paga con Nequi, DaviPlata, tarjeta o PSE (Wompi).</small></button>' : '') +
       (nequiDirecto ? '<button type="button" data-c="push">📲 Cobro a su Nequi<small>Le llega una notificación al celular del cliente para aprobar.</small></button>' +
         '<button type="button" data-c="qr">🔳 QR de Nequi<small>El cliente lo escanea desde su app Nequi.</small></button>' : '') +
-      (!wompi && !nequiDirecto ? '<div class="modal-sub">Todavía no hay una integración conectada. Ve a <b>Ajustes → 💜 Pagos</b> y toca «Conectar Nequi» o «Conectar DaviPlata».</div>' : '') +
+      (daviApi ? '<button type="button" data-c="otp">🔐 DaviPlata con código<small>Con su documento: le llega un código al celular y tú lo escribes aquí.</small></button>' : '') +
+      (!wompi && !nequiDirecto && !daviApi ? '<div class="modal-sub">Todavía no hay una integración conectada. Ve a <b>Ajustes → 💜 Pagos</b> y toca «Conectar Nequi» o «Conectar DaviPlata».</div>' : '') +
       '</div><div id="vpCobroRes"></div><div class="modal-actions"><button type="button" class="btn-close" id="vpCobroX">Cerrar</button></div></div>';
     ov.classList.add('show');
     ov.querySelector('#vpCobroX').onclick = function(){ cerrarVentana(ov); };
@@ -291,6 +306,7 @@
     ov.querySelectorAll('[data-c]').forEach(function(b){ b.onclick = function(){
       var canal = b.dataset.c, valor = Math.round(+ov.querySelector('#vpMonto').value || 0);
       if(valor < 100) return toast('Escribe el valor a cobrar.');
+      if(canal === 'otp') return cobroDavi(ov, n, mesa, valor);
       var tel = null;
       if(canal === 'push'){ tel = (prompt('Celular Nequi del cliente (10 dígitos):') || '').replace(/\D/g, ''); if(!/^3\d{9}$/.test(tel)) return toast('El celular debe tener 10 dígitos y empezar por 3.'); }
       var res = ov.querySelector('#vpCobroRes');
@@ -310,9 +326,12 @@
         if(x.canal === 'qr' && x.qr) html += '<div class="vp-qr" id="vpQr"></div><div class="modal-sub" style="text-align:center">Escanéalo desde la app Nequi.</div>';
         if(x.canal === 'push') html += '<div class="modal-sub" style="text-align:center">Le llegó una notificación a su Nequi (' + esc(x.telefono || '') + '). Debe aprobarla en su celular.</div>';
         html += '<div class="vp-estado"><span class="vp-gira">⏳</span> Esperando el pago…</div><div class="modal-sub" style="text-align:center">Se registra solo en la cuenta cuando Nequi/DaviPlata lo confirmen.</div>';
+      } else if(x.estado === 'aprobado' && x.proveedor === 'daviplata'){
+        html += '<div class="vp-estado vp-ok" id="vpAprobado">✅ Pago aprobado' + (x.aprobacion ? ' · N.º de aprobación ' + esc(x.aprobacion) : '') + '</div>' +
+          '<div class="modal-sub" style="text-align:center">DaviPlata' + (x.documento ? ' · <span class="vp-nw">' + esc(x.documento) + '</span>' : '') + '. ' + (!x.mesa ? '' : puedeCaja() ? 'Quedó registrado en la cuenta.' : 'La caja lo registra en la cuenta.') + '</div>';
       } else {
-        html += '<div class="vp-estado ' + (x.estado === 'aprobado' ? 'vp-ok' : 'vp-mal') + '">' + (ESTADO[x.estado] || x.estado) + (x.estado === 'aprobado' ? ' · ' + esc(nombreMetodo(x.metodo)) + (x.pagador ? ' · ' + esc(x.pagador) : '') : '') + '</div>' +
-          (x.estado === 'aprobado' ? '<div class="modal-sub" style="text-align:center">✅ Verificado por ' + (x.proveedor === 'nequi' ? 'Nequi' : 'Wompi') + '. Quedó registrado en la cuenta.</div>' : x.ultimo_error || x.detalle ? '<div class="modal-sub" style="text-align:center">' + esc(x.ultimo_error || x.detalle) + '</div>' : '');
+        html += '<div class="vp-estado ' + (x.estado === 'aprobado' ? 'vp-ok' : 'vp-mal') + '">' + etiqueta(x) + (x.estado === 'aprobado' ? ' · ' + esc(nombreMetodo(x.metodo)) + (x.pagador ? ' · ' + esc(x.pagador) : '') : '') + '</div>' +
+          (x.estado === 'aprobado' ? '<div class="modal-sub" style="text-align:center">✅ Verificado por ' + entidad(x) + '. Quedó registrado en la cuenta.</div>' : nota(x) ? '<div class="modal-sub" style="text-align:center">' + esc(nota(x)) + '</div>' : '');
       }
       res.innerHTML = html;
       var q = res.querySelector('#vpQr');
@@ -324,6 +343,65 @@
     var oye = function(x){ if(x.id === p.id && (x.estado !== p.estado)){ p = x; pintar(x); } };
     oyentes.push(oye);
     ov._fin = function(){ oyentes = oyentes.filter(function(f){ return f !== oye; }); };
+  }
+
+  // ---------- DaviPlata con código (API oficial de Davivienda) ----------
+  // 1) documento del cliente → «Enviar código» (DaviPlata le manda un código por mensaje a su celular)
+  // 2) la caja escribe el código → «Confirmar pago» → «Aprobado» (no hay aviso aparte: esta respuesta ES la confirmación).
+  function cobroDavi(ov, n, mesa, valor){
+    var res = ov.querySelector('#vpCobroRes'); ov.querySelector('.vp-opc').hidden = true;
+    var q = function(id){ return ov.querySelector('#' + id); };
+    if(q('vpMonto')) q('vpMonto').disabled = true;   // el valor ya quedó fijo para este cobro
+    var intento = 0, base = 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    res.innerHTML = '<div class="vp-form" id="vpDaviF"><div class="vp-monto">' + plata(valor) + '</div>' +
+      '<label for="vpDnum">Documento del cliente (el de su DaviPlata)</label>' +
+      '<div class="vp-doc"><select class="mz-in" id="vpDtipo" aria-label="Tipo de documento"><option value="01">CC</option><option value="02">CE</option><option value="04">TI</option></select>' +
+      '<input class="mz-in" id="vpDnum" inputmode="numeric" autocomplete="off" maxlength="16" placeholder="Número"></div>' +
+      '<button type="button" class="btn-primary vp-grande" id="vpDenviar">📲 Enviar código al celular del cliente</button><div id="vpDmsg" class="vp-estado"></div></div>';
+    var msg = function(t, malo){ var m = q('vpDmsg'); if(m){ m.className = 'vp-estado ' + (malo ? 'vp-mal' : ''); m.innerHTML = t; } };
+    setTimeout(function(){ try{ q('vpDnum').focus(); }catch(e){} }, 50);
+    q('vpDenviar').onclick = function(){
+      var num = (q('vpDnum').value || '').replace(/[\s.\-]/g, '');
+      if(!/^\d{3,14}$/.test(num)) return msg('⚠️ Escribe el número de documento (solo números).', true);
+      var b = q('vpDenviar'); b.disabled = true; msg('<span class="vp-gira">⏳</span> Pidiendo el código a DaviPlata…');
+      api('cobro', { negocio: n.id, proveedor: 'daviplata', canal: 'otp', monto: valor, mesa: mesa != null ? String(mesa) : null, tipo_documento: q('vpDtipo').value, numero_documento: num, idem: base + '-' + intento })
+        .then(function(j){ recibir(j.pago, false); pantallaCodigo(ov, n, j.pago, j.otp_prueba); })
+        .catch(function(e){ intento++; b.disabled = false; msg('⚠️ ' + esc(e.message), true); });
+    };
+  }
+  function pantallaCodigo(ov, n, p, prueba){
+    var res = ov.querySelector('#vpCobroRes'), q = function(id){ return ov.querySelector('#' + id); };
+    res.innerHTML = '<div class="vp-form"><div class="vp-monto">' + plata(p.monto) + '</div>' +
+      '<div class="modal-sub" style="text-align:center">DaviPlata le mandó un <b>código de 6 dígitos</b> por mensaje al celular del cliente' + (p.documento ? ' (<span class="vp-nw">' + esc(p.documento) + '</span>)' : '') + '. Pídeselo y escríbelo:</div>' +
+      '<input class="mz-in vp-otp" id="vpDotp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••" aria-label="Código de DaviPlata">' +
+      (prueba ? '<div class="vp-prueba" id="vpDprueba"><span>🧪 Laboratorio: código de prueba <b>' + esc(prueba) + '</b></span><button type="button" class="btn-ghost" id="vpDusar">Usar</button></div>' : '') +
+      '<button type="button" class="btn-primary vp-grande" id="vpDconf">✅ Confirmar pago</button><div id="vpDmsg" class="vp-estado"></div></div>';
+    var msg = function(t, malo){ var m = q('vpDmsg'); if(m){ m.className = 'vp-estado ' + (malo ? 'vp-mal' : ''); m.innerHTML = t; } };
+    var listo = false;
+    var terminar = function(x){ if(listo) return; listo = true; if(ov._fin){ try{ ov._fin(); }catch(e){} } ov._fin = null; mostrarCobro(ov, x); };
+    // Si otro celular lo confirma, o vence / queda rechazado, esta ventana se entera (tiempo real o sincronización).
+    var oye = function(x){ if(x.id === p.id && x.estado !== 'pendiente') terminar(x); };
+    oyentes.push(oye);
+    ov._fin = function(){ oyentes = oyentes.filter(function(f){ return f !== oye; }); };
+    if(q('vpDusar')) q('vpDusar').onclick = function(){ q('vpDotp').value = prueba; };
+    setTimeout(function(){ try{ q('vpDotp').focus(); }catch(e){} }, 50);
+    var otp = q('vpDotp');
+    otp.oninput = function(){ otp.value = otp.value.replace(/\D/g, '').slice(0, 6); };
+    otp.onkeydown = function(e){ if(e.key === 'Enter') q('vpDconf').click(); };
+    q('vpDconf').onclick = function(){
+      var c = (otp.value || '').replace(/\D/g, '');
+      if(c.length !== 6) return msg('⚠️ El código tiene 6 dígitos.', true);
+      var b = q('vpDconf'); b.disabled = true; msg('<span class="vp-gira">⏳</span> Confirmando con DaviPlata…');
+      api('confirmar', { negocio: n.id, pago: p.id, otp: c }).then(function(j){
+        // La respuesta «Aprobado» ES el aviso del pago: se recibe «en vivo» (sin mesa abre «Registrar en la mesa»).
+        if(j.pago) recibir(j.pago, !!(j.ok && !j.repetido));
+        if(j.ok || (j.pago && j.pago.estado !== 'pendiente')) return terminar(cache[(j.pago || p).id] || j.pago);
+        b.disabled = false;
+        if(!j.incierto){ otp.value = ''; }   // sin respuesta de DaviPlata se reintenta con el MISMO código
+        otp.focus();
+        msg('⚠️ ' + esc(j.mensaje || 'No se pudo confirmar.'), true);
+      }).catch(function(e){ b.disabled = false; msg('⚠️ ' + esc(e.message), true); });
+    };
   }
 
   function crearBotonCuenta(){
@@ -372,7 +450,7 @@
     var pinta = function(){
       var r = est.resumen, info = est.info || {}, admin = n && (n.rol === 'dueno' || n.rol === 'admin');
       var html = '<h2>💜 Pagos: Nequi y DaviPlata</h2>' +
-        '<div class="settings-desc">Los pagos llegan al <b>Servidor Vento</b> por una integración autorizada (Wompi o Nequi Conecta), quedan guardados en la base de datos y aparecen al instante en todos los celulares del negocio. Vento verifica la firma, evita duplicados y los registra solos en la cuenta.</div>' +
+        '<div class="settings-desc">Los pagos llegan al <b>Servidor Vento</b> por una integración autorizada (Wompi, Nequi Conecta o la API de DaviPlata), quedan guardados en la base de datos y aparecen al instante en todos los celulares del negocio. Vento verifica la firma, evita duplicados y los registra solos en la cuenta.</div>' +
         '<div class="vp-cards">' + estadoHtml('NEQUI', r && r.nequi, '🟢') + estadoHtml('DAVIPLATA', r && r.daviplata, '🔵') + '</div>' +
         (admin && est.servidor ? '<div class="mz-actions" style="flex-wrap:wrap"><button type="button" class="btn-primary" id="vpConNequi">Conectar Nequi</button><button type="button" class="btn-primary" id="vpConDavi">Conectar DaviPlata</button>' + (r && (r.nequi.estado === 'conectado' || r.daviplata.estado === 'conectado') ? '<button type="button" class="btn-ghost" id="vpProbar">🔄 Comprobar</button>' : '') + '</div>' : '') +
         chequeos();
@@ -421,8 +499,8 @@
     var el = document.getElementById('vpHist'); if(!el) return;
     var l = Object.keys(cache).map(function(k){ return cache[k]; }).sort(function(a, b){ return String(b.actualizado_en || '').localeCompare(String(a.actualizado_en || '')); }).slice(0, 20);
     el.innerHTML = l.length ? l.map(function(p){
-      return '<div><span>' + esc(nombreMetodo(p.metodo)) + (p.pagador ? ' · ' + esc(p.pagador) : '') + ' <b class="' + (p.estado === 'aprobado' ? 'vp-ok' : p.estado === 'pendiente' ? 'vp-pend' : 'vp-mal') + '">' + (ESTADO[p.estado] || p.estado) + '</b>' +
-        '<small>' + new Date(p.actualizado_en || p.creado_en).toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + (p.mesa ? ' · ' + esc(etiquetaMesa(p.mesa)) : '') + (p.aplicado_en ? ' · registrado' : '') + ' · ' + (p.verificado ? 'verificado por ' + (p.proveedor === 'nequi' ? 'Nequi' : 'Wompi') : 'aviso del celular') + '</small></span><b>' + plata(p.monto) + '</b></div>';
+      return '<div><span>' + esc(nombreMetodo(p.metodo)) + (p.pagador ? ' · ' + esc(p.pagador) : '') + ' <b class="' + (p.estado === 'aprobado' ? 'vp-ok' : p.estado === 'pendiente' ? 'vp-pend' : 'vp-mal') + '">' + etiqueta(p) + '</b>' +
+        '<small>' + new Date(p.actualizado_en || p.creado_en).toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + (p.mesa ? ' · ' + esc(etiquetaMesa(p.mesa)) : '') + (p.aplicado_en ? ' · registrado' : '') + ' · ' + (p.verificado ? 'verificado por ' + entidad(p) : 'aviso del celular') + '</small></span><b>' + plata(p.monto) + '</b></div>';
     }).join('') : '<div class="empty-note">Todavía no hay pagos en el servidor.</div>';
   }
   function pintarDispositivos(){
@@ -439,8 +517,22 @@
     var n = negocio(), ov = ventana('vpAsisOv');
     var r = est.resumen || {}, wompiYa = (est.info && est.info.proveedores || []).some(function(p){ return p.proveedor === 'wompi' && p.estado === 'conectado'; });
     var intro = cual === 'daviplata'
-      ? '<div class="modal-sub">DaviPlata permite integrar pagos de comercios por su <b>API Pago DaviPlata</b> solo con convenio y certificado de Davivienda. La vía autorizada y disponible para conectarlo aquí es <b>Wompi</b> (pasarela de Bancolombia), que cobra con <b>DaviPlata y Nequi</b> con las mismas llaves y avisa cada pago con un evento firmado.</div>'
+      ? '<div class="modal-sub">Hay dos vías oficiales. Puedes usar una o las dos: la <b>API Pago con DaviPlata</b> de Davivienda (cobro con código al celular del cliente) o <b>Wompi</b> (link o QR que se paga con DaviPlata, Nequi o tarjeta).</div>'
       : '<div class="modal-sub">Hay dos vías oficiales. Puedes usar una o las dos:</div>';
+    var provD = (est.info && est.info.proveedores || []).find(function(p){ return p.proveedor === 'daviplata'; }) || null, pubD = provD && provD.publico || {};
+    var formD = '<div class="vp-form" id="vpFormD"><h3 style="margin:14px 0 0">Conectar DaviPlata (API oficial de Davivienda)' + (provD && provD.estado === 'conectado' ? ' <span class="vp-ok">· conectada</span>' : provD && provD.estado === 'error' ? ' <span class="vp-mal">· con error</span>' : '') + '</h3>' +
+      '<div class="modal-sub">Cobras con el <b>documento</b> del cliente: a su celular le llega un código y tú lo escribes en Vento; DaviPlata responde «Aprobado» en ese momento (no manda aviso aparte). Necesitas: <b>convenio con Davivienda</b>, tu aplicación en el <a href="https://conectesunegocio.daviplata.com" target="_blank" rel="noopener">Developer Portal</a> (Client ID y Secret), su <b>certificado</b> (.cer + llave .pem) y los códigos de <b>comercio y terminal</b> que asigna Redeban.</div>' +
+      '<label for="vpDamb">Ambiente</label><select class="mz-in" id="vpDamb"><option value="sandbox">Laboratorio (pruebas · lun–vie 8:00–17:00)</option><option value="produccion">Producción (cobros reales)</option></select>' +
+      '<label for="vpDcid">Client ID (Consumer Key)</label><input class="mz-in" id="vpDcid" autocomplete="off" autocapitalize="none" spellcheck="false">' +
+      '<label for="vpDsec">Client Secret (Consumer Secret)</label><input class="mz-in" id="vpDsec" type="password" autocomplete="off"' + (provD ? ' placeholder="Vacío = conservar el guardado"' : '') + '>' +
+      '<label for="vpDtr">Conexión segura (TLS mutuo)</label><select class="mz-in" id="vpDtr"><option value="directo">Directa desde el Servidor Vento</option><option value="puente">Por mi puente de Cloudflare (Worker)</option></select>' +
+      '<div id="vpDdir"><label for="vpDcer">Certificado (.cer, .crt o .pem)</label><input class="mz-in" id="vpDcer" type="file" accept=".cer,.crt,.pem"><small class="vp-ayuda" id="vpDcerOk">' + (provD ? 'Vacío = conservar el guardado' : 'El que descargas en el Developer Portal (paso 4 de la Guía de inicio)') + '</small>' +
+      '<label for="vpDkey">Llave privada (.pem o .key)</label><input class="mz-in" id="vpDkey" type="file" accept=".pem,.key"><small class="vp-ayuda" id="vpDkeyOk"></small></div>' +
+      '<div id="vpDpte" hidden><label for="vpDurl">Dirección del puente</label><input class="mz-in" id="vpDurl" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="https://vento-daviplata.tu-cuenta.workers.dev">' +
+      '<label for="vpDpsec">Secreto del puente</label><input class="mz-in" id="vpDpsec" type="password" autocomplete="off"' + (provD ? ' placeholder="Vacío = conservar el guardado"' : '') + '><small class="vp-ayuda">El certificado se sube al Worker (puente/daviplata-worker.js). Pasos en supabase/LEEME.md.</small></div>' +
+      '<label for="vpDcom">Código de comercio (idComercio)</label><input class="mz-in" id="vpDcom" inputmode="numeric" autocomplete="off">' +
+      '<label for="vpDter">Terminal (idTerminal)</label><input class="mz-in" id="vpDter" autocomplete="off" autocapitalize="characters">' +
+      '<div class="mz-actions"><button type="button" class="btn-primary" id="vpDok">Comprobar y conectar</button>' + (provD ? '<button type="button" class="btn-ghost" id="vpDquitar">Desconectar</button>' : '') + '</div></div>';
     var formW = '<div class="vp-form" id="vpFormW"><h3 style="margin:14px 0 0">Wompi ' + (wompiYa ? '<span class="vp-ok">· ya conectado</span>' : '') + '</h3>' +
       '<div class="modal-sub">En <a href="https://comercios.wompi.co" target="_blank" rel="noopener">comercios.wompi.co</a> → <b>Desarrolladores</b> están las 4 llaves. Para pruebas usa las de «Sandbox» (empiezan por <b>pub_test_</b>); para cobrar de verdad, las de producción (<b>pub_prod_</b>).</div>' +
       '<label>Llave pública</label><input class="mz-in" id="vpWpub" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="pub_prod_…">' +
@@ -457,7 +549,7 @@
       '<label>Código de comercio</label><input class="mz-in" id="vpNcod" autocomplete="off" autocapitalize="none" placeholder="El que te asignó Nequi Conecta">' +
       '<div class="mz-actions"><button type="button" class="btn-primary" id="vpNok">Conectar con Nequi Conecta</button></div></div>';
     ov.innerHTML = '<div class="modal vp-modal" style="max-height:90vh;overflow:auto"><h2>' + (cual === 'daviplata' ? 'Conectar DaviPlata' : 'Conectar Nequi') + '</h2>' + chequeos() + intro +
-      (cual === 'daviplata' ? formW : formN + formW) +
+      (cual === 'daviplata' ? formD + formW : formN + formW) +
       '<div id="vpAsisMsg" class="vp-estado"></div><div class="modal-actions"><button type="button" class="btn-close" id="vpAsisX">Cerrar</button></div></div>';
     ov.classList.add('show');
     var q = function(id){ return ov.querySelector('#' + id); };
@@ -477,7 +569,73 @@
       }).catch(function(e){ msg('⚠️ ' + esc(e.message), true); }).then(function(){ btn.disabled = false; });
     };
     if(q('vpWok')) q('vpWok').onclick = function(){ enviar(q('vpWok'), { accion: 'guardar_wompi', llave_publica: q('vpWpub').value.trim(), llave_privada: q('vpWprv').value.trim(), secreto_eventos: q('vpWev').value.trim(), secreto_integridad: q('vpWint').value.trim() }); };
+    if(q('vpFormD')) formularioDavi(ov, provD, enviar, msg);
     if(q('vpNok')) q('vpNok').onclick = function(){ enviar(q('vpNok'), { accion: 'guardar_nequi', ambiente: q('vpNamb').value, client_id: q('vpNcid').value.trim(), client_secret: q('vpNsec').value.trim(), api_key: q('vpNkey').value.trim(), codigo: q('vpNcod').value.trim() }); };
+  }
+
+  // Lee el certificado / la llave del archivo como texto PEM (un .cer binario DER se convierte a PEM aquí mismo).
+  function leerPem(file, tipo){
+    if(!file) return Promise.resolve('');
+    if(file.size > 64 * 1024) return Promise.reject(new Error('Ese archivo es demasiado grande para ser un ' + (tipo === 'cert' ? 'certificado' : 'archivo de llave') + '.'));
+    return file.arrayBuffer().then(function(buf){
+      var u = new Uint8Array(buf), txt = '';
+      try{ txt = new TextDecoder('utf-8').decode(u); }catch(e){}
+      if(tipo === 'cert'){
+        var m = /-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----/.exec(txt);
+        if(m) return m[0];
+        if(u[0] === 0x30 && u.length > 200){
+          var s = ''; for(var i = 0; i < u.length; i++) s += String.fromCharCode(u[i]);
+          return '-----BEGIN CERTIFICATE-----\n' + btoa(s).replace(/(.{64})/g, '$1\n').replace(/\n$/, '') + '\n-----END CERTIFICATE-----';
+        }
+        throw new Error('Ese archivo no parece un certificado (.cer, .crt o .pem).');
+      }
+      if(/-----BEGIN ENCRYPTED PRIVATE KEY-----/.test(txt)) throw new Error('La llave tiene contraseña: expórtala sin contraseña.');
+      var k = /-----BEGIN (RSA |EC )?PRIVATE KEY-----[\s\S]+?-----END (RSA |EC )?PRIVATE KEY-----/.exec(txt);
+      if(k) return k[0];
+      throw new Error('Ese archivo no parece una llave privada (.pem o .key).');
+    });
+  }
+  function formularioDavi(ov, provD, enviar, msg){
+    var q = function(id){ return ov.querySelector('#' + id); }, pub = provD && provD.publico || {};
+    var LAB = { com: '0010203040', ter: 'ESB10934' };
+    if(provD){ q('vpDamb').value = provD.ambiente === 'produccion' ? 'produccion' : 'sandbox'; q('vpDtr').value = pub.transporte === 'puente' ? 'puente' : 'directo'; if(pub.puente_url) q('vpDurl').value = pub.puente_url; if(pub.terminal) q('vpDter').value = pub.terminal; }
+    var lab = function(){
+      // Laboratorio: los códigos estándar de Redeban; producción: los propios del comercio.
+      if(q('vpDamb').value === 'sandbox'){ if(!q('vpDcom').value) q('vpDcom').value = LAB.com; if(!q('vpDter').value) q('vpDter').value = LAB.ter; }
+      else { if(q('vpDcom').value === LAB.com) q('vpDcom').value = ''; if(q('vpDter').value === LAB.ter) q('vpDter').value = ''; }
+    };
+    var modo = function(){ var p = q('vpDtr').value === 'puente'; q('vpDdir').hidden = p; q('vpDpte').hidden = !p; };
+    q('vpDamb').onchange = lab; q('vpDtr').onchange = modo; lab(); modo();
+    var pem = { cert: '', key: '' };
+    var archivo = function(inp, tipo, nota){
+      inp.onchange = function(){
+        pem[tipo] = '';
+        leerPem(inp.files && inp.files[0], tipo).then(function(t){ pem[tipo] = t; q(nota).textContent = t ? '✅ ' + (tipo === 'cert' ? 'Certificado' : 'Llave') + ' leído' : ''; q(nota).className = 'vp-ayuda vp-ok'; })
+          .catch(function(e){ inp.value = ''; q(nota).textContent = '⚠️ ' + e.message; q(nota).className = 'vp-ayuda vp-mal'; });
+      };
+    };
+    archivo(q('vpDcer'), 'cert', 'vpDcerOk'); archivo(q('vpDkey'), 'key', 'vpDkeyOk');
+    q('vpDok').onclick = function(){
+      var directo = q('vpDtr').value === 'directo';
+      var c = { accion: 'guardar_daviplata', ambiente: q('vpDamb').value, transporte: q('vpDtr').value, client_id: q('vpDcid').value.trim(), client_secret: q('vpDsec').value.trim(),
+        id_comercio: q('vpDcom').value.trim(), id_terminal: q('vpDter').value.trim().toUpperCase() };
+      if(!c.client_id) return msg('⚠️ Falta el Client ID.', true);
+      if(!c.id_comercio || !c.id_terminal) return msg('⚠️ Faltan los códigos de comercio y terminal de Redeban.', true);
+      if(directo){
+        if(!provD && (!pem.cert || !pem.key)) return msg('⚠️ Elige el certificado (.cer) y la llave (.pem).', true);
+        c.cert = pem.cert; c.key = pem.key;
+      } else {
+        c.puente_url = q('vpDurl').value.trim(); c.puente_secreto = q('vpDpsec').value.trim();
+        if(!/^https:\/\//.test(c.puente_url)) return msg('⚠️ La dirección del puente empieza por https://', true);
+      }
+      enviar(q('vpDok'), c);
+    };
+    if(q('vpDquitar')) q('vpDquitar').onclick = function(){
+      if(!confirm('¿Desconectar la API de DaviPlata? Se borran sus credenciales del servidor.')) return;
+      var n = negocio();
+      api('config', { negocio: n.id, accion: 'desconectar', proveedor: 'daviplata' }).then(function(j){ est.info = j; est.resumen = j.resumen; msg('DaviPlata (API) desconectado.'); })
+        .catch(function(e){ msg('⚠️ ' + esc(e.message), true); });
+    };
   }
 
   // La categoría aparece siempre (aunque la nube no esté lista: el asistente dice qué falta).

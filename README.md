@@ -152,6 +152,21 @@ El nombre elegido aparece en el menú, los títulos, los avisos y en Laya. La co
   - En iPhone se intenta abrir la app y, si no abre, se usa la web.
   - En esta modalidad el tiempo es aproximado, porque esa app no informa el avance.
 
+## Cobrar con DaviPlata (API oficial de Davivienda)
+
+Con el negocio en **Vento Nube**, la caja cobra por **DaviPlata con código** usando la API «Pago con DaviPlata» del
+[Developer Portal de Davivienda](https://conectesunegocio.daviplata.com):
+
+1. En la mesa: **💜 Cobrar Nequi / DaviPlata → 🔐 DaviPlata con código**, tipo y número de documento del cliente.
+2. DaviPlata le manda un **código de 6 dígitos** por mensaje al celular del cliente; la caja lo escribe y toca **Confirmar pago**.
+3. DaviPlata responde **«Aprobado»** con su número de aprobación: el pago queda verificado, avisa a los celulares y se
+   registra **una sola vez** en la cuenta.
+
+DaviPlata no manda un aviso aparte: la respuesta «Aprobado» es la confirmación del pago. Se conecta en
+**Ajustes → 💜 Pagos → Conectar DaviPlata**. Requisitos: convenio con Davivienda, Client ID y Client Secret de la
+aplicación, el certificado (.cer + llave .pem) para el TLS mutuo que exige DaviPlata y los códigos de comercio y
+terminal que asigna Redeban. Detalles, laboratorio y el puente de Cloudflare: [supabase/LEEME.md](supabase/LEEME.md#daviplata-api-oficial-pago-con-daviplata).
+
 ## Suscripciones (beta: pago manual por Nequi y DaviPlata)
 
 Con el negocio en **Vento Nube**, la suscripción es de la cuenta + el negocio (no del celular) y la decide el servidor

@@ -43,3 +43,16 @@ así que no hay que tocar nada de la app. Conviene abortar el resto de internet 
 CORS: el servidor acepta cualquier `http://localhost:<puerto>`; a las funciones les agrega ese origen a `VENTO_ORIGENES`.
 El tiempo real (websocket) no se simula: la app reintenta sola. Dejarlo corriendo a mano:
 `node pruebas/servidor/supabase-local.js 54321`.
+
+## DaviPlata simulado
+
+`daviplata-simulado.js` responde como la API «Pago con DaviPlata» (token, compra, otpSec/read, confirmarCompra) y anota
+en `davi.malos` toda petición que no cumpla la especificación (form-urlencoded en el token, `valor` como texto,
+`idTransaccion` entero y único por terminal y día, `x-ibm-client-id`, `Bearer`). Se conecta a la función con el punto de
+inyección del transporte, solo para pruebas:
+
+```js
+const D = await import(pathToFileURL('supabase/functions/vento-pagos/daviplata.ts').href);   // misma instancia que usa el arnés
+const davi = require('./servidor/daviplata-simulado').crearDavi();
+D.usarTransportePruebas(davi.simular);    // null → vuelve al envío real (TLS mutuo directo o por el puente)
+```
