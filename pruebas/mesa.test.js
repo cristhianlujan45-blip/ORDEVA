@@ -129,7 +129,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 
  // ---------------- 3) Micrófono en la APK simulada con «Hola Vento» escuchando ----------------
  { const ctx=await b.newContext({viewport:{width:390,height:844}, hasTouch:true, isMobile:true});
-  await ctx.addInitScript(()=>{
+  await ctx.addInitScript(()=>{ try{ if(localStorage.getItem('vento-hola')===null) localStorage.setItem('vento-hola','1'); }catch(e){}   /* «Hola Vento» viene apagado de fábrica: esta parte lo prueba */
    // La APK no trae speechSynthesis: Vento habla con la voz de Android (A.hablar / A.callar)
    try{ Object.defineProperty(window,'speechSynthesis',{value:undefined,configurable:true,writable:true}); }catch(e){}
    window.__ini=0; window.__cancel=0; window.__callar=0; window.__hablar=0; window.__ttsLargo=false; window.__iniT=[];
@@ -159,13 +159,13 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
   chk('APK + «Hola Vento»: escucha al instante (< 150 ms del toque a «Habla ahora»)', A1.ms<150 && A1.escuchando, JSON.stringify(A1));
   chk('APK + «Hola Vento»: no cierra ni reabre el micrófono de Android y no dice «Abriendo…»', A1.ini===0 && A1.cancel===0 && !A1.abriendo, JSON.stringify(A1));
   await p.waitForTimeout(250);   // la persona empieza a hablar después de tocar
-  await p.evaluate(()=>{ __dice('mesa 2 una poker'); __fin(); }); await p.waitForTimeout(1200);
+  await p.evaluate(()=>{ __dice('mesa 2 una poker'); __fin(); }); await p.waitForTimeout(2700);   // el botón anota tras 2 s de silencio (pedidos con pausas)
   chk('APK: lo que se dice después del toque se anota (mesa 2)', (await q(2))===1);
   // b) «Hola Vento» ya había oído charla: lo de antes del toque no entra al pedido
   chk('APK: «Hola Vento» vuelve a escuchar solo', await listoHola());
   await p.evaluate(()=>__dice('la mesa 1 está sucia', false)); await p.waitForTimeout(100);
   await tocar(); await p.waitForTimeout(450);
-  await p.evaluate(()=>{ __dice('la mesa 1 está sucia mesa 3 dos poker', false); __dice('la mesa 1 está sucia mesa 3 dos poker'); __fin(); }); await p.waitForTimeout(1200);
+  await p.evaluate(()=>{ __dice('la mesa 1 está sucia mesa 3 dos poker', false); __dice('la mesa 1 está sucia mesa 3 dos poker'); __fin(); }); await p.waitForTimeout(2700);   // el botón anota tras 2 s de silencio (pedidos con pausas)
   chk('APK: la charla de antes del toque se descarta (mesa 3 = 2, mesa 1 nada)', (await q(3))===2 && (await q(1))===0, JSON.stringify(await p.evaluate(()=>[data.tables[1].items,data.tables[3].items])));
   // c) la escucha tomada se cierra por silencio antes de hablar: se reabre sola, sin «No escuché nada»
   chk('APK: «Hola Vento» otra vez listo', await listoHola());
@@ -173,7 +173,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
   await p.evaluate(()=>{ window.__ventoVoz('error',{error:'no-speech'}); window.__ventoVoz('end',{}); }); await p.waitForTimeout(200);
   const C1=await p.evaluate(()=>({ ini: window.__ini-window.__a.ini, escuchando: voiceListening, noEscuche: window.__toasts.some(t=>/No escuché/.test(t[1])) }));
   chk('APK: si Android cierra la escucha antes de hablar, se reabre sola (1 vez) sin «No escuché nada»', C1.ini===1 && C1.escuchando && !C1.noEscuche, JSON.stringify(C1));
-  await p.evaluate(()=>{ __dice('mesa 2 una poker'); __fin(); }); await p.waitForTimeout(1200);
+  await p.evaluate(()=>{ __dice('mesa 2 una poker'); __fin(); }); await p.waitForTimeout(2700);   // el botón anota tras 2 s de silencio (pedidos con pausas)
   chk('APK: y lo que se dice se anota', (await q(2))===2);
   // «Producto por voz» (Productos): también toma el micrófono de «Hola Vento» en vez de pelearlo
   chk('APK: «Hola Vento» listo antes de «Producto por voz»', await listoHola());
@@ -193,13 +193,13 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
   const D1=await p.evaluate(()=>{ const h=window.__toasts.find(t=>/Habla ahora/.test(t[1])); return { alStart: window.__iniT.length ? window.__iniT[window.__iniT.length-1]-window.__toque : 9999, ini: window.__ini-window.__a.ini, callar: window.__callar-window.__a.callar, habla: window.speechSynthesis.speaking, ms: h ? h[0]-window.__toque : 9999, abriendo: window.__toasts.some(t=>/Abriendo/.test(t[1])) }; });
   chk('APK hablando: el micrófono abre al instante (< 150 ms del toque a rec.start) y Vento se calla', D1.alStart<150 && D1.callar>=1 && !D1.habla, JSON.stringify(D1));
   chk('APK hablando: una sola apertura (sin reintentos) y sin «Abriendo…» si abre rápido', D1.ini===1 && !D1.abriendo && D1.ms<400, JSON.stringify(D1));
-  await p.evaluate(()=>{ __dice('mesa 1 una poker'); __fin(); }); await p.waitForTimeout(1200);
+  await p.evaluate(()=>{ __dice('mesa 1 una poker'); __fin(); }); await p.waitForTimeout(2700);   // el botón anota tras 2 s de silencio (pedidos con pausas)
   chk('APK hablando: el pedido se anota', (await q(1))===1);
   await ctx.close(); }
 
  // ---------------- 4) Navegador con «Hola Vento» escuchando: del toque a rec.start() ----------------
  { const ctx=await b.newContext({viewport:{width:390,height:844}});
-  await ctx.addInitScript(()=>{
+  await ctx.addInitScript(()=>{ try{ if(localStorage.getItem('vento-hola')===null) localStorage.setItem('vento-hola','1'); }catch(e){}   /* «Hola Vento» viene apagado de fábrica: esta parte lo prueba */
    window.__inst=[]; window.__startT=[];
    function F(){ this.onresult=this.onend=this.onerror=this.onstart=null; this._res=[]; window.__inst.push(this); }
    F.prototype.start=function(){ if(window.__act && window.__act!==this) throw new Error('busy'); window.__act=this; window.__startT.push([performance.now(),this]); this._res=[]; setTimeout(()=>this.onstart&&this.onstart({}),10); };

@@ -2,6 +2,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 (async()=>{ const b=await chromium.launch(); const ctx=await b.newContext({viewport:{width:390,height:844}});
  await ctx.route('**/*', r=>{const u=new URL(r.request().url()); return u.hostname==='localhost'?r.continue():r.abort();});
  await ctx.addInitScript(()=>{
+  try{ if(localStorage.getItem('vento-hola')===null) localStorage.setItem('vento-hola','1'); }catch(e){}   // «Hola Vento» viene apagado de fábrica: esta prueba lo prende
    window.__inst=[]; window.__starts=0;
    function F(){ this.onresult=this.onend=this.onerror=this.onstart=null; this._res=[]; window.__inst.push(this); }
    F.prototype.start=function(){ if(window.__act && window.__act!==this) throw new Error('busy'); window.__act=this; window.__starts++; this._res=[]; setTimeout(()=>this.onstart&&this.onstart({}),10); };

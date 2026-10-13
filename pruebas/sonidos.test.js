@@ -185,7 +185,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
  // ---------- APK (window.VentoAndroid simulado, como en holaapk) con «Hola Vento» prendido ----------
  const ctx2=await b.newContext({viewport:{width:390,height:844}});
  await ctx2.route('**/*', r=>{const u=new URL(r.request().url()); return u.hostname==='localhost'?r.continue():r.abort();});
- await ctx2.addInitScript(()=>{
+ await ctx2.addInitScript(()=>{ try{ if(localStorage.getItem('vento-hola')===null) localStorage.setItem('vento-hola','1'); }catch(e){}   /* «Hola Vento» viene apagado de fábrica: esta parte lo prueba */
   const V=()=>window.__ventoVoz;
   window.VentoAndroid={ info:()=>'{}', hablar(){}, callar(){}, guardarArchivo(){}, fondo:()=>true, fondoActivar(){}, notificar(){return true;}, avisosEstado:()=>'{"prendidos":true}', buscarTVs(){}, lounge(){}, pararTV(){}, vozPreparar(){},
    permisos:()=>'{"microfono":true,"camara":false,"avisos":true,"bateria":false,"fondo":true}', pedirPermisos(){}, vozSilencio(){},

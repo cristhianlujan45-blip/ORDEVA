@@ -37,7 +37,7 @@
   }
   SR.prototype.start = function(){
     if(activo && activo !== this){ try{ activo._vivo = false; }catch(e){} }
-    activo = this; this._fin = []; this._vivo = true; this._parado = false; this._oyo = false; this._ultimo = null; this._reabrir = false;
+    activo = this; this._fin = []; this._vivo = true; this._parado = false; this._oyo = false; this._ultimo = null; this._reabrir = false; this._desde = Date.now();
     var l = libre; libre = null; clearTimeout(libreT);
     if(l && l.lang === (this.lang || 'es-CO') && l.parcial === !!this.interimResults){
       // El micrófono ya está escuchando: se toma tal cual (sin cerrarlo ni volverlo a abrir).
@@ -94,6 +94,8 @@
     }
     if(tipo === 'error'){
       r._listo = false;
+      // Botón 🎤 (escucha «mantenida»): un silencio después de haber hablado no es un error, es que terminó de hablar.
+      if(r.mantener && r._oyo && d && /no-speech|aborted|network/.test(d.error || '')){ r._parado = true; return; }
       if(reabrir(r) && !(d && /not-allowed/.test(d.error || ''))){ r._reabrir = true; return; }
       r.onerror && r.onerror({ error: d && d.error }); return;
     }
@@ -103,6 +105,13 @@
           r._reabrir = false; r._tomada = 0; r._previo = null; r._listo = false; r._fin = [];
           try{ A.vozIniciar(r.lang || 'es-CO', !!r.interimResults, !!r.continuous); return; }catch(e){}
         }
+      }
+      // Botón 🎤: Android cierra la escucha en cada pausa («dos águilas… tres póker»). Antes ahí se cortaba el pedido y se
+      // perdía lo que seguía; ahora se vuelve a abrir sola y se SUMA, hasta que la página detecte un silencio de verdad
+      // (o se toque el botón). Lo que ya se oyó (r._fin) se conserva.
+      if(r.mantener && r._vivo && !r._parado && r._oyo && Date.now() - (r._desde || 0) < 45000){
+        r._listo = false; r._reabiertas = (r._reabiertas || 0) + 1;
+        try{ A.vozIniciar(r.lang || 'es-CO', !!r.interimResults, !!r.continuous); return; }catch(e){}
       }
       if(!r._vivo && r._finAvisado) return; r._vivo = false; r._finAvisado = true; if(activo === r) activo = null; r.onend && r.onend({}); setTimeout(function(){ r._finAvisado = false; }, 0);
     }
@@ -7700,7 +7709,7 @@ let voiceListening = false;
 let voiceFinalBuffer = '';
 let voiceInterim = '';        // lo último que se oyó aunque no llegara «final» (frases cortas: «una póker»)
 let voiceSilenceTimer = null;
-const VOICE_SILENCE_MS = 1700;      // silencio tras hablar antes de procesar el comando
+const VOICE_SILENCE_MS = 2000;      // silencio tras hablar antes de procesar el comando (pedidos largos con pausas)
 const VOICE_INITIAL_TIMEOUT_MS = 6000; // tiempo máximo esperando que empiece a hablar
 const VOICE_ABRIENDO_MS = 400;         // si el micrófono tarda más que esto en abrir, se avisa «Abriendo…»
 let voiceAbriendoT = null, voiceTocado = 0, voiceAvisado = false;
@@ -7765,6 +7774,7 @@ function ensureVoiceRecognizer(){
   voiceRecognizer.continuous = true;
   voiceRecognizer.interimResults = true;
   voiceRecognizer.maxAlternatives = 5;
+  voiceRecognizer.mantener = true;   // en la APK: no se corta en cada pausa (ver el puente de voz de Android, arriba)
   voiceRecognizer.onresult = (e) => {
     scheduleVoiceSilenceStop(VOICE_SILENCE_MS);
     // Se reconstruye el texto desde todos los resultados finales (en vez de ir
@@ -7796,7 +7806,9 @@ function ensureVoiceRecognizer(){
       if(Date.now() - voiceTocado > VOICE_ABRIENDO_MS) try{ navigator.vibrate && navigator.vibrate(35); }catch(e){}
       showToast(voiceModoIA ? '🤖 Habla ahora: di tu pedido con tus palabras.' : '🎤 Habla ahora…', 2500);
     }
-    scheduleVoiceSilenceStop(VOICE_INITIAL_TIMEOUT_MS);   // el tiempo de espera cuenta desde que de verdad escucha
+    // El tiempo de espera cuenta desde que de verdad escucha. Si la escucha se volvió a abrir a mitad del pedido (ya se
+    // oyó algo), se mantiene la espera corta de silencio para no quedarse 6 s escuchando de más.
+    if(!voiceFinalBuffer && !voiceInterim) scheduleVoiceSilenceStop(VOICE_INITIAL_TIMEOUT_MS);
   };
   voiceRecognizer.onerror = (e) => {
     clearTimeout(voiceAbriendoT);
@@ -7835,7 +7847,8 @@ function startVoiceCommand(conIA){
     showToast('Tu navegador no soporta comandos por voz. Prueba con Chrome en Android.');
     return;
   }
-  if(voiceListening) return;
+  if(voiceListening || voiceProductListening) return;
+  rec.mantener = true;
   // Si Vento está hablando se calla: el micrófono abre YA, sin esperar a que termine (y no se oye a sí misma).
   try{ if(window.speechSynthesis && (speechSynthesis.speaking || speechSynthesis.pending)) speechSynthesis.cancel(); }catch(e){}
   // «Hola Vento» le pasa el micrófono que ya tiene abierto (en la APK no se cierra y se vuelve a abrir).
@@ -7874,7 +7887,9 @@ function stopVoiceCommand(){
   // Con saludo («hola/oye … vento») se aceptan los errores típicos del reconocedor; sin saludo solo «Vento»/«Bento» al inicio.
   const WAKE = /^\s*(?:(?:hola|oye|ok|okey|ey|hey|ay)[\s,]+(?:vento|bento|viento|ventó|bentó|evento)|vento|bento)\b[\s,.:;!¡¿?-]*/i;
   let rec = null, corriendo = false, desde = 0, hechos = 0, atentoHasta = 0, fallos = 0, timer = null, gesto = !!window.VentoAndroid, ocupado = false;
-  const prendido = () => { try{ return localStorage.getItem(KEY) !== '0'; }catch(e){ return true; } };
+  // Apagado de fábrica: escuchar todo el tiempo hacía que el micrófono se prendiera y apagara solo (y al tocar 🎤 se
+  // perdía el comienzo de la frase). Quien lo quiera lo prende en ⚙️ Ajustes.
+  const prendido = () => { try{ return localStorage.getItem(KEY) === '1'; }catch(e){ return false; } };
   const A = window.VentoAndroid;
   function silencio(si){ try{ A && A.vozSilencio && A.vozSilencio(!!si); }catch(e){} }
   function puede(){
@@ -7963,7 +7978,7 @@ function stopVoiceCommand(){
 const voiceFabWrap = document.getElementById('voiceFabWrap');
 const voiceFabTab = document.getElementById('voiceFabTab');
 const micEnabledToggle = document.getElementById('micEnabledToggle');
-(function(){ const t = document.getElementById('holaVentoToggle'); if(!t) return; try{ t.checked = localStorage.getItem('vento-hola') !== '0'; }catch(e){} t.addEventListener('change', () => { if(!window.ventoHola) return; if(t.checked){ window.ventoHola.prender(); showToast('🟣 «Hola Vento» prendido: di «Hola Vento» y tu pedido.', 5000); } else window.ventoHola.apagar(); }); })();
+(function(){ const t = document.getElementById('holaVentoToggle'); if(!t) return; try{ t.checked = localStorage.getItem('vento-hola') === '1'; }catch(e){} t.addEventListener('change', () => { if(!window.ventoHola) return; if(t.checked){ window.ventoHola.prender(); showToast('🟣 «Hola Vento» prendido: di «Hola Vento» y tu pedido.', 5000); } else window.ventoHola.apagar(); }); })();
 if('speechSynthesis' in window){ window.speechSynthesis.onvoiceschanged = () => {}; }
 let micEnabled = true;
 let voiceFabWasHidden = false; // hidden state via the ✕ button, remembered while mic is disabled from settings
@@ -10102,6 +10117,9 @@ function startVoiceProductCreation(){
   try{ if(window.speechSynthesis && (speechSynthesis.speaking || speechSynthesis.pending)) speechSynthesis.cancel(); }catch(e){}
   try{ window.ventoHola && window.ventoHola.soltar(true); }catch(e){}
   voiceProductListening = true;
+  // Producto por voz es una sola frase («Póker, precio cinco mil»): termina al primer silencio (sin la escucha
+  // «mantenida» del botón 🎤, que se reabre en cada pausa para los pedidos largos).
+  rec.mantener = false;
   const btn = document.getElementById('voiceProductBtn');
   const hint = document.getElementById('voiceProductHint');
   if(btn){ btn.dataset.html = btn.dataset.html || btn.innerHTML; btn.classList.add('active'); btn.textContent = '⏺ Escuchando…'; }
@@ -10133,19 +10151,19 @@ function startVoiceProductCreation(){
     if(e.error === 'no-speech') showToast('No escuché nada. Intenta de nuevo.');
     else if(e.error === 'not-allowed' || e.error === 'service-not-allowed') showToast('Necesitas dar permiso de micrófono para usar el comando por voz.');
     else showToast('No se pudo reconocer el audio. Intenta de nuevo.');
-    rec.onresult = oldResult; rec.onerror = oldError; rec.onend = oldEnd;
+    rec.onresult = oldResult; rec.onerror = oldError; rec.onend = oldEnd; rec.mantener = true;
   };
   rec.onend = ()=>{
     voiceProductListening = false;
     if(btn){ btn.classList.remove('active'); btn.innerHTML = btn.dataset.html || '🎤 Producto por voz'; }
     if(hint) hint.classList.remove('show');
-    rec.onresult = oldResult; rec.onerror = oldError; rec.onend = oldEnd;
+    rec.onresult = oldResult; rec.onerror = oldError; rec.onend = oldEnd; rec.mantener = true;
   };
   try{ rec.start(); }catch(e){
     voiceProductListening = false;
     if(btn){ btn.classList.remove('active'); btn.innerHTML = btn.dataset.html || '🎤 Producto por voz'; }
     if(hint) hint.classList.remove('show');
-    rec.onresult = oldResult; rec.onerror = oldError; rec.onend = oldEnd;
+    rec.onresult = oldResult; rec.onerror = oldError; rec.onend = oldEnd; rec.mantener = true;
   }
 }
 
@@ -23390,7 +23408,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-13 · v1.31.1';
+const MESORA_VERSION = '2026-10-13 · v1.31.2';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'Vento · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 // Si el navegador (o el celular, con la app agregada a la pantalla de inicio) se quedó con

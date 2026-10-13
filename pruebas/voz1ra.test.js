@@ -6,10 +6,13 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
   window.__prep=0; window.__escena='parcial';
   window.VentoAndroid={ info:()=>'{}', hablar(){}, callar(){}, guardarArchivo(){}, fondo:()=>true, fondoActivar(){}, notificar(){return true;}, avisosEstado:()=>'{"prendidos":true}', buscarTVs(){}, lounge(){}, pararTV(){},
    vozPreparar(){ window.__prep++; },
-   vozIniciar(){ const V=()=>window.__ventoVoz; setTimeout(()=>V()('start',{}),1500);   // reconocedor frío: tarda 1,5 s
+   vozIniciar(){ const V=()=>window.__ventoVoz;
+     // Escucha que se vuelve a abrir enseguida después de una frase (pausa del que habla): Android solo escucha, en silencio.
+     if(Date.now()-(window.__finalAt||0)<1500){ setTimeout(()=>V()('start',{}),300); return; }
+     setTimeout(()=>V()('start',{}),1500);   // reconocedor frío: tarda 1,5 s
      if(window.__escena==='parcial'){ setTimeout(()=>V()('result',{alts:[{t:'mesa 1 una poker',c:0.8}],final:false}),2600); setTimeout(()=>{ V()('error',{error:'no-speech'}); V()('end',{}); },4200); }
-     else { setTimeout(()=>V()('result',{alts:[{t:'mesa 2 dos poker',c:0.9}],final:true}),2600); setTimeout(()=>V()('end',{}),2700); } },
-   vozParar(){}, vozCancelar(){ setTimeout(()=>window.__ventoVoz('end',{}),10); } };
+     else { setTimeout(()=>{ window.__finalAt=Date.now(); V()('result',{alts:[{t:'mesa 2 dos poker',c:0.9}],final:true}); },2600); setTimeout(()=>V()('end',{}),2700); } },
+   vozParar(){ const V=()=>window.__ventoVoz; setTimeout(()=>{ V()('error',{error:'no-speech'}); V()('end',{}); },40); }, vozCancelar(){ setTimeout(()=>window.__ventoVoz('end',{}),10); } };
   localStorage.setItem('cm-tutorial-seen','1');
  });
  const p=await ctx.newPage(); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
@@ -27,7 +30,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
  await p.waitForTimeout(3500);
  chk('Frase corta que Android solo dio como parcial: se anota a la PRIMERA', await p.evaluate(()=>(data.tables[1].items[0]||{}).qty===1), await p.evaluate(()=>JSON.stringify(data.tables[1].items)+' '+window.__toasts.join('|')));
  chk('No dice «No escuché nada»', await p.evaluate(()=>!window.__toasts.some(t=>/No escuché nada/.test(t))));
- await p.evaluate(()=>{ window.__escena='normal'; startVoiceCommand(false); }); await p.waitForTimeout(3500);
+ await p.evaluate(()=>{ window.__escena='normal'; startVoiceCommand(false); }); await p.waitForTimeout(5500);
  chk('Caso normal sigue igual', await p.evaluate(()=>(data.tables[2].items[0]||{}).qty===2));
  chk('Sin errores', !errs.length, errs.join('|'));
  console.log('RESULTADO',ok,'bien',mal,'mal'); await b.close(); process.exit(mal?1:0); })();
