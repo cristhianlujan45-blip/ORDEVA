@@ -120,7 +120,7 @@ async function actualizar(env: Env, db: Db, negocio: string, proveedor: string, 
     const p = r.pago;
     try {
       await avisarDispositivos(db, env.VENTO_SITIO || SITIO, negocio, {
-        titulo: "💜 Llegó un pago",
+        titulo: p.confianza === "revisar" ? "⚠️ Pago por revisar" : "✅ Pago confirmado",
         cuerpo: plata(p.monto) + " por " + nombreMetodo(p.metodo) + (p.pagador ? " de " + p.pagador : "") + (p.mesa ? " · Mesa " + p.mesa : "") + (p.confianza === "revisar" ? " (revisar)" : ""),
         url: env.VENTO_SITIO || SITIO, pago: p.id, tag: "pago-" + p.id,
       });

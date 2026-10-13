@@ -38,8 +38,12 @@
   2. **Cobro con código («Pago con DaviPlata», API oficial):**
      - En la mesa: «🔐 DaviPlata con código» → al cliente le llega el código → «✅ Pago aprobado · N.º de aprobación».
      - Necesita el convenio con DaviPlata: credenciales, idComercio, idTerminal y certificado.
-  - En los dos casos, cada pago que llega suena como **aviso del celular «💜 Llegó un pago»** en la app Android, aunque
-    Vento esté cerrada o la pantalla apagada. En el navegador lo hace el push que ya existía.
+  - **Como el parlante de Bold:** cuando llega la plata, suena el sonido de éxito y Vento dice en voz alta **«Pago confirmado.
+    25000 pesos por DaviPlata, de Juan Pérez, de la mesa 3»**.
+  - El aviso del celular dice «✅ Pago confirmado», también en la app Android con Vento cerrada o la pantalla apagada. En
+    el navegador lo hace el push.
+  - Solo dice «confirmado» si el aviso viene de la app del banco. Un SMS dice «revisar» y un SMS desde un celular común
+    dice «FALSO».
 
 - **Buscar canciones en YouTube sin límite.** YouTube decía «se alcanzó el límite» porque cada búsqueda desde el QR de las
   mesas gastaba 200 de las 10.000 unidades diarias de la API de YouTube (canciones + artistas). Con unas 50 búsquedas al
@@ -77,7 +81,7 @@
 |---|---|
 | cuentas (PostgreSQL real, 6 celulares) | 43 |
 | facturarapida (Gemini simulado: saturado, lento, basura, cortado, clave mala) | 9 |
-| avisosandroid (puente Android simulado) | 10 |
+| avisosandroid (puente Android simulado, voz «Pago confirmado») | 14 |
 | youtubesincupo (API de YouTube respondiendo «quotaExceeded») | 12 |
 | iaunavez (configurar la IA una sola vez) | 8 |
 | playlists (buscar, poner, pegar link, mesas primero, respaldo por API, quitar) | 16 |

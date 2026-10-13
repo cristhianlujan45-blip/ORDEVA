@@ -4,7 +4,8 @@
 //  1. Ajustes → Verificar pagos → «📲 Leer los avisos de ESTE celular»: sin permiso abre «Acceso a notificaciones».
 //  2. Aviso «DaviPlata | ¡Recibiste plata! | JUAN PEREZ te envió $25.000» → pago confirmado, de la mesa que debe $25.000.
 //  3. El mismo aviso otra vez (Android lo vuelve a publicar) → no se repite.
-//  4. Un pago que llega por el Servidor Vento → aviso del celular «💜 Llegó un pago» (con N.º de aprobación de DaviPlata).
+//  2b. Como el parlante de Bold: suena el sonido de éxito y dice en voz alta «Pago confirmado. 25000 pesos por Daviplata, de Juan Perez…».
+//  4. Un pago que llega por el Servidor Vento → aviso del celular «✅ Pago confirmado» y la voz (con N.º de aprobación de DaviPlata).
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 
@@ -16,7 +17,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     await ctx.route('**/*', r => new URL(r.request().url()).hostname === 'localhost' ? r.continue() : r.abort());
     await ctx.addInitScript(() => {
       try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '' })); }catch(e){}
-      const A = window.__and = { on: false, permiso: false, cola: [], notifs: [], permisoAbierto: 0 };
+      const A = window.__and = { on: false, permiso: false, cola: [], notifs: [], permisoAbierto: 0, voz: [], sonidos: 0 };
       window.VentoAndroid = {
         pagosAvisos: v => { A.on = !!v; }, pagosAvisosEstado: () => JSON.stringify({ on: A.on, permiso: A.permiso }),
         pagosAvisosTomar: () => { const s = JSON.stringify(A.cola); A.cola = []; return s; },
@@ -44,12 +45,18 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 
     // 2. Llega un aviso de DaviPlata
     await p.evaluate(() => {
+      const h = window.ventoHablar; window.ventoHablar = (t, o) => { window.__and.voz.push(String(t)); try{ h && h(t, o); }catch(e){} };
+      if(window.ventoSonidos){ const s0 = window.ventoSonidos.success; window.ventoSonidos.success = () => { window.__and.sonidos++; return s0(); }; }
       document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show'));
       data.products = [{ id: 'pk', name: 'Poker', price: 12500 }]; data.tables[1] = { items: [{ productId: 'pk', name: 'Poker', price: 12500, qty: 2, personId: null }], people: [] }; saveData();
       window.__and.cola.push({ id: 'k1:123', txt: 'DaviPlata | ¡Recibiste plata! | JUAN PEREZ te envió $25.000', t: Date.now() });
       window.ventoAvisosNativos();
     });
     const x = await p.evaluate(() => (data.pagos.lista || [])[0] || null);
+    const voz2 = await p.evaluate(() => window.__and.voz.slice());
+    chk('2b. Dice en voz alta «Pago confirmado» con el valor, DaviPlata y quién pagó', voz2.some(t => /^Pago confirmado\. 25000 pesos por Daviplata, de Juan Perez/.test(t)), voz2);
+    chk('2b. Suena el sonido de éxito (como el parlante de Bold)', await p.evaluate(() => window.__and.sonidos) >= 1);
+    chk('2b. En pantalla: «✅ Pago confirmado · $25.000 por Daviplata de Juan Perez»', /Pago confirmado · \$25\.000 por Daviplata de Juan Perez/.test(await p.evaluate(() => document.body.innerText)));
     chk('2. Aviso de DaviPlata → pago de $25.000 confirmado por la app', x && x.monto === 25000 && x.app === 'Daviplata' && x.estado === 'app' && x.de === 'Juan Perez', x);
     chk('2. … y es de la mesa que debe $25.000', x && x.mesa === 1, x);
 
@@ -62,8 +69,9 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     // 4. Pago por el Servidor Vento (otro celular o la API de DaviPlata)
     await p.evaluate(() => window.ventoPagos.recibir({ id: 'srv-77', estado: 'aprobado', confianza: 'ok', verificado: true, proveedor: 'daviplata', metodo: 'DAVIPLATA', monto: 18000, aprobacion: '604107', creado_en: new Date().toISOString(), actualizado_en: new Date().toISOString() }, true));
     A = await p.evaluate(() => window.__and);
-    const n = A.notifs.find(y => /Llegó un pago/.test(y.t));
-    chk('4. Aviso del celular «💜 Llegó un pago» con valor, DaviPlata y N.º de aprobación', n && /\$18\.000/.test(n.x) && /DaviPlata/i.test(n.x) && /604107/.test(n.x) && n.c === 'pedidos', A.notifs);
+    const n = A.notifs.find(y => /Pago confirmado/.test(y.t));
+    chk('4. Dice «Pago confirmado» en voz alta en los demás celulares', A.voz.some(t => /^Pago confirmado\. 18000 pesos por DaviPlata/.test(t)), A.voz);
+    chk('4. Aviso del celular «✅ Pago confirmado» con valor, DaviPlata y N.º de aprobación', n && /\$18\.000/.test(n.x) && /DaviPlata/i.test(n.x) && /604107/.test(n.x) && n.c === 'pedidos', A.notifs);
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.stack || e)); }
   chk('Sin errores de página', !errs.length, errs);
   await b.close();

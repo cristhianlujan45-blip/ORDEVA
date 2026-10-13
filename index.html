@@ -26627,9 +26627,11 @@ let fotosListas = false;
       if(navigator.vibrate) try{ navigator.vibrate([150, 80, 150]); }catch(e){}
       pgPintar(); return;
     }
-    const msg = '✅ Llegó ' + p.app + ': ' + plata(p.monto) + (p.de ? ' de ' + p.de : '') + (mesa ? ' · coincide con ' + tableLabel(mesa) : '') + ' (confirmado por la app).';
+    // Como el parlante de Bold: sonido de éxito y «Pago confirmado» en voz alta, con el valor y quién pagó.
+    const msg = '✅ Pago confirmado · ' + plata(p.monto) + ' por ' + p.app + (p.de ? ' de ' + p.de : '') + (mesa ? ' · ' + tableLabel(mesa) : '');
     try{ showToast(msg, 9000); }catch(e){}
-    try{ speakVoice('Llegó un ' + p.app + ' de ' + p.monto + ' pesos' + (p.de ? ' de ' + p.de : '') + (mesa ? ', es de la ' + tableLabel(mesa) : '')); }catch(e){}
+    try{ window.ventoSonidos && window.ventoSonidos.success(); }catch(e){}
+    try{ speakVoice('Pago confirmado. ' + p.monto + ' pesos por ' + p.app + (p.de ? ', de ' + p.de : '') + (mesa ? ', de la ' + tableLabel(mesa) : '')); }catch(e){}
     if(navigator.vibrate) try{ navigator.vibrate([150, 80, 150]); }catch(e){}
     try{ window.mesoraCelebrar && window.mesoraCelebrar(['💜', '💰', '✨']); }catch(e){}
     pgPintar();

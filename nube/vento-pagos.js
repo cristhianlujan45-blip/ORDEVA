@@ -132,7 +132,7 @@
   function avisoCelular(titulo, texto){ try{ window.VentoAndroid && window.VentoAndroid.notificar && window.VentoAndroid.notificar(titulo, texto, 'pedidos', false); }catch(e){} }
   function avisar(p, x){
     var m = (p.mesa ? ' · ' + etiquetaMesa(p.mesa) : '');
-    avisoCelular(p.confianza === 'falso' ? '🚨 Pago FALSO' : p.confianza === 'revisar' ? '⚠️ Pago por revisar' : '💜 Llegó un pago',
+    avisoCelular(p.confianza === 'falso' ? '🚨 Pago FALSO' : p.confianza === 'revisar' ? '⚠️ Pago por revisar' : '✅ Pago confirmado',
       plata(p.monto) + ' por ' + nombreMetodo(p.metodo) + (p.pagador ? ' de ' + p.pagador : '') + m + (p.verificado ? ' · ✅ verificado' + (p.aprobacion ? ' (N.º ' + p.aprobacion + ')' : '') : ''));
     if(p.confianza === 'falso'){
       toast('🚨 OJO, PAGO FALSO: ' + plata(p.monto) + '. ' + (p.detalle || 'No entregues nada.'), 15000);
@@ -144,8 +144,10 @@
       toast('⚠️ ' + nombreMetodo(p.metodo) + ': ' + plata(p.monto) + (p.pagador ? ' de ' + p.pagador : '') + m + '. ' + (p.detalle || 'Confírmalo en la app del banco.'), 12000);
       return;
     }
-    toast('💜 Llegó ' + nombreMetodo(p.metodo) + ': ' + plata(p.monto) + (p.pagador ? ' de ' + p.pagador : '') + m + (p.verificado ? ' · ✅ verificado' : ''), 9000);
-    hablar('Llegó un ' + nombreMetodo(p.metodo) + ' de ' + p.monto + ' pesos' + (p.pagador ? ' de ' + p.pagador : '') + (p.mesa ? ', de la ' + etiquetaMesa(p.mesa) : ''));
+    // Como el parlante de Bold: sonido de éxito y «Pago confirmado» en voz alta.
+    toast('✅ Pago confirmado · ' + plata(p.monto) + ' por ' + nombreMetodo(p.metodo) + (p.pagador ? ' de ' + p.pagador : '') + m + (p.aprobacion ? ' · N.º ' + p.aprobacion : ''), 9000);
+    try{ window.ventoSonidos && window.ventoSonidos.success(); }catch(e){}
+    hablar('Pago confirmado. ' + p.monto + ' pesos por ' + nombreMetodo(p.metodo) + (p.pagador ? ', de ' + p.pagador : '') + (p.mesa ? ', de la ' + etiquetaMesa(p.mesa) : ''));
     try{ navigator.vibrate && navigator.vibrate([150, 80, 150]); }catch(e){}
     try{ window.mesoraCelebrar && window.mesoraCelebrar(['💜', '💰', '✨']); }catch(e){}
   }

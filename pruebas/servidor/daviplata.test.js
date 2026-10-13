@@ -167,7 +167,7 @@ async function pruebas(sb) {
     P.confianza === 'entidad' && /^\d{6}$/.test(r.j.aprobacion) && P.aprobacion === r.j.aprobacion, r.j);
   chk('…con N.º de aprobación y autorizador en el detalle', /N\.º de aprobación \d{6}/.test(P.detalle) && /autorizador 0{6}\d+/.test(P.detalle), P.detalle);
   chk('…confirmarCompra con idTransaccion ENTERO, idComercio e idTerminal de Redeban', davi.n.confirmar === confAntes + 1 && davi.transacciones.every(Number.isInteger));
-  chk('Aviso push «💜 Llegó un pago» al celular (cifrado RFC 8291, una sola vez)', cel.recibidos.length === pushAntes + 1 && cel.recibidos.slice(-1)[0].msg &&
+  chk('Aviso push «✅ Pago confirmado» al celular (cifrado RFC 8291, una sola vez)', cel.recibidos.length === pushAntes + 1 && cel.recibidos.slice(-1)[0].msg && /Pago confirmado/.test(cel.recibidos.slice(-1)[0].msg.titulo) &&
     /DaviPlata/.test(cel.recibidos.slice(-1)[0].msg.cuerpo) && /\$12\.000/.test(cel.recibidos.slice(-1)[0].msg.cuerpo) && /Mesa 3/.test(cel.recibidos.slice(-1)[0].msg.cuerpo) &&
     cel.recibidos.slice(-1)[0].cab['content-encoding'] === 'aes128gcm', cel.recibidos.slice(-1)[0]);
   r = await confirmar(P.id, sesion[1].otp);
