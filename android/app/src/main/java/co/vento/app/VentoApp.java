@@ -559,6 +559,26 @@ public class VentoApp extends Application {
             } catch (Exception e) { return false; }
         }
 
+        // ---------------------------------------------------------------- Avisos de pagos (DaviPlata, Nequi…)
+        /** Prende o apaga, en ESTE celular, la lectura de los avisos de plata recibida (ver VentoEscucha). */
+        @JavascriptInterface
+        public void pagosAvisos(boolean on) {
+            getSharedPreferences("vento", MODE_PRIVATE).edit().putBoolean(VentoEscucha.PREF_ON, on).apply();
+        }
+
+        /** {on, permiso}: si está prendido aquí y si Vento tiene el «Acceso a notificaciones». */
+        @JavascriptInterface
+        public String pagosAvisosEstado() {
+            try {
+                return new JSONObject().put("on", getSharedPreferences("vento", MODE_PRIVATE).getBoolean(VentoEscucha.PREF_ON, false))
+                        .put("permiso", escuchaPermitida()).toString();
+            } catch (Exception e) { return "{}"; }
+        }
+
+        /** Los avisos que llegaron y la página todavía no ha tomado: [{id, txt, t}]. */
+        @JavascriptInterface
+        public String pagosAvisosTomar() { return VentoEscucha.tomar(getSharedPreferences("vento", MODE_PRIVATE)); }
+
         /** Abre el permiso «Acceso a notificaciones» para Vento. */
         @JavascriptInterface
         public void mediosPermiso() {

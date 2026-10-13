@@ -127,8 +127,13 @@
     return x;
   }
 
+  // App Android: aviso del celular con sonido aunque Vento esté cerrada o la pantalla apagada (en el navegador
+  // eso lo hace el push). Si la ventana de Vento se está viendo, no hace falta (ya sale en pantalla).
+  function avisoCelular(titulo, texto){ try{ window.VentoAndroid && window.VentoAndroid.notificar && window.VentoAndroid.notificar(titulo, texto, 'pedidos', false); }catch(e){} }
   function avisar(p, x){
     var m = (p.mesa ? ' · ' + etiquetaMesa(p.mesa) : '');
+    avisoCelular(p.confianza === 'falso' ? '🚨 Pago FALSO' : p.confianza === 'revisar' ? '⚠️ Pago por revisar' : '💜 Llegó un pago',
+      plata(p.monto) + ' por ' + nombreMetodo(p.metodo) + (p.pagador ? ' de ' + p.pagador : '') + m + (p.verificado ? ' · ✅ verificado' + (p.aprobacion ? ' (N.º ' + p.aprobacion + ')' : '') : ''));
     if(p.confianza === 'falso'){
       toast('🚨 OJO, PAGO FALSO: ' + plata(p.monto) + '. ' + (p.detalle || 'No entregues nada.'), 15000);
       hablar('Ojo. Llegó un mensaje de pago sospechoso por ' + p.monto + ' pesos. Parece falso.');

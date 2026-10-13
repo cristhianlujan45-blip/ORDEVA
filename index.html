@@ -26450,6 +26450,19 @@ let fotosListas = false;
   }
   window.pagosFuente = pgFuente;
   window.pagosRecibirTexto = pgRecibir;   // también para pruebas
+
+  // ---------- App Android: los avisos de plata recibida de DaviPlata/Nequi de ESTE celular, sin MacroDroid ----------
+  // VentoEscucha (Android) los guarda en una cola y avisa; aquí se toman y siguen el mismo camino que los de MacroDroid
+  // (voz, mesa que debe ese valor, Servidor Vento → los demás celulares del negocio).
+  const AND = () => window.VentoAndroid && window.VentoAndroid.pagosAvisosTomar ? window.VentoAndroid : null;
+  const andEstado = () => { try{ return JSON.parse(AND().pagosAvisosEstado() || '{}'); }catch(e){ return {}; } };
+  window.ventoAvisosNativos = function(){
+    if(!AND() || typeof authUser === 'undefined' || !authUser || typeof data === 'undefined' || !data) return;
+    let l = []; try{ l = JSON.parse(AND().pagosAvisosTomar() || '[]'); }catch(e){}
+    l.forEach(a => { try{ if(a && a.txt) pgRecibir(a.txt, 'and-' + a.id); }catch(e){} });
+    if(l.length) try{ pgPintar(); }catch(e){}
+  };
+  setInterval(() => window.ventoAvisosNativos(), 5000);
   window.pagosLeer = pgLeer;
 
   // La mesa avisó «Ya pagué por Nequi»: ¿ya llegó la plata?
@@ -26508,6 +26521,7 @@ let fotosListas = false;
       '<div class="settings-desc">Cada vez que te llega plata a Nequi, Daviplata o Bancolombia, tu celular recibe la notificación del banco. Con la app gratis <b>MacroDroid</b> esa notificación se reenvía a Vento en un segundo: te avisa con voz cuánto llegó y de quién, y te dice de qué mesa es (si el valor coincide con lo que debe una mesa, o si la mesa tocó «Ya pagué por Nequi»). Nequi y Daviplata no tienen conexión directa para cuentas personales; esta es la forma que sí funciona.</div>' +
       '<div class="settings-row"><div class="settings-row-text"><strong>Recibir avisos de pagos</strong><span id="pgEstado"></span></div><label class="switch"><input type="checkbox" id="pgOn"><span class="switch-slider"></span></label></div>' +
       '<div id="pgCaja" hidden>' +
+      (AND() ? '<div class="settings-row" id="pgAndFila"><div class="settings-row-text"><strong>📲 Leer los avisos de ESTE celular (sin MacroDroid)</strong><span id="pgAndTxt">Vento toma directo los avisos de plata recibida de DaviPlata, Nequi y tu banco que llegan a este celular. Nunca toma códigos, claves ni compras.</span></div><label class="switch"><input type="checkbox" id="pgAndOn"><span class="switch-slider"></span></label></div>' : '') +
       '<div class="settings-row" style="flex-direction:column;align-items:stretch"><div class="settings-row-text"><strong>Tu dirección privada de avisos</strong><span>No la compartas: quien la tenga podría mandarte avisos falsos.</span></div>' +
       '<input id="pgUrl" class="mz-in" style="width:100%" readonly onclick="this.select()"><div class="mz-actions"><button class="btn-primary" id="pgCopiar" type="button">📋 Copiar dirección</button><button class="btn-ghost" id="pgProbar" type="button">Probar</button><button class="btn-ghost" id="pgNueva" type="button">Cambiar dirección</button></div></div>' +
       '<details class="settings-desc" open><summary><b>Cómo configurarlo en el celular donde te llegan los pagos (una vez)</b></summary><ol style="margin:8px 0 0;padding-left:20px;line-height:1.55">' +
@@ -26522,6 +26536,15 @@ let fotosListas = false;
     grupo.insertAdjacentElement('afterend', g);
     const on = $p('pgOn');
     on.onchange = () => { PG().on = on.checked; saveData(); if(on.checked){ pgConectar(); pgSondear(); } else { try{ es && es.close(); }catch(e){} es = null; } pgPintar(); };
+    const andOn = $p('pgAndOn');
+    if(andOn) andOn.onchange = () => {
+      AND().pagosAvisos(andOn.checked);
+      if(andOn.checked && !andEstado().permiso){
+        showToast('Falta un permiso: en la pantalla que se abre, activa «Vento» en «Acceso a notificaciones» y vuelve.', 9000);
+        try{ AND().mediosPermiso(); }catch(e){}
+      } else if(andOn.checked) showToast('✅ Listo: los avisos de plata que te lleguen a DaviPlata o Nequi en este celular aparecen en Vento.', 7000);
+      pgPintar();
+    };
     $p('pgCopiar').onclick = async () => { try{ await navigator.clipboard.writeText(url()); showToast('📋 Dirección copiada. Pégala en MacroDroid (Solicitud HTTP → URL).', 7000); }catch(e){ $p('pgUrl').select(); showToast('Mantén presionada la dirección para copiarla.'); } };
     $p('pgProbar').onclick = async () => {
       try{ await fetch(url(), { method: 'POST', body: 'Nequi | ¡Te llegó plata! | PRUEBA VENTO te envió $1.000' }); showToast('Enviado. En unos segundos debe salir el aviso de $1.000.'); pgConectar(); setTimeout(pgSondear, 2500); }
@@ -26535,6 +26558,12 @@ let fotosListas = false;
     const g = PG();
     $p('pgOn').checked = !!g.on; $p('pgCaja').hidden = !g.on; $p('pgUrl').value = url();
     $p('pgEstado').textContent = !g.on ? 'Apagado.' : (es && es.readyState === 1 ? '🟢 Escuchando los avisos de pagos.' : '🟠 Conectando…');
+    if($p('pgAndOn')){
+      const e = andEstado();
+      $p('pgAndOn').checked = !!e.on;
+      $p('pgAndTxt').textContent = !e.on ? 'Vento toma directo los avisos de plata recibida de DaviPlata, Nequi y tu banco que llegan a este celular. Nunca toma códigos, claves ni compras.'
+        : e.permiso ? '🟢 Leyendo los avisos de plata recibida de este celular. Ya no necesitas MacroDroid aquí.' : '🟠 Falta el permiso «Acceso a notificaciones» para Vento: apaga y prende este interruptor para abrirlo.';
+    }
     const sello = x => x.estado === 'falso' ? '<span style="color:#e5484d;font-weight:800">🚨 FALSO</span>' : x.estado === 'revisar' ? '<span style="color:#f5a524;font-weight:800">⚠️ Revisar</span> <button type="button" class="btn-ghost" data-pgok="' + escp(x.id) + '" style="padding:2px 8px;font-size:12px">✅ Lo vi en la app</button>' : x.estado === 'ok' ? '<span style="color:#30a46c;font-weight:800">✅ Revisado</span>' : '<span style="color:#30a46c;font-weight:800">✅ Confirmado</span>';
     $p('pgLista').innerHTML = g.lista.length ? g.lista.slice(0, 15).map(x => '<div style="display:flex;gap:8px;padding:6px 0;border-top:1px solid var(--line);font-size:14px' + (x.estado === 'falso' ? ';opacity:.8;text-decoration:line-through' : '') + '"><span style="flex:1;min-width:0">' + escp(x.app) + (x.de ? ' · ' + escp(x.de) : '') + ' ' + sello(x) + '<br><small style="opacity:.7">' + new Date(x.t).toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + (x.mesa ? ' · ' + escp(tableLabel(x.mesa)) : '') + (x.fuente && x.estado !== 'app' ? ' · ' + escp(x.fuente) : '') + '</small></span><b>' + plata(x.monto) + '</b></div>').join('') : '<div class="empty-note">Todavía no ha llegado ningún aviso.</div>';
     $p('pgLista').onclick = e => {
