@@ -1,4 +1,4 @@
-# Vento 1.31.0 — Cuentas con correo en todos los celulares, facturas más rápidas avisos de DaviPlata en el celular y YouTube sin límite de búsquedas
+# Vento 1.31.0 — Cuentas con correo en todos los celulares, facturas más rápidas, avisos de DaviPlata en el celular y YouTube sin límite de búsquedas
 
 ## Qué cambió
 
