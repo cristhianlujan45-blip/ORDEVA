@@ -26706,14 +26706,19 @@ let fotosListas = false;
     if(!grupo) return false;
     const g = document.createElement('div');
     g.className = 'settings-group'; g.id = 'pgGrupo'; g.hidden = true; g.dataset.cat = 'negocio';
-    g.innerHTML = '<h2>🔔 Verificar pagos de Nequi y Daviplata al instante <span class="tvp-badge">Nuevo</span></h2>' +
-      '<div class="settings-desc">Cada vez que te llega plata a Nequi, Daviplata o Bancolombia, tu celular recibe la notificación del banco. Con la app gratis <b>MacroDroid</b> esa notificación se reenvía a Vento en un segundo: te avisa con voz cuánto llegó y de quién, y te dice de qué mesa es (si el valor coincide con lo que debe una mesa, o si la mesa tocó «Ya pagué por Nequi»). Nequi y Daviplata no tienen conexión directa para cuentas personales; esta es la forma que sí funciona.</div>' +
+    const enApp = !!AND();
+    g.innerHTML = '<h2>🔔 Pagos de Nequi y DaviPlata al instante <span class="tvp-badge">Nuevo</span></h2>' +
+      (enApp
+        ? '<div class="settings-desc">Cuando te llega plata a <b>DaviPlata</b>, <b>Nequi</b> o tu banco, <b>la app de Vento lee directamente el aviso del banco en este celular</b> y te dice en voz alta <b>«Pago confirmado»</b> con el valor, quién pagó y de qué mesa es (como el parlante de Bold). No necesitas instalar nada más.</div>'
+        : '<div class="settings-desc">Para que Vento te diga <b>«Pago confirmado»</b> apenas te llegue la plata, instala la <b>app Vento para Android</b> en el celular donde tienes DaviPlata o Nequi y prende esta opción allí: la app lee directamente el aviso del banco. Desde el navegador no se pueden leer los avisos de otras apps. Los demás celulares del negocio reciben el aviso por Vento Nube.</div>') +
       '<div class="settings-row"><div class="settings-row-text"><strong>Recibir avisos de pagos</strong><span id="pgEstado"></span></div><label class="switch"><input type="checkbox" id="pgOn"><span class="switch-slider"></span></label></div>' +
       '<div id="pgCaja" hidden>' +
-      (AND() ? '<div class="settings-row" id="pgAndFila"><div class="settings-row-text"><strong>📲 Leer los avisos de ESTE celular (sin MacroDroid)</strong><span id="pgAndTxt">Vento toma directo los avisos de plata recibida de DaviPlata, Nequi y tu banco que llegan a este celular. Nunca toma códigos, claves ni compras.</span></div><label class="switch"><input type="checkbox" id="pgAndOn"><span class="switch-slider"></span></label></div>' : '') +
+      (enApp ? '<div class="settings-row" id="pgAndFila"><div class="settings-row-text"><strong>📲 Leer los avisos de ESTE celular</strong><span id="pgAndTxt">Vento toma directo los avisos de plata recibida de DaviPlata, Nequi y tu banco que llegan a este celular. Nunca toma códigos, claves ni compras.</span></div><label class="switch"><input type="checkbox" id="pgAndOn"><span class="switch-slider"></span></label></div>' : '') +
+      '<details class="settings-desc"' + (enApp ? '' : ' open') + '><summary><b>' + (enApp ? 'Otro método, solo si en ese celular NO usas la app Vento' : 'Sin la app Vento: con MacroDroid') + '</b></summary>' +
       '<div class="settings-row" style="flex-direction:column;align-items:stretch"><div class="settings-row-text"><strong>Tu dirección privada de avisos</strong><span>No la compartas: quien la tenga podría mandarte avisos falsos.</span></div>' +
       '<input id="pgUrl" class="mz-in" style="width:100%" readonly onclick="this.select()"><div class="mz-actions"><button class="btn-primary" id="pgCopiar" type="button">📋 Copiar dirección</button><button class="btn-ghost" id="pgProbar" type="button">Probar</button><button class="btn-ghost" id="pgNueva" type="button">Cambiar dirección</button></div></div>' +
-      '<details class="settings-desc" open><summary><b>Cómo configurarlo en el celular donde te llegan los pagos (una vez)</b></summary><ol style="margin:8px 0 0;padding-left:20px;line-height:1.55">' +
+      '<div><b>Cómo configurarlo con MacroDroid (una vez):</b></div>' +
+      '<ol style="margin:8px 0 0;padding-left:20px;line-height:1.55">' +
       '<li>Instala <b>MacroDroid</b> desde Play Store (gratis) y dale el permiso de <b>acceso a notificaciones</b> que te pide.</li>' +
       '<li>Toca <b>Añadir macro</b>. En <b>Disparadores</b> elige <b>Notificación → Notificación recibida</b>, marca las <b>apps</b> Nequi, DaviPlata (y Bancolombia si quieres) y deja «Cualquier contenido». <b>Usa las notificaciones de las apps, no los SMS:</b> esas solo las puede mostrar la app del banco, así que no se pueden falsificar.</li>' +
       '<li>En <b>Acciones</b> elige <b>Web / Conectividad → Solicitud HTTP</b>. Método <b>POST</b>. En URL pega la dirección de arriba.</li>' +
@@ -26724,7 +26729,13 @@ let fotosListas = false;
       '<div class="settings-row" style="flex-direction:column;align-items:stretch"><div class="settings-row-text"><strong>Últimos pagos que llegaron</strong></div><div id="pgLista"></div></div></div>';
     grupo.insertAdjacentElement('afterend', g);
     const on = $p('pgOn');
-    on.onchange = () => { PG().on = on.checked; saveData(); if(on.checked){ pgConectar(); pgSondear(); } else { try{ es && es.close(); }catch(e){} es = null; } pgPintar(); };
+    on.onchange = () => {
+      PG().on = on.checked; saveData();
+      if(on.checked){ pgConectar(); pgSondear(); } else { try{ es && es.close(); }catch(e){} es = null; }
+      // En la app Android, prender los avisos = leer directo los avisos del banco de ESTE celular (sin MacroDroid).
+      if(AND() && on.checked && !andEstado().on){ const a = $p('pgAndOn'); if(a){ a.checked = true; a.onchange(); return; } }
+      pgPintar();
+    };
     const andOn = $p('pgAndOn');
     if(andOn) andOn.onchange = () => {
       AND().pagosAvisos(andOn.checked);
@@ -26746,7 +26757,8 @@ let fotosListas = false;
     if(!data || !pgCrearUI()) return;
     const g = PG();
     $p('pgOn').checked = !!g.on; $p('pgCaja').hidden = !g.on; $p('pgUrl').value = url();
-    $p('pgEstado').textContent = !g.on ? 'Apagado.' : (es && es.readyState === 1 ? '🟢 Escuchando los avisos de pagos.' : '🟠 Conectando…');
+    const ea = AND() ? andEstado() : null;
+    $p('pgEstado').textContent = !g.on ? 'Apagado.' : ea && ea.on ? (ea.permiso ? '🟢 La app lee directo los avisos de pagos de este celular.' : '🟠 Falta el permiso «Acceso a notificaciones» para Vento.') : (es && es.readyState === 1 ? '🟢 Escuchando los avisos de pagos.' : '🟠 Conectando…');
     if($p('pgAndOn')){
       const e = andEstado();
       $p('pgAndOn').checked = !!e.on;
@@ -28778,7 +28790,7 @@ window.mesoraCelebrar = function(emojis){
       const sello = x => x.estado === 'falso' ? '<span class="pp-s pp-f">🚨 Falso</span>' : x.estado === 'revisar' ? '<span class="pp-s pp-r">⚠️ Revisar</span>' : '<span class="pp-s pp-ok">✅</span>';
       ov.innerHTML = '<div class="modal" style="max-width:520px"><h2>💜 Pagos Nequi / Daviplata</h2>' +
         (on ? '<div class="pp-total"><small>Hoy, confirmados</small><b>' + plata(ok.reduce((a, x) => a + x.monto, 0)) + '</b><span>' + (Object.entries(porApp).map(([a, v]) => a + ' ' + plata(v)).join(' · ') || 'Todavía nada hoy') + '</span></div>'
-          : '<div class="pp-off"><b>Los avisos de pago no están activados.</b><br>Con la app gratis MacroDroid, cada notificación de Nequi o Daviplata de tu celular llega aquí en un segundo, con el valor y quién te pagó. Toma 5 minutos.<br><button type="button" class="btn-primary" data-pp="config" style="margin-top:10px">⚙️ Activar y ver los pasos</button></div>') +
+          : '<div class="pp-off"><b>Los avisos de pago no están activados.</b><br>' + (window.VentoAndroid && window.VentoAndroid.pagosAvisosTomar ? 'Prende «Recibir avisos de pagos»: la app de Vento lee directo el aviso de DaviPlata o Nequi de este celular y te dice «Pago confirmado» con el valor y quién te pagó.' : 'Con la app Vento para Android en el celular donde tienes DaviPlata o Nequi, cada pago que te llega sale aquí en un segundo y Vento dice «Pago confirmado».') + '<br><button type="button" class="btn-primary" data-pp="config" style="margin-top:10px">⚙️ Activar y ver los pasos</button></div>') +
         (l.length ? '<div class="pp-lista">' + l.map(x => '<div class="pp-fila' + (x.estado === 'falso' ? ' pp-tach' : '') + '"><span><b>' + plata(x.monto) + '</b> ' + esc(x.app) + (x.de ? ' · ' + esc(x.de) : '') + '<small>' + new Date(x.t).toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) + (x.aplicado ? ' · registrado en ' + esc(tableLabel(x.aplicado)) : x.mesa ? ' · coincide con ' + esc(tableLabel(x.mesa)) : '') + '</small></span>' + sello(x) +
           (x.estado === 'revisar' ? '<button type="button" class="btn-ghost" data-vi="' + esc(x.id) + '">Lo vi en la app</button>' : (confirmado(x) && !x.aplicado ? '<button type="button" class="btn-ghost" data-reg="' + esc(x.id) + '">Registrar</button>' : '')) + '</div>').join('') + '</div>' : (on ? '<div class="modal-sub">Aún no ha llegado ningún pago.</div>' : '')) +
         '<div class="modal-actions" style="flex-wrap:wrap;gap:8px">' + (on ? '<button type="button" class="btn-ghost" data-pp="config">⚙️ Configuración</button>' : '') + '<button type="button" class="btn-close" data-pp="cerrar">Cerrar</button></div></div>';

@@ -30,8 +30,9 @@
   1. **Transferencia normal a tu número de DaviPlata o Nequi (sin convenio):**
      - La app Android de Vento lee ella misma el aviso «¡Recibiste plata!» de la app DaviPlata/Nequi de ese celular.
        Ya no hace falta MacroDroid.
-     - Se activa en Ajustes → Negocio → Verificar pagos → **📲 Leer los avisos de ESTE celular**, más el permiso
-       «Acceso a notificaciones» (el mismo que usa la música).
+     - Se activa en la app Android: Ajustes → Negocio → **Recibir avisos de pagos** (un solo interruptor), más el permiso
+       «Acceso a notificaciones» (el mismo que usa la música). En la app ya no aparece MacroDroid: queda plegado como «otro
+       método» solo para celulares sin la app.
      - Solo toma avisos de plata RECIBIDA de apps de bancos y billeteras. Nunca toma códigos, claves, compras ni plata que
        sale, y de las demás apps nada.
      - El pago sale con voz en la mesa que debe ese valor, y por el Servidor Vento llega a los demás celulares del negocio.
@@ -81,7 +82,7 @@
 |---|---|
 | cuentas (PostgreSQL real, 6 celulares) | 43 |
 | facturarapida (Gemini simulado: saturado, lento, basura, cortado, clave mala) | 9 |
-| avisosandroid (puente Android simulado, voz «Pago confirmado») | 14 |
+| avisosandroid (puente Android simulado, voz «Pago confirmado», sin MacroDroid) | 15 |
 | youtubesincupo (API de YouTube respondiendo «quotaExceeded») | 12 |
 | iaunavez (configurar la IA una sola vez) | 8 |
 | playlists (buscar, poner, pegar link, mesas primero, respaldo por API, quitar) | 16 |

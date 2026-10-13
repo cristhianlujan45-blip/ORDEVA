@@ -1,7 +1,7 @@
 // App Android: los avisos de plata recibida de DaviPlata/Nequi de ESTE celular llegan a Vento sin MacroDroid, y cada pago
 // que llega (de otro celular o de la API de DaviPlata) suena como aviso del celular aunque Vento esté cerrada.
 // El puente nativo (VentoAndroid: VentoEscucha + notificar) se simula en la página; lo demás es la app de verdad.
-//  1. Ajustes → Verificar pagos → «📲 Leer los avisos de ESTE celular»: sin permiso abre «Acceso a notificaciones».
+//  1. Ajustes → «Recibir avisos de pagos»: en la app lee DIRECTO los avisos del banco (sin MacroDroid); sin permiso abre «Acceso a notificaciones».
 //  2. Aviso «DaviPlata | ¡Recibiste plata! | JUAN PEREZ te envió $25.000» → pago confirmado, de la mesa que debe $25.000.
 //  3. El mismo aviso otra vez (Android lo vuelve a publicar) → no se repite.
 //  2b. Como el parlante de Bold: suena el sonido de éxito y dice en voz alta «Pago confirmado. 25000 pesos por Daviplata, de Juan Perez…».
@@ -29,19 +29,20 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     await p.fill('#authBiz', 'Bar A'); await p.fill('#authUser', 'ana'); await p.fill('#authPass', 'clave123'); await p.click('#authBtn'); await p.waitForTimeout(1200);
     await p.evaluate(() => document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')));
 
-    // 1. Ajustes: interruptor del celular
-    await p.evaluate(() => { data.pagos = data.pagos || {}; data.pagos.on = true; saveData(); });
+    // 1. Ajustes: en la app, prender «Recibir avisos de pagos» = la app lee directo los avisos del banco (sin MacroDroid)
     await p.click('#navMoreBtn'); await p.click('.more-tile[data-go="ajustes"]');
     if(await p.isVisible('#ajustesBackBtn')) await p.click('#ajustesBackBtn');
     await p.click('.ajustes-cat[data-cat="negocio"]');
-    await p.waitForSelector('#pgAndOn', { state: 'attached', timeout: 5000 });
-    chk('1. En Ajustes aparece «📲 Leer los avisos de ESTE celular (sin MacroDroid)»', /Leer los avisos de ESTE celular/.test(await p.textContent('#pgAndFila')));
-    await p.evaluate(() => { const i = document.getElementById('pgAndOn'); i.checked = true; i.dispatchEvent(new Event('change')); });
+    await p.waitForSelector('#pgOn', { state: 'attached', timeout: 5000 });
+    const desc = await p.textContent('#pgGrupo');
+    chk('1. Explica que la app de Vento lee directamente el aviso del banco y dice «Pago confirmado»', /la app de Vento lee directamente el aviso del banco/.test(desc) && /Pago confirmado/.test(desc), desc.slice(0, 300));
+    chk('1. MacroDroid queda solo como «otro método», plegado', await p.evaluate(() => { const d = document.querySelector('#pgGrupo details'); return !!d && !d.open && /NO usas la app Vento/.test(d.querySelector('summary').textContent); }));
+    await p.evaluate(() => { const i = document.getElementById('pgOn'); i.checked = true; i.dispatchEvent(new Event('change')); });
     let A = await p.evaluate(() => window.__and);
-    chk('1. Al prenderlo queda prendido en el celular y, sin permiso, abre «Acceso a notificaciones»', A.on && A.permisoAbierto === 1, A);
-    chk('1. Dice que falta el permiso', /Falta el permiso/.test(await p.textContent('#pgAndTxt')));
+    chk('1. Al prender «Recibir avisos de pagos» queda leyendo los avisos de este celular y, sin permiso, abre «Acceso a notificaciones»', A.on && A.permisoAbierto === 1 && await p.evaluate(() => data.pagos.on === true), A);
+    chk('1. Dice que falta el permiso', /Falta el permiso/.test(await p.textContent('#pgAndTxt')) && /Falta el permiso/.test(await p.textContent('#pgEstado')));
     await p.evaluate(() => { window.__and.permiso = true; document.getElementById('pgAndOn').dispatchEvent(new Event('change')); });
-    chk('1. Con el permiso: «🟢 Leyendo los avisos…»', /Leyendo los avisos/.test(await p.textContent('#pgAndTxt')));
+    chk('1. Con el permiso: «🟢 La app lee directo los avisos de pagos de este celular»', /Leyendo los avisos/.test(await p.textContent('#pgAndTxt')) && /La app lee directo/.test(await p.textContent('#pgEstado')));
 
     // 2. Llega un aviso de DaviPlata
     await p.evaluate(() => {
