@@ -10303,6 +10303,29 @@ function cleanAiJsonText(text){
   if(first >= 0 && last > first){
     try{ return JSON.parse(t.slice(first, last + 1)); }catch(e){}
   }
+  return first >= 0 ? jsonRescatar(t.slice(first)) : null;
+}
+// La IA a veces repite un pedazo después del JSON («…]]}\n2]]}») o se corta en una factura larga.
+// 1) Se toma el primer objeto completo (contando llaves fuera de las comillas).
+// 2) Si quedó cortado, se conservan los renglones completos y se cierran las llaves que falten.
+function jsonRescatar(t){
+  const cerrar = pre => { const pila = []; let str = false, esc = false;
+    for(const c of pre){ if(str){ if(esc) esc = false; else if(c === '\\') esc = true; else if(c === '"') str = false; continue; }
+      if(c === '"') str = true; else if(c === '{') pila.push('}'); else if(c === '[') pila.push(']'); else if(c === '}' || c === ']') pila.pop(); }
+    return str ? null : pila; };
+  let d = 0, str = false, esc = false;
+  for(let k = 0; k < t.length; k++){
+    const c = t[k];
+    if(str){ if(esc) esc = false; else if(c === '\\') esc = true; else if(c === '"') str = false; continue; }
+    if(c === '"') str = true; else if(c === '{' || c === '[') d++;
+    else if((c === '}' || c === ']') && --d === 0){ try{ return JSON.parse(t.slice(0, k + 1)); }catch(e){ break; } }
+  }
+  for(let corte = t.length, n = 0; n < 8; n++){
+    corte = t.lastIndexOf(']', corte - 1); if(corte < 0) break;
+    const pre = t.slice(0, corte + 1), pila = cerrar(pre);
+    if(!pila) continue;
+    try{ return JSON.parse(pre + pila.reverse().join('')); }catch(e){}
+  }
   return null;
 }
 
@@ -10319,7 +10342,15 @@ const BUILTIN_GEMINI_KEY = '';
 const GEMINI_MODEL_DEFAULT = 'gemini-3.5-flash-lite';
 // Si el modelo principal no está disponible o se acabó su cuota diaria, se prueban estos en orden
 // (y, si ninguno sirve, la app le pregunta a Google qué modelos "flash" tiene tu clave).
-const GEMINI_MODEL_FALLBACKS = ['gemini-3.1-flash-lite', 'gemini-flash-lite-latest', 'gemini-flash-latest', 'gemini-3-flash-preview', 'gemini-2.5-flash-lite', 'gemini-2.5-flash'];
+// Si el principal está saturado se pasa primero a uno de OTRA familia (cuando Google satura los «lite»
+// suelen caer todos a la vez; los «flash» normales siguen respondiendo en 2-3 s).
+const GEMINI_MODEL_FALLBACKS = ['gemini-3.5-flash', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite', 'gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-2.5-flash-lite', 'gemini-2.5-flash'];
+// Modelos que Google respondió «saturado» (503) hace poco: van de últimos por unos minutos, así la próxima
+// lectura no pierde segundos esperándolos (antes se reintentaba el mismo modelo y una factura tardaba 20-30 s).
+const AI_SATURADOS_KEY = 'vento-ia-saturados', AI_SATURADO_MS = 4 * 60e3;
+function aiSaturados(){ try{ const o = JSON.parse(localStorage.getItem(AI_SATURADOS_KEY) || '{}'), now = Date.now(); Object.keys(o).forEach(k => { if(!(o[k] > now)) delete o[k]; }); return o; }catch(e){ return {}; } }
+function aiMarcarSaturado(m, si){ try{ const o = aiSaturados(); if(si) o[m] = Date.now() + AI_SATURADO_MS; else delete o[m]; localStorage.setItem(AI_SATURADOS_KEY, JSON.stringify(o)); }catch(e){} }
+function aiOrdenModelos(lista){ const sat = aiSaturados(); return lista.filter(m => !sat[m]).concat(lista.filter(m => sat[m])); }
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 /* IA de Vento ya configurada: si el negocio no puso su propia clave, Vento usa la IA del PROVEEDOR a través del
    Servidor Vento (Supabase → función vento-ia). La clave de Gemini vive allá como secreto del servidor: nunca está
@@ -10501,7 +10532,9 @@ async function geminiGenerate(o){
   if(/[^\x20-\x7E]/.test(key)) throw new OpenAIError('auth', 'La API key tiene caracteres raros (¿se pegó con espacios o saltos de línea?). Pégala de nuevo.');
   const retries = (typeof o.retries === 'number') ? o.retries : 5;
   const main = getGeminiModel();
-  const models = o.oneModel ? [main] : [main, ...GEMINI_MODEL_FALLBACKS.filter(m => m !== main)];
+  const todos = aiOrdenModelos([main, ...GEMINI_MODEL_FALLBACKS.filter(m => m !== main)]);
+  // Un solo intento rápido: con el principal, salvo que esté saturado (entonces con el primero que no lo esté).
+  const models = o.model ? [o.model] : o.oneModel ? [todos[0]] : todos;
   let lastErr = null, discovered = false, skippedForModel = false;
   for(let mi = 0; mi < models.length; mi++){
     const model = models[mi];
@@ -10527,6 +10560,8 @@ async function geminiGenerate(o){
           if(key === IA_VENTO && (err.kind === 'auth' || res.status === 503 || res.status === 403)) err.message = 'La IA de Vento no está disponible en este momento (el proveedor debe revisar la clave del servidor). Si quieres, pon tu propia clave en ⚙️ Configurar IA.';
           if(err.kind === 'model'){ skippedForModel = true; lastErr = err; break; }
           if(err.kind === 'daily'){ lastErr = err; break; }              // otro modelo tiene su propia cuota
+          // Saturado: se pasa YA a otro modelo (cada uno tiene su propia capacidad) en vez de esperar a este.
+          if(res.status === 503 || (err.kind === 'rate' && !o.oneModel)){ aiMarcarSaturado(model, true); if(mi < models.length - 1 || o.oneModel){ lastErr = err; break; } }
           if(err.kind === 'rate' || err.kind === 'server'){
             if(attempt <= retries && !(o.deadline && err.retryMs > 3000)){  // con hora límite, no espera minutos: pasa a otro modelo
               retryDelay = Math.min(30000, err.retryMs > 0 ? err.retryMs + 300 : 1500 * Math.pow(2, attempt - 1));
@@ -10539,6 +10574,7 @@ async function geminiGenerate(o){
           try{ json = JSON.parse(raw); }catch(x){ throw new OpenAIError('bad', 'La IA devolvió una respuesta que no se puede leer.'); }
           geminiExtractText(json); // lanza error claro si Google bloqueó la solicitud
           json._model = model; aiLastModel = model;
+          if(mi > 0 || model !== main) aiMarcarSaturado(model, false);
           if(model !== main && skippedForModel) setGeminiModel(model); // recuerda el que sí existe
           return json;
         }
@@ -10591,7 +10627,7 @@ async function geminiText(o){
 async function geminiStreamText(o, onDelta){
   const key = getGeminiKey();
   if(!key) throw new Error('NO_API_KEY');
-  const model = getGeminiModel();
+  const model = aiOrdenModelos([getGeminiModel(), ...GEMINI_MODEL_FALLBACKS.filter(m => m !== getGeminiModel())])[0];   // el principal, salvo que esté saturado
   const left = aiTimeLeft(o.deadline);
   if(left < 1500) throw new OpenAIError('timeout', 'La IA tardó demasiado en responder.');
   const ctrl = new AbortController();
@@ -10676,6 +10712,38 @@ async function openaiText(o){
 
 // Punto único de entrada para la IA. o = { prompt, imageDataUrl?, json?, web?, strictWeb?, timeoutMs?, retries?, maxMs? }
 // maxMs: tiempo máximo TOTAL (reintentos incluidos); pasado ese tiempo falla con kind 'timeout'.
+// Carrera de modelos (cada modelo tiene su propia capacidad en Google): arranca el principal y, si a los
+// `ventaja` ms no ha respondido (o falló / dijo «saturado»), arranca también el siguiente, y así hasta 3.
+// Gana la primera respuesta que `sirve(texto)` acepte (devuelve el resultado o null). Así una factura no
+// queda esperando a un modelo lento o saturado.
+function aiCarrera(o, sirve, ventaja){
+  if(getAIProvider() === 'openai') return aiText(o).then(t => { const v = sirve(t); if(!v) throw new OpenAIError('bad', 'La IA respondió pero no pude leer la respuesta.'); return v; });
+  if(!hasAIKey()) return Promise.reject(new Error('NO_API_KEY'));
+  const main = getGeminiModel();
+  const corredores = aiOrdenModelos([main, ...GEMINI_MODEL_FALLBACKS.filter(m => m !== main)]).slice(0, 3);
+  const deadline = o.deadline || (o.maxMs ? Date.now() + o.maxMs : 0);
+  return new Promise((res, rej) => {
+    let fin = false, vivos = 0, n = 0, ultimo = null, t = null;
+    const terminar = (f, v) => { if(fin) return; fin = true; clearTimeout(t); f(v); };
+    const revisar = () => { if(!fin && !vivos && n >= corredores.length) terminar(rej, ultimo || new OpenAIError('bad', 'La IA respondió pero no pude leer la respuesta.')); };
+    const lanzar = () => {
+      if(fin || n >= corredores.length) return;
+      const m = corredores[n++]; vivos++;
+      clearTimeout(t); t = setTimeout(lanzar, ventaja);
+      aiText(Object.assign({}, o, { model: m, oneModel: true, retries: 0, deadline })).then(txt => {
+        vivos--; if(fin) return;
+        let v = null; try{ v = sirve(txt); }catch(e){}
+        if(v) return terminar(res, v);
+        ultimo = new OpenAIError('bad', 'La IA respondió pero no pude leer la respuesta.'); lanzar(); revisar();
+      }, e => {
+        vivos--; ultimo = e; if(fin) return;
+        if(!(e && (AI_LADDER_KINDS.includes(e.kind) || e.kind === 'model'))) return terminar(rej, e);   // clave mala, etc.: se avisa ya
+        lanzar(); revisar();
+      });
+    };
+    lanzar();
+  });
+}
 async function aiText(o){
   if(!hasAIKey()) throw new Error('NO_API_KEY');
   if(o.maxMs && !o.deadline) o = Object.assign({}, o, { deadline: Date.now() + o.maxMs });
@@ -11860,38 +11928,28 @@ function fiExpandirCompacto(info){
 // vueltas) — normalmente responde en pocos segundos. Solo si esa pasada falla o no trae
 // nada usable se hace un segundo intento más a fondo (probando otro modelo si hace falta),
 // igual que ya se hace al reconocer un producto por foto.
+// La respuesta sirve si trae la lista de renglones.
+const fiLecturaIA = txt => { const i = fiExpandirCompacto(cleanAiJsonText(txt)); return i && Array.isArray(i.items) ? i : null; };
 async function recognizeInvoiceWithAI(dataUrl){
   const prompt = invoicePrompt();
-  let info = null;
   try{
-    // Sin reintentos aquí a propósito: si la pasada rápida no responde en 12s, reintentar con
-    // la misma foto/modelo casi nunca es más rápido — es mejor pasar de una vez a la pasada
-    // a fondo (que sí reintenta) que esperar el doble antes de caer a ella.
-    info = fiExpandirCompacto(cleanAiJsonText(await aiText({ prompt, imageDataUrl: dataUrl, json: true, timeoutMs: 9000, retries: 0, oneModel: true, fast: true, doc: true, maxOutputTokens: 3000 })));
+    // Carrera de modelos: el principal y, si en 3 s no respondió, otro en paralelo (ver aiCarrera).
+    return await aiCarrera({ prompt, imageDataUrl: dataUrl, json: true, timeoutMs: 16000, fast: true, doc: true, maxOutputTokens: 8000, maxMs: 26000 }, fiLecturaIA, 3000);
   }catch(err){
-    if(!(err && AI_LADDER_KINDS.includes(err.kind))) throw err;   // clave inválida, cuota diaria, etc.: se avisa tal cual
+    if(err && err.kind === 'bad') throw new OpenAIError('bad', 'La IA respondió pero no pude leer la factura. Prueba con una foto más clara, derecha y con buena luz.');
+    throw err;
   }
-  if(!info || !Array.isArray(info.items)){
-    info = fiExpandirCompacto(cleanAiJsonText(await aiText({ prompt, imageDataUrl: dataUrl, json: true, timeoutMs: 14000, retries: 1, fast: true, doc: true, maxOutputTokens: 3000, maxMs: 20000 })));
-  }
-  if(!info || !Array.isArray(info.items)) throw new OpenAIError('bad', 'La IA respondió pero no pude leer la factura. Prueba con una foto más clara, derecha y con buena luz.');
-  return info;
 }
 // Misma idea que recognizeInvoiceWithAI pero para el texto ya extraído de un PDF
 // digital (sin imagen) — más rápido y no depende de que la foto quede bien tomada.
 async function recognizeInvoiceWithAIFromText(text){
   const prompt = invoicePromptForText(text);
-  let info = null;
   try{
-    info = fiExpandirCompacto(cleanAiJsonText(await aiText({ prompt, json: true, timeoutMs: 12000, retries: 0, oneModel: true, fast: true, maxOutputTokens: 3000 })));
+    return await aiCarrera({ prompt, json: true, timeoutMs: 20000, fast: true, maxOutputTokens: 8000, maxMs: 32000 }, fiLecturaIA, 3500);
   }catch(err){
-    if(!(err && AI_LADDER_KINDS.includes(err.kind))) throw err;
+    if(err && err.kind === 'bad') throw new OpenAIError('bad', 'La IA respondió pero no pude leer el texto del PDF de la factura.');
+    throw err;
   }
-  if(!info || !Array.isArray(info.items)){
-    info = fiExpandirCompacto(cleanAiJsonText(await aiText({ prompt, json: true, timeoutMs: 30000, retries: 1, fast: true, maxOutputTokens: 3000 })));
-  }
-  if(!info || !Array.isArray(info.items)) throw new OpenAIError('bad', 'La IA respondió pero no pude leer el texto del PDF de la factura.');
-  return info;
 }
 
 /* ================= FacturaIQ: entender la factura, no solo copiar el texto =================
@@ -23117,7 +23175,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-07 · v1.30.0';
+const MESORA_VERSION = '2026-10-13 · v1.31.0';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'Vento · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 // Si el navegador (o el celular, con la app agregada a la pantalla de inicio) se quedó con
