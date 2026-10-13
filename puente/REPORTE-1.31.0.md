@@ -1,4 +1,4 @@
-# Vento 1.31.0 — Cuentas con correo en todos los celulares, facturas más rápidas y avisos de DaviPlata en el celular
+# Vento 1.31.0 — Cuentas con correo en todos los celulares, facturas más rápidas, avisos de DaviPlata en el celular y música sin límite
 
 ## Qué cambió
 
@@ -36,6 +36,11 @@
   - En los dos casos, cada pago que llega suena como **aviso del celular «💜 Llegó un pago»** en la app Android, aunque
     Vento esté cerrada o la pantalla apagada. En el navegador lo hace el push que ya existía.
 
+- **Música sin límite.** Antes cada mesa podía pedir máximo 10 canciones cada 15 minutos. Ahora pide todas las que quiera,
+  desde el QR o desde la app.
+  - Sigue la cola por turnos: una mesa que pide muchas no deja esperando a las demás.
+  - Sigue sin repetirse la misma canción por un doble toque.
+
 ## Para el administrador
 
 - Al publicar, el «Servidor Vento» deja las cuentas confirmadas solas si no hay correo propio (SMTP). Sin correo propio, el
@@ -48,6 +53,7 @@
 | cuentas (PostgreSQL real, 6 celulares) | 43 |
 | facturarapida (Gemini simulado: saturado, lento, basura, cortado, clave mala) | 9 |
 | avisosandroid (puente Android simulado) | 10 |
+| musicasinlimite (25 canciones seguidas desde el QR y la app) | 6 |
 
 La app Android cambió (VentoEscucha): hay que compilar y publicar el APK nuevo. Se publica solo cuando están los secretos
 de la llave de firma (ver `android/LEEME.md`).

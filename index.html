@@ -3607,7 +3607,7 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
     </div>
     <div class="settings-group">
       <h2>Cómo se reparte</h2>
-      <div class="settings-desc">Cada mesa puede pedir hasta 10 canciones; cada cupo se libera 15 minutos después de pedirlo. La cola va por turnos: suena una canción de cada mesa y luego vuelve a empezar, así nadie acapara la música. ▶ abre la canción en YouTube Music (si conectas Google abajo, ni falta te hace: se agregan solas a tu lista, de primeras, sin tocar lo que ya está sonando).</div>
+      <div class="settings-desc">Cada mesa puede pedir todas las canciones que quiera, sin límite. La cola va por turnos: suena una canción de cada mesa y luego vuelve a empezar, así nadie acapara la música. ▶ abre la canción en YouTube Music (si conectas Google abajo, ni falta te hace: se agregan solas a tu lista, de primeras, sin tocar lo que ya está sonando).</div>
     </div>
   </section>
 
@@ -20256,10 +20256,8 @@ function iniQR(){
   conectar();
 }
 
-/* ---------- Música: máximo 5 por mesa y turnos equitativos ---------- */
-const MAX=10;
+/* ---------- Música: sin límite de canciones por mesa, con turnos equitativos ---------- */
 const cola=()=>LS('vito_cola',[]);
-const VENT=15*6e4;
 /* ---------- Una sola cola con estados (vito_cola) ----------
    Cada pedido: {id, mesa, song (lo que se busca), pedido (lo que escribió el cliente), title, artist,
    vid (YouTube video ID), url, dur (s), ts (pedido), startedAt, endedAt, playedSeconds, status}.
@@ -20347,8 +20345,8 @@ function agregarCancion(mesa,song,reqId){
   const nk=normVoiceText(song);
   const dup=l.concat(mzHist()).find(x=>(reqId&&x.reqId===reqId)||(x.mesa===mesa&&normVoiceText(x.song||'')===nk&&now-(x.ts||x.requestedAt||0)<3*6e4&&x.status!=='cancelled'));
   if(dup)return{msg:'🎵 Esa canción ya está en la cola.',nuevo:false};
-  const rec=l.filter(x=>x.mesa===mesa&&now-x.ts<VENT).sort((x,y)=>x.ts-y.ts);
-  if(mesa!==0&&rec.length>=MAX)return{msg:'🎵 '+tableLabel(mesa)+' ya pidió '+MAX+' canciones; podrá pedir otra en '+Math.ceil((rec[0].ts+VENT-now)/6e4)+' min.'};
+  // Sin límite de canciones por mesa: cada quien pide las que quiera. El orden justo entre mesas (ordenJusto)
+  // sigue igual, así una mesa que pide muchas no deja a las demás esperando.
   const it={id:now+'-'+Math.random().toString(36).slice(2,6),reqId:reqId||null,mesa,mesaNombre:tableLabel(mesa),song:song.slice(0,120),pedido:pedidoOriginal,title:lim.title.slice(0,80),artist:lim.artist.slice(0,60),ts:now,done:false,status:'pending'};
   l.push(it);SS('vito_cola',l);mzRespaldo();
   // Busca el video y la agrega sola a la lista/reproductor apenas llega el pedido,
