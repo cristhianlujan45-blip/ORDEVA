@@ -5026,7 +5026,7 @@ export default {
       <label>Nombre del negocio<input id="authBiz" placeholder="Ej: Cafetería Vito" autocomplete="organization"></label>
       <div class="auth-tipo"><span style="font-size:13px;color:var(--ink-soft)">Tipo de negocio</span><select id="authType" hidden></select><div id="authTypePick"></div></div>
     </div>
-    <label>Usuario<input id="authUser" autocomplete="username" autocapitalize="none" spellcheck="false"></label>
+    <label>Correo o usuario<input id="authUser" autocomplete="username" autocapitalize="none" spellcheck="false" inputmode="email"></label>
     <label>Contraseña<input id="authPass" type="password" autocomplete="current-password"></label>
     <div class="auth-err" id="authErr"></div>
     <button class="btn-primary" type="submit" id="authBtn">Entrar</button>
@@ -18206,6 +18206,82 @@ window.bloquearApp = bloquearApp;
   // Al salir de la entrada, la contraseña vuelve a quedar oculta.
   document.addEventListener('submit', e => { try{ e.target.querySelectorAll('input[data-ojo]').forEach(i => { i.type = 'password'; const b = i.parentNode.querySelector('.pw-ojo'); if(b) b.textContent = '👁'; }); }catch(x){} }, true);
 })();
+// ---------- Cuentas con correo = cuentas de Vento Nube ----------
+// Un correo es UNA sola cuenta en todos los celulares: se crea y se comprueba en la nube (no solo en este
+// celular), así no se puede crear otra cuenta con el mismo correo y en otro celular se ven los mismos datos.
+// Los usuarios sin correo (ej. «mesero1») siguen siendo de este celular, como siempre.
+const authEsCorreo = t => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(t || '').trim());
+const authNubeCuentas = () => { const n = window.ventoNube; return n && n.configurada && n.configurada() && n.crearCuenta ? n : null; };
+const authYaExiste = e => /already registered|already exists/i.test(String((e && e.message) || e));
+const authClaveMala = e => /invalid login credentials/i.test(String((e && e.message) || e));
+const authSinRed = e => /failed to fetch|networkerror|load failed|sin conexión|no se pudo cargar|timeout/i.test(String((e && e.message) || e));
+// ¿Este negocio todavía no tiene nada propio (ni ventas, ni mesas abiertas, ni productos creados a mano)?
+function authDatosPristinos(d){
+  if(!d) return true;
+  if((d.history || []).length || (d.closures || []).length) return false;
+  if(Object.values(d.tables || {}).some(t => t && (t.items || []).length)) return false;
+  return (d.products || []).every(p => /^prod-/.test(String(p && p.id)));
+}
+async function authPonerClaveLocal(user, pass){
+  const us = authUsers(), u = us.find(x => x.user === user); if(!u) return;
+  u.salt = Math.random().toString(36).slice(2) + Date.now().toString(36); u.hash = await authHash(pass, u.salt);
+  localStorage.setItem(AUTH_USERS_KEY, JSON.stringify(us));
+}
+// Deja este celular conectado al negocio de la cuenta (después de entrar). Si la cuenta todavía no tiene
+// negocio en la nube, sube el de este celular. Sin internet no pasa nada: se intenta en la próxima entrada.
+async function authConectarNube(email, pass, crearSiFalta){
+  const nb = authNubeCuentas(); if(!nb || nb.conectado(email)) return;
+  try{
+    let lista;
+    try{ lista = await nb.entrarCuenta(email, pass); }
+    catch(e){
+      if(!authClaveMala(e) || !crearSiFalta) throw e;
+      // Cuenta vieja que solo existía en este celular: se crea en la nube con el mismo correo y contraseña.
+      try{ const r = await nb.crearCuenta(email, pass, ''); if(!r.sesion){ showToast('📧 Te mandamos un correo a ' + email + ' para confirmar la cuenta. Al confirmarla, tus datos quedan en la nube.', 9000); return; } lista = []; }
+      catch(e2){
+        if(authYaExiste(e2)){ showToast('⚠️ ' + email + ' ya tiene cuenta en Vento Nube con OTRA contraseña. Para ver los mismos datos en todos tus celulares: cierra sesión y entra con la contraseña de esa cuenta.', 10000); return; }
+        throw e2;
+      }
+    }
+    if(lista.length) await nb.vincular(lista[0], authDatosPristinos(data));
+    else await nb.crearNegocio((data && data.businessName) || 'Mi negocio');
+    showToast('☁️ Cuenta conectada: con ' + email + ' ves los mismos datos en cualquier celular.', 5000);
+  }catch(e){
+    if(/not confirmed/i.test(String(e && e.message))) showToast('📧 Falta confirmar el correo ' + email + ': abre el mensaje que te llegó. Mientras tanto los datos quedan solo en este celular.', 8000);
+    else if(!authSinRed(e)) showToast('⚠️ Vento Nube: ' + nb.msgError(e), 6000);
+  }
+}
+// Entrar con una cuenta de la nube que no está en este celular (celular nuevo) o cuya contraseña se cambió
+// en otro celular. Lanza el error de la nube (ej. contraseña incorrecta) para mostrarlo.
+async function authEntrarDesdeNube(email, pass){
+  const nb = authNubeCuentas();
+  const lista = await nb.entrarCuenta(email, pass);
+  const n = lista[0] || null;
+  const yaEstaba = authUsers().some(x => x.user === email);
+  if(yaEstaba){
+    await authPonerClaveLocal(email, pass);
+    await enterApp(email, null);
+    if(n){ if(!nb.conectado(email)) await nb.vincular(n, authDatosPristinos(data)); }
+    else await nb.crearNegocio((data && data.businessName) || 'Mi negocio');
+    return;
+  }
+  // Usuario de este celular para la cuenta (así también entra sin internet). Si en este celular ya hay otro
+  // negocio, la cuenta va en su propio espacio y no se mezcla con ese.
+  let cuenta = null;
+  if(authUsers().length){
+    cuenta = 'c' + Date.now().toString(36);
+    const sede = await addSede((n && n.nombre) || 'Mi negocio', cuenta);
+    localStorage.setItem(CURRENT_SEDE_KEY, sede.id); STORAGE_KEY = sede.key;
+  }else{
+    const sede = rawSedesList().find(x => x.id === 'default'); localStorage.setItem(CURRENT_SEDE_KEY, 'default'); STORAGE_KEY = sede ? sede.key : 'bar-data';
+  }
+  const msg = await authAddUser(email, pass, n && n.rol === 'mesero' ? 'staff' : 'admin', cuenta);
+  if(msg) throw new Error(msg);
+  if(n) await nb.vincular(n, true);          // se bajan los datos del negocio a este celular
+  await enterApp(email, null);
+  if(!n) await nb.crearNegocio((data && data.businessName) || 'Mi negocio');
+  showToast(n ? '☁️ Listo: estos son los datos de «' + n.nombre + '», los mismos de tus otros celulares.' : '☁️ Cuenta lista en este celular.', 5000);
+}
 function showAuth(firstRun){
   const ov = document.getElementById('authOverlay');
   document.getElementById('authTitle').textContent = firstRun ? 'Crear cuenta' : 'Iniciar sesión';
@@ -18220,22 +18296,31 @@ function showAuth(firstRun){
   const af = document.getElementById('authForm'), rf = document.getElementById('recForm'), g = i => document.getElementById(i);
   g('authForgot').hidden = firstRun;
   // «Crear cuenta nueva» en la entrada: otro negocio en este equipo, con sus propios datos y usuarios.
-  let modoNueva = false;
+  // Sin ningún usuario en el celular arranca en «crear cuenta», pero se puede pasar a «iniciar sesión»
+  // (celular nuevo de alguien que ya tiene cuenta con su correo).
+  let modoNueva = firstRun;
   const hintSetup = document.querySelector('#authSetup .auth-hint');
+  const conNube = () => !!authNubeCuentas();
   const ponerModo = nueva => {
     modoNueva = nueva;
-    g('authTitle').textContent = nueva ? 'Crear cuenta nueva' : 'Iniciar sesión';
-    g('authBtn').textContent = nueva ? 'Crear cuenta y empezar' : 'Entrar';
+    const vacio = !authUsers().length;
+    g('authTitle').textContent = nueva ? (vacio ? 'Crear cuenta' : 'Crear cuenta nueva') : 'Iniciar sesión';
+    g('authBtn').textContent = nueva ? (vacio ? 'Crear cuenta y entrar' : 'Crear cuenta y empezar') : 'Entrar';
     g('authSetup').hidden = !nueva; g('authSetup').style.display = nueva ? 'flex' : 'none';
-    if(hintSetup) hintSetup.innerHTML = nueva ? 'Para <b>otro negocio</b>: tendrá sus propios datos y usuarios, separados de los que ya están aquí. Luego te hacemos unas preguntas para que Vento se adapte a tu negocio.<br>¿Eres empleado de un negocio que ya está aquí? Pídele al administrador que te cree el usuario.' : 'Primera vez: crea el usuario administrador de este equipo.';
+    if(hintSetup) hintSetup.innerHTML = nueva
+      ? (vacio ? 'Primera vez: crea el usuario administrador de este equipo.' : 'Para <b>otro negocio</b>: tendrá sus propios datos y usuarios, separados de los que ya están aquí. Luego te hacemos unas preguntas para que Vento se adapte a tu negocio.<br>¿Eres empleado de un negocio que ya está aquí? Pídele al administrador que te cree el usuario.')
+        + (conNube() ? '<br>📧 Usa tu <b>correo</b>: es tu cuenta en todos tus celulares, con los mismos datos.' : '')
+      : '';
     g('authPass').autocomplete = nueva ? 'new-password' : 'current-password';
-    g('authForgot').hidden = nueva; g('authRestoreBtn').hidden = nueva;
+    g('authForgot').hidden = nueva; g('authRestoreBtn').hidden = nueva && !vacio;
     const ch = document.getElementById('authUsers'); if(ch){ ch.hidden = nueva || !authUsers().length; ch.style.display = ch.hidden ? 'none' : ''; }
-    g('authNueva').textContent = nueva ? '← Ya tengo cuenta: iniciar sesión' : '➕ Crear cuenta nueva';
-    g('authErr').textContent = ''; if(nueva){ g('authUser').value = ''; g('authPass').value = ''; g('authBiz').focus(); }
+    g('authNueva').textContent = nueva ? (vacio ? '¿Ya tienes cuenta? Entra con tu correo' : '← Ya tengo cuenta: iniciar sesión') : '➕ Crear cuenta nueva';
+    g('authErr').textContent = '';
+    if(nueva){ g('authUser').value = ''; g('authPass').value = ''; g('authBiz').focus(); } else if(vacio) g('authUser').focus();
   };
-  g('authNueva').hidden = firstRun;
+  g('authNueva').hidden = firstRun && !conNube();
   g('authNueva').onclick = () => ponerModo(!modoNueva);
+  if(firstRun) ponerModo(true);
   // Usuarios de este equipo: se tocan para no tener que escribir el nombre.
   let chips = document.getElementById('authUsers');
   if(!chips){ chips = document.createElement('div'); chips.id = 'authUsers'; chips.className = 'auth-users'; g('authUser').closest('label').before(chips); }
@@ -18282,36 +18367,76 @@ function showAuth(firstRun){
     rf.hidden = true; af.hidden = false;
     g('authErr').textContent = m.correo ? '✅ Contraseña cambiada con el código del correo. Ya puedes entrar.' : '✅ Contraseña cambiada. Ya puedes entrar. Ese código ya no sirve más' + (m.quedan ? ' (te quedan ' + m.quedan + ').' : ': crea códigos nuevos en Ajustes → Negocio.');
   };
+  let enviando = false;
   document.getElementById('authForm').onsubmit = async (e) => {
     e.preventDefault();
+    if(enviando) return;
     const err = document.getElementById('authErr'); err.textContent = '';
     const user = document.getElementById('authUser').value.trim().toLowerCase();
     const pass = document.getElementById('authPass').value;
-    if(firstRun){
-      const msg = await authAddUser(user, pass, 'admin');
-      if(msg){ err.textContent = msg; return; }
-      await enterApp(user, { biz: document.getElementById('authBiz').value.trim(), type: document.getElementById('authType').value, typeName: authTipoPropio });
-    }else if(modoNueva){
-      const biz = document.getElementById('authBiz').value.trim();
-      if(!biz){ err.textContent = 'Escribe el nombre del negocio.'; return; }
-      const cuenta = 'c' + Date.now().toString(36);
-      const msg = await authAddUser(user, pass, 'admin', cuenta);
-      if(msg){ err.textContent = msg; return; }
-      const sede = await addSede(biz, cuenta);
-      localStorage.setItem(CURRENT_SEDE_KEY, sede.id);
-      await enterApp(user, { biz, type: document.getElementById('authType').value, typeName: authTipoPropio });
-    }else{
-      const waitMin = authLoginLocked(user);
-      if(waitMin){ err.textContent = '🔒 Demasiados intentos con "' + user + '". Espera ' + waitMin + ' min. e intenta de nuevo.'; return; }
-      const u = authUsers().find(x => x.user === user);
-      if(!u || await authHash(pass, u.salt) !== u.hash){
+    const nb = authEsCorreo(user) ? authNubeCuentas() : null;
+    const btn = g('authBtn'), txt = btn.textContent;
+    const ocupado = t => { enviando = !!t; btn.disabled = !!t; btn.textContent = t || txt; };
+    try{
+      if(modoNueva){
+        const vacio = !authUsers().length;
+        const biz = document.getElementById('authBiz').value.trim();
+        if(!vacio && !biz){ err.textContent = 'Escribe el nombre del negocio.'; return; }
+        if(user.length < 3){ err.textContent = 'El usuario debe tener al menos 3 caracteres.'; return; }
+        if(pass.length < 6){ err.textContent = 'La contraseña debe tener al menos 6 caracteres.'; return; }
+        if(authUsers().some(u => u.user === user)){ err.textContent = authEsCorreo(user) ? 'Ese correo ya tiene cuenta en este celular: toca «Ya tengo cuenta» e inicia sesión.' : 'Ese usuario ya existe.'; return; }
+        let enNube = false;
+        if(nb){
+          ocupado('⏳ Creando tu cuenta…');
+          try{ enNube = (await nb.crearCuenta(user, pass, '')).sesion ? 'ok' : 'confirmar'; }
+          catch(x){
+            if(authYaExiste(x)){
+              // Ese correo YA es una cuenta: no se crea otra. Si la contraseña es la de esa cuenta, se entra a ella.
+              ocupado('⏳ Ese correo ya tiene cuenta: entrando…');
+              try{ await authEntrarDesdeNube(user, pass); }
+              catch(x2){ err.textContent = authClaveMala(x2) ? 'Ese correo ya tiene una cuenta. Escribe la contraseña de esa cuenta para entrar (o toca «¿Ya tienes cuenta?» → «¿Olvidaste tu contraseña?»).' : nb.msgError(x2); }
+              return;
+            }
+            // Sin internet se crea en este celular y se sube a la nube en la próxima entrada con internet.
+            if(!authSinRed(x)){ err.textContent = nb.msgError(x); return; }
+          }
+        }
+        const setup = { biz, type: document.getElementById('authType').value, typeName: authTipoPropio };
+        if(vacio){
+          const msg = await authAddUser(user, pass, 'admin');
+          if(msg){ err.textContent = msg; return; }
+        }else{
+          const cuenta = 'c' + Date.now().toString(36);
+          const msg = await authAddUser(user, pass, 'admin', cuenta);
+          if(msg){ err.textContent = msg; return; }
+          const sede = await addSede(biz, cuenta);
+          localStorage.setItem(CURRENT_SEDE_KEY, sede.id);
+        }
+        await enterApp(user, setup);
+        if(enNube === 'ok') nb.crearNegocio(biz || (data && data.businessName) || 'Mi negocio').catch(x => { if(!authSinRed(x)) showToast('⚠️ Vento Nube: ' + nb.msgError(x), 6000); });
+        else if(enNube === 'confirmar') showToast('📧 Te mandamos un correo a ' + user + ' para confirmar la cuenta. Al confirmarla, tus datos quedan en la nube.', 9000);
+      }else{
+        const waitMin = authLoginLocked(user);
+        if(waitMin){ err.textContent = '🔒 Demasiados intentos con "' + user + '". Espera ' + waitMin + ' min. e intenta de nuevo.'; return; }
+        const u = authUsers().find(x => x.user === user);
+        if(u && await authHash(pass, u.salt) === u.hash){
+          authLoginClear(user);
+          document.getElementById('authPass').value = '';
+          await enterApp(user, null);
+          if(nb) authConectarNube(user, pass, true);
+          return;
+        }
+        // Correo que no está en este celular (celular nuevo) o con la contraseña cambiada en otro celular:
+        // se busca la cuenta en la nube.
+        if(nb){
+          ocupado('⏳ Buscando tu cuenta…');
+          try{ await authEntrarDesdeNube(user, pass); authLoginClear(user); document.getElementById('authPass').value = ''; return; }
+          catch(x){ if(!authClaveMala(x)){ err.textContent = nb.msgError(x); return; } }
+        }
         authLoginFail(user);
-        err.textContent = 'Usuario o contraseña incorrectos.'; return;
+        err.textContent = authEsCorreo(user) ? 'Correo o contraseña incorrectos.' : 'Usuario o contraseña incorrectos.';
       }
-      authLoginClear(user);
-      document.getElementById('authPass').value = '';
-      await enterApp(user, null);
-    }
+    }finally{ ocupado(''); }
   };
 }
 // Locales sin música: se esconden todas las entradas a la sección (barra de abajo, «Más

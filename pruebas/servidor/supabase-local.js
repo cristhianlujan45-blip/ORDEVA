@@ -164,7 +164,7 @@ async function iniciar(opts = {}) {
   // ----- usuarios (auth) -----
   const usuarioPub = (u) => ({ id: u.id, aud: 'authenticated', role: 'authenticated', email: u.email, phone: '', email_confirmed_at: u.email_confirmed_at,
     confirmed_at: u.email_confirmed_at, last_sign_in_at: u.last_sign_in_at, app_metadata: u.raw_app_meta_data || {}, user_metadata: u.raw_user_meta_data || {},
-    identities: [], created_at: u.created_at, updated_at: u.updated_at, is_anonymous: false });
+    identities: [{ id: u.id, user_id: u.id, provider: 'email', identity_data: { email: u.email, sub: u.id } }], created_at: u.created_at, updated_at: u.updated_at, is_anonymous: false });
   function sesionDe(u) {
     const t = Math.floor(Date.now() / 1000);
     const access = firmarJwt({ aud: 'authenticated', exp: t + 3600, iat: t, iss: url + '/auth/v1', sub: u.id, email: u.email, phone: '',
@@ -422,7 +422,11 @@ async function iniciar(opts = {}) {
       if (String(b.password).length < 6) throw errAuth(422, 'weak_password', 'Password should be at least 6 characters.');
       const auto = opts.autoconfirmar !== false;   // { autoconfirmar: false } → hay que confirmar el correo (sin sesión)
       let usr; try { usr = await crearUsuario(b.email, b.password, b.data, auto); } catch (e) {
-        if (e.code === '23505') throw errAuth(422, 'user_already_exists', 'User already registered'); throw e;
+        if (e.code !== '23505') throw e;
+        // Como GoTrue: con confirmación por correo no dice «ya existe» (para no revelar correos): devuelve un
+        // usuario inventado SIN identidades. Sin confirmación responde el error.
+        if (!auto) return { id: crypto.randomUUID(), aud: 'authenticated', role: 'authenticated', email: String(b.email).toLowerCase(), phone: '', app_metadata: {}, user_metadata: {}, identities: [], created_at: new Date().toISOString(), updated_at: new Date().toISOString(), is_anonymous: false };
+        throw errAuth(422, 'user_already_exists', 'User already registered');
       }
       return auto ? sesionDe(usr) : usuarioPub(usr);
     }

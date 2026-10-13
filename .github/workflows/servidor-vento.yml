@@ -103,6 +103,10 @@ jobs:
             [ "$C" -ge 200 ] && [ "$C" -lt 300 ] && echo "✅ Correo propio configurado: llegan a cualquier correo y con código" || echo "::warning title=Correo propio::No se pudo configurar el SMTP ($C): $(head -c 300 /tmp/a2.out)"
           else
             echo "ℹ️ Sin correo propio (secretos VENTO_SMTP_*): se usa el de Supabase (enlace; solo a los correos del equipo de Supabase)."
+            # Sin correo propio el mensaje para confirmar la cuenta no le llega a nadie: las cuentas quedarían sin
+            # poder entrar en otro celular. Se confirman solas (el correo sigue siendo único: no se repite).
+            C=$(curl -s -o /tmp/a3.out -w '%{http_code}' -X PATCH "${H[@]}" "$API" --data '{"mailer_autoconfirm":true}'); echo "Cuentas sin confirmar por correo: $C"
+            [ "$C" -ge 200 ] && [ "$C" -lt 300 ] || echo "::warning title=Cuentas con correo::No se pudo quitar la confirmación por correo ($C): $(head -c 300 /tmp/a3.out)"
           fi
 
       - name: Entrar con Google (cuentas de Vento con Gmail)

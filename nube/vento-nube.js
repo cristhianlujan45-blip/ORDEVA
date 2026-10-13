@@ -156,13 +156,17 @@
   }
   var ROLES = { dueno: 'dueño', admin: 'administrador', cajero: 'cajero', mesero: 'mesero' };
 
+  // El negocio de la nube va atado al negocio de ESTE celular con el que se conectó (puede haber varios en
+  // un mismo celular): si se abre otro, no se sube ni se baja nada hasta volver al suyo.
+  function sedeActual(){ try{ return localStorage.getItem('bar-current-sede') || 'default'; }catch(e){ return 'default'; } }
+  function enSede(){ return !st.sede || st.sede === sedeActual(); }
   function cambio(){                     // la app acaba de guardar
-    if(!st.negocio || !configurada()) return;
+    if(!st.negocio || !configurada() || !enSede()) return;
     st.sucio = true; guardarSt(); pintarEstado();
     clearTimeout(tSubir); tSubir = setTimeout(subir, SUBIR_MS);
   }
   function subir(){
-    if(!st.negocio) return Promise.resolve();
+    if(!st.negocio || !enSede()) return Promise.resolve();
     if(subiendo){ otraVez = true; return Promise.resolve(); }
     var d = datosApp(); if(!d) return Promise.resolve();
     subiendo = true;
@@ -199,7 +203,7 @@
     });
   }
   function revisarNube(){
-    if(!st.negocio || !configurada() || document.hidden || subiendo) return;
+    if(!st.negocio || !configurada() || document.hidden || subiendo || !enSede()) return;
     cliente().then(function(c){ return c.from('datos_negocio').select('version').eq('negocio_id', st.negocio.id).maybeSingle(); })
       .then(function(r){
         if(r.error) throw r.error;
@@ -295,13 +299,57 @@
   function crearNegocio(nombre){
     var d = datosApp() || {};
     return rpc('crear_negocio', { p_nombre: nombre || d.businessName || 'Mi negocio', p_datos: d, p_nombre_usuario: st.nombre || null })
-      .then(function(id){ st.negocio = { id: id, nombre: nombre || d.businessName || 'Mi negocio', rol: 'dueno' }; st.version = 1; st.sucio = false; st.ultimo = Date.now(); guardarSt(); return base('put', clonar(d)); })
+      .then(function(id){ st.negocio = { id: id, nombre: nombre || d.businessName || 'Mi negocio', rol: 'dueno' }; st.sede = sedeActual(); st.version = 1; st.sucio = false; st.ultimo = Date.now(); guardarSt(); return base('put', clonar(d)); })
       .then(function(){ arrancar(); });
   }
   function elegir(n){
-    st.negocio = { id: n.id, nombre: n.nombre, rol: n.rol }; st.version = 0; guardarSt();
+    st.negocio = { id: n.id, nombre: n.nombre, rol: n.rol }; st.sede = sedeActual(); st.version = 0; guardarSt();
     return bajar(true).then(function(){ arrancar(); });
   }
+
+  // ---------- Cuenta con correo desde la pantalla de entrada ----------
+  // La cuenta vive en la nube, no en el celular: un correo es UNA sola cuenta, y en cualquier celular donde
+  // se entre con ella se ve el mismo negocio (con los mismos datos, sincronizados).
+  function soltarOtra(email){            // en este celular había abierta otra cuenta de la nube: se cierra (no se borra nada)
+    return st.email && st.email !== email ? salir() : Promise.resolve();
+  }
+  function crearCuenta(email, pass, nombre){
+    email = String(email || '').trim().toLowerCase();
+    return soltarOtra(email).then(cliente).then(function(c){ return c.auth.signUp({ email: email, password: pass, options: { data: { nombre: nombre || '' } } }); })
+      .then(function(r){
+        if(r.error) throw r.error;
+        var u = r.data && r.data.user;
+        // Si el servidor pide confirmar el correo, Supabase no dice «ya existe»: devuelve un usuario sin identidades.
+        if(!(r.data && r.data.session) && u && Array.isArray(u.identities) && !u.identities.length) throw new Error('User already registered');
+        st = { email: email, nombre: nombre || '' }; guardarSt();
+        return { sesion: !!(r.data && r.data.session) };
+      });
+  }
+  // Entra a la cuenta y devuelve sus negocios (el primero es el que más le conviene: el suyo propio).
+  function entrarCuenta(email, pass){
+    email = String(email || '').trim().toLowerCase();
+    var misma = st.email === email;
+    return soltarOtra(email).then(cliente).then(function(c){ return c.auth.signInWithPassword({ email: email, password: pass }); })
+      .then(function(r){
+        if(r.error) throw r.error;
+        if(!misma){ st = { email: email }; guardarSt(); }
+        return misNegocios();
+      })
+      .then(function(l){ return (l || []).slice().sort(function(a, b){ return (a.rol === 'dueno' ? 0 : 1) - (b.rol === 'dueno' ? 0 : 1); }); });
+  }
+  // Conecta el negocio de la nube con el de este celular. reemplazar=true (celular nuevo o sin nada propio):
+  // se bajan los datos de la nube. Si no: se juntan los dos (lo de cada lado se conserva) y se sube la mezcla.
+  function vincular(n, reemplazar){
+    st.negocio = { id: n.id, nombre: n.nombre, rol: n.rol }; st.sede = sedeActual(); st.version = 0; guardarSt();
+    if(reemplazar) return bajar(true).then(function(){ arrancar(); });
+    var local = datosApp();
+    return leerNube().then(function(nube){
+      var mezcla = local ? fusionar(null, local, nube.datos) : nube.datos;
+      return aplicar(mezcla, true).then(function(){ return rpc('guardar_datos', { p_negocio: n.id, p_datos: mezcla, p_version: nube.version }); })
+        .then(function(v){ st.version = v; st.sucio = false; st.ultimo = Date.now(); guardarSt(); return base('put', clonar(mezcla)); });
+    }).then(function(){ arrancar(); });
+  }
+  function conectado(email){ return !!(st.negocio && st.email === String(email || '').trim().toLowerCase()); }
   function unirse(codigo, nombre){
     return rpc('unirse_con_codigo', { p_codigo: codigo, p_nombre: nombre || st.nombre || null })
       .then(function(id){ return misNegocios().then(function(l){ var n = (l || []).find(function(x){ return x.id === id; }); if(!n) throw new Error('No se encontró el negocio.'); return elegir(n, true); }); });
@@ -450,6 +498,7 @@
     negocio: function(){ return st.negocio && configurada() ? { id: st.negocio.id, nombre: st.negocio.nombre, rol: st.negocio.rol } : null; },
     cliente: cliente, config: cfg,
     googleDisponible: googleDisponible, conGoogle: conGoogle, volvioDeGoogle: volvioDeGoogle,
+    crearCuenta: crearCuenta, entrarCuenta: entrarCuenta, vincular: vincular, crearNegocio: crearNegocio, conectado: conectado, salir: salir,
     msgError: msgError, codigoCorreo: codigoCorreo, enlaceClave: enlaceClave, correoDeEnlace: correoDeEnlace, claveConEnlace: claveConEnlace, soltarEnlace: soltarEnlace, verificarCorreo: verificarCorreo, nuevaClave: nuevaClave, soltarSesion: soltarSesion,
     _fusionar: fusionar
   };
