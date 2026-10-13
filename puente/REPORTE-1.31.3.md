@@ -42,4 +42,4 @@ Se reprodujo con un simulador del reconocedor de Android que se porta como la ap
 |---|---|
 | microfono — 10 vueltas, alternando la app instalada y la nueva: orden de un tirón, pedido con 4 pausas, cantidades grandes con gente hablando después, pausa a mitad de frase y tocar sin hablar. En cada una: un solo pitido, sin reabrirse, anota una vez y rápido, micrófono cerrado y sonido devuelto | 211 / 211 |
 | vozcomandos — 54 comandos dichos por el micrófono: básicos, formas cortas («la 3…», «3 dos águilas»), pedidos con pausas, cantidades grandes, corregir, deshacer, cuentas y totales, crear/nombrar/pasar/juntar/abrir/quitar mesas con «sí»/«no», personas, abonos, inventario, recordar, ayuda, libreta, calculadora, cobrar, botón IA sin clave y producto por voz | 109 / 109 |
-| Batería completa (todas las pruebas de `pruebas/`) | ver abajo |
+| Batería completa: las 30 pruebas de `pruebas/` (navegador, «Hola Vento», APK, facturas, pagos, música, cuentas…) | todas pasaron (más de 955 verificaciones, 0 fallas) |
