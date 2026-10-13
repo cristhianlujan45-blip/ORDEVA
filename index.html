@@ -10815,7 +10815,7 @@ function openAIConfigDialog(){
   provEl.value = current;
 
   const HELP = {
-    gemini: 'Consigue tu API key <b>gratis</b> en <b>aistudio.google.com/apikey</b> (entra con tu cuenta de Google y toca “Create API key”). Empieza por <b>AIza</b> o <b>AQ.</b>. Se guarda solo en este dispositivo. La app no pone límites; el plan gratis tiene topes diarios y por minuto que fija Google, y la voz clásica sigue funcionando sin límites.',
+    gemini: 'La mejor y más fácil para leer facturas. <b>1.</b> Toca <b>🔑 Sacar mi clave gratis</b> (entra con tu cuenta de Google → «Create API key»). <b>2.</b> Cópiala, pégala aquí y toca <b>Guardar</b>. Empieza por <b>AIza</b> o <b>AQ.</b>. Se configura <b>una sola vez</b>: queda en los datos del negocio y llega sola a los demás celulares.<br><a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" style="display:inline-block;margin-top:8px;padding:9px 12px;border-radius:10px;border:1px solid currentColor;color:inherit;text-decoration:none;font-weight:700">🔑 Sacar mi clave gratis</a>',
     openai: 'Pega tu API key de OpenAI (empieza por <b>sk-</b>). Se guarda solo en este dispositivo. No la compartas. La app no pone límites; los únicos son los de tu cuenta en platform.openai.com.'
   };
   const paint = () => {
@@ -10840,10 +10840,16 @@ function openAIConfigDialog(){
     setAIProvider(current);
     lsSet(AI_WEB_ALWAYS_KEY, webEl.checked ? '1' : '');
   };
-  box.querySelector('#aiCfgSave').onclick = () => {
+  // Guardar = guardar Y comprobar de una vez (antes había que tocar «Probar conexión» aparte).
+  box.querySelector('#aiCfgSave').onclick = async () => {
     persist();
-    statusEl.textContent = hasAIKey() ? 'Guardado. Toca “Probar conexión” para verificar que funciona.' : 'Clave eliminada.';
-    showToast(hasAIKey() ? 'IA configurada en este dispositivo.' : 'Clave de IA eliminada.');
+    if(!hasAIKey()){ statusEl.textContent = 'Clave eliminada.'; showToast('Clave de IA eliminada.'); return; }
+    statusEl.textContent = 'Guardado. Comprobando que funciona…';
+    try{
+      await aiText({ prompt: 'Responde solo con la palabra OK.', timeoutMs: 30000, retries: 1 });
+      statusEl.textContent = '✅ Listo: la IA quedó configurada para el negocio (modelo ' + aiLastModel + '). Ya puedes escanear facturas.';
+      showToast('✅ IA configurada: ya puedes escanear facturas.', 6000);
+    }catch(err){ statusEl.textContent = '⚠️ Se guardó, pero no funcionó: ' + (err && err.message ? err.message : err); }
   };
   box.querySelector('#aiCfgTest').onclick = async () => {
     persist();
@@ -13503,6 +13509,18 @@ async function leerFactura(files, btn, input){
     files = await Promise.all(files.map(async f => { if(fiEsPdf(f)) return f; try{ const m = (await fiMejorarFoto(f)).file; try{ m.__original = f; }catch(e){} return m; }catch(e){ return f; } }));
   }
   window.__fiArchivo = original;
+  // Sin IA configurada (ni la clave de Vento en el servidor ni una propia): se ofrece configurarla UNA vez (queda
+  // en los datos del negocio y llega sola a los demás celulares). Una vez al día como máximo; si no, se lee sin internet.
+  if(!hasAIKey() && navigator.onLine !== false && authIsAdmin()){
+    let hoy = ''; try{ hoy = new Date().toDateString(); }catch(e){}
+    if(lsGet('vento-ia-ofrecida') !== hoy){
+      lsSet('vento-ia-ofrecida', hoy);
+      const si = await showConfirm({ title: '⚡ Leer facturas con IA', icon: '🧾',
+        message: 'Con la IA (Gemini de Google, gratis) la factura se lee en segundos y con los datos completos (productos, cantidades, costos, IVA).\n\nSe configura UNA sola vez: pegas tu clave y queda para todos los celulares del negocio.\n\n¿Configurarla ahora? (Si no, esta factura se lee sin internet, más despacio.)',
+        confirmText: 'Configurar IA', cancelText: 'Leer sin IA' });
+      if(si){ input.value = ''; try{ openAIConfigDialog(); }catch(e){} return; }
+    }
+  }
   const conIA = hasAIKey() && navigator.onLine !== false;
   if(conIA && await handleOnlineInvoiceFiles(files, btn, input)) return;
   if(!window.VitoOfflineOCR){ if(!conIA) showToast('Configura la IA (⚙️ en Productos) para leer facturas.'); return; }

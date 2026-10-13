@@ -20,6 +20,11 @@
   - Medido con la clave real: ~10 s el primer intento con Google saturado (antes 20–28 s o error); ~6 s los siguientes.
   - Si la IA agrega basura al final del JSON o lo corta en una factura larga, se leen igual los renglones completos.
   - Lo mismo aplica a todo lo que usa la IA (foto de producto, voz, asistente): ya no se queda esperando un modelo saturado.
+- **IA para facturas configurada UNA vez.**
+  - Si no hay IA, al escanear una factura Vento ofrece «⚡ Leer facturas con IA» (máximo una vez al día).
+  - La ventana trae «🔑 Sacar mi clave gratis» (Google AI Studio). Al tocar «Guardar», la clave se guarda y se comprueba de una vez.
+  - La clave queda en los datos del negocio y llega sola a los demás celulares.
+  - Con el secreto `GEMINI_API_KEY` en el servidor, queda configurada para TODOS los negocios sin que nadie pegue nada.
 - **Confirmaciones de DaviPlata en el celular.** Hay dos caminos, porque DaviPlata **no tiene webhook** para las
   transferencias normales a tu número:
   1. **Transferencia normal a tu número de DaviPlata o Nequi (sin convenio):**
@@ -62,6 +67,7 @@
 | facturarapida (Gemini simulado: saturado, lento, basura, cortado, clave mala) | 9 |
 | avisosandroid (puente Android simulado) | 10 |
 | youtubesincupo (API de YouTube respondiendo «quotaExceeded») | 12 |
+| iaunavez (configurar la IA una sola vez) | 8 |
 
 La app Android cambió (VentoEscucha): hay que compilar y publicar el APK nuevo. Se publica solo cuando están los secretos
 de la llave de firma (ver `android/LEEME.md`).
