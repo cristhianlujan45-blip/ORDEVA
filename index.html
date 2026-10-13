@@ -2977,6 +2977,7 @@ body.mod-v #quickSaleBtn{ order:-1; background:var(--amber); color:#fff; border-
 .iv-grid label{font-size:11px;opacity:.75;display:block;margin-bottom:2px}
 .iv-item input,.iv-item select{width:100%;box-sizing:border-box;padding:8px;font-size:14px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px}
 .iv-note{font-size:12px;opacity:.7;margin-top:4px}
+.iv-division{opacity:.95;font-size:13px}.iv-qty.iv-falta{border:2px solid #f5a524!important;box-shadow:0 0 0 3px rgba(245,165,36,.25)}.iv-falta-msg{margin-top:6px;padding:8px 10px;border-radius:10px;background:rgba(245,165,36,.14);color:#f5a524;font-size:13px;font-weight:700;line-height:1.35}
 .iv-section{margin-top:10px;padding:10px;border-radius:10px;background:rgba(255,255,255,.03);border:1px solid var(--line)}
 .iv-section-venta{background:rgba(76,217,123,.05)}
 .iv-section-title{font-size:12.5px;font-weight:700;color:var(--ink-soft);margin-bottom:8px;text-transform:uppercase;letter-spacing:.02em}
@@ -12364,7 +12365,9 @@ function fiCuadrar(items, header){
       else if(cerca(q, c * k, 0.001)) N = q;
       else N = q;
     }
+    const qtyFalta = !(N > 0);
     if(!(N > 0)) N = 1;
+    if(qtyFalta) notas.push('no se leyó la cantidad: escríbela y Vento divide el total');
     // 2) total del renglón con IVA
     let Tc = null;
     if(S != null && V != null) Tc = S + V - (D || 0);
@@ -12395,7 +12398,7 @@ function fiCuadrar(items, header){
       line_subtotal: Math.round(lineaTotal / (1 + rr)), line_iva: Math.round(lineaTotal - lineaTotal / (1 + rr)),
       iva_pct: r != null ? Math.round(rr * 1000) / 10 : null, costo_unit_sin_iva: Math.round(sinIva * 100) / 100, iva_unit: Math.round((u - sinIva) * 100) / 100,
       cajas: c > 0 && k > 1 ? c : 1, unidades_por_caja: c > 0 && k > 1 ? k : N, costo_sin_iva: Math.round(sinIva * (c > 0 && k > 1 ? k : N) * 100) / 100,
-      cuadra: x.cuadra === false ? false : cuadra, ajustes: notas
+      cuadra: x.cuadra === false ? false : cuadra, ajustes: notas, qty_falta: qtyFalta
     });
     return x;
   });
@@ -12828,12 +12831,14 @@ function invoiceRowHtml(it, i){
     '<div class="iv-section">' +
       '<div class="iv-section-title">🧾 Lo que te costó (esta compra)</div>' +
       '<div class="iv-grid">' +
-        '<div><label>Cantidad (unidades)</label><input type="number" class="iv-qty" min="0" step="1" value="' + it.qty + '"></div>' +
+        '<div><label>Cantidad (unidades)</label><input type="number" inputmode="numeric" class="iv-qty' + (it.qtyFalta ? ' iv-falta' : '') + '" min="1" step="1" value="' + it.qty + '"></div>' +
         '<div><label>Costo por unidad (con IVA)</label><input type="number" class="iv-cost" min="0" step="50" value="' + it.cost + '"></div>' +
       '</div>' +
+      (it.qtyFalta ? '<div class="iv-falta-msg">⚠️ No se leyó cuántas unidades son. Escribe la cantidad (o abre «📦 ¿Viene en cajas?») y Vento divide el total entre las unidades.</div>' : '') +
+      '<div class="iv-note iv-division">' + fiDivisionTxt(it) + '</div>' +
       (matched && matched.cost != null ? '<div class="iv-note">Costo anterior de este producto: ' + fmt(matched.cost) + '</div>' : '') +
       '<div class="iv-full" style="margin-top:6px"><label>Total de la compra (' + cajas + ' × ' + unidadesPorCaja + ' = ' + (cajas * unidadesPorCaja) + ' unid., con IVA)</label><input type="number" class="iv-totalcompra" min="0" step="1" value="' + Math.round(totalCompraConIva) + '"></div>' +
-      '<details class="iv-boxdetails"><summary>📦 Cajas / paquetes de esta compra</summary>' +
+      '<details class="iv-boxdetails"' + ((it.qtyFalta || (it.cajas || 1) > 1) ? ' open' : '') + '><summary>📦 ¿Viene en cajas o paquetes? (ej. 1 caja × 24 unidades)</summary>' +
         '<div class="iv-grid" style="margin-top:8px">' +
           '<div><label>Cant. cajas / paquetes</label><input type="number" class="iv-cajas" min="1" step="1" value="' + cajas + '"></div>' +
           '<div><label>Unid. por caja / paquete</label><input type="number" class="iv-unidxcaja" min="1" step="1" value="' + unidadesPorCaja + '"></div>' +
@@ -12978,7 +12983,7 @@ function invoiceMatchItems(rawItems, proveedor){    // arma las filas de revisi�
         presentation: pesoNota ? upp + ' x ' + String(pesoU || volU).replace('.', ',') + ' ' + (pesoU ? 'g' : 'ml') + ' (' + (pres.presentacion || '').replace(/^\d+ x /, '') + ' en total)' : (x.presentation || pres.presentacion || ''), unitsPerPackage: upp,
         contentPerUnit: pesoNota ? String(pesoU || volU).replace('.', ',') + ' ' + (pesoU ? 'g' : 'ml') : (x.content_per_unit || (pres.contenido != null ? String(pres.contenido).replace('.', ',') + (pres.unidadContenido ? ' ' + pres.unidadContenido : '') : null)),
         pesoNota, pesoOpc, pesoModo: pesoNota ? 'div' : 'tot', weightG: pesoNota ? pesoU : pres.pesoG, volumeMl: pesoNota ? volU : pres.volumenMl, discount: n01(x.discount), ivaPctLeido: ivaLeido, ivaValue: n01(x.iva_value), lineTotal,
-        qtyDeColumna, match, noCuadra: x.cuadra === false, ajustes: Array.isArray(x.ajustes) ? x.ajustes.slice(0, 4) : [],
+        qtyDeColumna, qtyFalta: !!x.qty_falta, match, noCuadra: x.cuadra === false, ajustes: Array.isArray(x.ajustes) ? x.ajustes.slice(0, 4) : [],
         lineSubtotal: n01(x.line_subtotal), lineIva: n01(x.line_iva),
         qty, cost, cajas, unidadesPorCaja, costoSinIva, ivaPct,
         productId: match.productId || '',
@@ -13125,7 +13130,14 @@ function invoiceReadRow(el){
   if(uniEl) it.unit = uniEl.value.trim().slice(0, 12) || null;
   return it;
 }
+// «$60.000 ÷ 24 unid. = $2.500 c/u»: la división a la vista, para saber de dónde sale el costo por unidad.
+function fiDivisionTxt(it){
+  const total = (it.cajas || 1) * (it.costoSinIva || 0) * (1 + (it.ivaPct || 0)), q = Math.max(1, it.qty || 1);
+  if(!(total > 0)) return '';
+  return '🧮 Total del renglón ' + fmt(Math.round(total)) + ' ÷ ' + q + (q === 1 ? ' unidad' : ' unidades') + ' = <b>' + fmt(Math.round(total / q)) + '</b> cada una' + ((it.cajas || 1) > 1 ? ' (' + it.cajas + ' × ' + it.unidadesPorCaja + ')' : '');
+}
 function invoiceRecalcFromBox(it){                // recalcula cantidad y costo/unidad a partir de cajas × unid./caja × precio (con IVA)
+  it.qtyFalta = false;
   const totalUnidades = Math.max(1, (it.cajas || 1) * (it.unidadesPorCaja || 1));
   const costoTotalConIva = (it.cajas || 1) * (it.costoSinIva || 0) * (1 + (it.ivaPct || 0));
   it.qty = totalUnidades;
@@ -13154,9 +13166,18 @@ function invoiceApplyFieldChange(it, cls, target){  // recalcula el item según 
     // para que siempre cuadren entre sí.
     it.marginPct = it.newPrice > 0 ? Math.max(0, (it.newPrice - it.cost) / it.newPrice) : it.marginPct;
   } else if(cls.contains('iv-qty')){
-    // Cambió la cantidad total de unidades a mano: ajustamos "unid. por
-    // caja" para que cajas × unid./caja siga sumando lo mismo.
-    it.unidadesPorCaja = Math.max(1, Math.round(it.qty / (it.cajas || 1)));
+    // Cambió la cantidad de unidades a mano: lo que dice la factura es cuánto se PAGÓ por el renglón, así que ese
+    // total se mantiene y se DIVIDE entre las unidades (antes se dejaba el costo por unidad y el total se multiplicaba).
+    const q = Math.max(1, it.qty || 1), iva = it.ivaPct || 0;
+    const total = (it.cajas || 1) * (it.costoSinIva || 0) * (1 + iva);
+    if(q % (it.cajas || 1) === 0) it.unidadesPorCaja = q / (it.cajas || 1); else { it.cajas = 1; it.unidadesPorCaja = q; }
+    it.qty = q;
+    if(total > 0){
+      it.costoSinIva = total / (it.cajas * (1 + iva));
+      it.cost = Math.round(total / q * 100) / 100;
+      it.newPrice = invoicePriceFromMargin(it.cost, it.marginPct) || it.newPrice;
+    }
+    it.qtyFalta = false;
   } else if(cls.contains('iv-cajas') || cls.contains('iv-unidxcaja') || cls.contains('iv-costosiniva') || cls.contains('iv-ivapct')){
     // Cambió algo del desglose por cajas/paquetes: recalculamos la cantidad
     // total y el costo por unidad, y de ahí el precio de venta sugerido.
@@ -13218,6 +13239,8 @@ function invoiceUpdateRowLive(row, it){
     margenActualEl.textContent = c.margenActual == null ? '—' : Math.round(c.margenActual * 100) + '%';
     margenActualEl.className = 'iv-actual-margen ' + (c.margenActual == null ? '' : (c.margenActual < 0 ? 'bad' : 'good'));
   }
+  const dv = row.querySelector('.iv-division'); if(dv) dv.innerHTML = fiDivisionTxt(it);
+  if(!it.qtyFalta){ const fm = row.querySelector('.iv-falta-msg'); if(fm) fm.remove(); const qi = row.querySelector('.iv-qty'); if(qi) qi.classList.remove('iv-falta'); }
   const totalLabel = row.querySelector('.iv-totalcompra') && row.querySelector('.iv-totalcompra').previousElementSibling;
   if(totalLabel) totalLabel.textContent = 'Total de la compra (' + c.cajas + ' × ' + c.unidadesPorCaja + ' = ' + (c.cajas * c.unidadesPorCaja) + ' unid., con IVA)';
 
@@ -23367,7 +23390,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-13 · v1.31.0';
+const MESORA_VERSION = '2026-10-13 · v1.31.1';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'Vento · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 // Si el navegador (o el celular, con la app agregada a la pantalla de inicio) se quedó con
