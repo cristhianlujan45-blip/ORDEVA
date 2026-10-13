@@ -37,7 +37,7 @@
   }
   SR.prototype.start = function(){
     if(activo && activo !== this){ try{ activo._vivo = false; }catch(e){} }
-    activo = this; this._fin = []; this._vivo = true; this._parado = false; this._oyo = false; this._ultimo = null; this._reabrir = false; this._desde = Date.now();
+    activo = this; this._fin = []; this._vivo = true; this._parado = false; this._oyo = false; this._oyoSesion = false; this._ultimo = null; this._reabrir = false; this._desde = Date.now(); this._reabiertas = 0;
     var l = libre; libre = null; clearTimeout(libreT);
     if(l && l.lang === (this.lang || 'es-CO') && l.parcial === !!this.interimResults){
       // El micrófono ya está escuchando: se toma tal cual (sin cerrarlo ni volverlo a abrir).
@@ -48,11 +48,30 @@
     this._tomada = 0; this._previo = null; this._listo = false;
     A.vozIniciar(this.lang || 'es-CO', !!this.interimResults, !!this.continuous);
   };
-  SR.prototype.stop = function(){ this._parado = true; try{ A.vozParar(); }catch(e){} };
   // Cancelar: el aviso de «terminé» que manda Android después es de ESTA escucha; si llegara a la siguiente
   // (p. ej. «Hola Vento» suelta el micrófono y enseguida se toca el botón) la cortaría. Se descarta.
   var finesIgnorar = 0;
-  SR.prototype.abort = function(){ var me = this; if(activo !== me) return; activo = null; me._vivo = false; finesIgnorar++; try{ A.vozCancelar(); }catch(e){ finesIgnorar--; } setTimeout(function(){ me.onend && me.onend({}); }, 0); };
+  /* Pitido de Android: suena cada vez que se abre el micrófono. Con el botón 🎤 solo debe sonar al tocarlo; cuando la
+     escucha se vuelve a abrir sola tras una pausa del pedido se silencia (como «Hola Vento») y vuelve al terminar. */
+  var mudo = false;
+  function callar(si){ if(si === mudo) return; mudo = si; try{ A.vozSilencio && A.vozSilencio(si); }catch(e){} }
+  function soltarMudo(){ if(!mudo) return; setTimeout(function(){ if(activo && activo._vivo) return; callar(false); }, 350); }
+  /* Parar: si en ESTA escucha de Android no se ha oído nada (se volvió a abrir tras la orden, o nunca se habló) se
+     CANCELA y se termina ya. Antes se «paraba»: Android respondía «no te entendí», la app nativa lo tomaba como un
+     tropiezo al abrir y volvía a abrir el micrófono sola (otro pitido y 5–8 s más escuchando — y anotando lo que se
+     hablara cerca — antes de anotar el pedido). */
+  SR.prototype.stop = function(){
+    var me = this; me._parado = true;
+    if(activo === me && me._vivo && !me._oyoSesion){
+      activo = null; me._vivo = false; finesIgnorar++;
+      try{ A.vozCancelar(); }catch(e){ finesIgnorar--; }
+      soltarMudo();
+      setTimeout(function(){ if(!me._oyo && me.onerror) me.onerror({ error: 'no-speech' }); me.onend && me.onend({}); }, 0);
+      return;
+    }
+    try{ A.vozParar(); }catch(e){}
+  };
+  SR.prototype.abort = function(){ var me = this; if(activo !== me) return; activo = null; me._vivo = false; finesIgnorar++; try{ A.vozCancelar(); }catch(e){ finesIgnorar--; } soltarMudo(); setTimeout(function(){ me.onend && me.onend({}); }, 0); };
   SR.prototype.ceder = function(){
     var me = this; if(activo !== me) return;
     if(!me._listo || !me._vivo){ me.abort(); return; }          // todavía abriendo o ya terminando: como antes
@@ -84,7 +103,9 @@
         if(!r._oyo && Date.now() - r._tomada < 350){ if(d.final) r._reabrir = true; else if(alts[0]) r._previo = alts[0].t; return; }
         if(r._previo){ alts = sinPrevio(alts, r._previo); if(!alts.length){ if(d.final && !r._oyo) r._reabrir = true; return; } }
       }
-      if(alts[0]){ r._oyo = true; r._ultimo = alts[0].t; }
+      if(alts[0]){ r._oyo = true; r._oyoSesion = true; r._ultimo = alts[0].t; }
+      // Botón 🎤: terminó una frase; si la escucha se vuelve a abrir para seguir el pedido, que no pite.
+      if(d.final && r.mantener && alts[0]) callar(true);
       var res = lista(alts.map(function(a){ return { transcript: a.t, confidence: a.c }; })); res.isFinal = !!d.final;
       var todos;
       if(d.final){ r._fin.push(res); todos = lista(r._fin.slice()); }
@@ -102,18 +123,20 @@
     if(tipo === 'end'){
       if(r._reabrir || reabrir(r)){
         if(r._vivo && !r._parado){
-          r._reabrir = false; r._tomada = 0; r._previo = null; r._listo = false; r._fin = [];
+          r._reabrir = false; r._tomada = 0; r._previo = null; r._listo = false; r._fin = []; r._oyoSesion = false;
           try{ A.vozIniciar(r.lang || 'es-CO', !!r.interimResults, !!r.continuous); return; }catch(e){}
         }
       }
       // Botón 🎤: Android cierra la escucha en cada pausa («dos águilas… tres póker»). Antes ahí se cortaba el pedido y se
       // perdía lo que seguía; ahora se vuelve a abrir sola y se SUMA, hasta que la página detecte un silencio de verdad
       // (o se toque el botón). Lo que ya se oyó (r._fin) se conserva.
-      if(r.mantener && r._vivo && !r._parado && r._oyo && Date.now() - (r._desde || 0) < 45000){
-        r._listo = false; r._reabiertas = (r._reabiertas || 0) + 1;
+      // Tope: 25 s y 8 vueltas (con música o gente hablando cerca no se queda escuchando sin fin).
+      if(r.mantener && r._vivo && !r._parado && r._oyo && Date.now() - (r._desde || 0) < 25000 && (r._reabiertas || 0) < 8){
+        r._listo = false; r._oyoSesion = false; r._reabiertas = (r._reabiertas || 0) + 1;
+        callar(true);
         try{ A.vozIniciar(r.lang || 'es-CO', !!r.interimResults, !!r.continuous); return; }catch(e){}
       }
-      if(!r._vivo && r._finAvisado) return; r._vivo = false; r._finAvisado = true; if(activo === r) activo = null; r.onend && r.onend({}); setTimeout(function(){ r._finAvisado = false; }, 0);
+      if(!r._vivo && r._finAvisado) return; r._vivo = false; r._finAvisado = true; if(activo === r) activo = null; soltarMudo(); r.onend && r.onend({}); setTimeout(function(){ r._finAvisado = false; }, 0);
     }
   };
   window.SpeechRecognition = window.webkitSpeechRecognition = SR;
@@ -6432,8 +6455,12 @@ function parseVoiceCommand(rawText){
 
   // Modos: corregir/fijar cantidad, quitar/restar o agregar (por defecto).
   let mode = 'add';
-  if(/\b(corrige|corrigela|corrigelo|corregir|corrijo|correccion|corregime|corrigeme|deja|dejame|pon en)\b/.test(text)){
+  // «la mesa 4 son tres águilas», «no, eran dos póker» también corrigen la cantidad (antes AGREGABA una más).
+  // «son dos águilas para la mesa 3» sigue siendo un pedido nuevo.
+  const corrigeSon = /\b(mesa|meza|mesita)\s+\S+\s+(son|eran)\b|\beran\b|\b(no|realidad|realmente|dicho)\s+(y\s+)?son\b/;
+  if(corrigeSon.test(text) || /\b(corrige|corrigela|corrigelo|corregir|corrijo|correccion|corregime|corrigeme|deja|dejame|pon en)\b/.test(text)){
     mode = 'set';
+    if(corrigeSon.test(text)) text = text.replace(/\b(no\s+)?(en realidad\s+|realmente\s+|mejor dicho\s+)?(son|eran)\b/g, ' ');
     text = text.replace(/\b(corrige|corrigela|corrigelo|corregir|corrijo|correccion|corregime|corrigeme|deja|dejame|pon en)\b/g, ' ');
   } else if(/\b(quita|quitar|quitame|resta|restar|restame|elimina|eliminar|eliminame|saca|sacar|sacame|borra|borrar|borra de)\b/.test(text)){
     mode = 'subtract';
@@ -6907,11 +6934,12 @@ const PENDING_REMOVAL_TIMEOUT_MS = 20000;
 
 function isConfirmVoiceCommand(rawText){
   const t = normVoiceText(rawText);
-  return /\b(confirmar|confirmo|confirma|si quitar|si eliminar|si borrar|si estoy segur|si seguro|si segura|quitala igual|quitala de todas formas|hazlo|adelante|de una)\b/.test(t);
+  // Un «sí» solo también confirma (solo se pregunta cuando hay una mesa esperando confirmación).
+  return /\b(confirmar|confirmo|confirma|si quitar|si eliminar|si borrar|si estoy segur|si seguro|si segura|quitala igual|quitala de todas formas|hazlo|adelante|de una)\b/.test(t) || /^(si|sii|claro|dale|ok|okey|listo|correcto|exacto|quitala)( (si|senor|senora|claro|por favor|de una|quitala))*$/.test(t);
 }
 function isCancelVoiceCommand(rawText){
   const t = normVoiceText(rawText);
-  return /\b(cancelar|cancela|cancelo|no quitar|no la quites|mejor no|olvidalo|olvidelo|deja asi|dejala asi)\b/.test(t);
+  return /\b(cancelar|cancela|cancelo|no quitar|no la quites|mejor no|olvidalo|olvidelo|deja asi|dejala asi)\b/.test(t) || /^no( (no|senor|senora|gracias|todavia))*$/.test(t);
 }
 
 function doRemoveTable(target){
@@ -7265,7 +7293,7 @@ function voiceTableManagement(rawText){
   if(tdata.items && tdata.items.length){
     const balance = tableBalance(target);
     pendingTableRemoval = { tableId: target, at: Date.now() };
-    const msg = 'Atención: la Mesa ' + target + ' tiene una cuenta activa de ' + fmtSpoken(balance) + '. Si la quitas, esa cuenta pasa al historial como deuda. Si en verdad quieres quitarla, di "confirmar". Si no, di "cancelar".';
+    const msg = 'Atención: la Mesa ' + target + ' tiene una cuenta activa de ' + fmtSpoken(balance) + '. Si la quitas, esa cuenta pasa al historial como deuda. Si en verdad quieres quitarla, toca el micrófono y di "sí". Si no, di "no".';
     showToast('⚠️ ' + msg);
     speakVoice(msg);
     return true;
@@ -7362,7 +7390,7 @@ let voiceModoIA = false;
 //   no existe, se separa en "mesa 1, 2 águilas" (se prueba el corte que deja una mesa que sí existe).
 function voiceNormalizarHabla(raw){
   let t = String(raw || '');
-  try{ const [sg, pl] = espacio(); if(sg !== 'Mesa'){ const q = w => w.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); const pat = w => q(w).split('').map(c => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[\\u0300-\\u036f]?').join(''); t = t.normalize('NFD').replace(new RegExp('(^|[^\\p{L}])(' + pat(pl) + '|' + pat(sg) + ')(?![\\p{L}])', 'giu'), (m, a, w) => a + (q(w) === q(pl) && q(pl) !== q(sg) ? 'mesas' : 'mesa')).normalize('NFC'); } }catch(e){}
+  try{ const [sg, pl] = espacio(); if(sg !== 'Mesa'){ const q = w => w.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); const pat = w => q(w).split('').map(c => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[\\u0300-\\u036f]?').join(''); t = t.normalize('NFD').replace(new RegExp('(^|[^\\p{L}])(' + pat(pl) + '|' + pat(sg) + ')(?![\\p{L}])', 'giu'), (m, a, w, i, str) => /^cuentas?$/.test(q(w)) && /^\s+(de|del)\b/i.test(str.slice(i + m.length)) ? m : a + (q(w) === q(pl) && q(pl) !== q(sg) ? 'mesas' : 'mesa')).normalize('NFC'); } }catch(e){}   // «la cuenta de la mesa 2» es pedir la cuenta
   t = t.replace(/\bp[oó]quer(e?s)?\b/gi, 'póker').replace(/\bpoker(e?s)\b/gi, 'póker');
   t = t.replace(/\b(mesa|mesita)\s+(\d{2,3})\b(?=\s+[^\d\s])/gi, (all, w, num) => {
     if(data.tables[parseInt(num, 10)]) return all;
@@ -7390,6 +7418,8 @@ function voiceNormalizarHabla(raw){
   t = t.replace(/^\s*(\d{1,3})\s+(?=(?:un|una|uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|\d{1,2})\s+\S)/i, (all, n) => esMesa(parseInt(n, 10)) ? 'mesa ' + n + ' ' : all);
   t = t.replace(/\bmenos\s+(?=\S)/gi, 'quita ');
   // Muletillas al empezar: «que sean dos Póker…», «hay que agregar…», «que me traigan…» (se perdía la cantidad)
+  t = t.replace(/^\s*no[\s,.]+(?=(?:eran|son)\b)/i, '');
+  t = t.replace(/^\s*son\s+(?=(?:un|una|uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce|quince|veinte|treinta|cuarenta|cincuenta|\d+)\s)/i, '');
   t = t.replace(/^\s*(?:que\s+(?:sean|sea|me\s+(?:traigan|traiga|traes|traen|regalen|regale|den|des))|hay\s+que\s+(?:agregar|poner|anotar|sumar|meter)|me\s+(?:traen|traes|trae|regalan|regalas|dan|das))\s+/i, '');
   // Deshacer con otras palabras
   if(/^\s*(borra|quita|cancela|elimina)\s+(lo|el)\s+(ultimo|último)\s*$|^\s*(me equivoque|me equivoqué|error|eso no|corrige eso|devuelve|atras|atrás)\s*$/i.test(t)) t = 'deshacer';
@@ -7711,6 +7741,7 @@ let voiceInterim = '';        // lo último que se oyó aunque no llegara «fina
 let voiceSilenceTimer = null;
 const VOICE_SILENCE_MS = 2000;      // silencio tras hablar antes de procesar el comando (pedidos largos con pausas)
 const VOICE_INITIAL_TIMEOUT_MS = 6000; // tiempo máximo esperando que empiece a hablar
+const VOICE_COMPLETO_MS = 1200;     // app Android: la orden ya está completa (mesa + productos): se anota más rápido
 const VOICE_ABRIENDO_MS = 400;         // si el micrófono tarda más que esto en abrir, se avisa «Abriendo…»
 let voiceAbriendoT = null, voiceTocado = 0, voiceAvisado = false;
 
@@ -7756,6 +7787,22 @@ function pickBestVoiceAlternative(result){
   return best;
 }
 
+/* ¿La frase ya es una orden completa? (mesa que existe + productos conocidos, o un comando como «deshacer», «cuenta de
+   la mesa 2»…). Si termina en «y», «con», «para la mesa», un número suelto… todavía falta: se sigue escuchando. */
+function voiceComandoCompleto(raw){
+  try{
+    const t0 = voiceNormalizarHabla(String(raw || '')), t = normVoiceText(t0);
+    if(!t) return false;
+    if(/\b(y|e|o|con|de|del|para|pa|a|al|la|el|los|las|mas|mesa|meza|mesita|otra|otro|otras|otros|un|una|uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce|trece|catorce|quince|veinte|treinta|cuarenta|cincuenta|sesenta|setenta|ochenta|noventa|cien|ciento|numero|nombre|llama|llamada|son|eran|agrega|agregale|agregame|quita|quitale|pon|ponle|dame|traeme|regaleme)$/.test(t)) return false;
+    if(/\d$/.test(t) && !/\b(mesa|meza)\s+\d+$/.test(t)) return false;
+    if(pendingTableRemoval && (isConfirmVoiceCommand(t0) || isCancelVoiceCommand(t0))) return true;
+    if(isUndoVoiceCommand(t0) || isVoiceHelpCommand(t0) || isSalesTotalVoiceCommand(t0) || isAllTablesTotalVoiceCommand(t0)) return true;
+    if(isBillRequestVoiceCommand(t0) || isRecallVoiceCommand(t0)) return !!extractVoiceTableId(t0);
+    const p = parseVoiceCommand(t0);
+    return !!(p.tableId && data.tables[p.tableId] && p.items.length && p.items.every(it => matchProductVoice(it.productText)));
+  }catch(e){ return false; }
+}
+
 function scheduleVoiceSilenceStop(ms){
   if(voiceSilenceTimer) clearTimeout(voiceSilenceTimer);
   voiceSilenceTimer = setTimeout(() => {
@@ -7776,7 +7823,7 @@ function ensureVoiceRecognizer(){
   voiceRecognizer.maxAlternatives = 5;
   voiceRecognizer.mantener = true;   // en la APK: no se corta en cada pausa (ver el puente de voz de Android, arriba)
   voiceRecognizer.onresult = (e) => {
-    scheduleVoiceSilenceStop(VOICE_SILENCE_MS);
+    const ultFinal = e.results.length && e.results[e.results.length - 1].isFinal;
     // Se reconstruye el texto desde todos los resultados finales (en vez de ir
     // sumando), porque algunos Chrome/Android repiten o acumulan la frase y
     // eso rompía el reconocimiento de la mesa y del producto.
@@ -7796,6 +7843,9 @@ function ensureVoiceRecognizer(){
     // se guarda lo último oído para no perder el pedido (antes había que tocar el micrófono dos veces).
     const ult = e.results[e.results.length - 1];
     if(ult && !ult.isFinal){ const t = pickBestVoiceAlternative(ult); if(t && t.trim()) voiceInterim = t.trim(); }
+    // App Android: Android ya esperó su silencio antes de dar la frase final; si la orden está completa se anota en
+    // 1,2 s (si se sigue hablando, se suma). En el navegador se deja la espera normal.
+    scheduleVoiceSilenceStop(window.VentoAndroid && ultFinal && voiceComandoCompleto(voiceFinalBuffer) ? VOICE_COMPLETO_MS : VOICE_SILENCE_MS);
   };
   voiceRecognizer.onstart = () => {
     if(!voiceListening) return;
@@ -10129,14 +10179,18 @@ function startVoiceProductCreation(){
   const oldResult = rec.onresult;
   const oldError = rec.onerror;
   const oldEnd = rec.onend;
+  // Solo con la frase FINAL y una sola vez. Antes también actuaba con lo que se iba oyendo: con «Póker, precio cinco…»
+  // (todavía sin el «mil») guardaba el producto a $5 y luego otra vez a $5.000.
+  let hecho = false, oido = '';
   rec.onresult = (e)=>{
-    const transcript = e.results[0][0].transcript;
+    if(hecho) return;
+    const finales = []; for(let i = 0; i < e.results.length; i++) if(e.results[i].isFinal) finales.push(e.results[i][0].transcript);
+    if(!finales.length) return;
+    const transcript = finales.join(' ').trim(); oido = transcript;
     const parsed = parseVoiceProductCreation(transcript);
-    if(!parsed.name || parsed.price === null || isNaN(parsed.price) || parsed.price < 0){
-      showToast('No entendí el nombre y el precio. Ejemplo: “agregar producto Póker, precio cinco mil”.');
-      speakVoice('Necesito el nombre del producto y el precio.');
-      return;
-    }
+    if(!parsed.name || parsed.price === null || isNaN(parsed.price) || parsed.price < 0) return;   // falta algo: se avisa al terminar
+    hecho = true;
+    try{ rec.stop(); }catch(err){}
     document.getElementById('prodName').value = parsed.name;
     document.getElementById('prodPrice').value = parsed.price;
     document.getElementById('prodName').focus();
@@ -10158,6 +10212,10 @@ function startVoiceProductCreation(){
     if(btn){ btn.classList.remove('active'); btn.innerHTML = btn.dataset.html || '🎤 Producto por voz'; }
     if(hint) hint.classList.remove('show');
     rec.onresult = oldResult; rec.onerror = oldError; rec.onend = oldEnd; rec.mantener = true;
+    if(!hecho && oido){
+      showToast('Escuché «' + oido + '», pero no entendí el nombre y el precio. Ejemplo: “agregar producto Póker, precio cinco mil”.');
+      speakVoice('Necesito el nombre del producto y el precio.');
+    }
   };
   try{ rec.start(); }catch(e){
     voiceProductListening = false;
@@ -23408,7 +23466,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-13 · v1.31.2';
+const MESORA_VERSION = '2026-10-13 · v1.31.3';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'Vento · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 // Si el navegador (o el celular, con la app agregada a la pantalla de inicio) se quedó con

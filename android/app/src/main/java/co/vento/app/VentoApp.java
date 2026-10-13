@@ -127,10 +127,14 @@ public class VentoApp extends Application {
     // reintentaba con espera: era parte de la demora de «Abriendo el micrófono…».
     private int vozSesion = 0;
     private boolean vozActiva = false;      // hay una escucha abierta en el reconocedor
+    // La página pidió terminar (silencio después del pedido): el «no te entendí» que llega después NO es un tropiezo al
+    // abrir y no se vuelve a escuchar. Antes se reabría sola: otro pitido y varios segundos más escuchando.
+    private boolean vozDetenida = false;
 
     void iniciarVoz() {
         vozPendiente = false;
         vozReintentos = 0;
+        vozDetenida = false;
         escucharVoz(false);
     }
 
@@ -167,7 +171,7 @@ public class VentoApp extends Application {
                 long dura = System.currentTimeMillis() - vozInicio;
                 boolean arranque = dura < 2500 && error != SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS;
                 boolean sinOir = !vozHablo && (error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_CLIENT || error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY);
-                if (vozReintentos < 2 && (arranque || sinOir) && dura < 9000) {
+                if (!vozDetenida && vozReintentos < 2 && (arranque || sinOir) && dura < 9000) {
                     vozReintentos++;
                     // Primer tropiezo: se vuelve a pedir con el MISMO reconocedor (crearlo de nuevo es lo que tarda y
                     // hace perder lo que se dice); solo si vuelve a fallar se crea uno nuevo. «Ocupado» se vuelve a
@@ -719,7 +723,7 @@ public class VentoApp extends Application {
         public void vozPreparar() { ui.post(() -> prepararVoz()); }
 
         @JavascriptInterface
-        public void vozParar() { ui.post(() -> { try { if (voz != null) voz.stopListening(); } catch (Exception ignorado) { } }); }
+        public void vozParar() { ui.post(() -> { vozDetenida = true; try { if (voz != null) voz.stopListening(); } catch (Exception ignorado) { } }); }
 
         @JavascriptInterface
         public void vozCancelar() {
