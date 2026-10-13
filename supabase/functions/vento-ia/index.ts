@@ -10,7 +10,8 @@
 //   GET  /vento-ia/v1beta/models/<modelo>                  → (calentar conexión)
 //   POST /vento-ia/v1beta/models/<modelo>:generateContent
 //   POST /vento-ia/v1beta/models/<modelo>:streamGenerateContent?alt=sse
-//   GET  /vento-ia/yt/buscar?q=…&tipo=video|canal          → canciones/artistas de YouTube SIN gastar cupo (youtube.ts)
+//   GET  /vento-ia/yt/buscar?q=…&tipo=video|canal|lista    → canciones/artistas/playlists de YouTube SIN gastar cupo (youtube.ts)
+//   GET  /vento-ia/yt/lista?id=…                           → canciones de una playlist de YouTube, sin cupo
 // Solo se aceptan pedidos desde la página de Vento (VENTO_ORIGENES), modelos «gemini-…», cuerpos de hasta
 // 8 MB (fotos de facturas) y un máximo de pedidos por minuto por IP, para que nadie más gaste la clave.
 
@@ -56,7 +57,8 @@ Deno.serve(async (req: Request) => {
   // Buscar canciones en YouTube sin gastar el cupo de la API de YouTube (ver youtube.ts). No necesita la clave de Gemini.
   if (ruta === "/yt/buscar" && req.method === "GET") {
     const q = String(u.searchParams.get("q") || "").replace(/\s+/g, " ").trim().slice(0, 120);
-    const tipo = u.searchParams.get("tipo") === "canal" ? "canal" : "video";
+    const t0 = u.searchParams.get("tipo");
+    const tipo = t0 === "canal" ? "canal" : t0 === "lista" ? "lista" : "video";
     if (q.length < 2) return json({ items: [] }, 200, h);
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "?";
     if (demasiados("yt:" + ip)) return json({ error: { code: 429, message: "Demasiadas búsquedas seguidas. Espera un momento." } }, 429, h);
@@ -64,6 +66,18 @@ Deno.serve(async (req: Request) => {
       return json(await YT.buscar(q, tipo), 200, { ...h, "cache-control": "public, max-age=600" });
     } catch (e) {
       return json({ error: { code: 502, message: "No se pudo buscar en YouTube: " + (e instanceof Error ? e.message : String(e)) } }, 502, h);
+    }
+  }
+  // Canciones de una playlist de YouTube (sin cupo).
+  if (ruta === "/yt/lista" && req.method === "GET") {
+    const id = String(u.searchParams.get("id") || "").replace(/[^\w-]/g, "").slice(0, 60);
+    if (id.length < 10) return json({ error: { code: 400, message: "Esa no es una playlist de YouTube." } }, 400, h);
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "?";
+    if (demasiados("yt:" + ip)) return json({ error: { code: 429, message: "Demasiadas búsquedas seguidas. Espera un momento." } }, 429, h);
+    try {
+      return json(await YT.lista(id), 200, { ...h, "cache-control": "public, max-age=600" });
+    } catch (e) {
+      return json({ error: { code: 502, message: "No se pudo leer la playlist: " + (e instanceof Error ? e.message : String(e)) } }, 502, h);
     }
   }
   if (!key) return json({ error: { message: "La IA de Vento todavía no tiene clave en el servidor (secreto GEMINI_API_KEY)." } }, 503, h);

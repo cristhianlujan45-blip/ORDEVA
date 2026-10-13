@@ -1,4 +1,4 @@
-# Vento 1.31.0 — Cuentas con correo en todos los celulares, facturas más rápidas, avisos de DaviPlata en el celular y YouTube sin límite de búsquedas
+# Vento 1.31.0 — Cuentas con correo en todos los celulares, facturas más rápidas, avisos de DaviPlata en el celular YouTube sin límite de búsquedas y tus playlists de música
 
 ## Qué cambió
 
@@ -53,6 +53,16 @@
     (50 unidades por canción). Si se acaba, la app lo dice claro y ofrece «🔗 Vincular con código de TV», que manda las
     canciones directo al TV sin cupo.
 
+- **Música → «📃 Mis playlists de YouTube»:** pon tu propia playlist como música de fondo.
+  - Pega el link de una playlist de YouTube o YouTube Music, o escribe un nombre y toca **🔎 Buscar**. Luego **▶ Poner**.
+  - Queda guardada en tus playlists (en los datos del negocio, para todos los celulares). Se puede repetir al terminar o
+    sonar en orden aleatorio.
+  - Lo que pidan las mesas va primero y después sigue tu playlist. Las canciones entran a la cola de a 2.
+  - Suena por el camino de siempre: TV, YouTube del TV o el reproductor de la app.
+  - Las playlists se leen y se buscan desde el Servidor Vento, sin cupo. De respaldo, con la API de YouTube, que para
+    playlists casi no gasta cupo (1 unidad por cada 50 canciones).
+  - El lector del servidor ya entiende el formato nuevo de las páginas de YouTube.
+
 ## Para el administrador
 
 - Al publicar, el «Servidor Vento» despliega la búsqueda de YouTube sin cupo (función `vento-ia`).
@@ -68,6 +78,7 @@
 | avisosandroid (puente Android simulado) | 10 |
 | youtubesincupo (API de YouTube respondiendo «quotaExceeded») | 12 |
 | iaunavez (configurar la IA una sola vez) | 8 |
+| playlists (buscar, poner, pegar link, mesas primero, respaldo por API, quitar) | 16 |
 
 La app Android cambió (VentoEscucha): hay que compilar y publicar el APK nuevo. Se publica solo cuando están los secretos
 de la llave de firma (ver `android/LEEME.md`).

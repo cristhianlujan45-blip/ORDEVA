@@ -3510,6 +3510,17 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
       <div id="mzList"></div>
       <button class="btn-ghost" id="mzHistBtn" type="button" style="margin-top:8px">📜 Historial de música</button>
     </div>
+    <div class="settings-group" id="mzPlGrupo">
+      <h2>📃 Mis playlists de YouTube</h2>
+      <div class="settings-desc">Pon tu propia música de fondo: pega el link de una playlist de YouTube o YouTube Music (en la playlist: Compartir → Copiar link) o escribe un nombre para buscarla. Cuando una mesa pide una canción, la de la mesa va primero y después sigue tu playlist.</div>
+      <div class="tvv-add"><input id="mzPlIn" class="mz-in" placeholder="Link de la playlist o nombre (ej: salsa baúl)" autocomplete="off" enterkeyhint="search"><button class="btn-primary" id="mzPlBuscar" type="button">🔎 Buscar</button></div>
+      <div id="mzPlRes"></div>
+      <div class="mz-sonando" id="mzPlAhora" hidden></div>
+      <div class="settings-row"><div class="settings-row-text"><strong>🔀 Orden aleatorio</strong><span>Mezcla las canciones de la playlist.</span></div><label class="switch"><input type="checkbox" id="mzPlMezclar"><span class="switch-slider"></span></label></div>
+      <div class="settings-row"><div class="settings-row-text"><strong>🔁 Repetir al terminar</strong><span>Cuando se acaba, vuelve a empezar.</span></div><label class="switch"><input type="checkbox" id="mzPlRepetir" checked><span class="switch-slider"></span></label></div>
+      <div id="mzPlLista"></div>
+      <style>#mzPlGrupo .mz-song{flex-wrap:wrap;gap:8px}#mzPlGrupo .mz-song>span{flex:1 1 100%}#mzPlAhora{display:flex;flex-wrap:wrap;gap:8px;align-items:center}#mzPlAhora[hidden]{display:none}#mzPlAhora>span{flex:1 1 100%}</style>
+    </div>
     <div class="settings-group">
       <h2>🔊 Reproductor en la app</h2>
       <div class="settings-desc">La app reproduce sola las canciones en orden justo, una tras otra, y las que piden los clientes entran solas a la cola. Deja esta pantalla abierta con el celular encendido y con volumen.<br><br>🔈 Suena en este celular (o en el parlante Bluetooth conectado a él).</div>
@@ -18985,7 +18996,7 @@ bootApp();
   const LKEY='vito_notif_log';
   const getPendList=()=>{try{return JSON.parse(localStorage.getItem(PKEY))||[]}catch(e){return[]}};
   const setPendList=l=>{try{localStorage.setItem(PKEY,JSON.stringify(l));}catch(e){}};
-  const getSongList=()=>{try{return (JSON.parse(localStorage.getItem(CKEY))||[]).filter(x=>!x.done)}catch(e){return[]}};
+  const getSongList=()=>{try{return (JSON.parse(localStorage.getItem(CKEY))||[]).filter(x=>!x.done&&!x.fondo)}catch(e){return[]}};   // la música de fondo (tu playlist) no es un pedido: no suena la campana
   const getCfg=()=>{try{return Object.assign({voz:true,volumen:1},JSON.parse(localStorage.getItem(NKEY))||{})}catch(e){return{voz:true,volumen:1}}};
   const setCfg=c=>{try{localStorage.setItem(NKEY,JSON.stringify(c));}catch(e){}};
 
@@ -20343,7 +20354,7 @@ function mzPintarSonando(){
   if(x.dur)t=Math.min(t,x.dur);
   const pct=x.dur?Math.min(100,t/x.dur*100):0;
   e.hidden=false;
-  e.innerHTML='<div class="mzs-t">▶ <b>'+esc(x.title||x.song)+'</b>'+(x.artist?' · '+esc(x.artist):'')+' <span>· '+esc(tableLabel(x.mesa))+'</span></div>'+
+  e.innerHTML='<div class="mzs-t">▶ <b>'+esc(x.title||x.song)+'</b>'+(x.artist?' · '+esc(x.artist):'')+' <span>· '+esc(mzEtq(x))+'</span></div>'+
     '<div class="mzs-bar"><i style="width:'+pct.toFixed(1)+'%"></i></div><div class="mzs-time">'+mmss(t)+' / '+(x.dur?mmss(x.dur):'--:--')+(x.dur?' · faltan '+mmss(x.dur-t):'')+
     (x.fuente==='ytmusic'?' · (en YouTube Music: tiempo aproximado)':'')+'</div>';
 }
@@ -20382,12 +20393,147 @@ window.vitoMusica={cola:()=>cola(),hist:()=>mzHist(),actual:()=>mzActual(),salta
 // Rotación justa: cada mesa tiene «turnos». Su 1.ª canción va en la ronda 1, la 2.ª en la ronda 2…
 // y lo que ya le sonó en la última hora cuenta: una mesa que ya escuchó 3 no se adelanta a una
 // que no ha escuchado ninguna. Dentro de la misma ronda manda el orden de llegada.
+// La música de fondo (tu playlist) va SIEMPRE después de lo que piden las mesas.
 function ordenJusto(l){
-  const cnt={},turno=new Map(),hace=Date.now()-60*6e4;
-  mzHist().concat(l.filter(x=>x.status==='playing')).forEach(x=>{if(['played','playing','skipped'].includes(x.status)&&(x.startedAt||x.requestedAt||0)>=hace)cnt[x.mesa]=(cnt[x.mesa]||0)+1;});
-  l.filter(x=>!x.done).sort((a,b)=>a.ts-b.ts).forEach(x=>{cnt[x.mesa]=(cnt[x.mesa]||0)+1;turno.set(x.id,cnt[x.mesa]);});
-  return l.filter(x=>!x.done).sort((a,b)=>turno.get(a.id)-turno.get(b.id)||a.ts-b.ts);
+  const cnt={},turno=new Map(),hace=Date.now()-60*6e4,q=x=>x.fondo?'fondo':x.mesa;
+  mzHist().concat(l.filter(x=>x.status==='playing')).forEach(x=>{if(['played','playing','skipped'].includes(x.status)&&(x.startedAt||x.requestedAt||0)>=hace)cnt[q(x)]=(cnt[q(x)]||0)+1;});
+  l.filter(x=>!x.done).sort((a,b)=>a.ts-b.ts).forEach(x=>{cnt[q(x)]=(cnt[q(x)]||0)+1;turno.set(x.id,cnt[q(x)]);});
+  return l.filter(x=>!x.done).sort((a,b)=>(a.fondo?1:0)-(b.fondo?1:0)||turno.get(a.id)-turno.get(b.id)||a.ts-b.ts);
 }
+const mzEtq=x=>x&&x.fondo?'🎶 '+(x.mesaNombre||'Tu playlist'):tableLabel(x.mesa);
+/* ---------- 📃 Mis playlists de YouTube: música de fondo del negocio ----------
+   Se guardan en los datos del negocio (data.mzListas, llegan a los demás celulares). Al «Poner» una, sus canciones
+   entran a la cola de a 2 (así lo que pide una mesa no queda detrás de 100 canciones, y no se gasta el cupo de
+   YouTube metiéndolas todas de una) y suenan por el camino de siempre: TV, YouTube del TV o el reproductor de la app.
+   Las canciones se leen del Servidor Vento sin cupo (vento-ia/yt/lista); de respaldo, la API (1 unidad por cada 50). */
+const MZF_KEY='vito_fondo';
+const mzF=()=>LS(MZF_KEY,{on:false});
+const mzListas=()=>((typeof data!=='undefined'&&data&&Array.isArray(data.mzListas))?data.mzListas:[]);
+function mzListaId(t){
+  t=String(t||'').trim();
+  const m=/[?&]list=([\w-]{10,})/.exec(t);if(m)return m[1];
+  return /^(PL|OLAK5uy_|RD|UU|FL|OL|VL)[\w-]{8,}$/.test(t)?t.replace(/^VL/,''):'';
+}
+async function mzSrv(ruta){
+  const b=typeof iaVentoBase==='function'?iaVentoBase():'';if(!b)return null;
+  const ctrl=new AbortController(),tm=setTimeout(()=>ctrl.abort(),20000);
+  try{const r=await fetch(b+ruta,{signal:ctrl.signal});return r.ok?await r.json():null;}catch(e){return null;}finally{clearTimeout(tm);}
+}
+async function mzLeerLista(id){
+  const j=await mzSrv('/yt/lista?id='+encodeURIComponent(id));
+  if(j&&Array.isArray(j.items)&&j.items.length)return{titulo:j.titulo||'',vids:j.items.filter(x=>x&&x.id&&x.id.videoId).map(x=>({v:x.id.videoId,t:(x.snippet&&x.snippet.title)||'',c:(x.snippet&&x.snippet.channelTitle)||'',d:x.duracion||null}))};
+  const vids=[];let tok='',titulo='';
+  try{
+    for(let n=0;n<4;n++){
+      const r=await yGet('playlistItems?part=snippet&maxResults=50&playlistId='+encodeURIComponent(id)+(tok?'&pageToken='+encodeURIComponent(tok):''));
+      if(!r||!Array.isArray(r.items))break;
+      r.items.forEach(it=>{const sn=it.snippet||{},v=sn.resourceId&&sn.resourceId.videoId;if(v&&!/^(private|deleted) video$/i.test(sn.title||''))vids.push({v,t:sn.title||'',c:sn.videoOwnerChannelTitle||'',d:null});});
+      tok=r.nextPageToken;if(!tok)break;
+    }
+    const p=await yGet('playlists?part=snippet&id='+encodeURIComponent(id));titulo=(p&&p.items&&p.items[0]&&p.items[0].snippet&&p.items[0].snippet.title)||'';
+  }catch(e){}
+  return vids.length?{titulo,vids}:null;
+}
+const mzMezclar=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
+function mzGuardarLista(id,nombre,n){
+  if(typeof data==='undefined'||!data)return;
+  data.mzListas=[{id,nombre:String(nombre||'Mi playlist').slice(0,80),n:n||null}].concat(mzListas().filter(x=>x.id!==id)).slice(0,30);
+  saveData();
+}
+async function mzPonerLista(id,nombre,boton){
+  if(boton){boton.disabled=true;boton.dataset.t=boton.textContent;boton.textContent='⏳';}
+  try{
+    const L=await mzLeerLista(id);
+    if(!L){showToast('⚠️ No pude leer esa playlist. Revisa que sea pública (o «no listada») y que haya internet.',8000);return false;}
+    const nom=L.titulo||nombre||'Mi playlist';
+    mzGuardarLista(id,nom,L.vids.length);
+    mzFondoQuitar(true);
+    const mezclar=!!($('mzPlMezclar')&&$('mzPlMezclar').checked),repetir=!($('mzPlRepetir')&&!$('mzPlRepetir').checked);
+    SS(MZF_KEY,{on:true,id,nombre:nom,vids:mezclar?mzMezclar(L.vids):L.vids,pos:0,mezclar,repetir});
+    mzFondoRellenar();
+    showToast('🎶 Sonando de fondo: «'+nom+'» ('+L.vids.length+' canciones). Lo que pidan las mesas va primero.',7000);
+    try{renderMusica();}catch(e){}
+    return true;
+  }finally{if(boton){boton.disabled=false;boton.textContent=boton.dataset.t||'▶ Poner';}}
+}
+function mzFondoQuitar(silencio){
+  const f=mzF();f.on=false;SS(MZF_KEY,f);
+  cola().filter(x=>x.fondo&&!x.done&&x.status!=='playing').forEach(x=>mzTermino(x.id,'cancelled'));
+  try{tvPublicar(true);}catch(e){}
+  if(!silencio){showToast('⏹ Quitaste la música de fondo.');try{renderMusica();}catch(e){}}
+}
+function mzFondoRellenar(){
+  const f=mzF();if(!f.on||!Array.isArray(f.vids)||!f.vids.length)return;
+  const l=cola();let falta=2-l.filter(x=>x.fondo&&!x.done).length,nuevos=0,vueltas=0;
+  while(falta>0&&vueltas++<f.vids.length*2){
+    if(f.pos>=f.vids.length){
+      if(!f.repetir){f.on=false;showToast('🎶 Terminó tu playlist «'+f.nombre+'».');break;}
+      f.pos=0;if(f.mezclar)f.vids=mzMezclar(f.vids);
+    }
+    const v=f.vids[f.pos++];if(!v||!v.v||ytBad().includes(v.v))continue;
+    const now=Date.now();
+    if(v.d)ytDurCache[v.v]=v.d;
+    l.push({id:now+'-'+Math.random().toString(36).slice(2,6),reqId:null,mesa:0,fondo:true,mesaNombre:f.nombre,song:String(v.t||'Canción').slice(0,120),pedido:String(v.t||'').slice(0,120),title:String(v.t||'').slice(0,80),artist:String(v.c||'').slice(0,60),vid:v.v,dur:v.d||null,ts:now+nuevos,done:false,status:'pending'});
+    falta--;nuevos++;
+  }
+  SS(MZF_KEY,f);
+  if(!nuevos)return;
+  SS('vito_cola',l);mzRespaldo();
+  l.filter(x=>x.fondo&&!x.done&&!x.yt).forEach(x=>{try{ytAgregar(x.id);}catch(e){}});
+  try{tvPublicar();}catch(e){}
+  try{verificarCola();}catch(e){}
+  try{renderMusica();}catch(e){}
+}
+setInterval(()=>{try{mzFondoRellenar();}catch(e){}},8000);
+function mzPlFila(x,acciones){
+  const d=document.createElement('div');d.className='mz-song';
+  const sp=document.createElement('span');sp.innerHTML='<b></b> <small></small>';sp.querySelector('b').textContent=x.nombre;sp.querySelector('small').textContent=x.extra||'';
+  d.appendChild(sp);
+  acciones.forEach(([t,fn])=>{const b=document.createElement('button');b.type='button';b.className=t.startsWith('▶')?'btn-primary':'btn-ghost';b.textContent=t;b.onclick=()=>fn(b);d.appendChild(b);});
+  return d;
+}
+function mzPlPintar(){
+  const A=$('mzPlAhora'),L=$('mzPlLista');if(!A||!L)return;
+  const f=mzF();
+  A.hidden=!f.on;
+  if(f.on){
+    A.textContent='';const t=document.createElement('span');t.innerHTML='🎶 <b></b> <small></small>';t.querySelector('b').textContent='De fondo: «'+f.nombre+'»';
+    t.querySelector('small').textContent='· canción '+Math.min(f.pos,(f.vids||[]).length)+' de '+(f.vids||[]).length+(f.mezclar?' · 🔀':'')+(f.repetir?' · 🔁':'');
+    const b=document.createElement('button');b.type='button';b.className='btn-ghost';b.textContent='⏹ Quitar';b.onclick=()=>mzFondoQuitar();
+    A.append(t,b);
+  }
+  L.textContent='';
+  const ls=mzListas();
+  if(!ls.length){const e=document.createElement('div');e.className='empty-note';e.textContent='Todavía no tienes playlists guardadas.';L.appendChild(e);return;}
+  ls.forEach(x=>L.appendChild(mzPlFila({nombre:x.nombre,extra:(x.n?x.n+' canciones':'')+(f.on&&f.id===x.id?' · sonando':'')},[
+    ['▶ Poner',b=>mzPonerLista(x.id,x.nombre,b)],
+    ['🗑',()=>{if(f.on&&f.id===x.id)mzFondoQuitar(true);data.mzListas=mzListas().filter(y=>y.id!==x.id);saveData();mzPlPintar();}]])));
+}
+async function mzPlBuscar(){
+  const inp=$('mzPlIn'),R=$('mzPlRes'),b=$('mzPlBuscar');if(!inp||!R)return;
+  const q=inp.value.trim();if(!q)return showToast('Pega el link de la playlist o escribe un nombre.');
+  const id=mzListaId(q);
+  R.textContent='';b.disabled=true;b.textContent='⏳';
+  try{
+    if(id){ if(await mzPonerLista(id,'',null)){inp.value='';} return; }
+    const j=await mzSrv('/yt/buscar?tipo=lista&q='+encodeURIComponent(q));
+    const items=(j&&Array.isArray(j.items)?j.items:[]).filter(x=>x&&x.id&&x.id.playlistId).slice(0,8);
+    if(!items.length){const e=document.createElement('div');e.className='empty-note';e.textContent='No encontré playlists con ese nombre. Prueba con otras palabras o pega el link.';R.appendChild(e);return;}
+    items.forEach(x=>{const nombre=(x.snippet&&x.snippet.title)||'Playlist';
+      R.appendChild(mzPlFila({nombre,extra:[(x.canciones?x.canciones+' canciones':''),(x.snippet&&x.snippet.channelTitle)||''].filter(Boolean).join(' · ')},[
+        ['▶ Poner',async bt=>{if(await mzPonerLista(x.id.playlistId,nombre,bt))R.textContent='';}],
+        ['➕ Guardar',()=>{mzGuardarLista(x.id.playlistId,nombre,x.canciones);mzPlPintar();showToast('📃 Guardada en tus playlists.');}]]));});
+  }finally{b.disabled=false;b.textContent='🔎 Buscar';}
+}
+// Para Vento (voz/asistente) y las pruebas: el orden de la cola y la música de fondo.
+if(window.vitoMusica)Object.assign(window.vitoMusica,{orden:()=>ordenJusto(cola()),terminar:(id,e)=>mzTermino(id,e),fondo:{poner:mzPonerLista,quitar:mzFondoQuitar,rellenar:mzFondoRellenar,estado:mzF,listas:mzListas}});
+(function(){
+  const b=$('mzPlBuscar'),i=$('mzPlIn');if(!b||!i)return;
+  b.onclick=mzPlBuscar;i.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();mzPlBuscar();}});
+  const f=mzF();if($('mzPlMezclar'))$('mzPlMezclar').checked=!!f.mezclar;if($('mzPlRepetir'))$('mzPlRepetir').checked=f.repetir!==false;
+  $('mzPlMezclar').onchange=e=>{const x=mzF();x.mezclar=e.target.checked;if(x.on&&x.mezclar)x.vids=x.vids.slice(0,x.pos).concat(mzMezclar(x.vids.slice(x.pos)));SS(MZF_KEY,x);mzPlPintar();};
+  $('mzPlRepetir').onchange=e=>{const x=mzF();x.repetir=e.target.checked;SS(MZF_KEY,x);mzPlPintar();};
+})();
 // Abre una canción en YouTube MUSIC (no YouTube normal). Si ya se conoce el
 // video exacto (vid, resuelto por la búsqueda automática) va directo a esa
 // canción en vez de a una búsqueda, para no tener que elegirla a mano.
@@ -20483,21 +20629,22 @@ setInterval(()=>{
 document.addEventListener('visibilitychange',()=>{ const t=LS(MZ_T_KEY,null); if(!document.hidden&&t&&t.espera&&!t.pend&&mzAutoOn()) mzCronoAvanzar(); });
 function renderMusica(){
   const L=$('mzList');if(!L||typeof data==='undefined'||!data)return;
+  try{mzPlPintar();}catch(e){}
   const o=ordenJusto(cola()),now=LS('vito_now',null);L.textContent='';mzPintarSonando();
-  if(now&&!mzActual()){const d=document.createElement('div');d.className='mz-song';d.innerHTML='<span>▶ Última: <b>'+esc(now.song)+'</b> · '+esc(tableLabel(now.mesa))+'</span>';L.appendChild(d);}
+  if(now&&!mzActual()){const d=document.createElement('div');d.className='mz-song';d.innerHTML='<span>▶ Última: <b>'+esc(now.song)+'</b> · '+esc(mzEtq(now))+'</span>';L.appendChild(d);}
   // Las que ya se mandaron al TV (o a tu lista de YouTube) y todavía no suenan siguen a la vista.
   const enTV=cola().filter(x=>x.done&&(x.status==='tv'||(x.status==='lista'&&Date.now()-(x.ytAt||0)<3*36e5))).sort((a,b)=>(a.lngN||a.lngAt||a.ytAt||0)-(b.lngN||b.lngAt||b.ytAt||0)).slice(-15);
   if(!o.length&&!enTV.length){const d=document.createElement('div');d.className='empty-note';d.textContent='No hay canciones en cola. Los clientes las piden con el QR de su mesa.';L.appendChild(d);return;}
   if(enTV.length){
     const h=document.createElement('div');h.className='mz-song';h.innerHTML='<span><b>📺 Ya en el TV</b> <small>(suenan en este orden)</small></span>';L.appendChild(h);
     enTV.forEach((x,i)=>{const d=document.createElement('div');d.className='mz-song';
-      d.innerHTML='<span>'+(i+1)+'. '+esc(x.song)+' · '+esc(tableLabel(x.mesa))+' <small class="mz-est mz-approved">'+(x.status==='tv'?'En la cola del TV':'En tu lista de YouTube')+' · '+new Date(x.ts).toLocaleTimeString('es-CO',{hour:'numeric',minute:'2-digit'})+'</small></span>';
+      d.innerHTML='<span>'+(i+1)+'. '+esc(x.song)+' · '+esc(mzEtq(x))+' <small class="mz-est mz-approved">'+(x.status==='tv'?'En la cola del TV':'En tu lista de YouTube')+' · '+new Date(x.ts).toLocaleTimeString('es-CO',{hour:'numeric',minute:'2-digit'})+'</small></span>';
       L.appendChild(d);});
     if(o.length){const h2=document.createElement('div');h2.className='mz-song';h2.innerHTML='<span><b>⏳ Por mandar</b></span>';L.appendChild(h2);}
   }
   o.forEach((x,i)=>{
     const d=document.createElement('div');d.className='mz-song';
-    d.innerHTML='<span>'+(i+1)+'. '+esc(x.song)+' · '+esc(tableLabel(x.mesa))+' <small class="mz-est mz-'+(x.status||'pending')+'">'+(x.status==='approved'||x.ok?'En cola':'Pendiente')+' · '+new Date(x.ts).toLocaleTimeString('es-CO',{hour:'numeric',minute:'2-digit'})+'</small></span>';
+    d.innerHTML='<span>'+(i+1)+'. '+esc(x.song)+' · '+esc(mzEtq(x))+' <small class="mz-est mz-'+(x.status||'pending')+'">'+(x.status==='approved'||x.ok?'En cola':'Pendiente')+' · '+new Date(x.ts).toLocaleTimeString('es-CO',{hour:'numeric',minute:'2-digit'})+'</small></span>';
     d.append(btn('▶',()=>reproducir(x)),btn('🗑',()=>{mzTermino(x.id,'cancelled');tvPublicar(true);renderMusica();}));
     L.appendChild(d);
   });
