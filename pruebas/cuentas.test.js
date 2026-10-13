@@ -123,6 +123,25 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){
     await C.p.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
     chk('4. C recibe lo que agregó A', await esperar(C.p, () => data.products.some(p => p.name === 'Aguardiente de A') && data.products.some(p => p.name === 'Poker de B'), null, 12000));
 
+    // ===== 4b. Cambiar la contraseña en un celular la cambia en todos =====
+    const cambio = await A.p.evaluate(async () => {
+      window.prompt = () => 'nueva999'; accUsuariosPintar();
+      const fila = [...document.querySelectorAll('#accUsersList .acc-user')].find(r => r.textContent.includes('ana@bar.co'));
+      const b = fila && [...fila.querySelectorAll('button')].find(x => x.textContent === '🔑'); if(!b) return 'sin botón';
+      b.click(); await new Promise(r => setTimeout(r, 1500)); return 'ok';
+    });
+    chk('4b. Ana cambia su contraseña en A (Ajustes → Usuarios → 🔑)', cambio === 'ok', cambio);
+    chk('4b. En la nube quedó la contraseña nueva', Number((await uno("select count(*) n from auth.users where email = 'ana@bar.co' and encrypted_password = extensions.crypt('nueva999', encrypted_password)")).n) === 1);
+    await salirApp(C.p);
+    await entrar(C.p, 'ana@bar.co', 'nueva999');
+    chk('4b. En C (que tenía guardada la anterior) entra con la contraseña nueva', await dentro(C.p) && await esperar(C.p, () => data.products.some(p => p.name === 'Club Ana'), null, 8000));
+    await cerrarTodo(C.p);
+    await salirApp(C.p);
+    await entrar(C.p, 'ana@bar.co', 'clave123');
+    const e4 = await errorEntrada(C.p);
+    chk('4b. … y la anterior ya no sirve en C', /incorrectos/.test(e4), e4);
+    await entrar(C.p, 'ana@bar.co', 'nueva999'); await dentro(C.p); await cerrarTodo(C.p);
+
     // ===== 5. Cuenta vieja con correo que solo estaba en un celular =====
     const D = await celular('celular D');
     await D.p.evaluate(() => localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '' })));   // como antes: sin nube
@@ -157,7 +176,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){
     const ana = await nubeDe(NEG);
     chk('6. El negocio de Ana no se mezcló con el otro', !nombres(ana.datos).includes('Solo de Otro') && ana.datos.businessName === 'Bar Ana', nombres(ana.datos));
     await salirApp(A.p);
-    await entrar(A.p, 'ana@bar.co', 'clave123');
+    await entrar(A.p, 'ana@bar.co', 'nueva999');
     chk('6. Ana vuelve a entrar en A y ve sus datos (y no los del otro)', await dentro(A.p) && await esperar(A.p, () => data.products.some(p => p.name === 'Poker de B') && !data.products.some(p => p.name === 'Solo de Otro'), null, 10000));
     await cerrarTodo(A.p);
     chk('6. … y A vuelve a sincronizar con el negocio de Ana', await esperar(A.p, n => (window.ventoNube.negocio() || {}).id === n, NEG, 12000));

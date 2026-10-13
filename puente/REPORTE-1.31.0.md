@@ -11,6 +11,7 @@
     - Lo que cambia un celular le llega a los otros.
     - Las cuentas viejas con correo que solo estaban en un celular se suben solas a la nube al entrar.
     - Si en un celular hay dos cuentas, cada una sincroniza solo con su propio negocio.
+    - Cambiar la contraseña (Ajustes → Usuarios o «Olvidé mi contraseña» por correo) la cambia en todos los celulares.
   - Los usuarios sin correo (ej. «mesero1») siguen siendo de ese celular, como siempre.
 - **Lectura de facturas más rápida.** Hoy Google tiene saturados los modelos «lite» de Gemini (responden 503). Antes la
   app reintentaba el mismo modelo con esperas: 20–30 s, o terminaba en «tardó demasiado».
@@ -31,5 +32,5 @@
 
 | Prueba | Resultado |
 |---|---|
-| cuentas (PostgreSQL real, 6 celulares) | 39 |
+| cuentas (PostgreSQL real, 6 celulares) | 43 |
 | facturarapida (Gemini simulado: saturado, lento, basura, cortado, clave mala) | 9 |

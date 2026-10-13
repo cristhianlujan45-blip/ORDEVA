@@ -17701,6 +17701,9 @@ function accUsuariosPintar(){
         const l = authUsers(), x = l.find(y => y.user === u.user); if(!x) return;
         x.salt = Math.random().toString(36).slice(2) + Date.now().toString(36); x.hash = await authHash(np, x.salt);
         localStorage.setItem(AUTH_USERS_KEY, JSON.stringify(l)); showToast('✅ Contraseña de ' + u.user + ' cambiada.');
+        // Cuenta con correo: la contraseña es la misma en todos los celulares (se cambia también en la nube).
+        const nb = authEsCorreo(u.user) && u.user === authUser ? authNubeCuentas() : null;
+        if(nb && nb.conectado(u.user)) nb.nuevaClave(np).catch(e => showToast('⚠️ En este celular quedó cambiada, pero en la nube no (' + nb.msgError(e) + '). En otros celulares sigue la anterior.', 8000));
       };
       row.append(bRol, bPw);
       if(u.user !== authUser){
@@ -17892,6 +17895,7 @@ async function authEnlaceProcesar(){
   }
   if(!u.email || u.email !== correo){ nb.soltarEnlace(L.tok); return authEnlaceDialogo('📧 No coincide', 'Ese correo (' + correo + ') no es el de recuperación de «' + u.user + '».'); }
   const p = await authEnlaceDialogo('🔑 Contraseña nueva', 'Correo comprobado: ' + authMascara(correo) + '.\nUsuario: ' + u.user + '. Escribe tu contraseña nueva.', true);
+  if(p && authEsCorreo(u.user) && u.user === correo) try{ await nb.claveConEnlace(L.tok, p); }catch(e){}   // la misma en todos los celulares
   nb.soltarEnlace(L.tok);
   if(!p) return;
   u.hash = await authHash(p, u.salt); u.claveCambiada = Date.now();
@@ -17925,6 +17929,7 @@ async function authRecoverCorreo(user, code, newPass, newPass2){
   const nb = authNube(); if(!nb) return 'Sin conexión con el Servidor Vento.';
   try{ await nb.verificarCorreo(u.email, code); }
   catch(e){ localStorage.setItem('cm-rec-lock', JSON.stringify({ n: (lock.n || 0) + 1, t: Date.now(), nivel: lock.nivel || 0 })); return 'El código del correo no sirve o ya venció. Pide uno nuevo.'; }
+  if(authEsCorreo(u.user) && u.user === String(u.email).toLowerCase()) try{ await nb.nuevaClave(newPass); }catch(e){}   // la misma en todos los celulares
   try{ await nb.soltarSesion(); }catch(e){}
   u.hash = await authHash(newPass, u.salt); u.claveCambiada = Date.now();
   localStorage.setItem(AUTH_USERS_KEY, JSON.stringify(users)); localStorage.removeItem('cm-rec-lock');
