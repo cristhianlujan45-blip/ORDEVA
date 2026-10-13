@@ -71,6 +71,8 @@
 
 ## Pruebas
 
+`bash pruebas/correr.sh`: 26 pruebas en verde (758 verificaciones, más esc y vozundo sin errores). Las nuevas:
+
 | Prueba | Resultado |
 |---|---|
 | cuentas (PostgreSQL real, 6 celulares) | 43 |
