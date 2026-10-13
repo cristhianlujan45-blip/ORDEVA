@@ -1,4 +1,4 @@
-# Vento 1.31.0 — Cuentas con correo en todos los celulares, facturas más rápidas y avisos de DaviPlata en el celular
+# Vento 1.31.0 — Cuentas con correo en todos los celulares, facturas más rápidas avisos de DaviPlata en el celular y YouTube sin límite de búsquedas
 
 ## Qué cambió
 
@@ -36,8 +36,21 @@
   - En los dos casos, cada pago que llega suena como **aviso del celular «💜 Llegó un pago»** en la app Android, aunque
     Vento esté cerrada o la pantalla apagada. En el navegador lo hace el push que ya existía.
 
+- **Buscar canciones en YouTube sin límite.** YouTube decía «se alcanzó el límite» porque cada búsqueda desde el QR de las
+  mesas gastaba 200 de las 10.000 unidades diarias de la API de YouTube (canciones + artistas). Con unas 50 búsquedas al
+  día ya no aparecía nada, en todos los negocios.
+  - Ahora el Servidor Vento lee la página pública de resultados de YouTube (`vento-ia/yt/buscar`), igual que la app Android:
+    no tiene cupo. Además guarda en memoria las búsquedas repetidas y responde en ~0,5 s.
+  - Lo usan el QR de las mesas (canciones, artistas y lo más pedido de cada artista) y la app, al buscar el video de cada
+    canción pedida. La API de YouTube queda solo de respaldo.
+  - El límite de 10 canciones por mesa cada 15 minutos sigue igual.
+  - Lo único que todavía usa el cupo de Google es **agregar** canciones a la lista de YouTube Music con la cuenta conectada
+    (50 unidades por canción). Si se acaba, la app lo dice claro y ofrece «🔗 Vincular con código de TV», que manda las
+    canciones directo al TV sin cupo.
+
 ## Para el administrador
 
+- Al publicar, el «Servidor Vento» despliega la búsqueda de YouTube sin cupo (función `vento-ia`).
 - Al publicar, el «Servidor Vento» deja las cuentas confirmadas solas si no hay correo propio (SMTP). Sin correo propio, el
   mensaje de confirmación no le llega a nadie.
 
@@ -48,6 +61,7 @@
 | cuentas (PostgreSQL real, 6 celulares) | 43 |
 | facturarapida (Gemini simulado: saturado, lento, basura, cortado, clave mala) | 9 |
 | avisosandroid (puente Android simulado) | 10 |
+| youtubesincupo (API de YouTube respondiendo «quotaExceeded») | 12 |
 
 La app Android cambió (VentoEscucha): hay que compilar y publicar el APK nuevo. Se publica solo cuando están los secretos
 de la llave de firma (ver `android/LEEME.md`).

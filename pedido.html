@@ -488,6 +488,8 @@ img,video,iframe{max-width:100%}
 
 </div>
 
+<!-- Dirección del Servidor Vento (solo la parte pública): para buscar canciones en YouTube sin gastar cupo. -->
+<script src="nube/config.js"></script>
 <script>
 const P=new URLSearchParams(location.search),
   mesa=(P.get('mesa')||'').replace(/\D/g,''),
@@ -841,6 +843,16 @@ $('s').addEventListener('focus',()=>{ if(!$('s').value.trim()){ const box=$('sug
    es interno de la app YouTube Music—, así que "lo más pedido del artista"
    es lo más cerca que se puede llegar sin esa información. */
 const YT_KEY='AIzaSyCQ_IKzsP2TEPc7jiIfV3prwc6VYvgq1xY';
+/* Búsqueda SIN cupo: el Servidor Vento lee la página pública de resultados de YouTube (vento-ia/yt/buscar). Antes cada
+   búsqueda gastaba 200 de las 10.000 unidades diarias de la API (canciones + artistas) y con ~50 búsquedas al día YouTube
+   respondía «se alcanzó el límite»: ya no aparecía nada. La API queda solo de respaldo. */
+const ytSrv=()=>{try{const n=window.VENTO_NUBE_DEFAULT;return n&&n.url?String(n.url).replace(/\/+$/,'')+'/functions/v1/vento-ia/yt/buscar':''}catch(e){return ''}};
+async function ytSrvBuscar(q,tipo){
+  const b=ytSrv(); if(!b) return null;
+  const ctrl=new AbortController(), tm=setTimeout(()=>ctrl.abort(),7000);
+  try{ const r=await fetch(b+'?tipo='+tipo+'&q='+encodeURIComponent(q),{signal:ctrl.signal}); if(!r.ok) return null; const j=await r.json(); return j&&Array.isArray(j.items)&&j.items.length?j:null; }
+  catch(e){ return null; } finally{ clearTimeout(tm); }
+}
 let ytTimer=null, ytSeq=0, ytSelArtist=null;
 const ytArtistCache={};
 function ytPintarMsg(msg){
@@ -876,6 +888,8 @@ function ytPintarCanciones(wrap,q,songs,titulo){
 }
 // Canales cuyo nombre coincide o se parece a lo escrito.
 async function ytBuscarArtistas(q){
+  const sj=await ytSrvBuscar(q,'canal');
+  if(sj) return sj.items.filter(it=>it.id&&it.id.channelId).slice(0,6).map(it=>({ id:it.id.channelId, name:((it.snippet&&it.snippet.title)||'').replace(/\s*-\s*Topic$/i,''), thumb:ytThumb(it.snippet) }));
   try{
     const url='https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&maxResults=6&q='+encodeURIComponent(q)+'&key='+YT_KEY;
     const r=await fetch(url); if(!r.ok) return [];
@@ -892,22 +906,31 @@ async function ytBuscarArtistas(q){
 // YouTube arma solo para la música oficial) y se ordenan por reproducciones
 // reales — 3 llamadas baratas en vez de una búsqueda por canal (que con
 // canales "- Topic" casi siempre viene vacía).
-async function ytCancionesDeArtista(channelId){
+async function ytCancionesDeArtista(channelId,nombre){
   if(ytArtistCache[channelId]) return ytArtistCache[channelId];
+  // Si la API no responde (sin cupo), las canciones del artista salen de la búsqueda sin cupo con su nombre.
+  const porNombre=async()=>{ const sj=nombre?await ytSrvBuscar(nombre,'video'):null; return sj?sj.items.filter(it=>it.id&&it.id.videoId).slice(0,8).map(it=>({title:it.snippet.title,channelTitle:it.snippet.channelTitle,thumb:ytThumb(it.snippet),views:0})):[]; };
+  const r=await ytCancionesDeArtistaApi(channelId);
+  if(r.length) return ytArtistCache[channelId]=r;
+  const r2=await porNombre();
+  if(r2.length) ytArtistCache[channelId]=r2;
+  return r2;
+}
+async function ytCancionesDeArtistaApi(channelId){
   try{
     const chJ=await fetch('https://www.googleapis.com/youtube/v3/channels?part=contentDetails&id='+channelId+'&key='+YT_KEY).then(r=>r.json());
     const uploads=chJ.items&&chJ.items[0]&&chJ.items[0].contentDetails&&chJ.items[0].contentDetails.relatedPlaylists&&chJ.items[0].contentDetails.relatedPlaylists.uploads;
-    if(!uploads) return ytArtistCache[channelId]=[];
+    if(!uploads) return [];
     const plJ=await fetch('https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=25&playlistId='+uploads+'&key='+YT_KEY).then(r=>r.json());
     const ids=(plJ.items||[]).filter(it=>it.snippet&&it.snippet.resourceId&&it.snippet.resourceId.videoId).map(it=>it.snippet.resourceId.videoId).slice(0,50);
-    if(!ids.length) return ytArtistCache[channelId]=[];
+    if(!ids.length) return [];
     const vJ=await fetch('https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id='+ids.join(',')+'&key='+YT_KEY).then(r=>r.json());
     const songs=(vJ.items||[]).map(it=>({
       title:it.snippet.title, channelTitle:it.snippet.channelTitle, thumb:ytThumb(it.snippet),
       views:+(it.statistics&&it.statistics.viewCount)||0
     })).sort((a,b)=>b.views-a.views).slice(0,8);
-    return ytArtistCache[channelId]=songs;
-  }catch(e){ return ytArtistCache[channelId]=[]; }
+    return songs;
+  }catch(e){ return []; }
 }
 async function ytElegirArtista(a,btn,row,songsWrap,q,myId){
   if(ytSeq!==myId) return;
@@ -916,7 +939,7 @@ async function ytElegirArtista(a,btn,row,songsWrap,q,myId){
   ytSelArtist=a;
   songsWrap.textContent='';
   songsWrap.appendChild(h('div','ytmsg','Buscando lo más pedido de '+a.name+'…'));
-  const songs=await ytCancionesDeArtista(a.id);
+  const songs=await ytCancionesDeArtista(a.id,a.name);
   if(ytSeq!==myId||ytSelArtist!==a) return;
   ytPintarCanciones(songsWrap,q,songs,'🔥 Lo más pedido de '+a.name);
 }
@@ -929,7 +952,7 @@ async function ytBuscar(q){
   try{
     [artistas,cancionesJson]=await Promise.all([
       ytBuscarArtistas(q),
-      fetch('https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoCategoryId=10&maxResults=4&q='+encodeURIComponent(q)+'&key='+YT_KEY).then(r=>r.ok?r.json():null).catch(()=>null)
+      ytSrvBuscar(q,'video').then(j=>j?{items:j.items.slice(0,4)}:fetch('https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoCategoryId=10&maxResults=4&q='+encodeURIComponent(q)+'&key='+YT_KEY).then(r=>r.ok?r.json():null).catch(()=>null))
     ]);
   }catch(err){}
   if(myId!==ytSeq) return;

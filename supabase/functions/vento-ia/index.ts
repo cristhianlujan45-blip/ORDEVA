@@ -10,8 +10,11 @@
 //   GET  /vento-ia/v1beta/models/<modelo>                  → (calentar conexión)
 //   POST /vento-ia/v1beta/models/<modelo>:generateContent
 //   POST /vento-ia/v1beta/models/<modelo>:streamGenerateContent?alt=sse
+//   GET  /vento-ia/yt/buscar?q=…&tipo=video|canal          → canciones/artistas de YouTube SIN gastar cupo (youtube.ts)
 // Solo se aceptan pedidos desde la página de Vento (VENTO_ORIGENES), modelos «gemini-…», cuerpos de hasta
 // 8 MB (fotos de facturas) y un máximo de pedidos por minuto por IP, para que nadie más gaste la clave.
+
+import * as YT from "./youtube.ts";
 
 const GEMINI = "https://generativelanguage.googleapis.com";
 const MAX_BYTES = 8 * 1024 * 1024;
@@ -50,6 +53,19 @@ Deno.serve(async (req: Request) => {
   const ruta = u.pathname.replace(/^.*?\/vento-ia/, "");
   if (ruta === "/salud" || ruta === "" || ruta === "/") return json({ ok: true, gemini: !!key }, 200, h);
   if (origin && origenes().length && !origenes().includes(origin)) return json({ error: { message: "Origen no permitido." } }, 403, h);
+  // Buscar canciones en YouTube sin gastar el cupo de la API de YouTube (ver youtube.ts). No necesita la clave de Gemini.
+  if (ruta === "/yt/buscar" && req.method === "GET") {
+    const q = String(u.searchParams.get("q") || "").replace(/\s+/g, " ").trim().slice(0, 120);
+    const tipo = u.searchParams.get("tipo") === "canal" ? "canal" : "video";
+    if (q.length < 2) return json({ items: [] }, 200, h);
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "?";
+    if (demasiados("yt:" + ip)) return json({ error: { code: 429, message: "Demasiadas búsquedas seguidas. Espera un momento." } }, 429, h);
+    try {
+      return json(await YT.buscar(q, tipo), 200, { ...h, "cache-control": "public, max-age=600" });
+    } catch (e) {
+      return json({ error: { code: 502, message: "No se pudo buscar en YouTube: " + (e instanceof Error ? e.message : String(e)) } }, 502, h);
+    }
+  }
   if (!key) return json({ error: { message: "La IA de Vento todavía no tiene clave en el servidor (secreto GEMINI_API_KEY)." } }, 503, h);
   const m = /^\/v1beta\/models(?:\/(gemini-[\w.-]+)(:generateContent|:streamGenerateContent)?)?$/.exec(ruta);
   if (!m || (req.method === "POST" && !m[2]) || (req.method === "GET" && m[2])) return json({ error: { message: "Ruta no permitida." } }, 404, h);

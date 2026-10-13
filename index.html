@@ -20606,11 +20606,27 @@ function yBuscarApp(q){
     try{window.VentoAndroid.buscarYT(id,decodeURIComponent(q));}catch(e){clearTimeout(tmo);delete window.__ventoCbs[id];res(undefined);}
   });
 }
+// Búsqueda SIN cupo desde el Servidor Vento (vento-ia/yt/buscar lee la página pública de resultados de YouTube).
+// La API de YouTube da 10.000 unidades al día y cada búsqueda cuesta 100: así ya no aparece «se alcanzó el límite».
+async function ySrvBuscar(qEnc){
+  const b=typeof iaVentoBase==='function'?iaVentoBase():'';if(!b)return undefined;
+  const ctrl=new AbortController(),tm=setTimeout(()=>ctrl.abort(),8000);
+  try{
+    const r=await fetch(b+'/yt/buscar?tipo=video&q='+qEnc,{signal:ctrl.signal});if(!r.ok)return undefined;
+    const j=await r.json();if(!j||!Array.isArray(j.items)||!j.items.length)return undefined;
+    j.items.forEach(x=>{if(x&&x.id&&x.id.videoId&&x.duracion>0)ytDurCache[x.id.videoId]=x.duracion;});
+    return {items:j.items,_srv:true};
+  }catch(e){return undefined;}finally{clearTimeout(tm);}
+}
 async function yGet(u){
   const c=yCfg();let err=null;
   if(/^search\?/.test(u)&&window.VentoAndroid&&typeof window.VentoAndroid.buscarYT==='function'){
     const q=(u.match(/[?&]q=([^&]*)/)||[])[1];
     if(q){const j=await yBuscarApp(q);if(j){yFuente='app';window.ytFallo=null;return j;}}
+  }
+  if(/^search\?/.test(u)){
+    const q=(u.match(/[?&]q=([^&]*)/)||[])[1];
+    if(q){const j=await ySrvBuscar(q);if(j){yFuente='servidor';window.ytFallo=null;return j;}}
   }
   if(c.key){
     try{const r=await fetch('https://www.googleapis.com/youtube/v3/'+u+'&key='+encodeURIComponent(c.key));const j=await r.json();
@@ -20626,7 +20642,7 @@ async function yGet(u){
     if(j){yFuente='libre';window.ytFallo=null;return j;}
   }
   if(err){
-    window.ytFallo=/quota/i.test(err.message)?'Se acabó el cupo del día para buscar canciones. Conecta tu cuenta de YouTube (Música → YouTube del TV) o pon tu propia API key.':'No pude buscar la canción en YouTube: '+err.message;
+    window.ytFallo=/quota/i.test(err.message)?'YouTube no respondió la búsqueda (sin internet o el Servidor Vento no contesta). Se reintenta sola.':'No pude buscar la canción en YouTube: '+err.message;
     throw err;
   }
   return undefined;
@@ -20714,7 +20730,13 @@ async function ytUno(id){
     l=cola();it=l.find(x=>x.id===id);if(it){it.yt=true;it.done=true;it.ytAt=Date.now();it.ytItemId=r&&r.id;if(['pending','approved'].includes(it.status||'pending'))it.status='lista';SS('vito_cola',l);}
     try{if(typeof castEstado==='function')castEstado();}catch(e){}
     const c=yCfg();c.len++;SS('vito_yt',c);
-  }catch(e){ if(!window.ytAvisoT||Date.now()-window.ytAvisoT>600000){ window.ytAvisoT=Date.now(); showToast('YouTube: '+(window.ytFallo||e.message),8000); } }
+  }catch(e){
+    // Agregar a la lista de YouTube Music con la cuenta conectada SÍ usa el cupo diario de Google (50 de 10.000 por canción):
+    // se explica claro y se ofrece el camino que no tiene cupo («Vincular con código de TV»: va directo al TV).
+    const sinCupo=/quota|exceeded/i.test(String(e&&e.message));
+    if(!window.ytAvisoT||Date.now()-window.ytAvisoT>600000){ window.ytAvisoT=Date.now();
+      showToast(sinCupo?'YouTube no deja agregar más canciones a tu lista por hoy (límite diario de Google, se renueva en la madrugada). Para seguir sin límite: Música → «🔗 Vincular con código de TV»: las canciones van directo al TV.':'YouTube: '+(window.ytFallo||e.message),sinCupo?12000:8000); }
+  }
   yEstado();
 }
 function yPendientes(silencio){
