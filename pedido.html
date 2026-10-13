@@ -1054,10 +1054,13 @@ $('ronda').onclick=()=>{
 
 /* ---------- Pestañas ---------- */
 function info(){
-  if(modo=='c'){pintarCupos();setMsg(()=>'','')}   // sin límite de canciones: ya no hay cupos que mostrar
+  if(modo=='c'){pintarCupos();setMsg(()=>t('cancionesEstado',{u:usadas(),max:MAX}),'')}
 }
-// Las canciones ya no tienen límite por mesa: la barra de cupos queda escondida.
-function pintarCupos(){const b=$('cupos');if(b){b.textContent='';b.hidden=true}}
+function pintarCupos(){
+  const b=$('cupos');b.textContent='';
+  const u=usadas();
+  for(let i=0;i<MAX;i++)b.appendChild(h('i',i<u?'on':''));
+}
 function set(x){
   modo=x;colocarEnvio();
   ['p','c','q'].forEach(k=>{
@@ -1217,6 +1220,7 @@ $('b').onclick=async()=>{
   }else if(modo=='c')txt=$('s').value.replace(/\s+/g,' ').trim();
   else txt=$('n').value.replace(/\s+/g,' ').trim();
   if(!txt&&modo!='q')return setMsg(()=>t('escribeAlgo'),'err');
+  if(modo=='c'&&usadas()>=MAX)return setMsg(()=>t('cancionLimite',{max:MAX,min:Math.ceil((Math.min(...recientes())+V-Date.now())/6e4)}),'err');
   const tipo={p:'PEDIDO',c:'CANCION',q:'CUENTA'}[modo];
   if(dom){
     // DOMICILIO: nombre | teléfono | dirección | productos
@@ -1250,7 +1254,7 @@ $('b').onclick=async()=>{
         $('s').value=$('n').value='';
         $('b').disabled=false;
         if(modo=='c')pintarCupos();
-        setMsg(()=>(modo=='p'?t('pedEsperando'):t('enviadoOk'))+'','ok');
+        setMsg(()=>(modo=='p'?t('pedEsperando'):t('enviadoOk'))+(modo=='c'?t('cancionesLlevas',{u:usadas(),max:MAX}):''),'ok');
         if(modo=='p')escucharEstados();
         try{ mesoraCelebrar(modo=='c'?['🎵','🎶','✨']:dom?['🛵','🎉','✨']:['🎉','✨','🍻']); }catch(e){}
         return;
