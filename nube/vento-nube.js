@@ -7,9 +7,12 @@
      • varios celulares comparten el mismo negocio (caja, meseros, dueño desde la casa);
      • roles: dueño, administrador, cajero, mesero (el mesero entra en «modo mesero»);
      • invitaciones con código; respaldos automáticos en la nube (uno por hora, últimos 48).
-   Sincronización: cada vez que la app guarda, sube los datos (a los 3 s). Cada 15 s mira si otro
-   celular cambió algo y lo baja. Si dos celulares cambiaron a la vez, MEZCLA los cambios (lo que
-   agregó cada uno se conserva) en vez de que uno pise al otro.
+   Sincronización AL INSTANTE: cada vez que la app guarda, sube los datos (en ~1 s) y avisa a los demás
+   equipos de la cuenta (celular, computador…) por un canal en vivo; ellos bajan lo nuevo enseguida. Por si el
+   aviso no llega (internet malo), igual revisan cada 5 s. Si dos equipos cambiaron a la vez, MEZCLA los cambios
+   (lo que agregó cada uno se conserva) en vez de que uno pise al otro.
+   Fotos y archivos (fotos de productos, facturas escaneadas, recibos, comprobantes) también viajan: van a la
+   tabla archivos_negocio y cada equipo los baja cuando los necesita.
    Seguridad: solo se usa la «anon key» pública de Supabase; las reglas (Row Level Security) de
    nube/schema.sql impiden ver o tocar negocios ajenos. Ninguna clave privada va en la app.
    ===================================================================== */
@@ -17,7 +20,7 @@
   'use strict';
   var SDK = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
   var K_CFG = 'vento_nube_cfg', K_ST = 'vento_nube_estado';
-  var POLL_MS = 15000, SUBIR_MS = 3000;
+  var POLL_MS = 5000, SUBIR_MS = 1000;
 
   // ---------- Estado guardado en el celular ----------
   function lsGet(k, d){ try{ var v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; }catch(e){ return d; } }
@@ -171,7 +174,7 @@
     var d = datosApp(); if(!d) return Promise.resolve();
     subiendo = true;
     return rpc('guardar_datos', { p_negocio: st.negocio.id, p_datos: d, p_version: st.version || 0 })
-      .then(function(v){ st.version = v; st.sucio = false; st.ultimo = Date.now(); ultimoError = ''; guardarSt(); return base('put', clonar(d)); })
+      .then(function(v){ st.version = v; st.sucio = false; st.ultimo = Date.now(); ultimoError = ''; guardarSt(); avisarOtros(v); return base('put', clonar(d)); })
       .catch(function(e){
         if(/conflicto/.test(String(e && e.message))) return mezclarConNube();
         ultimoError = msgError(e); clearTimeout(tSubir); tSubir = setTimeout(subir, 20000);
@@ -190,7 +193,7 @@
       return aplicar(mezcla).then(function(){
         return rpc('guardar_datos', { p_negocio: st.negocio.id, p_datos: mezcla, p_version: nube.version });
       }).then(function(v){
-        st.version = v; st.sucio = false; st.ultimo = Date.now(); guardarSt();
+        st.version = v; st.sucio = false; st.ultimo = Date.now(); guardarSt(); avisarOtros(v);
         aviso('☁️ Otro celular también hizo cambios: se juntaron los dos.');
         return base('put', clonar(mezcla));
       });
@@ -208,17 +211,106 @@
       .then(function(r){
         if(r.error) throw r.error;
         if(!r.data){ ultimoError = 'ya no eres miembro de este negocio'; pintarEstado(); return; }
-        if(r.data.version > (st.version || 0)){ if(st.sucio) return subir(); return bajar().then(function(){ aviso('☁️ Datos actualizados desde otro celular.'); }); }
+        if(r.data.version > (st.version || 0)){ if(st.sucio) return subir(); return bajar().then(function(){ avisoBajada(); }); }
       }).catch(function(e){ ultimoError = msgError(e); pintarEstado(); });
   }
+  // «Datos actualizados»: como mucho un aviso por minuto (con la sincronización al instante llegarían seguido).
+  var tAvisoBajada = 0;
+  function avisoBajada(){ if(Date.now() - tAvisoBajada > 60000){ tAvisoBajada = Date.now(); aviso('☁️ Datos al día con tus otros equipos.'); } }
+
+  // ---------- Canal en vivo: «hay datos nuevos» llega a los demás equipos al instante ----------
+  // Solo viaja el número de versión (nunca los datos): el equipo que lo recibe los baja con su sesión.
+  var canal = null, canalDe = '';
+  function abrirCanal(){
+    if(!st.negocio || canalDe === st.negocio.id) return;
+    var id = st.negocio.id;
+    cliente().then(function(c){
+      if(!c.channel || !st.negocio || st.negocio.id !== id) return;
+      try{ if(canal) c.removeChannel(canal); }catch(e){}
+      canalDe = id;
+      canal = c.channel('vento-datos-' + id, { config: { broadcast: { self: false } } })
+        .on('broadcast', { event: 'version' }, function(m){ var v = m && m.payload && m.payload.v; if(!v || v > (st.version || 0)) revisarNube(true); })
+        .on('broadcast', { event: 'archivo' }, function(m){ var k = m && m.payload && m.payload.k; if(k) archivoCambiado(k); })
+        .subscribe();
+    }).catch(function(){});
+  }
+  function avisarOtros(v){ try{ if(canal) canal.send({ type: 'broadcast', event: 'version', payload: { v: v } }); }catch(e){} }
+  function avisarArchivo(k){ try{ if(canal) canal.send({ type: 'broadcast', event: 'archivo', payload: { k: k } }); }catch(e){} }
+
+  var oyendo = false;
   function arrancar(){
     clearInterval(tPoll);
     if(!st.negocio || !configurada()) return;
-    tPoll = setInterval(revisarNube, POLL_MS);
-    document.addEventListener('visibilitychange', function(){ if(!document.hidden) revisarNube(); });
-    window.addEventListener('online', function(){ if(st.sucio) subir(); else revisarNube(); });
-    setTimeout(function(){ if(st.sucio) subir(); else revisarNube(); }, 2500);
+    tPoll = setInterval(function(){ revisarNube(); archivosPendientes(); }, POLL_MS);
+    if(!oyendo){             // una sola vez (antes se sumaban escuchas en cada arranque)
+      oyendo = true;
+      document.addEventListener('visibilitychange', function(){ if(!document.hidden) revisarNube(); });
+      window.addEventListener('online', function(){ if(st.sucio) subir(); else revisarNube(); archivosPendientes(); });
+    }
+    abrirCanal();
+    setTimeout(function(){ if(st.sucio) subir(); else revisarNube(); archivosPendientes(); }, 1500);
   }
+
+  // ---------- Fotos y archivos del negocio ----------
+  // clave: «foto/<id producto>», «rec/<id>» (facturas escaneadas, recibos), «rcpt/<id>» (comprobantes de pago).
+  // Si no hay internet al guardar, quedan en cola (en este equipo) y se suben solas después.
+  var K_PEND = 'vento_nube_arch_pend', oyentesArch = [];
+  function claveOk(k){ return String(k || '').replace(/[^A-Za-z0-9_./:-]/g, '_').slice(0, 120); }
+  function enNube(){ return !!(st.negocio && configurada() && enSede()); }
+  function pendKv(op, k, v){
+    return new Promise(function(ok){
+      try{
+        var abrir = idb ? Promise.resolve(idb) : new Promise(function(a, b){ var r = indexedDB.open('vento-nube', 1); r.onupgradeneeded = function(){ r.result.createObjectStore('kv'); }; r.onsuccess = function(){ idb = r.result; a(idb); }; r.onerror = b; });
+        abrir.then(function(db){
+          var tx = db.transaction('kv', op === 'get' ? 'readonly' : 'readwrite'), s = tx.objectStore('kv'), key = 'arch_' + k;
+          var q = op === 'get' ? s.get(key) : op === 'del' ? s.delete(key) : s.put(v, key);
+          q.onsuccess = function(){ ok(op === 'get' ? q.result || null : true); }; q.onerror = function(){ ok(null); };
+        }, function(){ ok(null); });
+      }catch(e){ ok(null); }
+    });
+  }
+  function archivoSubir(clave, datos){
+    if(!enNube() || !datos) return Promise.resolve(false);
+    var k = claveOk(clave), neg = st.negocio.id;
+    return rpc('guardar_archivo', { p_negocio: neg, p_clave: k, p_datos: String(datos) })
+      .then(function(){ var p = lsGet(K_PEND, {}); if(p[k]){ delete p[k]; lsSet(K_PEND, p); pendKv('del', k); } avisarArchivo(k); return true; })
+      .catch(function(e){
+        if(/archivo_grande|clave_invalida|sin_permiso/.test(String(e && e.message))) return false;
+        var p = lsGet(K_PEND, {}); p[k] = { n: neg, b: 0, t: Date.now() }; lsSet(K_PEND, p);
+        return pendKv('put', k, { b: false, d: String(datos) }).then(function(){ return false; });
+      });
+  }
+  function archivoBorrar(clave){
+    if(!enNube()) return Promise.resolve(false);
+    var k = claveOk(clave), neg = st.negocio.id;
+    return rpc('borrar_archivo', { p_negocio: neg, p_clave: k }).then(function(){ avisarArchivo(k); return true; })
+      .catch(function(){ var p = lsGet(K_PEND, {}); p[k] = { n: neg, b: 1, t: Date.now() }; lsSet(K_PEND, p); return pendKv('put', k, { b: true }).then(function(){ return false; }); });
+  }
+  function archivoBajar(clave){
+    if(!enNube()) return Promise.resolve(null);
+    var k = claveOk(clave), neg = st.negocio.id;
+    return cliente().then(function(c){ return c.from('archivos_negocio').select('datos').eq('negocio_id', neg).eq('clave', k).maybeSingle(); })
+      .then(function(r){ if(r.error) throw r.error; return r.data ? r.data.datos : null; })
+      .catch(function(){ return null; });
+  }
+  var subiendoPend = false;
+  function archivosPendientes(){
+    if(!enNube() || subiendoPend) return;
+    var p = lsGet(K_PEND, {}), ks = Object.keys(p).filter(function(k){ return p[k].n === st.negocio.id; });
+    if(!ks.length) return;
+    subiendoPend = true;
+    var sig = function(i){
+      if(i >= ks.length){ subiendoPend = false; return; }
+      var k = ks[i];
+      pendKv('get', k).then(function(x){
+        if(!x){ var q = lsGet(K_PEND, {}); delete q[k]; lsSet(K_PEND, q); return; }
+        return x.b ? archivoBorrar(k) : archivoSubir(k, x.d);
+      }).then(function(){ sig(i + 1); }, function(){ subiendoPend = false; });
+    };
+    sig(0);
+  }
+  function archivoCambiado(k){ oyentesArch.forEach(function(f){ try{ f(k); }catch(e){} }); }
+  function alCambiarArchivo(f){ if(typeof f === 'function') oyentesArch.push(f); }
 
   // ---------- Cuentas y negocios ----------
   function registrar(email, pass, nombre){
@@ -291,6 +383,7 @@
   function soltarSesion(){ if(st.email) return Promise.resolve(); return cliente().then(function(c){ return c.auth.signOut(); }).catch(function(){}); }
   function salir(){
     clearInterval(tPoll);
+    try{ if(canal && sb) sb.removeChannel(canal); }catch(e){} canal = null; canalDe = '';
     var p = st.sucio ? subir() : Promise.resolve();
     return p.then(function(){ return cliente(); }).then(function(c){ return c.auth.signOut(); }).catch(function(){})
       .then(function(){ st = {}; guardarSt(); pintarEstado(); });
@@ -500,7 +593,10 @@
     googleDisponible: googleDisponible, conGoogle: conGoogle, volvioDeGoogle: volvioDeGoogle,
     crearCuenta: crearCuenta, entrarCuenta: entrarCuenta, vincular: vincular, crearNegocio: crearNegocio, conectado: conectado, salir: salir,
     msgError: msgError, codigoCorreo: codigoCorreo, enlaceClave: enlaceClave, correoDeEnlace: correoDeEnlace, claveConEnlace: claveConEnlace, soltarEnlace: soltarEnlace, verificarCorreo: verificarCorreo, nuevaClave: nuevaClave, soltarSesion: soltarSesion,
-    _fusionar: fusionar
+    _fusionar: fusionar,
+    // Fotos y archivos compartidos entre los equipos de la cuenta
+    enNube: enNube,
+    archivos: { subir: archivoSubir, bajar: archivoBajar, borrar: archivoBorrar, alCambiar: alCambiarArchivo, pendientes: function(){ return Object.keys(lsGet(K_PEND, {})).length; } }
   };
   if(st.negocio && configurada()){ if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', arrancar); else arrancar(); }
 })();
