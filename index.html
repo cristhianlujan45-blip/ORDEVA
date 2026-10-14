@@ -568,6 +568,13 @@ body.mod-v #quickSaleBtn{ order:-1; background:var(--amber); color:#fff; border-
 .fi-hist td small{display:block;color:var(--ink-soft);font-size:11.5px}
 .fi-dtot{text-align:right;margin:8px 0;font-size:15px}
 .fi-desc{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.fi-esq-pags{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.fi-esq-pags[hidden]{display:none}
+.overlay.fi-esq,.overlay.fi-esq.show{z-index:10070;flex-direction:column;align-items:stretch;justify-content:flex-start;padding:0;background:#0b0b0d;color:#fff}.overlay.fi-esq > *{zoom:1;width:100%;box-sizing:border-box}
+.fi-esq-top{padding:calc(10px + env(safe-area-inset-top)) 14px 6px;display:flex;flex-direction:column;gap:2px;text-align:center}.fi-esq-top b{font-size:17px}.fi-esq-top small{font-size:13px;opacity:.75}
+.fi-esq-zona{position:relative;flex:1;min-height:0;touch-action:none}.fi-esq-c{position:absolute;inset:0;touch-action:none}
+.fi-esq-lupa{position:absolute;width:132px;height:132px;border-radius:50%;pointer-events:none;box-shadow:0 6px 20px rgba(0,0,0,.6)}.fi-esq-lupa[hidden]{display:none}
+.fi-esq-bts{display:flex;gap:6px;padding:8px 10px 0;flex-wrap:wrap;justify-content:center}.fi-esq-bts button{flex:1 1 auto;color:#fff;border-color:#444;padding:10px 8px;font-size:13.5px}
+.fi-esq-pie{display:flex;gap:8px;padding:8px 10px calc(10px + env(safe-area-inset-bottom))}.fi-esq-pie button{flex:1;padding:14px;font-size:16px}
 .fi-desc-prev{position:relative;min-height:120px;max-height:360px;overflow:auto;border:1px solid var(--line);border-radius:10px;background:#fff;display:flex;align-items:flex-start;justify-content:center}
 .fi-desc-img{width:100%;display:block}.fi-desc-img:not([src]){display:none}
 .fi-desc-msg{position:absolute;inset:auto 8px 8px 8px;text-align:center;font-size:12.5px;color:#333;background:rgba(255,255,255,.85);border-radius:8px;padding:6px}
@@ -12833,7 +12840,9 @@ async function fiMejorarFoto(file, o){
   const LADO = o.lado || FI_MAX_LADO, MIN = o.minLado || 0;
   const img = await fiCargarImagen(file);
   let fuente = img, W = img.width, H = img.height, enderezada = false, odListo = null;
-  const q = fiEsquinasPapel(img);
+  // Esquinas puestas a mano (✂️ Ajustar esquinas) o, si no, las que detecta Vento.
+  const q = (o.esquinas && o.esquinas.length === 4) ? o.esquinas.map(([x, y]) => [Math.max(0, Math.min(img.width, x)), Math.max(0, Math.min(img.height, y))]) : fiEsquinasPapel(img);
+  if(o.esquinas && o.alinear === undefined) o = Object.assign({}, o, { alinear: false });   // ya la alineó la persona
   if(q){
     const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
     let ow = Math.max(dist(q[0], q[1]), dist(q[3], q[2])), oh = Math.max(dist(q[0], q[3]), dist(q[1], q[2]));
@@ -12948,6 +12957,119 @@ function fiValidarArchivos(files){
 }
 // Estados claros mientras se lee la factura
 function fiEstado(txt){ const s = document.getElementById('invoiceSub'); if(s) s.textContent = txt; }
+/* ================= ✂️ Ajustar esquinas (como CamScanner) =================
+   La foto original con las 4 esquinas de la hoja (las que detectó Vento; si no encontró la hoja, un recuadro). Se
+   arrastran las esquinas o los bordes con el dedo; mientras se arrastra, una lupa muestra de cerca dónde queda el punto.
+   «🔍 Detectar otra vez», «⬜ Toda la foto», «↻ Girar». «✅ Listo» devuelve { esquinas, archivo } (archivo = la foto,
+   girada si se giró). Las esquinas van en píxeles de la foto, en orden: arriba-izq, arriba-der, abajo-der, abajo-izq. */
+function fiOrdenarEsquinas(q){
+  const cx = q.reduce((a, p) => a + p[0], 0) / 4, cy = q.reduce((a, p) => a + p[1], 0) / 4;
+  const s = q.slice().sort((a, b) => Math.atan2(a[1] - cy, a[0] - cx) - Math.atan2(b[1] - cy, b[0] - cx));   // en orden de las agujas del reloj (y hacia abajo)
+  let i0 = 0; s.forEach((p, i) => { if(p[0] + p[1] < s[i0][0] + s[i0][1]) i0 = i; });
+  return [0, 1, 2, 3].map(k => s[(i0 + k) % 4]);
+}
+async function fiGirarArchivo(file){
+  const img = await fiCargarImagen(file), c = document.createElement('canvas'); c.width = img.height; c.height = img.width;
+  const x = c.getContext('2d'); x.translate(c.width, 0); x.rotate(Math.PI / 2); x.drawImage(img, 0, 0);
+  const b = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.92));
+  return new File([b], (file.name || 'factura').replace(/\.[^.]+$/, '') + '-girada.jpg', { type: 'image/jpeg' });
+}
+function fiEditarEsquinas(file, inicial){
+  return new Promise(async resolve => {
+    let ov = document.getElementById('fiEsqOv');
+    if(!ov){
+      ov = document.createElement('div'); ov.id = 'fiEsqOv'; ov.className = 'overlay fi-esq';
+      ov.innerHTML = '<div class="fi-esq-top"><b>✂️ Ajusta las esquinas</b><small>Arrastra cada punto a una esquina de la hoja</small></div>' +
+        '<div class="fi-esq-zona"><canvas class="fi-esq-c"></canvas><canvas class="fi-esq-lupa" width="132" height="132" hidden></canvas></div>' +
+        '<div class="fi-esq-bts"><button type="button" class="btn-ghost" data-e="auto">🔍 Detectar otra vez</button><button type="button" class="btn-ghost" data-e="todo">⬜ Toda la foto</button><button type="button" class="btn-ghost" data-e="girar">↻ Girar</button></div>' +
+        '<div class="fi-esq-pie"><button type="button" class="btn-close" data-e="no">Cancelar</button><button type="button" class="btn-primary" data-e="ok">✅ Listo</button></div>';
+      document.body.appendChild(ov);
+    }
+    const cv = ov.querySelector('.fi-esq-c'), lupa = ov.querySelector('.fi-esq-lupa'), zona = ov.querySelector('.fi-esq-zona');
+    let img = null, q = null, k = 1, ox = 0, oy = 0, arr = null;
+    const cargar = async f => {
+      file = f; img = await fiCargarImagen(f);
+      const det = fiEsquinasPapel(img);
+      q = (inicial && !cargar.usado) ? inicial.map(p => p.slice()) : det;
+      cargar.usado = true;
+      if(!q){ const m = 0.04; q = [[img.width * m, img.height * m], [img.width * (1 - m), img.height * m], [img.width * (1 - m), img.height * (1 - m)], [img.width * m, img.height * (1 - m)]]; }
+      medir(); pintar();
+    };
+    function medir(){
+      const r = zona.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+      cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr); cv.style.width = r.width + 'px'; cv.style.height = r.height + 'px';
+      const pad = 22;
+      k = Math.min((r.width - 2 * pad) / img.width, (r.height - 2 * pad) / img.height);
+      ox = (r.width - img.width * k) / 2; oy = (r.height - img.height * k) / 2;
+    }
+    const aPant = p => [ox + p[0] * k, oy + p[1] * k];
+    const aFoto = (x, y) => [Math.max(0, Math.min(img.width, (x - ox) / k)), Math.max(0, Math.min(img.height, (y - oy) / k))];
+    const medios = () => [0, 1, 2, 3].map(i => { const a = q[i], b = q[(i + 1) % 4]; return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; });
+    function pintar(){
+      if(!img) return;
+      const x = cv.getContext('2d'), dpr = window.devicePixelRatio || 1;
+      x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, cv.width, cv.height);
+      x.drawImage(img, ox, oy, img.width * k, img.height * k);
+      const P = q.map(aPant);
+      x.save(); x.beginPath(); x.rect(0, 0, cv.width, cv.height); x.moveTo(P[0][0], P[0][1]); P.slice(1).forEach(p => x.lineTo(p[0], p[1])); x.closePath();
+      x.fillStyle = 'rgba(0,0,0,.55)'; x.fill('evenodd'); x.restore();
+      x.beginPath(); x.moveTo(P[0][0], P[0][1]); P.slice(1).forEach(p => x.lineTo(p[0], p[1])); x.closePath();
+      x.lineWidth = 3; x.strokeStyle = '#22c55e'; x.stroke();
+      medios().map(aPant).forEach(p => { x.beginPath(); x.arc(p[0], p[1], 9, 0, 7); x.fillStyle = '#fff'; x.fill(); x.lineWidth = 3; x.strokeStyle = '#22c55e'; x.stroke(); });
+      P.forEach((p, i) => { x.beginPath(); x.arc(p[0], p[1], 15, 0, 7); x.fillStyle = arr && arr.i === i ? '#22c55e' : 'rgba(34,197,94,.35)'; x.fill(); x.lineWidth = 3; x.strokeStyle = '#fff'; x.stroke(); });
+    }
+    function pintarLupa(pf, pantalla){
+      const L = lupa.getContext('2d'), Z = 2.6, R = 66;
+      L.clearRect(0, 0, 132, 132); L.save(); L.beginPath(); L.arc(R, R, R - 2, 0, 7); L.clip();
+      L.fillStyle = '#000'; L.fillRect(0, 0, 132, 132);
+      const ancho = 132 / (k * Z);
+      L.drawImage(img, pf[0] - ancho / 2, pf[1] - ancho / 2, ancho, ancho, 0, 0, 132, 132);
+      L.restore(); L.strokeStyle = '#22c55e'; L.lineWidth = 3; L.beginPath(); L.arc(R, R, R - 2, 0, 7); L.stroke();
+      L.beginPath(); L.moveTo(R - 12, R); L.lineTo(R + 12, R); L.moveTo(R, R - 12); L.lineTo(R, R + 12); L.lineWidth = 2; L.stroke();
+      const izq = pantalla[0] < zona.clientWidth / 2;
+      Object.assign(lupa.style, { left: izq ? '' : '10px', right: izq ? '10px' : '', top: '10px' }); lupa.hidden = false;
+    }
+    const punto = e => { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+    cv.onpointerdown = e => {
+      const pt = punto(e), P = q.map(aPant), M = medios().map(aPant), d = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+      let i = -1, best = 40; P.forEach((p, j) => { if(d(p, pt) < best){ best = d(p, pt); i = j; } });
+      if(i >= 0) arr = { i };
+      else { let m = -1, bm = 34; M.forEach((p, j) => { if(d(p, pt) < bm){ bm = d(p, pt); m = j; } }); if(m < 0) return; arr = { lado: m, desde: aFoto(pt[0], pt[1]), q0: q.map(p => p.slice()) }; }
+      try{ cv.setPointerCapture(e.pointerId); }catch(x){} e.preventDefault(); mover(e);
+    };
+    function mover(e){
+      if(!arr) return;
+      const pt = punto(e), f = aFoto(pt[0], pt[1]);
+      if(arr.i != null){ q[arr.i] = f; pintarLupa(f, pt); }
+      else { const dx = f[0] - arr.desde[0], dy = f[1] - arr.desde[1], a = arr.lado, b = (arr.lado + 1) % 4;
+        [a, b].forEach(j => { q[j] = [Math.max(0, Math.min(img.width, arr.q0[j][0] + dx)), Math.max(0, Math.min(img.height, arr.q0[j][1] + dy))]; }); pintarLupa(f, pt); }
+      pintar();
+    }
+    cv.onpointermove = e => { if(arr){ e.preventDefault(); mover(e); } };
+    cv.onpointerup = cv.onpointercancel = () => { arr = null; lupa.hidden = true; q = fiOrdenarEsquinas(q); pintar(); };
+    const alCambiarTam = () => { if(img && ov.classList.contains('show')){ medir(); pintar(); } };
+    window.addEventListener('resize', alCambiarTam);
+    const fin = v => { ov.classList.remove('show'); window.removeEventListener('resize', alCambiarTam); ov._fin = null; resolve(v); };
+    ov._fin = () => fin(null);
+    ov._prueba = { esquinas: () => q.map(x => x.slice()), pantalla: x => aPant(x), foto: () => img && { w: img.width, h: img.height } };   // para las pruebas automáticas
+    ov.querySelector('.fi-esq-bts').onclick = async e => {
+      const b = e.target.closest('[data-e]'); if(!b || !img) return;
+      if(b.dataset.e === 'auto'){ const d = fiEsquinasPapel(img); if(d){ q = d; pintar(); } else showToast('No encontré bien la hoja: ajústala con los puntos.'); }
+      else if(b.dataset.e === 'todo'){ q = [[0, 0], [img.width, 0], [img.width, img.height], [0, img.height]]; pintar(); }
+      else if(b.dataset.e === 'girar'){ b.disabled = true; try{ inicial = null; await cargar(await fiGirarArchivo(file)); }finally{ b.disabled = false; } }
+    };
+    ov.querySelector('.fi-esq-pie').onclick = e => {
+      const b = e.target.closest('[data-e]'); if(!b) return;
+      if(b.dataset.e === 'no') return fin(null);
+      const o = fiOrdenarEsquinas(q), area = Math.abs(o.reduce((a, p, i) => { const n = o[(i + 1) % 4]; return a + p[0] * n[1] - n[0] * p[1]; }, 0)) / 2;
+      if(area < img.width * img.height * 0.04){ showToast('El recuadro quedó muy pequeño: abre las esquinas hasta los bordes de la hoja.'); return; }
+      fin({ esquinas: o, archivo: file });
+    };
+    ov.classList.add('show');
+    try{ await cargar(file); }catch(e){ showToast('No pude abrir la foto.'); fin(null); }
+  });
+}
+window.fiEditarEsquinas = fiEditarEsquinas;
 /* Revisar la foto antes de leerla: se muestra ya arreglada (recortada, enderezada y con la luz
    pareja). «Usar esta foto», «Tomar otra», «Elegir otra» o «Usar la original». */
 function fiRevisarFoto(file, onLista){
@@ -12959,6 +13081,7 @@ function fiRevisarFoto(file, onLista){
         '<div class="fi-foto-img"><img id="fiFotoImg" alt="Factura"></div>' +
         '<div class="fi-foto-btns"><button type="button" class="btn-primary" id="fiFotoOk">✅ Usar esta foto</button>' +
         '<button type="button" class="btn-ghost" id="fiFotoOtra">📷 Tomar otra</button><button type="button" class="btn-ghost" id="fiFotoGal">🖼️ Elegir otra</button>' +
+        '<button type="button" class="btn-ghost" id="fiFotoEsq">✂️ Ajustar esquinas</button>' +
         '<button type="button" class="btn-ghost" id="fiFotoOrig">Usar la original</button><button type="button" class="btn-close" id="fiFotoNo">Cancelar</button></div></div>';
       document.body.appendChild(ov);
     }
@@ -12967,12 +13090,24 @@ function fiRevisarFoto(file, onLista){
     const fin = v => { ov.classList.remove('show'); resolve(v); };
     let mejor = null;
     try{ mejor = await fiMejorarFoto(file); im.src = mejor.dataUrl;
-      sub.textContent = (mejor.enderezada ? 'La recorté y la enderecé. ' : '') + 'Mejoré la luz y el contraste. ¿Se lee bien?'; }
+      sub.textContent = (mejor.enderezada ? 'La recorté y la enderecé. ' : '') + 'Mejoré la luz y el contraste. ¿Se lee bien? Si el recorte no quedó bien, toca «✂️ Ajustar esquinas».'; }
     catch(e){ im.src = URL.createObjectURL(file); sub.textContent = 'No pude mejorarla, pero puedes usarla así o tomar otra.'; }
     // Mientras la persona mira la foto, ya se empieza a leer (así al tocar «Usar esta foto» la respuesta ya viene en camino).
     if(typeof onLista === 'function') try{ onLista(mejor ? mejor.file : file); }catch(e){}
     document.getElementById('fiFotoOk').onclick = () => fin({ usar: mejor ? mejor.file : file, original: file });
     document.getElementById('fiFotoOrig').onclick = () => fin({ usar: file, original: file });
+    // ✂️ Ajustar esquinas (como CamScanner): la persona corrige el recorte y la foto se vuelve a escanear con sus esquinas.
+    document.getElementById('fiFotoEsq').onclick = async () => {
+      const r = await fiEditarEsquinas(file);
+      if(!r) return;
+      file = r.archivo; file.__esquinas = r.esquinas;
+      sub.textContent = 'Recortando con tus esquinas…';
+      try{ mejor = await fiMejorarFoto(file, { esquinas: r.esquinas }); im.src = mejor.dataUrl; sub.textContent = '✂️ Recortada con tus esquinas, enderezada y con la luz pareja. ¿Se lee bien?'; }
+      catch(e){ sub.textContent = 'No pude recortarla así. Prueba otra vez.'; }
+      if(typeof onLista === 'function') try{ onLista(mejor ? mejor.file : file); }catch(e){}
+      document.getElementById('fiFotoOk').onclick = () => fin({ usar: mejor ? mejor.file : file, original: file });
+      document.getElementById('fiFotoOrig').onclick = () => fin({ usar: file, original: file });
+    };
     document.getElementById('fiFotoOtra').onclick = () => fin({ otra: 'cam' });
     document.getElementById('fiFotoGal').onclick = () => fin({ otra: 'gal' });
     document.getElementById('fiFotoNo').onclick = () => fin(null);
@@ -13011,17 +13146,53 @@ async function fiPaginasDe(files){
   }
   return out.slice(0, 12);
 }
-// Escanea cada página en HD y la guarda en el celular. Devuelve [{ id, w, h }].
+// Escanea cada página en HD y la guarda en el celular. Devuelve [{ id, w, h, esq }]. Si la persona ajustó las esquinas
+// (✂️), se usan esas. También queda en este equipo la foto original de cada página («-o»), para poder corregir el
+// recorte después desde «Facturas anteriores» (las esquinas van en fracciones de la foto: 0 a 1).
 async function fiGuardarEscaneos(files, base){
   const pags = await fiPaginasDe(files), out = [];
   for(let i = 0; i < pags.length; i++){
     try{
-      const r = await fiMejorarFoto(pags[i], FI_HD), id = base + '-p' + (i + 1);
+      const esq = pags[i].__esquinas || null;
+      const r = await fiMejorarFoto(pags[i], Object.assign({}, FI_HD, esq ? { esquinas: esq } : {})), id = base + '-p' + (i + 1);
       await window.ctReciboGuardar(id, await fiBlobADataUrl(r.file));
-      out.push({ id, w: r.w, h: r.h });
+      let fr = null;
+      try{
+        const im = await fiCargarImagen(pags[i]);
+        if(esq) fr = esq.map(([x, y]) => [x / im.width, y / im.height]);
+        await window.ctReciboGuardar(id + '-o', await scalePhotoForAI(pags[i], 2000, 0.85));
+      }catch(e){}
+      out.push(Object.assign({ id, w: r.w, h: r.h }, fr ? { esq: fr } : {}));
     }catch(e){}
   }
   return out;
+}
+// ✂️ Corregir el recorte de una factura ya guardada: se abre la foto original de esa página con sus esquinas, se
+// ajustan y se vuelve a escanear en HD (reemplaza la página guardada; el texto se vuelve a detectar al descargarla).
+async function fiCorregirEscaneo(p, n, avisar){
+  avisar = avisar || (t => showToast(t, 3500));
+  await fiEscaneosDe(p);
+  const e = (p.escaneos || [])[n]; if(!e){ showToast('No encontré esa página.'); return false; }
+  const leer = window.ctReciboLeer;
+  let url = await leer(e.id + '-o'), desdeOriginal = !!url;
+  if(!url && n === 0 && p.archivoId){ url = await leer(p.archivoId); desdeOriginal = !!url; }
+  if(!url) url = await leer(e.id);
+  if(!url){ showToast('La foto de esta página no está en este equipo.'); return false; }
+  const f = await fiDataUrlAFile(url, 'factura-p' + (n + 1) + '.jpg');
+  let inicial = null;
+  if(desdeOriginal && e.esq){ const im = await fiCargarImagen(f); inicial = e.esq.map(([x, y]) => [x * im.width, y * im.height]); }
+  const r = await fiEditarEsquinas(f, inicial);
+  if(!r) return false;
+  avisar('✂️ Recortando y escaneando en HD…');
+  const m = await fiMejorarFoto(r.archivo, Object.assign({}, FI_HD, { esquinas: r.esquinas }));
+  await window.ctReciboGuardar(e.id, await fiBlobADataUrl(m.file));
+  try{ await window.ctReciboBorrar(e.id + '-ocr'); }catch(x){}
+  const im2 = await fiCargarImagen(r.archivo);
+  if(r.archivo !== f || !desdeOriginal) try{ await window.ctReciboGuardar(e.id + '-o', await scalePhotoForAI(r.archivo, 2000, 0.85)); }catch(x){}
+  Object.assign(e, { w: m.w, h: m.h, esq: r.esquinas.map(([x, y]) => [x / im2.width, y / im2.height]), corregida: Date.now() });
+  saveData();
+  showToast('✅ Página ' + (n + 1) + ' recortada con tus esquinas y guardada en HD.', 4500);
+  return true;
 }
 // Lo que se hace después de aplicar (sin hacer esperar): escanear en HD todas las páginas y detectar su texto.
 async function fiEscanearCompra(compraId, files){
@@ -14060,12 +14231,13 @@ async function leerFactura(files, btn, input){
     if(!r) return;
     if(r.otra){ (r.otra === 'cam' ? invoiceCamInput : invoiceGalInput).click(); return; }
     files = [r.usar];
-    if(r.usar !== original) try{ r.usar.__original = original; }catch(e){}
+    if(r.original && r.original !== original) originales[0] = r.original;     // girada o con esquinas puestas a mano
+    if(r.usar !== original) try{ r.usar.__original = originales[0]; }catch(e){}
   } else {
     // Varias fotos (o un PDF): las fotos se arreglan solas, sin preguntar.
     files = await Promise.all(files.map(async f => { if(fiEsPdf(f)) return f; try{ const m = (await fiMejorarFoto(f)).file; try{ m.__original = f; }catch(e){} return m; }catch(e){ return f; } }));
   }
-  window.__fiArchivo = original; window.__fiArchivos = originales;
+  window.__fiArchivo = originales[0]; window.__fiArchivos = originales;
   // Sin IA configurada (ni la clave de Vento en el servidor ni una propia): se ofrece configurarla UNA vez (queda
   // en los datos del negocio y llega sola a los demás celulares). Una vez al día como máximo; si no, se lee sin internet.
   if(!hasAIKey() && navigator.onLine !== false && authIsAdmin()){
@@ -24178,7 +24350,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-14 · v1.32.0';
+const MESORA_VERSION = '2026-10-14 · v1.33.0';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'Vento · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 // Si el navegador (o el celular, con la app agregada a la pantalla de inicio) se quedó con
@@ -28681,6 +28853,7 @@ window.mesoraCelebrar = function(emojis){
         ? '<div class="fi-desc"><div class="fi-desc-prev"><img class="fi-desc-img" alt="Factura escaneada"><span class="fi-desc-msg">Cargando la factura escaneada…</span></div>' +
           '<button type="button" class="btn-primary fi-dl-pdf">📄 Descargar escaneada (PDF HD con el texto)</button>' +
           '<button type="button" class="btn-ghost fi-dl-jpg">🖼️ Descargar imagen HD (JPG)</button>' +
+          '<button type="button" class="btn-ghost fi-esq-btn">✂️ Corregir el recorte (esquinas)</button><div class="fi-esq-pags" hidden></div>' +
           (p.archivoId ? '<button type="button" class="btn-ghost fi-verorig">📎 Ver la foto original</button>' : '') +
           '<div class="settings-desc">Escaneada como en un escáner: recortada, enderezada, con el texto alineado y en Full HD. El PDF trae el texto de la factura (se puede buscar y copiar) y una hoja con los datos leídos.</div></div>'
         : '<div class="settings-desc">La foto de esta factura no quedó guardada en este equipo (se guarda en el celular donde se escaneó). Igual puedes descargar sus datos.</div><button type="button" class="btn-ghost fi-dl-pdf">📄 Descargar los datos (PDF)</button>'));
@@ -28692,6 +28865,15 @@ window.mesoraCelebrar = function(emojis){
       finally{ x.disabled = false; x.textContent = lbl; if(msg) msg.hidden = true; }
     }; };
     boton('.fi-dl-pdf', 'pdf'); boton('.fi-dl-jpg', 'jpg');
+    const eb = ov.querySelector('.fi-esq-btn'), ep = ov.querySelector('.fi-esq-pags');
+    const corregir = async n => { const ok = await fiCorregirEscaneo(p, n, avisar); if(ok){ const pg = await fiEscaneosDe(p); const im = ov.querySelector('.fi-desc-img'); if(im && pg[0]) im.src = pg[0].url; } if(msg) msg.hidden = true; ep.hidden = true; };
+    if(eb) eb.onclick = async () => {
+      await fiEscaneosDe(p, avisar);
+      const n = (p.escaneos || []).length;
+      if(n <= 1) return corregir(0);
+      ep.innerHTML = '<small>¿Cuál página?</small>' + p.escaneos.map((x, i) => '<button type="button" class="btn-ghost" data-pag="' + i + '">Página ' + (i + 1) + '</button>').join('');
+      ep.hidden = false; ep.onclick = ev => { const b = ev.target.closest('[data-pag]'); if(b) corregir(+b.dataset.pag); };
+    };
     // Vista previa de la página 1 ya escaneada (las facturas de antes se escanean en HD al abrirlas)
     const im = ov.querySelector('.fi-desc-img');
     if(im) fiEscaneosDe(p, t => { if(msg) msg.textContent = t; }).then(pg => { if(!ov.classList.contains('show')) return; if(pg[0]){ im.src = pg[0].url; if(msg) msg.hidden = true; } else if(msg) msg.textContent = 'La foto no está en este equipo.'; }).catch(() => { if(msg) msg.textContent = 'No pude abrir la foto.'; });
@@ -28750,7 +28932,7 @@ window.mesoraCelebrar = function(emojis){
   const tx = async (modo, fn) => { const d = await db(); return new Promise((res, rej) => { const t = d.transaction('recibos', modo), rq = fn(t.objectStore('recibos')); t.oncomplete = () => res(rq && rq.result); t.onerror = () => rej(t.error); }); };
   // También en la nube (clave «rec/<id>»): facturas escaneadas, sus fotos originales y los recibos de gastos se ven
   // en todos los equipos de la cuenta. El texto detectado («-ocr») no se sube: cada equipo lo saca si lo necesita.
-  const nubeRec = id => !/-ocr$/.test(String(id)) && window.ventoNube && window.ventoNube.enNube && window.ventoNube.enNube() && window.ventoNube.archivos;
+  const nubeRec = id => !/-(ocr|o)$/.test(String(id)) && window.ventoNube && window.ventoNube.enNube && window.ventoNube.enNube() && window.ventoNube.archivos;
   window.ctReciboGuardar = (id, url) => { const n = nubeRec(id); if(n) n.subir('rec/' + id, url); return tx('readwrite', st => st.put(url, id)).catch(() => showToast('⚠️ No se pudo guardar el recibo en este celular.')); };
   window.ctReciboBorrar = id => { const n = nubeRec(id); if(n) n.borrar('rec/' + id); return tx('readwrite', st => st.delete(id)).catch(() => {}); };
   const leerAqui = id => tx('readonly', st => st.get(id));
