@@ -12834,6 +12834,85 @@ function fiAnguloTexto(g, w, h){
   for(let a = mejor - 0.4; a <= mejor + 0.41; a += 0.1){ const v = puntaje(a); if(v > pm){ pm = v; mejor = a; } }
   return (pm > p0 * 1.04 && Math.abs(mejor) >= 0.3) ? Math.round(mejor * 10) / 10 : 0;
 }
+/* Hacia dónde quedó la hoja (como CamScanner): 0, 90, 180 o 270 = cuánto hay que girarla (a la derecha) para que el texto
+   quede derecho. Primero se ve si los renglones van acostados o parados (y qué tan torcidos); después si está al revés:
+   las letras se apoyan alineadas abajo, y en texto en MAYÚSCULAS los puntos y comas («2.500», «S.A.S.») quedan abajo del
+   renglón. seguro=false si no hay pistas claras (entonces no se gira: queda «↻ Girar» a mano). */
+function fiOrientacion(g, w, h){
+  const k = Math.min(1, 1200 / Math.max(w, h)), sw = Math.max(1, Math.round(w * k)), sh = Math.max(1, Math.round(h * k));
+  const b = new Uint8Array(sw * sh), xs = [], ys = [];
+  for(let y = 0; y < sh; y++){ const fy = Math.min(h - 1, (y / k) | 0) * w; for(let x = 0; x < sw; x++){ if(g[fy + Math.min(w - 1, (x / k) | 0)] < 140){ b[y * sw + x] = 1; xs.push(x - sw / 2); ys.push(y - sh / 2); } } }
+  const n = xs.length;
+  if(n < 400 || n > sw * sh * 0.45) return { giro: 0, seguro: false, razon: 'sin texto' };
+  // 1. ¿Renglones acostados o parados, y qué tan torcidos? Se prueban giros (0° o 90°, ±8°) y gana el que deja más
+  //    filas en blanco entre renglones (como cuando los renglones quedan derechos).
+  const paso = Math.max(1, Math.floor(n / 60000)), L = Math.ceil(Math.hypot(sw, sh)) + 4, bins = new Int32Array(L);
+  const huecos = th => {
+    const a = th * Math.PI / 180, si = Math.sin(a), co = Math.cos(a); bins.fill(0);
+    for(let i = 0; i < n; i += paso){ const r = (xs[i] * si + ys[i] * co + L / 2) | 0; if(r >= 0 && r < L) bins[r]++; }
+    let i0 = 0; while(i0 < L && !bins[i0]) i0++; let i1 = L - 1; while(i1 > i0 && !bins[i1]) i1--;
+    let bl = 0; for(let i = i0; i <= i1; i++) if(bins[i] === 0) bl++;
+    return bl / Math.max(1, i1 - i0 + 1);
+  };
+  const junto = th => { huecos(th); let t = 0; for(let i = 0; i < L; i++) t += bins[i] * bins[i]; return t; };   // tinta concentrada en filas
+  const mejorDe = base => { let m = { th: base, v: -1 }; for(let a = -8; a <= 8; a += 1){ const v = huecos(base + a); if(v > m.v) m = { th: base + a, v }; }
+    let c = m.th, cj = junto(c); for(let a = m.th - 1; a <= m.th + 1.01; a += 0.1){ const v = junto(a); if(v > cj){ cj = v; c = a; } } m.th = c; return m; };
+  const mh = mejorDe(0), mv = mejorDe(90);
+  if(Math.abs(mh.v - mv.v) < 0.08 || Math.max(mh.v, mv.v) < 0.12) return { giro: 0, seguro: false, razon: 'sin renglones claros', mh, mv };
+  const m = mh.v > mv.v ? mh : mv, base = m === mh ? 0 : 90;
+  // 2. La hoja «enderezada» (girada base + torcido) para revisar cada renglón.
+  const th = m.th * Math.PI / 180, co = Math.cos(th), si = Math.sin(th);
+  const W = base ? sh : sw, H = base ? sw : sh, t = new Uint8Array(W * H);
+  for(let Y = 0; Y < H; Y++) for(let X = 0; X < W; X++){
+    const dx = X - W / 2, dy = Y - H / 2, x = Math.round(dx * co + dy * si + sw / 2), y = Math.round(-dx * si + dy * co + sh / 2);
+    if(x >= 0 && y >= 0 && x < sw && y < sh && b[y * sw + x]) t[Y * W + X] = 1;
+  }
+  const P = new Float64Array(H); for(let Y = 0; Y < H; Y++){ let c = 0; for(let X = 0; X < W; X++) c += t[Y * W + X]; P[Y] = c; }
+  const umbral = Math.max(1, W * 0.004), lineas = [];
+  for(let i = 0; i < H;){
+    if(P[i] <= umbral){ i++; continue; }
+    let j = i; while(j < H && P[j] > umbral) j++;
+    if(j - i >= 5 && j - i < H / 6){
+      let pico = 0; for(let q = i; q < j; q++) pico = Math.max(pico, P[q]);
+      if(pico < W * 0.85){ const tt = pico * 0.5; let ct = i, cb = j - 1; while(P[ct] < tt) ct++; while(P[cb] < tt) cb--; lineas.push({ y0: i, y1: j, ct, cb }); }
+    }
+    i = j;
+  }
+  if(lineas.length < 2) return { giro: 0, seguro: false, razon: 'pocos renglones' };
+  // Pista 2 (texto en MAYÚSCULAS): puntos y comas («2.500», «S.A.S.») quedan abajo del renglón; las tildes, arriba.
+  const lin = new Int32Array(H).fill(-1); lineas.forEach((l, q) => { for(let y = l.y0; y < l.y1; y++) lin[y] = q; });
+  const vis = new Uint8Array(W * H), pila = []; let pAbajo = 0, pArriba = 0; const letras = lineas.map(() => []);
+  for(let s = 0; s < W * H; s++){
+    if(!t[s] || vis[s]) continue;
+    vis[s] = 1; pila.push(s); let x0 = W, x1 = 0, y0 = H, y1 = 0, c = 0;
+    while(pila.length){ const q = pila.pop(), x = q % W, y = (q / W) | 0; c++; if(x < x0) x0 = x; if(x > x1) x1 = x; if(y < y0) y0 = y; if(y > y1) y1 = y;
+      if(x > 0 && t[q - 1] && !vis[q - 1]){ vis[q - 1] = 1; pila.push(q - 1); } if(x < W - 1 && t[q + 1] && !vis[q + 1]){ vis[q + 1] = 1; pila.push(q + 1); }
+      if(y > 0 && t[q - W] && !vis[q - W]){ vis[q - W] = 1; pila.push(q - W); } if(y < H - 1 && t[q + W] && !vis[q + W]){ vis[q + W] = 1; pila.push(q + W); } }
+    const cy = (y0 + y1) >> 1, li = lin[cy]; if(li < 0) continue;
+    const l = lineas[li], alto = l.cb - l.ct + 1; if(alto < 4) continue;
+    if(y1 - y0 + 1 >= alto * 0.6){ letras[li].push([y0, y1]); continue; }   // letras y números (para la pista 1)
+    if(y1 - y0 + 1 > alto * 0.38 || x1 - x0 + 1 > alto * 0.45) continue;   // solo puntos, comas, tildes
+    const pos = (cy - l.ct) / alto;
+    if(pos > 0.62) pAbajo++; else if(pos < 0.3) pArriba++;
+  }
+  const s2 = (pAbajo - pArriba) / (pAbajo + pArriba + 1);
+  // Pista 1: casi todas las letras se apoyan en la misma línea (abajo), pero arriba no: unas suben (b, d, h, l, mayúsculas,
+  // números) y otras no (a, c, e, o…). Las que bajan (g, p, q, y) son pocas. Al revés, las letras quedan alineadas arriba.
+  // En texto en MAYÚSCULAS las letras quedan alineadas arriba y abajo: ahí decide la pista 2.
+  let votos = 0, total = 0;
+  letras.forEach((ls, li) => {
+    if(ls.length < 4) return;
+    const l = lineas[li], tol = Math.max(1.5, (l.y1 - l.y0) * 0.1);
+    const alineadas = k => { const v = ls.map(c => c[k]).sort((a, b) => a - b); let mejor = 0; for(let i = 0, j = 0; i < v.length; i++){ while(v[i] - v[j] > tol * 2) j++; mejor = Math.max(mejor, i - j + 1); } return mejor / v.length; };
+    const fb = alineadas(1), ft = alineadas(0);
+    votos += (fb - ft) * ls.length; total += ls.length;
+  });
+  const s1 = total ? votos / total : 0, peso1 = total;
+  let s = 0, seguro = false;
+  if(Math.abs(s1) > 0.15 && peso1 >= 12){ s = s1; seguro = true; }
+  else if(pAbajo + pArriba >= 4 && Math.abs(s2) > 0.3){ s = s2; seguro = true; }
+  return { giro: seguro ? (s >= 0 ? base : base + 180) % 360 : 0, seguro, torcido: m.th - base, s1, s2, peso1, pAbajo, pArriba, lineas: lineas.length, mh, mv };
+}
 // o: { lado: lado máximo en px, minLado: agrandar hasta este lado (Full HD = 1920), calidad: JPG 0–1, alinear: enderezar el texto }
 async function fiMejorarFoto(file, o){
   o = o || {};
@@ -12931,21 +13010,33 @@ async function fiMejorarFoto(file, o){
   for(let x = 0; x < w; x++){ for(const y of [0, h - 1]){ const o = (y * w + x) * 4, v = out[y * w + x] > 222 ? 255 : out[y * w + x]; px[o] = px[o + 1] = px[o + 2] = v; px[o + 3] = 255; } }
   for(let y = 0; y < h; y++){ for(const x of [0, w - 1]){ const o = (y * w + x) * 4, v = out[y * w + x] > 222 ? 255 : out[y * w + x]; px[o] = px[o + 1] = px[o + 2] = v; px[o + 3] = 255; } }
   cx.putImageData(id, 0, 0);
+  // Foto de lado o al revés: se gira sola (o como la dejó la persona con «↻ Girar»).
+  let giro = 0, giroAuto = false;
+  const giroPedido = o.giro != null ? o.giro : file.__giro;
+  if(giroPedido != null) giro = ((Number(giroPedido) || 0) % 360 + 360) % 360;
+  else if(o.autoGiro !== false){ try{ const r = fiOrientacion(out, w, h); if(r.seguro && r.giro){ giro = r.giro; giroAuto = true; } }catch(e){} }
+  // Con el giro, los píxeles del texto se giran también para medir la inclinación ya derecha.
+  let og = out, gw = w, gh = h;
+  if(giro){
+    gw = giro % 180 ? h : w; gh = giro % 180 ? w : h; og = new Uint8ClampedArray(w * h);
+    for(let y = 0; y < h; y++) for(let x = 0; x < w; x++){
+      const v = out[y * w + x];
+      if(giro === 90) og[x * gw + (h - 1 - y)] = v; else if(giro === 180) og[(h - 1 - y) * gw + (w - 1 - x)] = v; else og[(w - 1 - x) * gw + y] = v;
+    }
+  }
   // Texto torcido (la hoja ocupaba toda la foto o quedó un poco girada): se alinea como un escáner.
   let angulo = 0, final = c;
-  if(o.alinear !== false){
-    try{ angulo = fiAnguloTexto(out, w, h); }catch(e){ angulo = 0; }
-    if(angulo){
-      const r = document.createElement('canvas'); r.width = w; r.height = h;
-      const rx = r.getContext('2d'); rx.fillStyle = '#fff'; rx.fillRect(0, 0, w, h); rx.imageSmoothingQuality = 'high';
-      rx.translate(w / 2, h / 2); rx.rotate(-angulo * Math.PI / 180); rx.drawImage(c, -w / 2, -h / 2);
-      final = r; enderezada = true;
-    }
+  if(o.alinear !== false){ try{ angulo = fiAnguloTexto(og, gw, gh); }catch(e){ angulo = 0; } }
+  if(angulo || giro){
+    const r = document.createElement('canvas'); r.width = gw; r.height = gh;
+    const rx = r.getContext('2d'); rx.fillStyle = '#fff'; rx.fillRect(0, 0, gw, gh); rx.imageSmoothingQuality = 'high';
+    rx.translate(gw / 2, gh / 2); rx.rotate((giro - angulo) * Math.PI / 180); rx.drawImage(c, -w / 2, -h / 2);
+    final = r; if(angulo) enderezada = true;
   }
   const blob = await new Promise(r => final.toBlob(r, 'image/jpeg', o.calidad || 0.85));
   const nombre = (file.name || 'factura').replace(/\.[^.]+$/, '') + '-mejorada.jpg';
   const file2 = new File([blob], nombre, { type: 'image/jpeg' });
-  return { file: file2, dataUrl: URL.createObjectURL(file2), enderezada, angulo, w, h };   // vista previa sin volver a codificar la foto
+  return { file: file2, dataUrl: URL.createObjectURL(file2), enderezada, angulo, giro, giroAuto, w: final.width, h: final.height };   // vista previa sin volver a codificar la foto
 }
 const fiEsPdf = f => (window.VitoOfflineOCR && window.VitoOfflineOCR.isPdfFile && window.VitoOfflineOCR.isPdfFile(f)) || /\.pdf$/i.test(f.name || '') || f.type === 'application/pdf';
 // Archivos válidos: fotos o PDF, de hasta 15 MB cada uno, máximo 10 a la vez.
@@ -13081,7 +13172,7 @@ function fiRevisarFoto(file, onLista){
         '<div class="fi-foto-img"><img id="fiFotoImg" alt="Factura"></div>' +
         '<div class="fi-foto-btns"><button type="button" class="btn-primary" id="fiFotoOk">✅ Usar esta foto</button>' +
         '<button type="button" class="btn-ghost" id="fiFotoOtra">📷 Tomar otra</button><button type="button" class="btn-ghost" id="fiFotoGal">🖼️ Elegir otra</button>' +
-        '<button type="button" class="btn-ghost" id="fiFotoEsq">✂️ Ajustar esquinas</button>' +
+        '<button type="button" class="btn-ghost" id="fiFotoEsq">✂️ Ajustar esquinas</button><button type="button" class="btn-ghost" id="fiFotoGirar">↻ Girar</button>' +
         '<button type="button" class="btn-ghost" id="fiFotoOrig">Usar la original</button><button type="button" class="btn-close" id="fiFotoNo">Cancelar</button></div></div>';
       document.body.appendChild(ov);
     }
@@ -13089,8 +13180,9 @@ function fiRevisarFoto(file, onLista){
     im.removeAttribute('src'); sub.textContent = 'Procesando imagen…'; ov.classList.add('show');
     const fin = v => { ov.classList.remove('show'); resolve(v); };
     let mejor = null;
+    const giroTxt = m => m && m.giroAuto ? (m.giro === 180 ? 'Estaba al revés: la giré. ' : 'Estaba de lado: la giré. ') : '';
     try{ mejor = await fiMejorarFoto(file); im.src = mejor.dataUrl;
-      sub.textContent = (mejor.enderezada ? 'La recorté y la enderecé. ' : '') + 'Mejoré la luz y el contraste. ¿Se lee bien? Si el recorte no quedó bien, toca «✂️ Ajustar esquinas».'; }
+      sub.textContent = giroTxt(mejor) + (mejor.enderezada ? 'La recorté y la enderecé. ' : '') + 'Mejoré la luz y el contraste. ¿Se lee bien? Si quedó girada, toca «↻ Girar»; si el recorte no quedó bien, «✂️ Ajustar esquinas».'; }
     catch(e){ im.src = URL.createObjectURL(file); sub.textContent = 'No pude mejorarla, pero puedes usarla así o tomar otra.'; }
     // Mientras la persona mira la foto, ya se empieza a leer (así al tocar «Usar esta foto» la respuesta ya viene en camino).
     if(typeof onLista === 'function') try{ onLista(mejor ? mejor.file : file); }catch(e){}
@@ -13100,10 +13192,24 @@ function fiRevisarFoto(file, onLista){
     document.getElementById('fiFotoEsq').onclick = async () => {
       const r = await fiEditarEsquinas(file);
       if(!r) return;
-      file = r.archivo; file.__esquinas = r.esquinas;
+      file = r.archivo; file.__esquinas = r.esquinas; delete file.__giro;   // la hoja ya quedó como la puso la persona
       sub.textContent = 'Recortando con tus esquinas…';
       try{ mejor = await fiMejorarFoto(file, { esquinas: r.esquinas }); im.src = mejor.dataUrl; sub.textContent = '✂️ Recortada con tus esquinas, enderezada y con la luz pareja. ¿Se lee bien?'; }
       catch(e){ sub.textContent = 'No pude recortarla así. Prueba otra vez.'; }
+      if(typeof onLista === 'function') try{ onLista(mejor ? mejor.file : file); }catch(e){}
+      document.getElementById('fiFotoOk').onclick = () => fin({ usar: mejor ? mejor.file : file, original: file });
+      document.getElementById('fiFotoOrig').onclick = () => fin({ usar: file, original: file });
+    };
+    // ↻ Girar a mano (un cuarto de vuelta a la derecha cada vez). El giro queda en la foto, así el escaneo HD que se guarda
+    // también sale derecho.
+    const gb = document.getElementById('fiFotoGirar');
+    gb.onclick = async () => {
+      if(gb.disabled) return; gb.disabled = true;
+      const g = (((mejor && mejor.giro) || 0) + 90) % 360; file.__giro = g;
+      sub.textContent = 'Girando…';
+      try{ mejor = await fiMejorarFoto(file, Object.assign({ giro: g }, file.__esquinas ? { esquinas: file.__esquinas } : {})); im.src = mejor.dataUrl; sub.textContent = '↻ Girada. ¿Quedó derecha? Si no, toca «↻ Girar» otra vez.'; }
+      catch(e){ sub.textContent = 'No pude girarla. Prueba otra vez.'; }
+      finally{ gb.disabled = false; }
       if(typeof onLista === 'function') try{ onLista(mejor ? mejor.file : file); }catch(e){}
       document.getElementById('fiFotoOk').onclick = () => fin({ usar: mejor ? mejor.file : file, original: file });
       document.getElementById('fiFotoOrig').onclick = () => fin({ usar: file, original: file });
@@ -13162,7 +13268,7 @@ async function fiGuardarEscaneos(files, base){
         if(esq) fr = esq.map(([x, y]) => [x / im.width, y / im.height]);
         await window.ctReciboGuardar(id + '-o', await scalePhotoForAI(pags[i], 2000, 0.85));
       }catch(e){}
-      out.push(Object.assign({ id, w: r.w, h: r.h }, fr ? { esq: fr } : {}));
+      out.push(Object.assign({ id, w: r.w, h: r.h }, fr ? { esq: fr } : {}, r.giro ? { giro: r.giro } : {}));
     }catch(e){}
   }
   return out;
@@ -13184,7 +13290,7 @@ async function fiCorregirEscaneo(p, n, avisar){
   const r = await fiEditarEsquinas(f, inicial);
   if(!r) return false;
   avisar('✂️ Recortando y escaneando en HD…');
-  const m = await fiMejorarFoto(r.archivo, Object.assign({}, FI_HD, { esquinas: r.esquinas }));
+  const m = await fiMejorarFoto(r.archivo, Object.assign({}, FI_HD, { esquinas: r.esquinas }, desdeOriginal && r.archivo === f && e.giro ? { giro: e.giro } : {}));
   await window.ctReciboGuardar(e.id, await fiBlobADataUrl(m.file));
   try{ await window.ctReciboBorrar(e.id + '-ocr'); }catch(x){}
   const im2 = await fiCargarImagen(r.archivo);
@@ -13192,6 +13298,23 @@ async function fiCorregirEscaneo(p, n, avisar){
   Object.assign(e, { w: m.w, h: m.h, esq: r.esquinas.map(([x, y]) => [x / im2.width, y / im2.height]), corregida: Date.now() });
   saveData();
   showToast('✅ Página ' + (n + 1) + ' recortada con tus esquinas y guardada en HD.', 4500);
+  return true;
+}
+// ↻ Girar una página guardada: un cuarto de vuelta a la derecha de la imagen HD (sin volver a escanear, así no pierde
+// calidad). El texto se vuelve a detectar al descargarla.
+async function fiGirarEscaneo(p, n, avisar){
+  avisar = avisar || (t => showToast(t, 3500));
+  await fiEscaneosDe(p);
+  const e = (p.escaneos || [])[n]; if(!e){ showToast('No encontré esa página.'); return false; }
+  const url = await window.ctReciboLeer(e.id);
+  if(!url){ showToast('La foto de esta página no está en este equipo.'); return false; }
+  avisar('↻ Girando la página ' + (n + 1) + '…');
+  const f = await fiGirarArchivo(await fiDataUrlAFile(url, 'factura-p' + (n + 1) + '.jpg'));
+  await window.ctReciboGuardar(e.id, await fiBlobADataUrl(f));
+  try{ await window.ctReciboBorrar(e.id + '-ocr'); }catch(x){}
+  e.giro = ((e.giro || 0) + 90) % 360; const w = e.w; e.w = e.h; e.h = w;
+  saveData();
+  showToast('↻ Página ' + (n + 1) + ' girada y guardada.', 3500);
   return true;
 }
 // Lo que se hace después de aplicar (sin hacer esperar): escanear en HD todas las páginas y detectar su texto.
@@ -28882,6 +29005,7 @@ window.mesoraCelebrar = function(emojis){
           '<button type="button" class="btn-primary fi-dl-pdf">📄 Descargar escaneada (PDF HD con el texto)</button>' +
           '<button type="button" class="btn-ghost fi-dl-jpg">🖼️ Descargar imagen HD (JPG)</button>' +
           '<button type="button" class="btn-ghost fi-esq-btn">✂️ Corregir el recorte (esquinas)</button><div class="fi-esq-pags" hidden></div>' +
+          '<button type="button" class="btn-ghost fi-girar-btn">↻ Girar la página</button><div class="fi-girar-pags" hidden></div>' +
           (p.archivoId ? '<button type="button" class="btn-ghost fi-verorig">📎 Ver la foto original</button>' : '') +
           '<div class="settings-desc">Escaneada como en un escáner: recortada, enderezada, con el texto alineado y en Full HD. El PDF trae el texto de la factura (se puede buscar y copiar) y una hoja con los datos leídos.</div></div>'
         : '<div class="settings-desc">La foto de esta factura no quedó guardada en este equipo (se guarda en el celular donde se escaneó). Igual puedes descargar sus datos.</div><button type="button" class="btn-ghost fi-dl-pdf">📄 Descargar los datos (PDF)</button>'));
@@ -28901,6 +29025,16 @@ window.mesoraCelebrar = function(emojis){
       if(n <= 1) return corregir(0);
       ep.innerHTML = '<small>¿Cuál página?</small>' + p.escaneos.map((x, i) => '<button type="button" class="btn-ghost" data-pag="' + i + '">Página ' + (i + 1) + '</button>').join('');
       ep.hidden = false; ep.onclick = ev => { const b = ev.target.closest('[data-pag]'); if(b) corregir(+b.dataset.pag); };
+    };
+    // ↻ Girar una página ya guardada (un cuarto de vuelta a la derecha): se gira la imagen HD y se vuelve a detectar el texto.
+    const gb = ov.querySelector('.fi-girar-btn'), gp = ov.querySelector('.fi-girar-pags');
+    const girar = async n => { gp.hidden = true; const ok = await fiGirarEscaneo(p, n, avisar); if(ok){ const pg = await fiEscaneosDe(p); const im = ov.querySelector('.fi-desc-img'); if(im && pg[n]) im.src = pg[n].url; } if(msg) msg.hidden = true; };
+    if(gb) gb.onclick = async () => {
+      await fiEscaneosDe(p, avisar);
+      const n = (p.escaneos || []).length;
+      if(n <= 1) return girar(0);
+      gp.innerHTML = '<small>¿Cuál página?</small>' + p.escaneos.map((x, i) => '<button type="button" class="btn-ghost" data-pag="' + i + '">Página ' + (i + 1) + '</button>').join('');
+      gp.hidden = false; gp.onclick = ev => { const b = ev.target.closest('[data-pag]'); if(b) girar(+b.dataset.pag); };
     };
     // Vista previa de la página 1 ya escaneada (las facturas de antes se escanean en HD al abrirlas)
     const im = ov.querySelector('.fi-desc-img');
