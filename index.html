@@ -5174,6 +5174,7 @@ export default {
 <script src="nube/vento-suscripcion.js" defer></script>
 <script src="lib/vento-pos.js" defer></script><!-- Modos de trabajo (tienda/mixto) y modo fácil -->
 <script src="lib/vento-guia.js" defer></script><!-- Modo fácil para mayores: guía paso a paso con voz, «Ayúdame» y recorrido -->
+<script src="lib/vento-cuenta.js" defer></script><!-- Soporte en la app, licencias del proveedor, recuperar por SMS, cuenta de cliente aparte del administrador -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="lib/vento-sonidos.js"></script>
 <script>
@@ -19330,6 +19331,8 @@ function showAuth(firstRun){
     const btn = g('authBtn'), txt = btn.textContent;
     const ocupado = t => { enviando = !!t; btn.disabled = !!t; btn.textContent = t || txt; };
     try{
+      // El correo del administrador de Vento no es cuenta de cliente (lib/vento-cuenta.js).
+      if(authEsCorreo(user) && window.ventoCuenta && await window.ventoCuenta.guardia(user, pass, modoNueva)) return;
       if(modoNueva){
         const vacio = !authUsers().length;
         const biz = document.getElementById('authBiz').value.trim();
@@ -25301,6 +25304,13 @@ function licPintar(){
   const a = document.getElementById('licOpen'); if(a) a.onclick = e => { e.preventDefault(); licPaywall(''); };
 }
 async function licActivar(texto, silencioso){
+  // Licencia del proveedor (VENTO-XXXX-XXXX-XXXX): la activa el servidor en el negocio de la cuenta.
+  const lic = /VENTO-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}/i.exec(String(texto || '').replace(/\s+/g, ''));
+  if(lic){
+    if(!(window.ventoSuscripcion && window.ventoSuscripcion.canjear)){ if(!silencioso) showToast('⚠️ Para activar esa licencia entra con tu cuenta de Vento Nube (correo y contraseña).', 8000); return false; }
+    try{ const r = await window.ventoSuscripcion.canjear(lic[0]); showToast('🎉 Licencia activada: plan ' + String(r.plan_id || '').toUpperCase() + ' hasta el ' + new Date(r.hasta).toLocaleDateString('es-CO') + '.', 9000); return true; }
+    catch(e){ if(!silencioso) showToast('⚠️ ' + ((e && e.message) || 'No se pudo activar la licencia.'), 8000); return false; }
+  }
   const r = await licVerificar(texto);
   if(r.error){
     const why = { formato: 'Ese código no está completo. Cópialo o ábrelo desde el link tal como te llegó.', firma: 'Ese código no es válido.', equipo: 'Ese código es para otro negocio (' + (r.p && r.p.d) + '). El código de tu negocio es ' + codigoNegocio() + '.', vencida: 'Ese código ya venció.' }[r.error];

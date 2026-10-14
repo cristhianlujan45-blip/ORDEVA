@@ -208,6 +208,9 @@
     E.cargando = api('estado', { negocio: id }).then(function(j){
       if(E.neg !== id) return;
       var tok = j.token, info = Object.assign({}, j); delete info.token; delete info.ok;
+      if(j.licencias_activadas && j.licencias_activadas.length){ var la = j.licencias_activadas[j.licencias_activadas.length - 1];
+        setTimeout(function(){ toast('🎉 Se activó tu licencia ' + la.codigo + ': plan ' + nombrePlan(la.plan_id) + ' hasta el ' + fecha(la.hasta) + '.', 9000); }, 600); }
+      delete info.licencias_activadas;
       return verificar(tok, id, true).then(function(p){
         if(E.neg !== id) return;
         E.ultimo = Date.now();
@@ -380,7 +383,16 @@
       if(s.renovar && !s.pago && !s.rechazo) h += '<div class="vs-aviso" id="vsAvisoRenovar"><span>⏰ Tu suscripción vence el ' + fecha(s.vence) + '.</span><button type="button" class="btn-primary" data-vs="renovar">RENOVAR</button></div>';
       if(s.status === 'rejected' || s.rechazo) h += '<div class="vs-acciones vs-sep"><button type="button" class="btn-primary vs-grande" data-vs="reintentar">📸 Enviar otro comprobante</button></div>';
       h += planesHtml(s);
+      h += '<div class="vs-acciones vs-sep"><button type="button" class="btn-ghost" id="vsLicBtn">🔑 Tengo un código de licencia</button></div>' +
+        '<div id="vsLicBox" hidden><input id="vsLicIn" class="mz-in" placeholder="VENTO-XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false" style="width:100%;box-sizing:border-box;text-align:center;letter-spacing:1px">' +
+        '<div class="vs-acciones"><button type="button" class="btn-primary" id="vsLicGo">✅ Activar licencia</button></div></div>';
       pantalla('inicio', 'Tu plan Vento', h, function(c){
+        var lb = c.querySelector('#vsLicBtn'); if(lb) lb.onclick = function(){ c.querySelector('#vsLicBox').hidden = false; lb.hidden = true; c.querySelector('#vsLicIn').focus(); };
+        var lg = c.querySelector('#vsLicGo'); if(lg) lg.onclick = function(){
+          lg.disabled = true; msg('Activando…');
+          canjear(c.querySelector('#vsLicIn').value).then(function(r){ msg(''); toast('🎉 Licencia activada: plan ' + nombrePlan(r.plan_id) + ' hasta el ' + fecha(r.hasta) + '.', 9000); ir(vInicio('')); },
+            function(e){ msg((e && e.message) || ERRORES.red, true); }).then(function(){ lg.disabled = false; });
+        };
         c.querySelectorAll('[data-pagar]').forEach(function(b){ b.onclick = function(){ pagarPlan(b.dataset.pagar); }; });
         c.querySelectorAll('[data-instr]').forEach(function(b){ b.onclick = function(){ var d = lsGet(K_BORRADOR + s.negocio, {}); pagarPlan(b.dataset.instr, d.metodo); }; });
       });
@@ -548,6 +560,13 @@
     });
     if(!E.cat && s.manda) cargarCatalogo().catch(function(){});
   }
+  // Licencia que dio el proveedor de Vento (código VENTO-XXXX-XXXX-XXXX): la activa el servidor en este negocio.
+  function canjear(codigo){
+    var c = String(codigo || '').toUpperCase().replace(/\s+/g, '');
+    if(!/^VENTO-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(c)) return Promise.reject(errorDe('licencia_formato', 'Escribe el código completo: VENTO-XXXX-XXXX-XXXX.'));
+    var id = negId(); if(!id) return Promise.reject(errorDe('sin_nube', 'Para activar una licencia entra con tu cuenta de Vento Nube (correo y contraseña).'));
+    return api('licencia', { negocio: id, codigo: c }).then(function(r){ return refrescar(true).then(function(){ return r; }); });
+  }
   function abrirPlanes(motivo){ abrir(vInicio(motivo || '')); if(!E.cat && manda()) cargarCatalogo().catch(function(){}); }
   function abrirRenovar(){ abrir(vInicio('')); pagarPlan(planParaRenovar()); }
 
@@ -635,7 +654,7 @@
     estado: estado, refrescar: refrescar, enCuenta: enCuenta, verificado: function(){ return !!E.p; },
     tiene: function(ent){ return ents().indexOf(String(ent)) >= 0; }, entitlements: ents,
     planEfectivo: function(){ return estado().plan; },
-    abrirPlanes: abrirPlanes, abrirRenovar: abrirRenovar, funcionPro: funcionPro, catalogo: cargarCatalogo,
+    abrirPlanes: abrirPlanes, abrirRenovar: abrirRenovar, funcionPro: funcionPro, catalogo: cargarCatalogo, canjear: canjear,
     estadoApp: estadoApp, pintarPanel: pintarPanel, barra: barra, fecha: fecha,
     proveedores: { registrar: registrarProveedor, lista: function(){ return registro.map(function(p){ return p.id; }); }, elegir: function(){ return proveedorPara(E.cat); },
       ManualPaymentProvider: ManualPaymentProvider, GooglePlayPaymentProvider: GooglePlayPaymentProvider }

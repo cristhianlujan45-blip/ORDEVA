@@ -532,6 +532,26 @@ begin
   return n;
 end $$;
 
+-- El dueño pasa su negocio a otra cuenta suya (ej. el administrador de Vento que tenía su negocio con el correo de
+-- administrador lo pasa a su cuenta de cliente). La otra cuenta queda como dueña y esta sale del negocio.
+create or replace function public.pasar_negocio_a(p_negocio uuid, p_email text) returns boolean
+language plpgsql security definer set search_path = public, extensions as $$
+declare v_dest uuid;
+begin
+  if auth.uid() is null then raise exception 'sin_sesion'; end if;
+  if not exists (select 1 from miembros where negocio_id = p_negocio and usuario_id = auth.uid() and rol = 'dueno') then raise exception 'sin_permiso'; end if;
+  select id into v_dest from auth.users where lower(email) = lower(trim(coalesce(p_email, '')));
+  if v_dest is null then raise exception 'no_existe'; end if;
+  if v_dest = auth.uid() then return true; end if;
+  insert into miembros(negocio_id, usuario_id, rol, email) values (p_negocio, v_dest, 'dueno', lower(trim(p_email)))
+    on conflict (negocio_id, usuario_id) do update set rol = 'dueno';
+  update negocios set creado_por = v_dest where id = p_negocio;
+  update subscriptions set user_id = v_dest where business_id = p_negocio;
+  delete from miembros where negocio_id = p_negocio and usuario_id = auth.uid();
+  perform vento_auditar(p_negocio, auth.uid(), null, 'negocio_pasado', jsonb_build_object('a', lower(trim(p_email))));
+  return true;
+end $$;
+
 -- ---------- Permisos ----------
 do $$
 declare f text;
@@ -553,7 +573,7 @@ begin
     execute 'grant execute on function ' || f || ' to anon, authenticated, service_role';
   end loop;
   -- Solo con la cuenta.
-  foreach f in array array['public.perfil_yo()', 'public.perfil_guardar(jsonb)'] loop
+  foreach f in array array['public.perfil_yo()', 'public.perfil_guardar(jsonb)', 'public.pasar_negocio_a(uuid, text)'] loop
     execute 'revoke all on function ' || f || ' from public, anon';
     execute 'grant execute on function ' || f || ' to authenticated, service_role';
   end loop;
