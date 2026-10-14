@@ -22975,6 +22975,7 @@ document.addEventListener('click', function(ev){
       try {
         await worker.setParameters({
           tessedit_pageseg_mode: (Tesseract.PSM && Tesseract.PSM.SINGLE_BLOCK) || "6",
+          preserve_interword_spaces: "1",   // el texto sale tal cual (con sus espacios y columnas), sin juntar palabras
           load_system_dawg: "0",
           load_freq_dawg: "0",
           load_punc_dawg: "0",
@@ -23983,6 +23984,16 @@ document.addEventListener('click', function(ev){
     var t0 = Date.now(), PRESUPUESTO = 6000;   // las relecturas extra solo caben dentro de ~6 s (meta: menos de 10 s en total)
     var aTiempo = function(){ return Date.now() - t0 < PRESUPUESTO; };
     var canvas = await fileToOcrCanvas(file);
+    // La hoja de lado o al revés se endereza ANTES de leer (como el escáner): así no hace falta leerla 3-4 veces
+    // girada (cada lectura tarda segundos) y el texto sale en orden.
+    try {
+      if (typeof window.fiOrientacion === "function") {
+        var cx0 = canvas.getContext("2d"), d0 = cx0.getImageData(0, 0, canvas.width, canvas.height).data, g0 = new Uint8ClampedArray(canvas.width * canvas.height);
+        for (var q0 = 0, p0 = 0; p0 < g0.length; q0 += 4, p0++) g0[p0] = d0[q0];
+        var or0 = window.fiOrientacion(g0, canvas.width, canvas.height);
+        if (or0 && or0.seguro && or0.giro) canvas = rotarCanvas(canvas, or0.giro);
+      }
+    } catch (eOr) { /* sin enderezar: se lee igual */ }
     var text = await recognizeWithWorker(worker, canvas, OCR_RECOGNIZE_TIMEOUT_MS);
     // Si la lectura salió pobre (foto de lado, al revés, o el arreglo de la foto la dañó), se prueba
     // con la foto original y girada 90°/270°/180°, y se queda la lectura que mejor arme los renglones.
