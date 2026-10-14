@@ -2425,7 +2425,10 @@ body.mod-v #quickSaleBtn{ order:-1; background:var(--amber); color:#fff; border-
   .auth-google{ display:flex; align-items:center; justify-content:center; gap:10px; min-height:48px; border-radius:12px; border:1px solid #dadce0; background:#fff; color:#1f1f1f; font:600 15px/1 var(--font-main); cursor:pointer; }
   .auth-google[hidden]{ display:none; }
   .sub-bar{ display:flex; align-items:center; gap:10px; margin:8px 0 4px; padding:9px 12px; border-radius:12px; border:1px solid color-mix(in srgb, var(--amber) 45%, var(--line)); background:color-mix(in srgb, var(--amber) 12%, var(--surface)); color:var(--ink); font-size:13px; line-height:1.35; cursor:pointer; }
+  /* «hidden» de verdad: antes el display:flex le ganaba y quedaba una franja (vacía, o la de la ✕ que no se iba). */
+  .sub-bar[hidden], .more-tile[hidden]{ display:none !important; }
   .sub-bar span{ flex:1; min-width:0; }
+  .sub-bar i[data-x]{ display:inline-grid; place-items:center; min-width:32px; min-height:32px; margin:-6px -4px -6px 0; border-radius:50%; font-size:15px; opacity:.75; }
   .sub-bar b:last-of-type{ white-space:nowrap; color:var(--cream); }
   .sub-bar i{ font-style:normal; opacity:.6; padding:0 2px 0 6px; }
   .sub-bar[data-k="vencida"], .sub-bar[data-k="gracia"]{ border-color:var(--brick); background:color-mix(in srgb, var(--brick) 14%, var(--surface)); }
@@ -4393,6 +4396,7 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
       <button type="button" class="more-tile" data-go="libreta"><span class="more-ic">📒</span><strong>Libreta</strong><small>Quién me debe y pagos a empleados</small></button>
       <button type="button" class="more-tile" data-go="pagos"><span class="more-ic">💜</span><strong>Pagos Nequi / Daviplata</strong><small>Lo que llegó hoy, verificado</small></button>
       <button type="button" class="more-tile" data-go="calculadora"><span class="more-ic">🧮</span><strong>Calculadora</strong><small>Con teclado o por voz</small></button>
+      <button type="button" class="more-tile" data-go="plan" id="morePlanTile"><span class="more-ic">💳</span><strong>Mi plan</strong><small id="morePlanTxt">Suscripción, planes y pagos</small></button>
       <button type="button" class="more-tile" data-go="ajustes"><span class="more-ic">⚙️</span><strong>Ajustes</strong><small>Configura tu negocio</small></button>
       <button type="button" class="more-tile more-tile-salir" data-go="salir"><span class="more-ic">🚪</span><strong>Cerrar sesión</strong><small>Salir o entrar con otro usuario</small></button>
       <button type="button" class="more-tile more-tile-ia" data-go="ia"><span class="more-ic more-ic-mesi"><i class="mesi-wrap" data-mesi="static" style="width:30px;height:30px"></i></span><strong>Vento (IA)</strong><small>Pregúntale lo que sea</small></button>
@@ -8421,6 +8425,7 @@ navMoreSheet.addEventListener('click', e => {
   if(tile.dataset.go === 'libreta'){ if(window.libretaAbrir) window.libretaAbrir(); return; }
   if(tile.dataset.go === 'pagos'){ if(window.pagosAbrirPanel) window.pagosAbrirPanel(); return; }
   if(tile.dataset.go === 'calculadora'){ if(window.calculadoraAbrir) window.calculadoraAbrir(); return; }
+  if(tile.dataset.go === 'plan'){ try{ subPaywall(''); }catch(e){} return; }   // menú de suscripción siempre a mano (no solo desde la barra)
   if(tile.dataset.go === 'salir'){ cerrarSesion(); return; }
   const b = document.querySelector('nav button[data-view="' + tile.dataset.go + '"]');
   if(b) b.click();
@@ -25210,18 +25215,22 @@ function subPintar(){
     const h = document.querySelector('.wrap > header'); if(!h) return;
     bar = document.createElement('div'); bar.id = 'subBar'; bar.className = 'sub-bar';
     h.parentNode.insertBefore(bar, h.nextSibling);
-    bar.addEventListener('click', e => { if(e.target.closest('[data-x]')){ try{ sessionStorage.setItem('vento-subbar-x', '1'); }catch(x){} bar.hidden = true; return; }
+    // ✕: la barra se oculta por 3 días (o hasta que cambie lo que avisa: ej. de «prueba» a «vencida»). El menú sigue en ⋯ Más → 💳 Mi plan.
+    bar.addEventListener('click', e => { if(e.target.closest('[data-x]')){ e.stopPropagation(); try{ localStorage.setItem('vento-subbar-x', JSON.stringify({ k: bar.dataset.k || '', t: Date.now() })); }catch(x){} bar.hidden = true; try{ showToast('Listo, oculté el aviso. Tu plan está en ⋯ Más → 💳 Mi plan.', 4500); }catch(x){} return; }
       const s2 = subNube(); if(s2 && bar.dataset.accion === 'renovar'){ s2.abrirRenovar(); return; } subPaywall(''); });
   }
-  let cerrada = false; try{ cerrada = sessionStorage.getItem('vento-subbar-x') === '1'; }catch(e){}
+  const xGuard = (() => { try{ return JSON.parse(localStorage.getItem('vento-subbar-x') || 'null'); }catch(e){ return null; } })();
+  const cerradaK = k => !!(xGuard && xGuard.k === k && Date.now() - (xGuard.t || 0) < 3 * 864e5);
+  // «Mi plan» en ⋯ Más: para quien maneja los pagos (con la nube, dueño o administrador; sin nube, siempre).
+  try{ const mt = document.getElementById('morePlanTile'); if(mt){ mt.hidden = !!(sn && !(sn.estado() || {}).manda); const tx = document.getElementById('morePlanTxt'); if(tx) tx.textContent = sn ? ('Plan ' + String((sn.estado() || {}).plan || 'gratis').toUpperCase() + ' · planes y pagos') : (st.k === 'prueba' ? 'Prueba gratis: ' + st.dias + ' día' + (st.dias === 1 ? '' : 's') : 'Suscripción, planes y pagos'); } }catch(e){}
   if(sn){   // barra de Vento Nube: renovar, pago en revisión, rechazado, vencido (cajero y mesero no la ven)
     const b = sn.barra() || {};
-    bar.hidden = !b.mostrar || (cerrada && !b.fija); bar.dataset.k = b.k || ''; bar.dataset.accion = b.accion || '';
+    bar.hidden = !b.mostrar || (cerradaK(b.k || '') && !b.fija); bar.dataset.k = b.k || ''; bar.dataset.accion = b.accion || '';
     bar.innerHTML = b.html || '';
     return;
   }
   bar.dataset.accion = '';
-  bar.hidden = !mostrar || (cerrada && st.k !== 'vencida');
+  bar.hidden = !mostrar || (cerradaK(st.k) && st.k !== 'vencida');
   bar.dataset.k = st.k;
   bar.innerHTML = '<span>' + subTexto(st) + '</span><b>' + (st.k === 'vencida' ? 'Renovar' : 'Activar') + ' ›</b>' + (st.k !== 'vencida' ? '<i data-x title="Ocultar">✕</i>' : '');
 }
