@@ -21614,7 +21614,9 @@ async function ytUno(id){
     }
     // Si el reproductor de ESTA app es el que pone la música, no se copia a la lista de YouTube Music: quedaba marcada
     // «en tu lista» y el reproductor de la app ya no la tocaba (con Google conectado, la cola se «gastaba» sin sonar).
-    if(!it.vid||it.yt||!yTok()||tvOn()||(typeof lngOn==='function'&&lngOn())||AUTO())return;
+    // Ya se renovó el cupo y el reproductor lo había prendido Vento por eso: se vuelve a la lista de YouTube Music.
+    if(!ySinCupo()&&LS('vito_auto_por_cupo',0)&&AUTO()&&!sonando){SS('vito_auto_play',{on:false});SS('vito_auto_por_cupo',0);try{const a=$('autoPlay');if(a)a.checked=false;}catch(e){}}
+    if(!it.vid||it.yt||!yTok()||tvOn()||(typeof lngOn==='function'&&lngOn())||AUTO()||ySinCupo())return;
     const pl=await yLista();
     // position:1 (no position:0) pone la canción nueva JUSTO DESPUÉS de la
     // que ya está sonando — la posición 0 de la lista es la que YouTube
@@ -21639,11 +21641,35 @@ async function ytUno(id){
     // Agregar a la lista de YouTube Music con la cuenta conectada SÍ usa el cupo diario de Google (50 de 10.000 por canción):
     // se explica claro y se ofrece el camino que no tiene cupo («Vincular con código de TV»: va directo al TV).
     const sinCupo=/quota|exceeded/i.test(String(e&&e.message));
+    if(sinCupo){ ySinLimite(); yEstado(); return; }
     if(!window.ytAvisoT||Date.now()-window.ytAvisoT>600000){ window.ytAvisoT=Date.now();
-      showToast(sinCupo?'YouTube no deja agregar más canciones a tu lista por hoy (límite diario de Google, se renueva en la madrugada). Para seguir sin límite: Música → «🔗 Vincular con código de TV»: las canciones van directo al TV.':'YouTube: '+(window.ytFallo||e.message),sinCupo?12000:8000); }
+      showToast('YouTube: '+(window.ytFallo||e.message),8000); }
   }
   yEstado();
 }
+/* ---------- Música SIN el límite de YouTube ----------
+   Meter cada canción en la lista de YouTube Music gasta el cupo diario de Google (50 de 10.000 unidades por canción,
+   compartido por todos los negocios que usan Vento): al acabarse, las canciones del QR se quedaban sin entrar.
+   Ahora la música NUNCA se detiene por eso: Vento deja de usar ese cupo hasta que Google lo renueve (medianoche de
+   California) y sigue poniendo las canciones por un camino sin límite: el TV vinculado con su código, o el
+   reproductor de Vento (que también suena con la app en segundo plano). */
+const YSC_KEY='vito_yt_sincupo';
+const ySinCupo=()=>Number(LS(YSC_KEY,0)||0)>Date.now();
+function ySinLimite(){
+  const d=new Date(),fin=Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate(),8,0,0)+(d.getUTCHours()>=8?864e5:0);   // ~00:00 en California
+  const yaEstaba=ySinCupo();
+  SS(YSC_KEY,fin);
+  // Las canciones que no alcanzaron a entrar a la lista siguen en la cola (no se pierde ninguna).
+  const tv=(typeof lngOn==='function'&&lngOn())||(window.tvConectado&&window.tvConectado());
+  if(!tv&&!AUTO()){
+    SS('vito_auto_play',{on:true});SS('vito_auto_por_cupo',1);   // lo prendió Vento: al renovarse el cupo se vuelve a la lista
+    try{const a=$('autoPlay');if(a)a.checked=true;const b=$('ytBox');if(b)b.hidden=false;}catch(e){}
+    try{cargarAPI();}catch(e){}
+  }
+  try{siguienteAuto();}catch(e){} try{tvPublicar(true);}catch(e){} try{renderMusica();}catch(e){}
+  if(!yaEstaba)showToast('🎵 La lista de YouTube Music llegó al tope de Google por hoy, pero la música NO se detiene: '+(tv?'las canciones siguen yendo directo al TV.':'sigo poniéndolas con el reproductor de Vento, sin límite.')+' Mañana vuelve a usar tu lista sola.',12000);
+}
+window.vitoSinLimite={activo:ySinCupo,activar:ySinLimite};
 function yPendientes(silencio){
   const o=ordenJusto(cola().filter(x=>!x.yt));
   if(!o.length){if(!silencio)showToast('No hay canciones nuevas por cargar.');return;}
@@ -22008,7 +22034,7 @@ function iniAutoPlay(){
   setInterval(mzAutoPintar,3000);setTimeout(mzAutoPintar,800);
   $('autoPlay').checked=AUTO();$('ytBox').hidden=!AUTO();
   $('autoPlay').onchange=e=>{
-    SS('vito_auto_play',{on:e.target.checked});$('ytBox').hidden=!e.target.checked;
+    SS('vito_auto_play',{on:e.target.checked});SS('vito_auto_por_cupo',0);$('ytBox').hidden=!e.target.checked;
     if(e.target.checked)cargarAPI();else{sonando=false;cargadoEn=0;if(yPl&&yPl.pauseVideo)yPl.pauseVideo();}
     yEstado();
   };
@@ -23975,8 +24001,10 @@ const fotosVer = (() => { try{ return JSON.parse(localStorage.getItem(FOTOS_VER_
 const fotosVerGuardar = () => { try{ localStorage.setItem(FOTOS_VER_K, JSON.stringify(fotosVer)); }catch(e){} };
 const nubeArch = () => (window.ventoNube && window.ventoNube.enNube && window.ventoNube.enNube() && window.ventoNube.archivos) || null;
 const fotoSetLocal = (id, url) => fotoTx('readwrite', st => st.put(url, id));
+// Productos de los datos cargados (vacío antes de entrar a la cuenta, cuando todavía no hay datos).
+const fotosProds = () => { try{ return (typeof data !== 'undefined' && data && data.products) || []; }catch(e){ return []; } };
 const fotoSet = (id, url) => {
-  const p = (data.products || []).find(x => x.id === id); fotosVer[id] = p && p.foto || Date.now(); fotosVerGuardar();
+  const p = fotosProds().find(x => x.id === id); fotosVer[id] = p && p.foto || Date.now(); fotosVerGuardar();
   const n = nubeArch(); if(n) n.subir('foto/' + id, url);
   return fotoSetLocal(id, url);
 };
@@ -23987,7 +24015,7 @@ async function fotosDeLaNube(){
   const n = nubeArch(); if(!n || fotosBajando) return 0;
   fotosBajando = true; let hechas = 0;
   try{
-    const falta = (data.products || []).filter(p => p.foto && (!fotosCache[p.id] || fotosVer[p.id] !== p.foto)).slice(0, 60);
+    const falta = fotosProds().filter(p => p.foto && (!fotosCache[p.id] || fotosVer[p.id] !== p.foto)).slice(0, 60);
     for(const p of falta){
       const url = await n.bajar('foto/' + p.id);
       if(url && /^data:image\//.test(url)){ fotosCache[p.id] = url; fotosVer[p.id] = p.foto; await fotoSetLocal(p.id, url).catch(() => {}); hechas++; }
@@ -24020,7 +24048,7 @@ async function fotosALaNube(){
   const n = nubeArch(); if(!n) return;
   let hechas = {}; try{ hechas = JSON.parse(localStorage.getItem('vento-fotos-subidas') || '{}') || {}; }catch(e){}
   let cambio = false;
-  for(const p of (data.products || [])){
+  for(const p of fotosProds()){
     if(!p.foto || !fotosCache[p.id] || hechas[p.id] === p.foto) continue;
     if(await n.subir('foto/' + p.id, fotosCache[p.id])){ hechas[p.id] = p.foto; cambio = true; }
   }
