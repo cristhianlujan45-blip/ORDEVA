@@ -567,6 +567,10 @@ body.mod-v #quickSaleBtn{ order:-1; background:var(--amber); color:#fff; border-
 .fi-dgrid div{border:1px solid var(--line);border-radius:8px;padding:6px 8px;min-width:0}.fi-dgrid span{display:block;font-size:11.5px;color:var(--ink-soft)}.fi-dgrid b{overflow-wrap:anywhere}
 .fi-hist td small{display:block;color:var(--ink-soft);font-size:11.5px}
 .fi-dtot{text-align:right;margin:8px 0;font-size:15px}
+.fi-desc{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.fi-desc-prev{position:relative;min-height:120px;max-height:360px;overflow:auto;border:1px solid var(--line);border-radius:10px;background:#fff;display:flex;align-items:flex-start;justify-content:center}
+.fi-desc-img{width:100%;display:block}.fi-desc-img:not([src]){display:none}
+.fi-desc-msg{position:absolute;inset:auto 8px 8px 8px;text-align:center;font-size:12.5px;color:#333;background:rgba(255,255,255,.85);border-radius:8px;padding:6px}
 .iv-ajuste{font-size:12.5px;margin:2px 0 4px;padding:4px 8px;border-radius:8px;background:color-mix(in srgb,var(--amber) 14%,transparent)}
 .iv-desglose{font-size:12.5px;color:var(--ink-soft);margin:0 0 6px}
 </style>
@@ -3007,6 +3011,14 @@ body.mod-v #quickSaleBtn{ order:-1; background:var(--amber); color:#fff; border-
 .iv-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
 .iv-grid .iv-full{grid-column:1/-1}
 .iv-grid label{font-size:11px;opacity:.75;display:block;margin-bottom:2px}
+.iv-catgrid{margin:0 0 8px}
+.iv-codewrap{display:flex;gap:6px;align-items:stretch}.iv-codewrap input,.iv-codewrap select{flex:1;min-width:0}
+.iv-code-scan{flex:0 0 auto;padding:0 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:16px;cursor:pointer}
+.iv-catnew{display:flex;gap:6px;margin:0 0 8px}.iv-catnew[hidden]{display:none}.iv-catnew input{flex:1;min-width:0}.iv-catnew .btn-primary{flex:0 0 auto;padding:8px 14px}
+.iv-cattodos{margin:8px 0;padding:10px;border-radius:10px;border:1px dashed var(--line);background:rgba(127,127,127,.06)}
+.iv-cattodos label{font-size:12px;font-weight:700;display:block;margin-bottom:6px}
+.iv-cattodos select,.iv-cattodos input{padding:8px;font-size:14px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;box-sizing:border-box}
+.iv-cattodos .iv-catnew{margin:6px 0 0}
 .iv-item input,.iv-item select{width:100%;box-sizing:border-box;padding:8px;font-size:14px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px}
 .iv-note{font-size:12px;opacity:.7;margin-top:4px}
 .iv-division{opacity:.95;font-size:13px}.iv-qty.iv-falta{border:2px solid #f5a524!important;box-shadow:0 0 0 3px rgba(245,165,36,.25)}.iv-falta-msg{margin-top:6px;padding:8px 10px;border-radius:10px;background:rgba(245,165,36,.14);color:#f5a524;font-size:13px;font-weight:700;line-height:1.35}
@@ -3422,7 +3434,7 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
     </details>
 
     <div class="prod-buscar">
-      <input type="search" id="prodBuscar" placeholder="🔎 Buscar producto: nombre, tamaño o categoría" autocomplete="off" enterkeyhint="search">
+      <input type="search" id="prodBuscar" placeholder="🔎 Buscar producto: nombre, código, tamaño o categoría" autocomplete="off" enterkeyhint="search">
       <span id="prodBuscarN"></span>
     </div>
     <div class="category-bar" id="categoryBar"></div>
@@ -4725,6 +4737,8 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
     <input type="number" id="editProdMin" min="0" step="1" placeholder="5">
     <label for="editProdCategory">Categoría</label>
     <select id="editProdCategory"></select>
+    <label for="editProdCodigo">Código (de barras o interno)</label>
+    <div class="iv-codewrap"><input type="text" id="editProdCodigo" maxlength="40" autocomplete="off" autocapitalize="characters" placeholder="Opcional: escríbelo o escanéalo"><button type="button" class="iv-code-scan" id="editProdCodigoScan" title="Escanear el código con la cámara">📷</button></div>
     <div class="modal-actions">
       <button class="btn-close" id="editProdCancelBtn">Cancelar</button>
       <button class="btn-primary" id="editProdSaveBtn">Guardar cambios</button>
@@ -4750,6 +4764,7 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
     <div id="ivIaMsg" class="iv-iamsg" hidden></div>
     <details class="iv-head" id="ivHeaderWrap" open><summary>📄 Datos de la factura</summary><div id="ivHeader"></div></details>
     <div id="ivAvisos"></div>
+    <div id="ivCatTodos"></div>
     <div id="invoiceBody"></div>
     <div class="modal-actions">
       <button class="btn-close" id="invoiceCancelBtn">Cancelar</button>
@@ -12736,14 +12751,36 @@ function fiHomografia(w, h, q){
   }
   return B.map((b, i) => b / A[i][i]);
 }
-async function fiMejorarFoto(file){
+/* Ángulo (en grados) de los renglones de texto, como un escáner: se prueban giros entre −8° y 8° y gana el que deja
+   la tinta más concentrada en filas (renglones derechos). 0 si no hay una inclinación clara (o no hay texto). */
+function fiAnguloTexto(g, w, h){
+  const k = Math.min(1, 700 / Math.max(w, h)), sw = Math.max(1, Math.round(w * k)), sh = Math.max(1, Math.round(h * k));
+  const xs = [], ys = [];
+  for(let y = 0; y < sh; y++){ const fy = Math.min(h - 1, (y / k) | 0) * w; for(let x = 0; x < sw; x++){ if(g[fy + Math.min(w - 1, (x / k) | 0)] < 110){ xs.push(x - sw / 2); ys.push(y - sh / 2); } } }
+  const n = xs.length; if(n < 300 || n > sw * sh * 0.5) return 0;
+  const paso = Math.max(1, Math.floor(n / 40000)), alto = Math.ceil(Math.hypot(sw, sh)) + 4, bins = new Float64Array(alto);
+  const puntaje = gr => {
+    const a = gr * Math.PI / 180, si = Math.sin(a), co = Math.cos(a); bins.fill(0);
+    for(let i = 0; i < n; i += paso){ const r = (-xs[i] * si + ys[i] * co + alto / 2) | 0; if(r >= 0 && r < alto) bins[r]++; }
+    let t = 0; for(let i = 0; i < alto; i++) t += bins[i] * bins[i]; return t;
+  };
+  let mejor = 0, pm = puntaje(0); const p0 = pm;
+  for(let a = -8; a <= 8; a += 0.5){ if(!a) continue; const v = puntaje(a); if(v > pm){ pm = v; mejor = a; } }
+  for(let a = mejor - 0.4; a <= mejor + 0.41; a += 0.1){ const v = puntaje(a); if(v > pm){ pm = v; mejor = a; } }
+  return (pm > p0 * 1.04 && Math.abs(mejor) >= 0.3) ? Math.round(mejor * 10) / 10 : 0;
+}
+// o: { lado: lado máximo en px, minLado: agrandar hasta este lado (Full HD = 1920), calidad: JPG 0–1, alinear: enderezar el texto }
+async function fiMejorarFoto(file, o){
+  o = o || {};
+  const LADO = o.lado || FI_MAX_LADO, MIN = o.minLado || 0;
   const img = await fiCargarImagen(file);
   let fuente = img, W = img.width, H = img.height, enderezada = false, odListo = null;
   const q = fiEsquinasPapel(img);
   if(q){
     const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
     let ow = Math.max(dist(q[0], q[1]), dist(q[3], q[2])), oh = Math.max(dist(q[0], q[3]), dist(q[1], q[2]));
-    const k = Math.min(2, FI_MAX_LADO / Math.max(ow, oh)); ow = Math.round(ow * k); oh = Math.round(oh * k);   // si la hoja salió chica se agranda (letra pequeña)
+    let k = Math.min(2, LADO / Math.max(ow, oh)); if(MIN && Math.max(ow, oh) * k < MIN) k = Math.min(3, MIN / Math.max(ow, oh));
+    ow = Math.round(ow * k); oh = Math.round(oh * k);   // si la hoja salió chica se agranda (letra pequeña)
     if(ow > 200 && oh > 200){
       /* Más rápido sin perder calidad: la hoja se recorta a máx. 2000 px, así que no hace falta leer
          la foto de 12 MP completa. Se reduce primero (lo hace la tarjeta gráfica) a lo justo que
@@ -12755,35 +12792,52 @@ async function fiMejorarFoto(file){
       const s32 = new Uint32Array(scx.getImageData(0, 0, sw, sh).data.buffer);
       const oc = document.createElement('canvas'); oc.width = ow; oc.height = oh;
       const ocx = oc.getContext('2d'); const od = ocx.createImageData(ow, oh), o32 = new Uint32Array(od.data.buffer);
-      const [a, b, c, d, e, f, g, h] = fiHomografia(ow, oh, q.map(([x, y]) => [x * kk, y * kk]));
-      const BLANCO = 0xFFFFFFFF;
+      // Un pelo hacia adentro del borde de la hoja, para que no quede la raya de la mesa en la orilla.
+      const cxq = (q[0][0] + q[1][0] + q[2][0] + q[3][0]) / 4, cyq = (q[0][1] + q[1][1] + q[2][1] + q[3][1]) / 4;
+      const [a, b, c, d, e, f, g, h] = fiHomografia(ow, oh, q.map(([x, y]) => [(x + (cxq - x) * 0.014) * kk, (y + (cyq - y) * 0.014) * kk]));
+      const BLANCO = 0xFFFFFFFF, s8 = new Uint8Array(s32.buffer), od8 = od.data;
       for(let y = 0, o = 0; y < oh; y++){
         let nu = b * y + c, nv = e * y + f, nz = h * y + 1;   // se suman a, d, g en cada paso de x
         for(let x = 0; x < ow; x++, o++, nu += a, nv += d, nz += g){
-          const u = (nu / nz + 0.5) | 0, v = (nv / nz + 0.5) | 0;
-          o32[o] = (u >= 0 && v >= 0 && u < sw && v < sh) ? (s32[v * sw + u] | 0xFF000000) : BLANCO;
+          // Interpolación bilineal (antes el píxel más cercano: al agrandar la letra quedaba con escalones y vetas)
+          const fu = nu / nz, fv = nv / nz, u = Math.floor(fu), v = Math.floor(fv);
+          if(u < 0 || v < 0 || u >= sw - 1 || v >= sh - 1){ o32[o] = (u >= 0 && v >= 0 && u < sw && v < sh) ? (s32[v * sw + u] | 0xFF000000) : BLANCO; continue; }
+          const du = fu - u, dv = fv - v, i0 = (v * sw + u) * 4, i1 = i0 + sw * 4, q = o * 4;
+          for(let ch = 0; ch < 3; ch++){
+            const top = s8[i0 + ch] + (s8[i0 + 4 + ch] - s8[i0 + ch]) * du, bot = s8[i1 + ch] + (s8[i1 + 4 + ch] - s8[i1 + ch]) * du;
+            od8[q + ch] = top + (bot - top) * dv;
+          }
+          od8[q + 3] = 255;
         }
       }
       odListo = od; fuente = oc; W = ow; H = oh; enderezada = true;   // los píxeles ya enderezados se usan directo abajo (sin dibujar y leer otra vez)
     }
   }
-  const k = Math.min(1, FI_MAX_LADO / Math.max(W, H)), w = Math.round(W * k), h = Math.round(H * k);
+  let kf = Math.min(1, LADO / Math.max(W, H)); if(MIN && Math.max(W, H) * kf < MIN) kf = Math.min(3, MIN / Math.max(W, H));
+  const k = kf, w = Math.round(W * k), h = Math.round(H * k);
   const c = document.createElement('canvas'); c.width = w; c.height = h;
-  const cx = c.getContext('2d', { willReadFrequently: true });
+  const cx = c.getContext('2d', { willReadFrequently: true }); cx.imageSmoothingEnabled = true; cx.imageSmoothingQuality = 'high';
   let id;
   if(odListo && w === W && h === H) id = odListo;
   else { if(odListo) fuente.getContext('2d').putImageData(odListo, 0, 0); cx.drawImage(fuente, 0, 0, w, h); id = cx.getImageData(0, 0, w, h); }
   const px = id.data;
   const gr = new Float32Array(w * h);
   for(let i = 0, p = 0; p < gr.length; i += 4, p++) gr[p] = px[i] * 0.299 + px[i + 1] * 0.587 + px[i + 2] * 0.114;
-  // Luz del papel: en cada bloque se toma el punto MÁS claro (la letra no lo oscurece, así no
-  // quedan manchas blancas alrededor del texto) y luego se suaviza entre bloques.
+  /* Luz del papel: en cada bloque, el tono del papel (el 90 % más claro, no el punto MÁS claro: el borde de cada letra
+     sale más claro que el papel por la compresión de la foto y eso dejaba una sombra gris alrededor del texto). Un bloque
+     casi todo de letra toma el papel de sus vecinos. Luego se suaviza entre bloques. */
   const B = Math.max(12, Math.round(Math.max(w, h) / 48)), bw = Math.ceil(w / B), bh = Math.ceil(h / B);
   const bc = document.createElement('canvas'); bc.width = bw; bc.height = bh;
-  const bcx = bc.getContext('2d'), bd = bcx.createImageData(bw, bh);
+  const bcx = bc.getContext('2d'), bd = bcx.createImageData(bw, bh), pb = new Float32Array(bw * bh), hb = new Uint32Array(64);
   for(let by = 0; by < bh; by++) for(let bx = 0; bx < bw; bx++){
-    let mx = 0; const y1 = Math.min(h, (by + 1) * B), x1 = Math.min(w, (bx + 1) * B);
-    for(let y = by * B; y < y1; y += 2) for(let x = bx * B; x < x1; x += 2){ const v = gr[y * w + x]; if(v > mx) mx = v; }
+    hb.fill(0); let nn = 0; const y1 = Math.min(h, (by + 1) * B), x1 = Math.min(w, (bx + 1) * B);
+    for(let y = by * B; y < y1; y += 2) for(let x = bx * B; x < x1; x += 2){ hb[Math.min(63, gr[y * w + x] / 4) | 0]++; nn++; }
+    let acc = 0, i = 63; const lim = nn * 0.10; for(; i > 0; i--){ acc += hb[i]; if(acc >= lim) break; }
+    pb[by * bw + bx] = i * 4 + 2;
+  }
+  for(let by = 0; by < bh; by++) for(let bx = 0; bx < bw; bx++){
+    let mx = pb[by * bw + bx];
+    for(let yy = Math.max(0, by - 1); yy <= Math.min(bh - 1, by + 1); yy++) for(let xx = Math.max(0, bx - 1); xx <= Math.min(bw - 1, bx + 1); xx++) mx = Math.max(mx, pb[yy * bw + xx] - 6);
     const o = (by * bw + bx) * 4; bd.data[o] = bd.data[o + 1] = bd.data[o + 2] = mx; bd.data[o + 3] = 255;
   }
   bcx.putImageData(bd, 0, 0);
@@ -12798,17 +12852,33 @@ async function fiMejorarFoto(file){
   acc = 0; for(let i = 255; i >= 0; i--){ acc += hist[i]; if(acc > n * 0.02){ hi = i; break; } }
   const rango = Math.max(40, hi - lo);
   const out = new Uint8ClampedArray(g.length);
-  for(let p = 0; p < g.length; p++) out[p] = (g[p] - lo) * 255 / rango;
+  // Como un escáner: el papel queda blanco parejo (sin vetas ni manchas) y la letra bien negra.
+  const blanco = 0.88 * 255;
+  for(let p = 0; p < g.length; p++){ const v = (g[p] - lo) * 255 / rango; out[p] = v >= blanco ? 255 : v * 255 / blanco; }
   // nitidez: realce de bordes 3×3 (letra pequeña más marcada)
   for(let y = 1; y < h - 1; y++) for(let x = 1; x < w - 1; x++){
     const p = y * w + x, s = out[p] * 5 - out[p - 1] - out[p + 1] - out[p - w] - out[p + w];
-    const v = out[p] * 0.6 + s * 0.4, o = p * 4; px[o] = px[o + 1] = px[o + 2] = v < 0 ? 0 : v > 255 ? 255 : v; px[o + 3] = 255;
+    const v = out[p] * 0.6 + s * 0.4, o = p * 4; px[o] = px[o + 1] = px[o + 2] = v < 0 ? 0 : v > 222 ? 255 : v; px[o + 3] = 255;   // >222: puntitos del ruido de la cámara → papel blanco
   }
+  // Orillas (el filtro de nitidez no las recorre): quedaban con la foto sin procesar y salía una raya en el borde.
+  for(let x = 0; x < w; x++){ for(const y of [0, h - 1]){ const o = (y * w + x) * 4, v = out[y * w + x] > 222 ? 255 : out[y * w + x]; px[o] = px[o + 1] = px[o + 2] = v; px[o + 3] = 255; } }
+  for(let y = 0; y < h; y++){ for(const x of [0, w - 1]){ const o = (y * w + x) * 4, v = out[y * w + x] > 222 ? 255 : out[y * w + x]; px[o] = px[o + 1] = px[o + 2] = v; px[o + 3] = 255; } }
   cx.putImageData(id, 0, 0);
-  const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.85));
+  // Texto torcido (la hoja ocupaba toda la foto o quedó un poco girada): se alinea como un escáner.
+  let angulo = 0, final = c;
+  if(o.alinear !== false){
+    try{ angulo = fiAnguloTexto(out, w, h); }catch(e){ angulo = 0; }
+    if(angulo){
+      const r = document.createElement('canvas'); r.width = w; r.height = h;
+      const rx = r.getContext('2d'); rx.fillStyle = '#fff'; rx.fillRect(0, 0, w, h); rx.imageSmoothingQuality = 'high';
+      rx.translate(w / 2, h / 2); rx.rotate(-angulo * Math.PI / 180); rx.drawImage(c, -w / 2, -h / 2);
+      final = r; enderezada = true;
+    }
+  }
+  const blob = await new Promise(r => final.toBlob(r, 'image/jpeg', o.calidad || 0.85));
   const nombre = (file.name || 'factura').replace(/\.[^.]+$/, '') + '-mejorada.jpg';
   const file2 = new File([blob], nombre, { type: 'image/jpeg' });
-  return { file: file2, dataUrl: URL.createObjectURL(file2), enderezada, w, h };   // vista previa sin volver a codificar la foto
+  return { file: file2, dataUrl: URL.createObjectURL(file2), enderezada, angulo, w, h };   // vista previa sin volver a codificar la foto
 }
 const fiEsPdf = f => (window.VitoOfflineOCR && window.VitoOfflineOCR.isPdfFile && window.VitoOfflineOCR.isPdfFile(f)) || /\.pdf$/i.test(f.name || '') || f.type === 'application/pdf';
 // Archivos válidos: fotos o PDF, de hasta 15 MB cada uno, máximo 10 a la vez.
@@ -12863,6 +12933,190 @@ async function fiGuardarOriginal(file){
   }catch(e){ return null; }
 }
 
+/* ================= Facturas escaneadas en HD (como CamScanner) =================
+   Al aplicar una factura, cada página (todas las fotos o todas las hojas del PDF) se guarda en el celular ya
+   escaneada: recortada, enderezada, con el texto alineado, la luz pareja y en Full HD o más (lado largo ≥ 1920 px).
+   Después, sin estorbar, se detecta todo el texto de cada página (con la posición de cada palabra).
+   Desde «📚 Facturas anteriores» se descarga en PDF (las páginas escaneadas con el texto encima, que se puede buscar y
+   copiar, más una hoja con los datos leídos) o en imagen JPG HD. Las facturas que ya estaban guardadas (solo con la foto
+   original) también se descargan mejoradas: se escanean en ese momento. */
+const FI_HD = { lado: 2560, minLado: 1920, calidad: 0.9 };
+const fiBlobADataUrl = b => new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = () => rej(fr.error); fr.readAsDataURL(b); });
+async function fiDataUrlAFile(url, nombre){ const b = await (await fetch(url)).blob(); return new File([b], nombre || 'factura.jpg', { type: b.type || 'image/jpeg' }); }
+// Fotos y PDF → una imagen por página (máx. 12 páginas).
+async function fiPaginasDe(files){
+  const out = [];
+  for(const f of (files || [])){
+    if(out.length >= 12) break;
+    if(fiEsPdf(f)){ try{ const pags = window.VitoOfflineOCR && window.VitoOfflineOCR.expandFilesWithPdfPages ? await window.VitoOfflineOCR.expandFilesWithPdfPages([f]) : []; pags.forEach(x => out.push(x)); }catch(e){} }
+    else out.push(f);
+  }
+  return out.slice(0, 12);
+}
+// Escanea cada página en HD y la guarda en el celular. Devuelve [{ id, w, h }].
+async function fiGuardarEscaneos(files, base){
+  const pags = await fiPaginasDe(files), out = [];
+  for(let i = 0; i < pags.length; i++){
+    try{
+      const r = await fiMejorarFoto(pags[i], FI_HD), id = base + '-p' + (i + 1);
+      await window.ctReciboGuardar(id, await fiBlobADataUrl(r.file));
+      out.push({ id, w: r.w, h: r.h });
+    }catch(e){}
+  }
+  return out;
+}
+// Lo que se hace después de aplicar (sin hacer esperar): escanear en HD todas las páginas y detectar su texto.
+async function fiEscanearCompra(compraId, files){
+  try{
+    if(!window.ctReciboGuardar || !(files || []).length) return;
+    const esc = await fiGuardarEscaneos(files, 'fesc-' + compraId);
+    const p = (data.purchases || []).find(x => x.id === compraId);
+    if(p && esc.length){ p.escaneos = esc; saveData(); }
+    setTimeout(async () => { for(const e of esc){ try{ await fiOcrEscaneo(e.id); }catch(err){} } }, 1500);
+  }catch(e){}
+}
+// Texto con posiciones de una página escaneada (se detecta una vez y queda guardado en el celular).
+async function fiOcrEscaneo(id, url){
+  const leer = window.ctReciboLeer; if(!leer) return null;
+  try{ const ya = await leer(id + '-ocr'); if(ya) return JSON.parse(ya); }catch(e){}
+  const V = window.VitoOfflineOCR; if(!V || !V.palabrasDeImagen) return null;
+  url = url || await leer(id); if(!url) return null;
+  const r = await V.palabrasDeImagen(await fiDataUrlAFile(url, id + '.jpg'));
+  if(r && (r.words || []).length){ try{ await window.ctReciboGuardar(id + '-ocr', JSON.stringify(r)); }catch(e){} }
+  return r;
+}
+// Las páginas escaneadas de una factura guardada: [{ id, url }]. Si solo estaba la foto original (facturas de
+// antes), se escanea en HD en este momento y queda guardada.
+async function fiEscaneosDe(p, avance){
+  const leer = window.ctReciboLeer; if(!leer) return [];
+  const out = [];
+  for(const e of (p.escaneos || [])){ try{ const url = await leer(e.id); if(url) out.push({ id: e.id, url }); }catch(err){} }
+  if(out.length || !p.archivoId) return out;
+  const orig = await leer(p.archivoId); if(!orig) return [];
+  if(avance) avance('🖨️ Escaneando la factura en HD…');
+  const r = await fiMejorarFoto(await fiDataUrlAFile(orig, 'factura.jpg'), FI_HD), id = 'fesc-' + p.id + '-p1', url = await fiBlobADataUrl(r.file);
+  await window.ctReciboGuardar(id, url);
+  p.escaneos = [{ id, w: r.w, h: r.h }]; saveData();
+  return [{ id, url }];
+}
+const fiNombreArchivo = (p, ext) => ('Factura ' + [p.supplier || 'proveedor', p.invoiceNumber || '', (p.date || String(p.at || '').slice(0, 10) || '')].filter(Boolean).join(' ')).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9 ._-]+/g, '').replace(/\s+/g, ' ').trim().slice(0, 80) + '.' + ext;
+function fiDescargar(blob, nombre){
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = nombre; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+const fiDataUrlABytes = url => { const b = atob(String(url).split(',')[1] || ''), u = new Uint8Array(b.length); for(let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; };
+const fiTamImagen = url => new Promise(res => { const im = new Image(); im.onload = () => res({ w: im.naturalWidth, h: im.naturalHeight }); im.onerror = () => res(null); im.src = url; });
+
+/* PDF hecho a mano (sin librerías): cada página escaneada como imagen JPG con el texto detectado encima, invisible
+   (se puede buscar y copiar, como un PDF de escáner), y al final la hoja «Datos de la factura». */
+// Ancho aproximado de un texto en Helvetica (en «em»), para que cada palabra invisible tape justo la palabra de la foto.
+function fiAnchoHelvetica(t){
+  let a = 0;
+  for(const ch of String(t)){
+    if(/[ilIjtf.,;:!'|]/.test(ch)) a += 0.28; else if(/[mwMW]/.test(ch)) a += 0.86; else if(/[A-ZÁÉÍÓÚÑ]/.test(ch)) a += 0.69;
+    else if(/[0-9$]/.test(ch)) a += 0.556; else if(/[rJ]/.test(ch)) a += 0.36; else a += 0.53;
+  }
+  return a;
+}
+function fiPdf(paginas, resumen){
+  const WIN = { 0x2013: 0x96, 0x2014: 0x97, 0x2018: 0x91, 0x2019: 0x92, 0x201C: 0x93, 0x201D: 0x94, 0x2022: 0x95, 0x2026: 0x85, 0x20AC: 0x80 };
+  const bytes = str => { const u = new Uint8Array(str.length); for(let i = 0; i < str.length; i++) u[i] = str.charCodeAt(i) & 255; return u; };
+  const txt = t => '(' + Array.from(String(t == null ? '' : t)).map(ch => { let c = ch.codePointAt(0); if(WIN[c]) c = WIN[c]; else if(c > 255 || c < 32) c = c < 32 ? 32 : 63; const x = String.fromCharCode(c); return x === '(' || x === ')' || x === '\\' ? '\\' + x : x; }).join('') + ')';
+  const n2 = v => (Math.round(v * 100) / 100).toString();
+  const objs = [];                        // cada objeto: [partes…] (texto o bytes)
+  const nuevo = () => { objs.push(null); return objs.length; };
+  const CAT = nuevo(), PAGS = nuevo(), F1 = nuevo(), F2 = nuevo(), kids = [];
+  objs[F1 - 1] = ['<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>'];
+  objs[F2 - 1] = ['<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>'];
+  const pagina = (W, H, contenido, img) => {
+    const cont = nuevo(), pg = nuevo(); let res = '/Font << /F1 ' + F1 + ' 0 R /F2 ' + F2 + ' 0 R >>';
+    if(img){ const im = nuevo(); objs[im - 1] = ['<< /Type /XObject /Subtype /Image /Width ' + img.w + ' /Height ' + img.h + ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + img.jpg.length + ' >>\nstream\n', img.jpg, '\nendstream']; res += ' /XObject << /Im1 ' + im + ' 0 R >>'; }
+    const c = bytes(contenido);
+    objs[cont - 1] = ['<< /Length ' + c.length + ' >>\nstream\n', c, '\nendstream'];
+    objs[pg - 1] = ['<< /Type /Page /Parent ' + PAGS + ' 0 R /MediaBox [0 0 ' + n2(W) + ' ' + n2(H) + '] /Resources << ' + res + ' >> /Contents ' + cont + ' 0 R >>'];
+    kids.push(pg);
+  };
+  // Páginas escaneadas
+  (paginas || []).forEach(pg => {
+    const W = 595.28, H = W * pg.h / pg.w;
+    let c = 'q ' + n2(W) + ' 0 0 ' + n2(H) + ' 0 0 cm /Im1 Do Q\n';
+    const o = pg.ocr;
+    if(o && (o.words || []).length && o.w && o.h){
+      c += 'BT 3 Tr\n';                  // 3 = texto invisible (encima de la imagen, para buscar y copiar)
+      o.words.forEach(wd => {
+        const fs = Math.max(2, (wd.y1 - wd.y0) / o.h * H), ancho = (wd.x1 - wd.x0) / o.w * W, nat = fs * Math.max(0.3, fiAnchoHelvetica(wd.t));
+        c += '/F1 ' + n2(fs) + ' Tf ' + n2(Math.max(20, Math.min(400, ancho / nat * 100))) + ' Tz 1 0 0 1 ' + n2(wd.x0 / o.w * W) + ' ' + n2(H - wd.y1 / o.h * H + fs * 0.15) + ' Tm ' + txt(wd.t) + ' Tj\n';
+      });
+      c += 'ET\n';
+    } else if(o && o.text){
+      c += 'BT 3 Tr /F1 6 Tf\n'; let y = H - 10;
+      String(o.text).split(/\n+/).slice(0, 200).forEach(l => { if(y < 4) return; c += '1 0 0 1 10 ' + n2(y) + ' Tm ' + txt(l) + ' Tj\n'; y -= 7; });
+      c += 'ET\n';
+    }
+    pagina(W, H, c, { w: pg.w, h: pg.h, jpg: pg.jpg });
+  });
+  // Hoja «Datos de la factura» (texto normal, visible)
+  if(resumen && resumen.length){
+    const W = 595.28, H = 841.89, M = 40; let c = '', y = H - M;
+    const linea = (partes, tam, neg) => { if(y < M + tam){ pagina(W, H, c); c = ''; y = H - M; } partes.forEach(([x, t]) => { c += 'BT /' + (neg ? 'F2' : 'F1') + ' ' + tam + ' Tf 1 0 0 1 ' + n2(M + x) + ' ' + n2(y) + ' Tm ' + txt(t) + ' Tj ET\n'; }); y -= tam * 1.45; };
+    resumen.forEach(r => { if(r.raya){ c += '0.6 w ' + M + ' ' + n2(y + 6) + ' m ' + n2(W - M) + ' ' + n2(y + 6) + ' l S\n'; y -= 6; return; } linea(r.partes, r.tam || 9, r.neg); });
+    pagina(W, H, c);
+  }
+  objs[PAGS - 1] = ['<< /Type /Pages /Kids [' + kids.map(k => k + ' 0 R').join(' ') + '] /Count ' + kids.length + ' >>'];
+  objs[CAT - 1] = ['<< /Type /Catalog /Pages ' + PAGS + ' 0 R >>'];
+  const partes = [bytes('%PDF-1.4\n%\xE2\xE3\xCF\xD3\n')], offs = []; let len = partes[0].length;
+  objs.forEach((ob, i) => {
+    offs.push(len);
+    [('' + (i + 1) + ' 0 obj\n')].concat(ob, ['\nendobj\n']).forEach(x => { const u = typeof x === 'string' ? bytes(x) : x; partes.push(u); len += u.length; });
+  });
+  const xref = len;
+  let tr = 'xref\n0 ' + (objs.length + 1) + '\n0000000000 65535 f \n' + offs.map(o => String(o).padStart(10, '0') + ' 00000 n \n').join('');
+  tr += 'trailer\n<< /Size ' + (objs.length + 1) + ' /Root ' + CAT + ' 0 R >>\nstartxref\n' + xref + '\n%%EOF';
+  partes.push(bytes(tr));
+  return new Blob(partes, { type: 'application/pdf' });
+}
+// Renglones de la hoja «Datos de la factura».
+function fiResumenPdf(p){
+  const h = p.header || {}, r = [], corta = (t, n) => { t = String(t == null ? '' : t); return t.length > n ? t.slice(0, n - 1) + '…' : t; };
+  const pesos = v => '$' + Math.round(v || 0).toLocaleString('es-CO');
+  const catN = id => { const c = id ? (data.categories || []).find(k => String(k.id) === String(id)) : null; return c ? c.name : ''; };
+  r.push({ partes: [[0, 'Datos de la factura']], tam: 16, neg: true });
+  r.push({ partes: [[0, (p.supplier || 'Proveedor sin nombre') + (p.invoiceNumber ? ' · Factura ' + p.invoiceNumber : '')]], tam: 11, neg: true });
+  const datos = [['Fecha', p.date || ''], ['NIT', h.supplierNit || h.nit || ''], ['Procesada', p.procesadaEn ? new Date(p.procesadaEn).toLocaleString('es-CO') : ''], ['Confirmó', p.usuario || '']].filter(x => x[1]);
+  datos.forEach(([k, v]) => r.push({ partes: [[0, k + ':'], [80, v]], tam: 9 }));
+  r.push({ raya: true });
+  r.push({ partes: [[0, 'Producto'], [205, 'Código'], [290, 'Categoría'], [380, 'Cant.'], [420, 'Costo/u'], [470, 'Total']], tam: 8.5, neg: true });
+  (p.items || []).forEach(i => r.push({ partes: [[0, corta(i.name, 42)], [205, corta(i.codigo || i.barcode || '', 16)], [290, corta(catN(i.categoryId), 17)], [380, String(i.qty || 0)], [420, pesos(i.cost)], [470, pesos(i.total != null ? i.total : (i.qty || 0) * (i.cost || 0))]], tam: 8.5 }));
+  r.push({ raya: true });
+  if(p.subtotal) r.push({ partes: [[330, 'Subtotal'], [470, pesos(p.subtotal)]], tam: 9 });
+  if(p.ivaTotal) r.push({ partes: [[330, 'IVA'], [470, pesos(p.ivaTotal)]], tam: 9 });
+  r.push({ partes: [[330, 'TOTAL'], [470, pesos(p.total)]], tam: 10.5, neg: true });
+  r.push({ partes: [[0, 'Generado por Vento.']], tam: 7.5 });
+  return r;
+}
+// Descargar una factura guardada: 'pdf' (escaneada + texto + datos) o 'jpg' (cada página en HD).
+async function fiDescargarFactura(p, tipo, avisar){
+  avisar = avisar || (t => showToast(t, 4000));
+  const pags = await fiEscaneosDe(p, avisar);
+  if(tipo === 'jpg'){
+    if(!pags.length){ showToast('La foto de esta factura no quedó guardada en este equipo.'); return false; }
+    for(let i = 0; i < pags.length; i++){ const b = await (await fetch(pags[i].url)).blob(); fiDescargar(b, fiNombreArchivo(p, '').replace(/\.$/, '') + (pags.length > 1 ? ' pag ' + (i + 1) : '') + '.jpg'); }
+    showToast('⬇️ ' + (pags.length > 1 ? pags.length + ' imágenes HD descargadas' : 'Imagen HD descargada') + ' (Descargas).');
+    return true;
+  }
+  const paginas = [];
+  for(let i = 0; i < pags.length; i++){
+    avisar('🔎 Detectando el texto' + (pags.length > 1 ? ' (página ' + (i + 1) + ' de ' + pags.length + ')' : '') + '…');
+    let ocr = null; try{ ocr = await fiOcrEscaneo(pags[i].id, pags[i].url); }catch(e){}
+    const t = await fiTamImagen(pags[i].url); if(!t) continue;
+    paginas.push({ jpg: fiDataUrlABytes(pags[i].url), w: t.w, h: t.h, ocr });
+  }
+  fiDescargar(fiPdf(paginas, fiResumenPdf(p)), fiNombreArchivo(p, 'pdf'));
+  showToast('⬇️ PDF descargado' + (paginas.length ? ' (' + paginas.length + ' página' + (paginas.length > 1 ? 's' : '') + ' escaneada' + (paginas.length > 1 ? 's' : '') + ' en HD' + (paginas.some(x => x.ocr) ? ', con el texto' : '') + ')' : ' (los datos de la factura)') + '.', 5000);
+  return true;
+}
+
 let invoiceDraft = null; // { supplier, date, header, archivo, items:[{name,originalDescription,qty,cost,productId,match,newPrice,include}] }
 
 // Desglose por unidad que se ve en cada renglón: sin IVA + IVA = con IVA, y el total de la compra.
@@ -12872,6 +13126,72 @@ function fiDesgloseHtml(it){
   const peso = it.contentPerUnit ? '<br>⚖️ Cada unidad: <b>' + invEsc(String(it.contentPerUnit)) + '</b>' + (it.pesoNota ? ' <small>(' + invEsc(it.pesoNota) + ')</small>' : '') +
     (po ? ' <button type="button" class="iv-peso-flip">' + (it.pesoModo === 'div' ? '↩️ No dividir: ' + invEsc(po.tot) + ' c/u' : '➗ Dividir: ' + invEsc(po.div) + ' c/u') + '</button>' : '') : '';
   return it.qty + ' unid. × (' + fmt(Math.round(sin)) + ' sin IVA + ' + fmt(Math.round(c - sin)) + ' IVA ' + Math.round(r * 100) + '%) = <b>' + fmt(Math.round(c)) + ' c/u</b> · total ' + fmt(Math.round(c * it.qty)) + peso;
+}
+/* ---------- Categoría y código de cada producto de la factura ----------
+   Cada renglón lleva su propia categoría (la del producto si ya existe; si es nuevo, la que se parezca: cervezas,
+   gaseosas, licores…) y su código (de barras o interno: el que trae la factura, el del producto o uno escrito/escaneado). */
+const fiSinT = x => String(x || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+const FI_CAT_PISTAS = [
+  [/\b(cerveza|pilsen|lager|aguila|poker|club colombia|costena|corona|heineken|budweiser|stella|redds|andina|tres cordilleras|bbc)\b/, /cervez|pola/],
+  [/\b(gaseosa|coca|pepsi|postobon|sprite|colombiana|manzana postobon|quatro|uva|7up|seven up|big cola|ginger)\b/, /gaseos|bebida|refresc/],
+  [/\b(agua|cristal|brisa|manantial|h2o)\b/, /agua|bebida/],
+  [/\b(jugo|hit|tutti|del valle|frutto|natumalta|malta|pony)\b/, /jug|malta|bebida/],
+  [/\b(energizante|red bull|vive 100|speed|monster|volt)\b/, /energ|bebida/],
+  [/\b(aguardiente|antioqueno|nectar|ron|medellin|viejo de caldas|whisky|whiskey|old parr|buchanan|vodka|tequila|vino|ginebra|brandy|licor)\b/, /licor|trago|aguardient|ron|vino/],
+  [/\b(papas|margarita|chitos|de todito|doritos|tostacos|platanitos|mani|snack|natuchips|yupi|choclitos|cheetos)\b/, /snack|mecato|paquet|pasaboc/],
+  [/\b(cigarrillo|cigarro|marlboro|lucky|boston|belmont|pielroja)\b/, /cigarr|tabaco/],
+  [/\b(chocolatina|jet|jumbo|chicle|bombon|dulce|galleta|festival|ducales|wafer)\b/, /dulce|golosin|confit|galleta/],
+  [/\b(hielo)\b/, /hielo/]
+];
+function fiCategoriaSugerida(it){
+  const m = it.productId ? data.products.find(p => p.id === it.productId) : null;
+  if(m) return m.categoryId || '';
+  const cats = data.categories || []; if(!cats.length) return '';
+  const nom = fiSinT((it.name || '') + ' ' + (it.originalDescription || ''));
+  // 1) La categoría de otro producto que empiece igual («Cerveza Águila…» → la de «Cerveza Póker»)
+  const pal = nom.split(/[^a-z0-9]+/).filter(w => w.length > 3 && !/^(caja|paca|und|unid|unidad|botella|lata|litro|pet|vidrio|x\d+)$/.test(w));
+  for(const w of pal.slice(0, 2)){
+    const cnt = {}; data.products.forEach(p => { if(p.categoryId && !p.combo && fiSinT(p.name).split(/[^a-z0-9]+/).includes(w)) cnt[p.categoryId] = (cnt[p.categoryId] || 0) + 1; });
+    const mejor = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0];
+    if(mejor && cats.some(c => c.id === mejor)) return mejor;
+  }
+  // 2) Por el tipo de producto, si ya existe una categoría así
+  for(const [re, cre] of FI_CAT_PISTAS){ if(re.test(nom)){ const c = cats.find(k => cre.test(fiSinT(k.name))); if(c) return c.id; } }
+  return '';
+}
+function fiCodigoSugerido(it){
+  const m = it.productId ? data.products.find(p => p.id === it.productId) : null;
+  return String(it.barcode || (m && (m.codigo || (m.barcodes || [])[0])) || it.sku || '').trim();
+}
+function fiCatOpciones(sel){
+  return '<option value="">Sin categoría</option>' + (data.categories || []).filter(c => c.id !== (typeof PROMO_CAT !== 'undefined' ? PROMO_CAT : '')).map(c => '<option value="' + invEsc(c.id) + '"' + (String(c.id) === String(sel) ? ' selected' : '') + '>' + invEsc(c.name) + '</option>').join('') + '<option value="__nueva">➕ Nueva categoría…</option>';
+}
+function fiCatCodigoHtml(it){
+  if(it.categoryId === undefined) it.categoryId = fiCategoriaSugerida(it);
+  if(it.codigo === undefined) it.codigo = fiCodigoSugerido(it);
+  return '<div class="iv-grid iv-catgrid">' +
+      '<div><label>🏷️ Categoría</label><select class="iv-cat">' + fiCatOpciones(it.categoryId) + '</select></div>' +
+      '<div><label>🔢 Código (barras o interno)</label><div class="iv-codewrap"><input type="text" class="iv-code" maxlength="40" autocomplete="off" autocapitalize="characters" placeholder="Opcional" value="' + invEsc(it.codigo || '') + '"><button type="button" class="iv-code-scan" title="Escanear el código con la cámara">📷</button></div></div>' +
+    '</div>' +
+    '<div class="iv-catnew" hidden><input type="text" class="iv-catnew-in" maxlength="40" placeholder="Nombre de la nueva categoría"><button type="button" class="btn-primary iv-catnew-ok">Crear</button></div>';
+}
+// Crea la categoría (o usa la que ya se llame igual) y devuelve su id.
+const fiCatValida = id => { const c = id ? (data.categories || []).find(k => String(k.id) === String(id)) : null; return c ? c.id : null; };
+function fiCrearCategoria(nombre){
+  nombre = String(nombre || '').trim().slice(0, 40); if(!nombre) return null;
+  data.categories = data.categories || [];
+  const ya = data.categories.find(c => fiSinT(c.name) === fiSinT(nombre)); if(ya) return ya.id;
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+  data.categories.push({ id, name: nombre }); saveData();
+  try{ renderProductos(); }catch(e){}
+  return id;
+}
+// Barra «Poner a todos la misma categoría» (arriba de los productos).
+function fiCatTodosHtml(){
+  if(!invoiceDraft || invoiceDraft.items.length < 2) return '';
+  return '<div class="iv-cattodos"><label>🏷️ Poner a todos la categoría</label><div class="iv-codewrap"><select id="ivCatTodosSel">' + fiCatOpciones('') + '</select><button type="button" class="btn-ghost" id="ivCatTodosBtn">Aplicar a todos</button></div>' +
+    '<div class="iv-catnew" id="ivCatTodosNueva" hidden><input type="text" id="ivCatTodosNuevaIn" maxlength="40" placeholder="Nombre de la nueva categoría"><button type="button" class="btn-primary" id="ivCatTodosNuevaOk">Crear</button></div>' +
+    '<div class="iv-note">Luego puedes cambiar la de cada producto.</div></div>';
 }
 function invoiceRowHtml(it, i){
   const matched = it.productId ? data.products.find(p => p.id === it.productId) : null;
@@ -12900,6 +13220,7 @@ function invoiceRowHtml(it, i){
     '<div class="iv-desglose">' + fiDesgloseHtml(it) + '</div>' +
     fiChipConfianza(it) +
     '<div class="iv-full" style="margin-bottom:8px"><label>Coincide con</label><select class="iv-match">' + opts + '</select></div>' +
+    fiCatCodigoHtml(it) +
     '<div class="iv-grid iv-presgrid"><div><label>Presentación</label><input type="text" class="iv-pres" maxlength="40" placeholder="Ej. 24 x 594 g" value="' + invEsc(it.presentation || '') + '"></div>' +
     '<div><label>Unidad</label><input type="text" class="iv-unidad" maxlength="12" placeholder="und, caja, kg…" value="' + invEsc(it.unit || '') + '"></div></div>' +
 
@@ -12981,6 +13302,7 @@ function fiPintarAvisos(){
 function renderInvoiceReview(){
   const hb = document.getElementById('ivHeader'); if(hb) hb.innerHTML = fiHeaderHtml();
   document.getElementById('invoiceBody').innerHTML = invoiceDraft.items.map(invoiceRowHtml).join('');
+  const ct = document.getElementById('ivCatTodos'); if(ct) ct.innerHTML = fiCatTodosHtml();
   fiPintarAvisos();
 }
 document.getElementById('ivHeader').addEventListener('input', e => {
@@ -13136,8 +13458,8 @@ function invoiceOpen(info){
   fiEstado('Buscando producto…');
   const items = invoiceMatchItems(info.items, header.supplier);
   invoiceDraft = { supplier: header.supplier, date: header.issueDate || info.date || '', header, items, rawText: info.rawText || '',
-    archivo: window.__fiArchivo || null, fuente: info.fuente || (info.rawText ? 'ocr' : 'ia'), iaMsg: '' };
-  window.__fiArchivo = null;
+    archivo: window.__fiArchivo || null, archivos: window.__fiArchivos || null, fuente: info.fuente || (info.rawText ? 'ocr' : 'ia'), iaMsg: '' };
+  window.__fiArchivo = null; window.__fiArchivos = null;
   invoiceResumen(info);
   renderInvoiceReview();
   const rawWrap = document.getElementById('invoiceRawWrap'), rawBox = document.getElementById('invoiceRawText');
@@ -13184,7 +13506,15 @@ function invoiceReadRow(el){
   const nameEl = el.querySelector('.iv-name-in');
   if(nameEl){ const v = nameEl.value.trim(); if(v) it.name = v.slice(0, 60); }
   it.include = el.querySelector('.iv-inc').checked;
+  const pidAntes = it.productId;
   it.productId = el.querySelector('.iv-match').value;
+  // Otro producto elegido: su categoría y su código se vuelven a sugerir (salvo que ya los hayas puesto tú).
+  if((pidAntes || '') !== (it.productId || '')){ if(!it.catTocada) it.categoryId = undefined; if(!it.codTocado) it.codigo = undefined; }
+  else {
+    const catEl = el.querySelector('.iv-cat'), codEl = el.querySelector('.iv-code');
+    if(catEl && catEl.value !== '__nueva' && catEl.value !== String(it.categoryId || '')){ it.categoryId = catEl.value; it.catTocada = true; }
+    if(codEl){ const v = codEl.value.trim().slice(0, 40); if(v !== (it.codigo || '')){ it.codigo = v; it.codTocado = true; } }
+  }
   const qAntes = it.qty, cAntes = it.cost;
   it.qty = Math.max(0, Math.round(invNum(el.querySelector('.iv-qty').value) || 0));
   const cLeido = Math.max(0, invNum(el.querySelector('.iv-cost').value) || 0);
@@ -13393,6 +13723,56 @@ document.getElementById('invoiceBody').addEventListener('click', async e => {
     const freshNote = row.querySelector('.iv-webprice-note'); if(freshNote) freshNote.textContent = it.webPriceNote || '';
   }
 });
+// Categoría «➕ Nueva…», crear, escanear el código y «Poner a todos la categoría».
+document.getElementById('invoiceBody').addEventListener('change', e => {
+  const sel = e.target.closest('.iv-cat'); if(!sel || !invoiceDraft) return;
+  const row = sel.closest('.iv-item'), it = invoiceDraft.items[+row.dataset.i];
+  if(sel.value === '__nueva'){
+    sel.value = (it && it.categoryId) || '';
+    const box = row.querySelector('.iv-catnew'); box.hidden = false; const inp = box.querySelector('.iv-catnew-in'); inp.value = ''; inp.focus();
+  }
+});
+function fiCatNuevaEnFila(row){
+  const it = invoiceDraft && invoiceDraft.items[+row.dataset.i]; if(!it) return;
+  const inp = row.querySelector('.iv-catnew-in'), id = fiCrearCategoria(inp.value);
+  if(!id){ showToast('Escribe el nombre de la categoría.'); inp.focus(); return; }
+  document.querySelectorAll('#invoiceBody .iv-item').forEach(invoiceReadRow);
+  it.categoryId = id; it.catTocada = true;
+  renderInvoiceReview(); showToast('🏷️ Categoría «' + inp.value.trim() + '» creada.');
+}
+document.getElementById('invoiceBody').addEventListener('keydown', e => {
+  if(e.key === 'Enter' && e.target.classList.contains('iv-catnew-in')){ e.preventDefault(); fiCatNuevaEnFila(e.target.closest('.iv-item')); }
+});
+document.getElementById('invoiceBody').addEventListener('click', e => {
+  if(!invoiceDraft) return;
+  const ok = e.target.closest('.iv-catnew-ok'); if(ok){ fiCatNuevaEnFila(ok.closest('.iv-item')); return; }
+  const sc = e.target.closest('.iv-code-scan'); if(!sc) return;
+  const row = sc.closest('.iv-item'), it = invoiceDraft.items[+row.dataset.i]; if(!it) return;
+  openScanOverlay(raw => {
+    const v = String(raw || '').trim().slice(0, 40); if(!v) return;
+    it.codigo = v; it.codTocado = true;
+    const inp = row.querySelector('.iv-code'); if(inp) inp.value = v;
+    closeScanOverlay(); showToast('🔢 Código ' + v + ' para ' + (it.name || 'el producto') + '.');
+  }, { hint: 'Apunta al código de barras de «' + (it.name || 'el producto') + '».' });
+});
+document.getElementById('ivCatTodos').addEventListener('change', e => {
+  if(e.target.id !== 'ivCatTodosSel') return;
+  const nv = document.getElementById('ivCatTodosNueva');
+  if(e.target.value === '__nueva'){ e.target.value = ''; nv.hidden = false; const i = document.getElementById('ivCatTodosNuevaIn'); i.value = ''; i.focus(); }
+});
+function fiCatTodos(id){
+  if(!invoiceDraft) return;
+  document.querySelectorAll('#invoiceBody .iv-item').forEach(invoiceReadRow);
+  invoiceDraft.items.forEach(it => { it.categoryId = id || ''; it.catTocada = true; });
+  renderInvoiceReview();
+  const c = (data.categories || []).find(k => String(k.id) === String(id));
+  showToast('🏷️ ' + (c ? 'Todos quedaron en «' + c.name + '»' : 'Todos quedaron sin categoría') + '. Puedes cambiar la de cada uno.');
+}
+document.getElementById('ivCatTodos').addEventListener('click', e => {
+  if(e.target.id === 'ivCatTodosBtn'){ fiCatTodos(document.getElementById('ivCatTodosSel').value); return; }
+  if(e.target.id === 'ivCatTodosNuevaOk'){ const i = document.getElementById('ivCatTodosNuevaIn'), id = fiCrearCategoria(i.value); if(!id){ showToast('Escribe el nombre de la categoría.'); i.focus(); return; } fiCatTodos(id); }
+});
+document.getElementById('ivCatTodos').addEventListener('keydown', e => { if(e.key === 'Enter' && e.target.id === 'ivCatTodosNuevaIn'){ e.preventDefault(); document.getElementById('ivCatTodosNuevaOk').click(); } });
 function invoiceClose(){
   document.getElementById('invoiceOverlay').classList.remove('show'); invoiceDraft = null;
   clearInterval(invoiceProgressTimer); invoiceProgressTimer = null;
@@ -13436,9 +13816,11 @@ document.getElementById('invoiceApplyBtn').addEventListener('click', async () =>
       if(it.ivaPct > 0 && (p.iva == null || p.iva === '')) p.iva = Math.round(it.ivaPct * 100);
       p.costSinIva = Math.round(it.cost / (1 + (it.ivaPct || 0)) * 100) / 100;
       if(it.newPrice > 0){ p.price = it.newPrice; sincronizarProductoEnMesas(p); }
+      // La categoría que elegiste en la revisión (si no la tocaste, solo se pone si el producto no tenía).
+      if(it.categoryId !== undefined && (it.catTocada || !p.categoryId)){ const c = fiCatValida(it.categoryId); if(c || it.catTocada) p.categoryId = c; }
       updated++;
     } else {
-      p = { id: 'inv-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6), name: it.name, price: it.newPrice || it.cost, categoryId: null,
+      p = { id: 'inv-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6), name: it.name, price: it.newPrice || it.cost, categoryId: fiCatValida(it.categoryId),
         size: it.contentPerUnit || '', specifications: '', stock: it.qty, cost: it.cost,
         iva: it.ivaPct > 0 ? Math.round(it.ivaPct * 100) : undefined, costSinIva: Math.round(it.cost / (1 + (it.ivaPct || 0)) * 100) / 100 };
       if(it.presentation || it.unitsPerPackage) p.det = Object.assign({}, p.det, { presentacion: it.presentation || null, unidadesPorPaquete: it.unitsPerPackage || null });
@@ -13450,6 +13832,9 @@ document.getElementById('invoiceApplyBtn').addEventListener('click', async () =>
     fiAprender(draft.supplier, it.originalDescription || it.name, p.id);
     if(it.sku){ p.skus = p.skus || []; if(!p.skus.includes(it.sku)) p.skus.push(it.sku); }
     if(it.barcode && it.barcode.length >= 8){ p.barcodes = p.barcodes || []; if(!p.barcodes.includes(it.barcode)) p.barcodes.push(it.barcode); }
+    // El código de la revisión queda como código del producto (y se reconoce al escanearlo para vender).
+    const cod = String(it.codigo || '').trim();
+    if(cod){ p.codigo = cod; p.barcodes = p.barcodes || []; if(!p.barcodes.includes(cod)) p.barcodes.push(cod); }
     if(!p.brand && it.brand) p.brand = it.brand;
     const modificado = it.orig && (it.orig.productId !== it.productId || it.orig.qty !== it.qty || it.orig.cost !== it.cost);
     // Desglose guardado: costo por unidad sin IVA, IVA por unidad, costo con IVA, subtotal, IVA y total.
@@ -13459,6 +13844,7 @@ document.getElementById('invoiceApplyBtn').addEventListener('click', async () =>
       subtotal: Math.round(totL / (1 + tasa)), ivaTotal: Math.round(totL - totL / (1 + tasa)), total: totL, cajas: it.cajas || 1, unidadesPorCaja: it.unidadesPorCaja || it.qty };
     purchaseItems.push({ productId: p.id, name: p.name, qty: it.qty, cost: it.cost, originalDescription: it.originalDescription || '', presentation: it.presentation || '',
       unitsPerPackage: it.unitsPerPackage || null, contentPerUnit: it.contentPerUnit || null, unit: it.unit || null, sku: it.sku || null, barcode: it.barcode || null,
+      categoryId: p.categoryId || null, codigo: cod || null,
       taxRate: it.ivaPctLeido != null ? it.ivaPctLeido : Math.round((it.ivaPct || 0) * 100), lineTotal: it.lineTotal != null ? it.lineTotal : totL, matchConfidence: it.match ? it.match.confianza : null, modificado: !!modificado,
       ajustes: it.ajustes || [], ...desg });
     data.inventarioMov.push({ id: compraId + '-' + p.id, tipo: 'entrada', productId: p.id, name: p.name, qty: it.qty, costo: it.cost, unidad: it.unit || 'und', presentacion: it.presentation || '',
@@ -13475,6 +13861,9 @@ document.getElementById('invoiceApplyBtn').addEventListener('click', async () =>
   saveData();
   renderInventario(); renderProductos();
   invoiceClose();
+  // Todas las páginas quedan guardadas escaneadas en HD (sin hacer esperar): se descargan en «📚 Facturas anteriores».
+  const archivosFact = (draft.archivos && draft.archivos.length) ? draft.archivos : (draft.archivo ? [draft.archivo] : []);
+  if(archivosFact.length) fiEscanearCompra(compraId, archivosFact);
   let msg = '✅ ' + updated + ' actualizado' + (updated === 1 ? '' : 's');
   if(created) msg += ', ' + created + ' nuevo' + (created === 1 ? '' : 's');
   if(raised) msg += ', ' + raised + ' con aumento de precio';
@@ -13599,7 +13988,7 @@ async function handleOnlineInvoiceFiles(files, triggerBtn, inputEl){
 async function leerFactura(files, btn, input){
   files = fiValidarArchivos(files);
   if(!files.length){ input.value = ''; return; }
-  const original = files[0];
+  const original = files[0], originales = files.slice();   // todas las fotos / el PDF tal como llegaron (para guardarlas escaneadas en HD)
   if(files.length === 1 && !fiEsPdf(files[0])){
     // Una sola foto: se muestra ya arreglada para revisarla antes de leerla.
     const iaYa = hasAIKey() && navigator.onLine !== false;
@@ -13618,7 +14007,7 @@ async function leerFactura(files, btn, input){
     // Varias fotos (o un PDF): las fotos se arreglan solas, sin preguntar.
     files = await Promise.all(files.map(async f => { if(fiEsPdf(f)) return f; try{ const m = (await fiMejorarFoto(f)).file; try{ m.__original = f; }catch(e){} return m; }catch(e){ return f; } }));
   }
-  window.__fiArchivo = original;
+  window.__fiArchivo = original; window.__fiArchivos = originales;
   // Sin IA configurada (ni la clave de Vento en el servidor ni una propia): se ofrece configurarla UNA vez (queda
   // en los datos del negocio y llega sola a los demás celulares). Una vez al día como máximo; si no, se lee sin internet.
   if(!hasAIKey() && navigator.onLine !== false && authIsAdmin()){
@@ -16013,7 +16402,7 @@ function renderProductos(){
   const sinTilde = x => String(x || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const qWords = sinTilde(qRaw).split(/\s+/).filter(Boolean);
   if(qWords.length){
-    products = data.products.filter(p => { const h = sinTilde([p.name, p.size, p.categoryId ? categoryName(p.categoryId) : '', Array.isArray(p.specifications) ? p.specifications.join(' ') : p.specifications].join(' ')); return qWords.every(w => h.includes(w)); });
+    products = data.products.filter(p => { const h = sinTilde([p.name, p.size, p.categoryId ? categoryName(p.categoryId) : '', Array.isArray(p.specifications) ? p.specifications.join(' ') : p.specifications, p.codigo || '', (p.barcodes || []).join(' ')].join(' ')); return qWords.every(w => h.includes(w)); });
   }
   const nEl = document.getElementById('prodBuscarN');
   if(nEl) nEl.textContent = qWords.length ? products.length + ' de ' + data.products.length : data.products.length + ' productos';
@@ -16048,6 +16437,7 @@ function renderProductos(){
           ${typeof prodFotoThumbHtml === 'function' ? prodFotoThumbHtml(p) : ''}
       <span class="p-name">${qWords.length ? invEsc(p.name).replace(new RegExp('(' + qWords.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')', 'gi'), '<mark class="pb">$1</mark>') : invEsc(p.name)}</span>
           ${p.size ? `<span class="p-size">📦 ${invEsc(p.size)}</span>` : ''}
+          ${p.codigo ? `<span class="p-size">🔢 ${invEsc(p.codigo)}</span>` : ''}
           ${detResumen(p, 70) ? `<span class="p-det">${invEsc(detResumen(p, 70))}</span>` : ''}
           ${tag}
           ${invChip(p)}
@@ -16202,6 +16592,7 @@ function openEditProductModal(productId){
   document.getElementById('editProdStock').value = p.stock != null ? p.stock : '';
   document.getElementById('editProdMin').value = p.minStock != null ? p.minStock : '';
   refreshEditProdCategorySelect(p.categoryId);
+  const codEl = document.getElementById('editProdCodigo'); if(codEl) codEl.value = p.codigo || (p.barcodes || [])[0] || '';
   if(typeof prodFotoModalAbrir === 'function') prodFotoModalAbrir(p);
   renderProductCostHistory(productId);
   renderEditProdMargin();
@@ -16341,6 +16732,13 @@ function saveEditedProduct(){
   p.specifications = document.getElementById('editProdSpecs').value.trim();
   const det = leerCamposProducto(); if(det) p.det = det; else delete p.det;
   p.categoryId = categoryId;
+  // Código: queda como código del producto y entre sus códigos de barras (así se reconoce al escanearlo).
+  const codEl = document.getElementById('editProdCodigo');
+  if(codEl){
+    const v = codEl.value.trim().slice(0, 40), viejo = p.codigo || '';
+    if(viejo && viejo !== v && Array.isArray(p.barcodes)) p.barcodes = p.barcodes.filter(b => b !== viejo);
+    if(v){ p.codigo = v; p.barcodes = p.barcodes || []; if(!p.barcodes.includes(v)) p.barcodes.push(v); } else delete p.codigo;
+  }
   p.stock = invNum(document.getElementById('editProdStock').value);
   p.minStock = invNum(document.getElementById('editProdMin').value);
   p.cost = invNum(document.getElementById('editProdCost').value);
@@ -16359,6 +16757,10 @@ function saveEditedProduct(){
 document.getElementById('prodBuscar').addEventListener('input', () => renderProductos());
 document.getElementById('editProdCancelBtn').addEventListener('click', closeEditProductModal);
 document.getElementById('editProdSaveBtn').addEventListener('click', saveEditedProduct);
+document.getElementById('editProdCodigoScan').addEventListener('click', () => {
+  openScanOverlay(raw => { const v = String(raw || '').trim().slice(0, 40); if(!v) return; document.getElementById('editProdCodigo').value = v; closeScanOverlay(); showToast('🔢 Código leído: ' + v + '. Toca «Guardar cambios».'); },
+    { hint: 'Apunta al código de barras del producto.' });
+});
 editProductOverlay.addEventListener('click', (e)=>{ if(e.target === editProductOverlay) closeEditProductModal(); });
 
 /* ---------- Compartir por WhatsApp ---------- */
@@ -23079,6 +23481,17 @@ document.addEventListener('click', function(ev){
     scanInvoiceFiles: scanInvoiceFiles,
     // Texto de una imagen (comprobantes de pago): misma lectura sin internet de las facturas.
     textoDeImagen: async function (file) { var w = await getOfflineWorker(); var c = await fileToOcrCanvas(file); return await recognizeWithWorker(w, c, OCR_RECOGNIZE_TIMEOUT_MS); },
+    // Todo el texto de la foto CON la posición de cada palabra (para el PDF escaneado con texto que se puede buscar y copiar).
+    palabrasDeImagen: async function (file) {
+      var w = await getOfflineWorker(); var c = await fileToOcrCanvas(file), r;
+      try { r = await withTimeout(w.recognize(c, {}, { text: true, blocks: true }), OCR_RECOGNIZE_TIMEOUT_MS * 2, "La lectura del texto tardó demasiado."); }
+      catch (e) { try { w.terminate(); } catch (e2) { /* noop */ } offlineWorkerPromise = null; throw e; }
+      var d = (r && r.data) || {}, words = [];
+      var add = function (x) { var t = x && String(x.text || "").trim(); if (t && x.bbox) words.push({ t: t, x0: x.bbox.x0, y0: x.bbox.y0, x1: x.bbox.x1, y1: x.bbox.y1 }); };
+      if (d.words && d.words.length) d.words.forEach(add);
+      else (d.blocks || []).forEach(function (b) { (b.paragraphs || []).forEach(function (p) { (p.lines || []).forEach(function (l) { (l.words || []).forEach(add); }); }); });
+      return { text: d.text || "", words: words, w: c.width, h: c.height };
+    },
     _ocrPrueba: async function (file, grados) { var w = await getOfflineWorker(); var c = rotarCanvas(await fileToOcrCanvas(file), grados || 0); var t = await recognizeWithWorker(w, c, OCR_RECOGNIZE_TIMEOUT_MS); return { text: t, conf: ultimaConfianza }; },
     parseTextToInvoiceItems: parseTextToInvoiceItems,
     // Se exponen también para el escaneo CON internet (IA): así puede leer
@@ -23466,7 +23879,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-13 · v1.31.3';
+const MESORA_VERSION = '2026-10-14 · v1.32.0';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'Vento · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 // Si el navegador (o el celular, con la app agregada a la pantalla de inicio) se quedó con
@@ -27938,7 +28351,7 @@ window.mesoraCelebrar = function(emojis){
     const t = String(q || '').toLowerCase();
     const ps = (data.purchases || []).filter(p => !t || [p.supplier, p.invoiceNumber, p.date].concat((p.items || []).map(i => i.name + ' ' + (i.originalDescription || ''))).join(' ').toLowerCase().includes(t));
     return ps.length ? ps.map(p => '<button type="button" class="fi-hrow" data-id="' + e(p.id) + '"><span><b>' + e(p.supplier || 'Proveedor sin nombre') + '</b>' +
-      '<small>' + (p.invoiceNumber ? 'Factura ' + e(p.invoiceNumber) + ' · ' : '') + fecha(p.date || p.at) + ' · ' + (p.items || []).length + ' producto(s)' + (p.archivoId ? ' · 📎' : '') + '</small></span><b>' + fmt(Math.round(p.total || 0)) + '</b></button>').join('')
+      '<small>' + (p.invoiceNumber ? 'Factura ' + e(p.invoiceNumber) + ' · ' : '') + fecha(p.date || p.at) + ' · ' + (p.items || []).length + ' producto(s)' + ((p.archivoId || (p.escaneos || []).length) ? ' · 📎' : '') + '</small></span><b>' + fmt(Math.round(p.total || 0)) + '</b></button>').join('')
       : '<div class="empty-state">' + (t ? 'Ninguna factura coincide.' : 'Todavía no hay facturas aplicadas.') + '</div>';
   }
   function abrirHist(){
@@ -27960,8 +28373,24 @@ window.mesoraCelebrar = function(emojis){
       (p.avisos && p.avisos.length ? '<div class="iv-avisos"><b>Avisos al guardarla</b><ul>' + p.avisos.map(a => '<li>' + e(a) + '</li>').join('') + '</ul></div>' : '') +
       '<div class="margin-table-wrap"><table class="margin-table"><thead><tr><th>Producto</th><th>Cant.</th><th>Sin IVA/u</th><th>IVA/u</th><th>Con IVA/u</th><th>Total</th></tr></thead><tbody>' + items + '</tbody></table></div>' +
       '<div class="fi-dtot">' + (p.subtotal ? 'Subtotal ' + fmt(Math.round(p.subtotal)) + ' · IVA ' + fmt(Math.round(p.ivaTotal || 0)) + ' · ' : '') + 'Total: <b>' + fmt(Math.round(p.total || 0)) + '</b></div>' +
-      (p.archivoId ? '<button type="button" class="btn-ghost fi-verorig">📎 Ver la foto original</button>' : '<div class="settings-desc">La foto original no quedó guardada en este equipo.</div>'));
+      ((p.archivoId || (p.escaneos || []).length)
+        ? '<div class="fi-desc"><div class="fi-desc-prev"><img class="fi-desc-img" alt="Factura escaneada"><span class="fi-desc-msg">Cargando la factura escaneada…</span></div>' +
+          '<button type="button" class="btn-primary fi-dl-pdf">📄 Descargar escaneada (PDF HD con el texto)</button>' +
+          '<button type="button" class="btn-ghost fi-dl-jpg">🖼️ Descargar imagen HD (JPG)</button>' +
+          (p.archivoId ? '<button type="button" class="btn-ghost fi-verorig">📎 Ver la foto original</button>' : '') +
+          '<div class="settings-desc">Escaneada como en un escáner: recortada, enderezada, con el texto alineado y en Full HD. El PDF trae el texto de la factura (se puede buscar y copiar) y una hoja con los datos leídos.</div></div>'
+        : '<div class="settings-desc">La foto de esta factura no quedó guardada en este equipo (se guarda en el celular donde se escaneó). Igual puedes descargar sus datos.</div><button type="button" class="btn-ghost fi-dl-pdf">📄 Descargar los datos (PDF)</button>'));
     const b = ov.querySelector('.fi-verorig'); if(b) b.onclick = () => window.ctVerRecibo && window.ctVerRecibo(p.archivoId, 'Factura ' + (p.invoiceNumber || p.supplier || ''));
+    const msg = ov.querySelector('.fi-desc-msg'), avisar = t => { if(msg){ msg.textContent = t; msg.hidden = false; } showToast(t, 4000); };
+    const boton = (sel, tipo) => { const x = ov.querySelector(sel); if(!x) return; x.onclick = async () => {
+      if(x.disabled) return; const lbl = x.textContent; x.disabled = true; x.textContent = '⏳ Preparando…';
+      try{ await fiDescargarFactura(p, tipo, avisar); }catch(err){ showToast('⚠️ No se pudo preparar la descarga: ' + (err && err.message ? err.message : 'error') + '.'); }
+      finally{ x.disabled = false; x.textContent = lbl; if(msg) msg.hidden = true; }
+    }; };
+    boton('.fi-dl-pdf', 'pdf'); boton('.fi-dl-jpg', 'jpg');
+    // Vista previa de la página 1 ya escaneada (las facturas de antes se escanean en HD al abrirlas)
+    const im = ov.querySelector('.fi-desc-img');
+    if(im) fiEscaneosDe(p, t => { if(msg) msg.textContent = t; }).then(pg => { if(!ov.classList.contains('show')) return; if(pg[0]){ im.src = pg[0].url; if(msg) msg.hidden = true; } else if(msg) msg.textContent = 'La foto no está en este equipo.'; }).catch(() => { if(msg) msg.textContent = 'No pude abrir la foto.'; });
   }
   function abrirMov(){
     const ms = (data.inventarioMov || []).slice().reverse().slice(0, 300);
@@ -28018,6 +28447,7 @@ window.mesoraCelebrar = function(emojis){
   window.ctReciboGuardar = (id, url) => tx('readwrite', st => st.put(url, id)).catch(() => showToast('⚠️ No se pudo guardar el recibo en este celular.'));
   window.ctReciboBorrar = id => tx('readwrite', st => st.delete(id)).catch(() => {});
   const leer = id => tx('readonly', st => st.get(id));
+  window.ctReciboLeer = leer;
   // Foto o PDF → imagen liviana (la primera página del PDF)
   async function aImagen(f){
     let file = f;

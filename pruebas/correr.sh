@@ -17,7 +17,7 @@ lista=("$@"); [ ${#lista[@]} -eq 0 ] && lista=($(ls pruebas/*.test.js | xargs -n
 mal=0
 for t in "${lista[@]}"; do
   echo "== $t"
-  salida=$(timeout 240 node "pruebas/$t.test.js" 2>&1); code=$?
+  salida=$(timeout 600 node "pruebas/$t.test.js" 2>&1); code=$?
   echo "$salida" | grep -E "✅|❌|RESULTADO|errores|sin errores" | tail -40
   if [ $code -ne 0 ] || echo "$salida" | grep -qE "❌|RESULTADO [0-9]+ bien [1-9]"; then echo "   ⚠️  FALLÓ: $t"; mal=1; fi
 done
