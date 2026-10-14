@@ -260,8 +260,8 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
  // Celular: nada se sale de la pantalla
  chk('Celular: sin desborde horizontal', await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), await p.evaluate(() => document.documentElement.scrollWidth));
  // Las demás pestañas siguen funcionando
- await p.click('#tabs [data-t="clientes"]');
- chk('Las otras pestañas siguen funcionando', await p.evaluate(() => document.querySelector('section[data-tab="clientes"]').classList.contains('on') && !document.querySelector('section[data-tab="subs"]').classList.contains('on')));
+ await p.click('#tabs [data-t="equipo"]');
+ chk('Las otras pestañas siguen funcionando', await p.evaluate(() => document.querySelector('section[data-tab="equipo"]').classList.contains('on') && !document.querySelector('section[data-tab="subs"]').classList.contains('on')));
  await p.click('#tabs [data-t="subs"]');
  chk('Al volver a 💳 no repite el arranque', await visible('#sxPanel') && llamadas('yo').filter(x => x.auth === 'Bearer TOK-ADMIN').length === 1);
  // Computador
@@ -269,7 +269,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
  chk('Computador: las tarjetas van en varias columnas', await p.evaluate(() => { const c = [...document.querySelectorAll('#sxPlanes .sxc')]; return c.length > 1 && c[0].getBoundingClientRect().top === c[1].getBoundingClientRect().top; }));
  // Al recargar vuelve el bloqueo con código personal
  await p.reload(); await p.waitForTimeout(800);
- chk('Al recargar vuelve a pedir el código personal', await visible('#lock'));
+ chk('Al recargar vuelve a pedir entrar (correo y contraseña)', await visible('#lock'));
  chk('Sin errores', !errs.length, errs.join(' | '));
  console.log('RESULTADO', ok, 'bien', mal, 'mal'); await b.close(); process.exit(mal ? 1 : 0);
 })();

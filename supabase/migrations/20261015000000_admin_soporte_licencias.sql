@@ -152,7 +152,7 @@ alter table public.soporte_mensajes enable row level security;
 create or replace function public.soporte_caso_pub(c public.soporte_casos, p_admin boolean default false) returns jsonb
 language sql stable security definer set search_path = public, extensions as $$
   select jsonb_build_object('id', c.id, 'tipo', c.tipo, 'asunto', c.asunto, 'estado', c.estado, 'creado_en', c.creado_en,
-      'actualizado_en', c.actualizado_en, 'nombre', c.nombre, 'negocio_nombre', c.negocio_nombre,
+      'actualizado_en', c.actualizado_en, 'nombre', c.nombre, 'negocio_nombre', coalesce(c.negocio_nombre, (select nombre from negocios where id = c.negocio_id)),
       'mensajes', coalesce((select jsonb_agg(jsonb_build_object('id', m.id, 'autor', m.autor, 'texto', m.texto, 'creado_en', m.creado_en) order by m.id)
                             from soporte_mensajes m where m.caso_id = c.id), '[]'::jsonb),
       'sin_leer', (select count(*) from soporte_mensajes m where m.caso_id = c.id

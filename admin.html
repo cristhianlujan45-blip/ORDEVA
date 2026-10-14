@@ -170,6 +170,17 @@
   .ents input, label.tog input{ width:18px; height:18px; flex:0 0 auto; accent-color:var(--acc); }
   .ents label:has(input:checked){ border-color:color-mix(in srgb, var(--acc) 55%, var(--line)); }
   dialog.ancho{ width:min(780px, calc(100vw - 24px)); }
+  .sp-hilo{ display:flex; flex-direction:column; gap:8px; margin:12px 0; max-height:46vh; overflow:auto; padding:4px; }
+  .sp-m{ max-width:85%; padding:9px 12px; border-radius:14px; background:var(--card2); border:1px solid var(--line); white-space:pre-wrap; overflow-wrap:anywhere; }
+  .sp-m.adm{ align-self:flex-end; background:color-mix(in srgb, var(--acc) 22%, var(--card)); border-color:color-mix(in srgb, var(--acc) 45%, var(--line)); }
+  .sp-m small{ display:block; color:var(--soft); font-size:11.5px; margin-top:3px; }
+  .us-acc{ display:grid; gap:8px; grid-template-columns:repeat(auto-fill, minmax(min(100%, 210px), 1fr)); margin-top:10px; }
+  .clave-temp{ font:700 22px ui-monospace,monospace; letter-spacing:1px; text-align:center; padding:12px; border:2px dashed var(--acc2); border-radius:12px; margin:10px 0; user-select:all; }
+  .lic-cod{ font:700 16px ui-monospace,monospace; letter-spacing:.5px; }
+  .chips{ display:flex; flex-wrap:wrap; gap:6px; }
+  .chip{ font-size:12.5px; padding:3px 9px; border-radius:999px; border:1px solid var(--line); background:var(--card2); }
+  .chip.ok{ border-color:var(--ok); } .chip.x{ cursor:pointer; }
+  details > summary{ cursor:pointer; }
   .visor{ margin-top:10px; border-radius:12px; background:#0b0b10; overflow:auto; max-height:62vh; display:grid; place-items:center; min-height:160px; }
   .visor img{ display:block; max-width:100%; height:auto; cursor:zoom-in; }
   .visor.zoom{ place-items:start; }
@@ -198,10 +209,32 @@
   <div class="card">
     <img src="icons/vento-180.png" alt="" style="width:64px;height:64px;border-radius:16px">
     <h2 id="lockTit" style="margin-top:10px">Vento Admin</h2>
-    <p class="soft" id="lockTxt">Solo para el administrador de Vento. Escribe tu código personal.</p>
-    <input id="lockPin" type="password" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="VENTO-XXXX-XXXX-XXXX-XXXX-XXXX" style="text-align:center;font-size:15px;letter-spacing:1px">
-    <label style="display:flex;gap:8px;align-items:center;justify-content:center"><input type="checkbox" id="lockRec" style="width:auto">Recordar en este equipo (solo si es tuyo)</label>
-    <div class="row"><button class="b p" id="lockGo" type="button">🔓 Entrar</button></div>
+    <p class="soft" id="lockTxt">Solo para el administrador de Vento. Entra con tu correo y tu contraseña de administrador.</p>
+    <div id="lkEntrar">
+      <input id="lkCorreo" type="email" autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false" placeholder="Correo del administrador">
+      <input id="lkClave" type="password" autocomplete="current-password" placeholder="Contraseña" style="margin-top:8px">
+      <div class="row"><button class="b p" id="lkGo" type="button">🔓 Entrar</button></div>
+      <div class="row" style="margin-top:6px"><button class="b" id="lkOlvide" type="button">¿Olvidaste la contraseña?</button><button class="b" id="lkCrear" type="button">Crear mi cuenta</button></div>
+    </div>
+    <div id="lkCrearBox" hidden>
+      <p class="soft" style="margin-top:0">La primera vez: crea la cuenta con el correo de administrador y una contraseña de al menos 8 caracteres. <b>Para usar Vento como cliente usa otro correo (o tu correo con «+cliente») y otra contraseña.</b></p>
+      <input id="lkNCorreo" type="email" autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false" placeholder="Correo del administrador">
+      <input id="lkNClave" type="password" autocomplete="new-password" placeholder="Contraseña nueva" style="margin-top:8px">
+      <input id="lkNClave2" type="password" autocomplete="new-password" placeholder="Repite la contraseña" style="margin-top:8px">
+      <div class="row"><button class="b p" id="lkNGo" type="button">Crear y entrar</button><button class="b" type="button" data-lk="entrar">Volver</button></div>
+    </div>
+    <div id="lkOlvBox" hidden>
+      <p class="soft" style="margin-top:0">Te mandamos un código de 6 números a tu correo para poner una contraseña nueva.</p>
+      <input id="lkOCorreo" type="email" autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false" placeholder="Correo del administrador">
+      <div class="row"><button class="b p" id="lkOEnviar" type="button">📧 Enviarme el código</button></div>
+      <div id="lkOPaso2" hidden>
+        <input id="lkOCodigo" inputmode="numeric" autocomplete="one-time-code" placeholder="Código de 6 números" style="margin-top:8px;text-align:center;letter-spacing:4px">
+        <input id="lkOClave" type="password" autocomplete="new-password" placeholder="Contraseña nueva (mín. 8)" style="margin-top:8px">
+        <div class="row"><button class="b p" id="lkOGo" type="button">Cambiar y entrar</button></div>
+      </div>
+      <div class="row"><button class="b" type="button" data-lk="entrar">Volver</button></div>
+    </div>
+    <div class="sx-msg" id="lkMsg" role="status" style="margin-top:10px"></div>
   </div>
 </div>
 
@@ -214,11 +247,10 @@
   </div>
   <nav id="tabs">
     <button type="button" data-t="resumen" class="on">📊 Resumen</button>
-    <button type="button" data-t="subs">💳 Suscripciones<span class="nb" id="sxBadge" hidden></span></button>
-    <button type="button" data-t="clientes">👥 Clientes</button>
-    <button type="button" data-t="pagos">💵 Pagos</button>
+    <button type="button" data-t="usuarios">👥 Usuarios</button>
+    <button type="button" data-t="soporte">🎧 Soporte<span class="nb" id="spBadge" hidden></span></button>
     <button type="button" data-t="licencias">🔑 Licencias</button>
-    <button type="button" data-t="planes">📦 Planes</button>
+    <button type="button" data-t="subs">💳 Suscripciones<span class="nb" id="sxBadge" hidden></span></button>
     <button type="button" data-t="equipo">🧑‍💻 Equipo</button>
     <button type="button" data-t="app">⚙️ Configurar la app</button>
     <button type="button" data-t="datos">💾 Respaldo</button>
@@ -229,7 +261,17 @@
 <main>
   <!-- ===================== RESUMEN ===================== -->
   <section data-tab="resumen" class="on">
-    <div class="grid" id="kpis"></div>
+    <div class="grid" id="rsKpis"><div class="kpi"><b>…</b><span>Cargando del servidor</span></div></div>
+    <div class="card" style="margin-top:14px">
+      <h2>🆕 Últimos registrados</h2>
+      <div class="list" id="rsRecientes"><div class="empty">Cargando…</div></div>
+    </div>
+    <div class="card">
+      <h2>🎧 Soporte por responder</h2>
+      <div class="list" id="rsSoporte"><div class="empty">Cargando…</div></div>
+    </div>
+    <details class="card"><summary><b>📒 Mi libreta (clientes anotados a mano en este equipo)</b></summary>
+    <div class="grid" id="kpis" style="margin-top:10px"></div>
     <div class="card" style="margin-top:14px">
       <h2>💵 Ingresos de los últimos 6 meses</h2>
       <div class="chart" id="chart"></div>
@@ -238,6 +280,47 @@
       <h2>⏰ Por cobrar (vencen en los próximos 7 días o ya vencieron)</h2>
       <div class="list" id="porCobrar"></div>
     </div>
+    <div class="row"><button class="b" type="button" data-ir-tab="clientes">👥 Ver la libreta de clientes</button><button class="b" type="button" data-ir-tab="pagos">💵 Pagos anotados</button><button class="b" type="button" data-ir-tab="planes">📦 Planes de la libreta</button></div>
+    </details>
+  </section>
+
+  <!-- ===================== USUARIOS (todas las cuentas registradas en el servidor) ===================== -->
+  <section data-tab="usuarios">
+    <div class="bar">
+      <input id="usBuscar" type="search" placeholder="🔎 Correo o nombre del negocio">
+      <select id="usFiltro" aria-label="Filtrar">
+        <option value="">Todas las cuentas</option>
+        <option value="pagada">✅ Con plan pagado</option>
+        <option value="prueba">🎁 En prueba</option>
+        <option value="gratis">Plan gratis / vencido</option>
+        <option value="sinneg">Sin negocio</option>
+        <option value="bloq">⛔ Bloqueadas</option>
+      </select>
+      <button class="b p" id="usNuevo" type="button">➕ Crear cuenta de cliente</button>
+      <button class="b" id="usRef" type="button" title="Actualizar">🔄</button>
+    </div>
+    <p class="soft" id="usInfo" style="margin-top:0"></p>
+    <div class="list" id="usLista"><div class="empty">Cargando…</div></div>
+    <details class="card" style="margin-top:14px"><summary><b>📱 Equipos que usan Vento sin cuenta en la nube</b></summary>
+      <p class="soft">Negocios que abrieron Vento con un usuario de ese equipo (sin correo). Invítalos a crear su cuenta para tener sus datos seguros y en todos sus equipos.</p>
+      <div class="list" id="usLocales"></div>
+    </details>
+  </section>
+
+  <!-- ===================== SOPORTE ===================== -->
+  <section data-tab="soporte">
+    <div class="bar">
+      <select id="spEstado" aria-label="Casos">
+        <option value="abiertos">📬 Por atender</option>
+        <option value="abierto">🔴 Sin responder</option>
+        <option value="respondido">🟡 Respondidos</option>
+        <option value="cerrado">✅ Cerrados</option>
+        <option value="todos">Todos</option>
+      </select>
+      <input id="spBuscar" type="search" placeholder="🔎 Correo, celular, negocio o texto">
+      <button class="b" id="spRef" type="button" title="Actualizar">🔄</button>
+    </div>
+    <div class="list" id="spLista"><div class="empty">Cargando…</div></div>
   </section>
 
   <!-- ===================== SUSCRIPCIONES (Vento Nube) ===================== -->
@@ -378,6 +461,40 @@
   <!-- ===================== LICENCIAS ===================== -->
   <section data-tab="licencias">
     <div class="card">
+      <h2>🔑 Nueva licencia</h2>
+      <p class="soft">Solo tú puedes crear licencias. Cada licencia da un plan por el tiempo que elijas. Si escribes correos, <b>solo esas cuentas</b> la pueden usar (se les activa sola al entrar a Vento); así nadie puede revenderla ni pasarla.</p>
+      <div class="f2">
+        <div><label for="lsPlan">Plan</label><select id="lsPlan"><option value="pro">PRO</option></select></div>
+        <div><label for="lsTipo">Duración</label><select id="lsTipo">
+          <option value="d">Días</option><option value="m" selected>Meses</option><option value="a">Años</option><option value="f">Hasta una fecha</option><option value="s">♾️ Para siempre</option></select></div>
+        <div id="lsCantBox"><label for="lsCant">Cuántos</label><input id="lsCant" type="number" min="1" max="1200" value="1" inputmode="numeric"></div>
+        <div id="lsFechaBox" hidden><label for="lsFecha">Vence el</label><input id="lsFecha" type="date"></div>
+      </div>
+      <label for="lsCorreos">Correos con los que se comparte (uno por renglón o separados por coma)</label>
+      <textarea id="lsCorreos" placeholder="cliente@gmail.com&#10;socio@gmail.com"></textarea>
+      <div class="f2">
+        <div><label for="lsUsos">Usos (negocios que la pueden activar)</label><input id="lsUsos" type="number" min="1" max="1000" placeholder="Automático" inputmode="numeric"></div>
+        <div><label for="lsNota">Nota (para ti)</label><input id="lsNota" placeholder="Ej: Bar El Paisa, pagó en efectivo"></div>
+      </div>
+      <div class="row"><button class="b p" id="lsCrear" type="button">🔑 Crear licencia</button></div>
+      <div id="lsRes" hidden class="out"></div>
+      <div class="row" id="lsResBtns" hidden><button class="b" type="button" id="lsCopiar">📋 Copiar</button><a class="b" id="lsWa" target="_blank" rel="noopener">💬 Enviar por WhatsApp</a><a class="b" id="lsMail">📧 Enviar por correo</a></div>
+    </div>
+    <div class="bar">
+      <input id="lsBuscar" type="search" placeholder="🔎 Código, correo o nota">
+      <select id="lsFiltro"><option value="">Todas</option><option value="activa">Activas</option><option value="revocada">Anuladas</option></select>
+      <button class="b" id="lsRef" type="button" title="Actualizar">🔄</button>
+    </div>
+    <div class="sx-cards" id="lsLista"><div class="empty">Cargando…</div></div>
+    <details class="card" style="margin-top:14px"><summary><b>🔐 Códigos firmados sin internet (sistema anterior)</b></summary>
+    <div class="card" style="margin-top:10px">
+      <h2>🔓 Desbloquear la firma</h2>
+      <p class="soft">Para crear códigos sin internet hace falta tu código personal (el de antes).</p>
+      <input id="lockPin" type="password" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="VENTO-XXXX-XXXX-XXXX-XXXX-XXXX" style="text-align:center;letter-spacing:1px">
+      <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="lockRec" style="width:auto">Recordar en este equipo (solo si es tuyo)</label>
+      <div class="row"><button class="b" id="lockGo" type="button">🔓 Desbloquear</button></div>
+    </div>
+    <div class="card">
       <h2>🔐 Firma de licencias</h2>
       <div id="keyState" class="soft">Sin cargar.</div>
       <p class="soft">Tu código personal desbloquea la llave que firma las licencias. Nadie puede crear licencias sin ese código.</p>
@@ -409,6 +526,7 @@
       <div id="lRes" hidden><div class="out" id="lLink"></div><div class="row"><button class="b" type="button" id="lCopiar">📋 Copiar link</button></div></div>
     </div>
     <div class="card"><h2>Códigos creados</h2><div class="hist" id="lHist"></div></div>
+    </details>
   </section>
 
   <!-- ===================== PLANES ===================== -->
@@ -673,6 +791,45 @@
 <dialog id="dlgSxNeg" class="ancho">
   <div class="dh"><h2 id="sxNegTit">Negocio</h2><button class="x" type="button" data-cerrar>✕</button></div>
   <div class="db" id="sxNegCuerpo"></div>
+</dialog>
+
+<!-- ===================== USUARIOS: ficha ===================== -->
+<dialog id="dlgUs" class="ancho">
+  <div class="dh"><h2 id="usTit">Cuenta</h2><button class="x" type="button" data-cerrar>✕</button></div>
+  <div class="db" id="usCuerpo"></div>
+</dialog>
+<dialog id="dlgUsNuevo">
+  <div class="dh"><h2>➕ Crear cuenta de cliente</h2><button class="x" type="button" data-cerrar>✕</button></div>
+  <div class="db">
+    <p class="soft">Creas la cuenta y le das la contraseña al cliente (por WhatsApp o mensaje de texto). Al entrar, la app le pide poner una propia.</p>
+    <label for="unCorreo">Correo del cliente</label><input id="unCorreo" type="email" inputmode="email" autocapitalize="none" spellcheck="false" placeholder="cliente@gmail.com">
+    <div class="f2">
+      <div><label for="unNombre">Nombre</label><input id="unNombre" placeholder="Ana Pérez"></div>
+      <div><label for="unNegocio">Negocio</label><input id="unNegocio" placeholder="Café Central"></div>
+      <div><label for="unTel">Celular (para mandarle la contraseña)</label><input id="unTel" inputmode="tel" placeholder="3001234567"></div>
+      <div><label for="unLic">Licencia</label><select id="unLic"><option value="">Sin licencia (prueba gratis)</option><option value="1">PRO 1 mes</option><option value="3">PRO 3 meses</option><option value="6">PRO 6 meses</option><option value="12">PRO 1 año</option><option value="s">PRO para siempre</option></select></div>
+    </div>
+    <div class="err" id="unErr" role="alert"></div>
+    <div class="row"><button class="b" type="button" data-cerrar>Cancelar</button><button class="b p" id="unGo" type="button">Crear cuenta</button></div>
+    <div id="unRes" hidden></div>
+  </div>
+</dialog>
+<!-- ===================== SOPORTE: caso ===================== -->
+<dialog id="dlgSp" class="ancho">
+  <div class="dh"><h2 id="spTit">Caso</h2><button class="x" type="button" data-cerrar>✕</button></div>
+  <div class="db">
+    <div id="spInfo"></div>
+    <div class="sp-hilo" id="spHilo"></div>
+    <div class="motivos" id="spRapidas"></div>
+    <textarea id="spTexto" maxlength="2000" placeholder="Escribe la respuesta…"></textarea>
+    <div class="row">
+      <button class="b p" id="spResponder" type="button">📨 Responder</button>
+      <button class="b" id="spCerrar" type="button">✅ Cerrar caso</button>
+      <a class="b" id="spWa" target="_blank" rel="noopener" hidden>💬 WhatsApp</a>
+      <a class="b" id="spSms" hidden>📱 Mensaje de texto</a>
+    </div>
+    <div id="spAcciones" class="row"></div>
+  </div>
 </dialog>
 
 <!-- ===================== SUSCRIPCIONES: plan ===================== -->
@@ -1600,6 +1757,392 @@
   $('dlgSxNeg').addEventListener('click', sxClic);
   $('sxKpis').addEventListener('keydown', e => { if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); sxClic(e); } });
 
+  // ================= Vento Admin conectado al servidor: resumen, usuarios, soporte y licencias =================
+  /* Todo se lee del servidor (Edge Function vento-suscripciones, rutas /admin/*) con la sesión del administrador:
+     así cualquier equipo donde entres ve los mismos usuarios, casos y licencias. */
+  const ad = { usuarios: [], locales: null, casos: [], lics: [], resumen: null, us: null, caso: null, cargando: {} };
+  const SP_TIPO = { ayuda: '🙋 Ayuda', error: '🐞 Error', pago: '💳 Pago', clave: '🔑 Contraseña', licencia: '🔑 Licencia', otro: '💬 Otro' };
+  const SP_EST = { abierto: ['🔴 Sin responder', 'bad'], respondido: ['🟡 Respondido', 'warn'], cerrado: ['✅ Cerrado', 'ok'] };
+  const telWa = t => { t = String(t || '').replace(/\D/g, ''); if(t.length === 10) t = '57' + t; return t; };
+  const appUrl = () => APP_URL;
+  function irTab(t){
+    const b = document.querySelector('#tabs button[data-t="' + t + '"]');
+    if(b){ b.click(); return; }
+    document.querySelectorAll('#tabs button').forEach(x => x.classList.remove('on'));
+    document.querySelectorAll('section[data-tab]').forEach(x => x.classList.toggle('on', x.dataset.tab === t));
+    window.scrollTo(0, 0);
+  }
+  document.addEventListener('click', e => { const b = e.target.closest('[data-ir-tab]'); if(b){ e.preventDefault(); irTab(b.dataset.irTab); } });
+  $('tabs').addEventListener('click', e => {
+    const b = e.target.closest('button[data-t]'); if(!b || !$('lock').hidden) return;
+    if(b.dataset.t === 'resumen') rsCargar();
+    if(b.dataset.t === 'usuarios') usCargar();
+    if(b.dataset.t === 'soporte') spCargar();
+    if(b.dataset.t === 'licencias') lsCargar();
+  });
+  async function intentar(fn, caja){
+    try{ return await fn(); }
+    catch(e){
+      if(e && (e.codigo === 'sin_sesion' || e.status === 401 || e.codigo === 'no_admin')){ bloquear(e.codigo === 'no_admin' ? 'Esta cuenta no es administradora de Vento.' : 'Tu sesión venció. Vuelve a entrar.'); return null; }
+      if(caja) caja.innerHTML = '<div class="empty">⚠️ ' + esc(sxMsgError(e)) + '</div>'; else toast('⚠️ ' + sxMsgError(e), 6000);
+      return null;
+    }
+  }
+
+  // ---------- Resumen ----------
+  async function rsCargar(){
+    const j = await intentar(() => sxApi('resumen'), $('rsRecientes')); if(!j) return;
+    const R = ad.resumen = j.resumen || {};
+    const K = [['acc', R.usuarios, 'Usuarios registrados', 'usuarios'], ['ok', R.usuarios_7d, 'Nuevos esta semana', 'usuarios'], ['acc', R.activos_7d, 'Entraron esta semana', 'usuarios'],
+      ['acc', R.negocios, 'Negocios', 'usuarios'], ['ok', R.pagadas, 'Planes pagados activos', 'subs'], ['acc', R.prueba, 'En prueba gratis', 'subs'], ['bad', R.vencidas, 'Vencidos', 'subs'],
+      ['warn', R.pagos_revision, 'Pagos por revisar', 'subs'], ['bad', R.soporte_abiertos, 'Soporte sin responder', 'soporte'], ['acc', R.licencias_activas, 'Licencias activas', 'licencias'],
+      ['acc', R.equipos_30d, 'Equipos usando Vento (30 días)', 'usuarios'], ['soft', R.equipos_locales, 'Equipos sin cuenta en la nube', 'usuarios']];
+    $('rsKpis').innerHTML = K.map(k => '<div class="kpi ' + k[0] + '" data-ir-tab="' + k[3] + '" tabindex="0"><b>' + esc(k[1] == null ? '—' : k[1]) + '</b><span>' + esc(k[2]) + '</span></div>').join('');
+    $('rsRecientes').innerHTML = (R.recientes || []).length ? R.recientes.map(u => '<div class="item" data-us="' + esc(u.id) + '"><div class="av">' + inicial(u.email) + '</div><div class="t"><b>' + esc(u.email) + '</b><small>' + esc((u.negocio || 'sin negocio todavía') + ' · ' + hace(u.creado_en)) + '</small></div></div>').join('') : '<div class="empty">Todavía no hay cuentas registradas.</div>';
+    spBadge(R.soporte_abiertos);
+    const c = await intentar(() => sxApi('soporte', { estado: 'abierto' }), $('rsSoporte'));
+    if(c) $('rsSoporte').innerHTML = (c.casos || []).length ? c.casos.slice(0, 6).map(spItem).join('') : '<div class="empty">🎉 Nada por responder.</div>';
+  }
+  function spBadge(n){ $('spBadge').textContent = n ? String(n) : ''; $('spBadge').hidden = !n; }
+
+  // ---------- Usuarios ----------
+  function planDeUsuario(u){
+    const n = (u.negocios || [])[0]; if(!n) return ['Sin negocio', 'soft', 'sinneg'];
+    const s = n.suscripcion;
+    if(s && sxVigente(s) && !s.trial) return ['✅ ' + nomPlan(s.plan_id) + (s.source === 'admin' ? ' (licencia)' : '') + ' · vence ' + fCo(s.expiry_date), 'ok', 'pagada'];
+    if(s && sxVigente(s) && s.trial) return ['🎁 Prueba · ' + (s.dias_restantes != null ? s.dias_restantes + ' días' : ''), 'acc', 'prueba'];
+    if(s && !sxVigente(s)) return ['⌛ Vencido', 'bad', 'gratis'];
+    return ['Gratis', 'soft', 'gratis'];
+  }
+  async function usCargar(forzar){
+    if(ad.cargando.us) return; ad.cargando.us = true;
+    try{
+      if(!sx.planes.length){ const pl = await intentar(() => sxApi('planes')); if(pl){ sx.planes = pl.planes || []; sx.ents = pl.entitlements || []; sx.cfg = pl.config || {}; } }
+      const j = await intentar(() => sxApi('usuarios', { limite: 2000 }), $('usLista')); if(!j) return;
+      ad.usuarios = j.usuarios || []; usPintar();
+      if(forzar || ad.locales === null){ const l = await intentar(() => sxApi('equipos', { solo_locales: true }), $('usLocales')); if(l){ ad.locales = l.equipos || []; usPintarLocales(); } }
+    }finally{ ad.cargando.us = false; }
+  }
+  function usPintar(){
+    const q = $('usBuscar').value.trim().toLowerCase(), f = $('usFiltro').value;
+    const l = ad.usuarios.filter(u => {
+      if(q && !(String(u.email || '').toLowerCase().includes(q) || (u.negocios || []).some(n => String(n.nombre || '').toLowerCase().includes(q)) || String(u.telefono || '').includes(q))) return false;
+      if(f === 'bloq') return u.bloqueado;
+      if(f) return planDeUsuario(u)[2] === f;
+      return true;
+    });
+    $('usInfo').textContent = ad.usuarios.length + ' cuentas registradas' + (l.length !== ad.usuarios.length ? ' · mostrando ' + l.length : '');
+    $('usLista').innerHTML = l.length ? l.slice(0, 400).map(u => { const p = planDeUsuario(u);
+      return '<div class="item" data-us="' + esc(u.id) + '"><div class="av">' + (u.admin ? '👑' : inicial(u.email)) + '</div><div class="t"><b>' + esc(u.email) + '</b><small>' +
+        esc([(u.negocios || []).map(n => n.nombre + (n.rol !== 'dueno' ? ' (' + (SX_ROL[n.rol] || n.rol) + ')' : '')).join(', ') || 'sin negocio', u.equipos ? u.equipos + ' equipo' + (u.equipos === 1 ? '' : 's') : '', u.ultimo_ingreso ? 'entró ' + hace(u.ultimo_ingreso) : 'registrado ' + hace(u.creado_en)].filter(Boolean).join(' · ')) +
+        '</small></div>' + (u.soporte_abiertos ? '<span class="pill bad">🎧 ' + u.soporte_abiertos + '</span>' : '') + (u.bloqueado ? '<span class="pill bad">⛔ Bloqueada</span>' : '<span class="pill ' + p[1] + '">' + esc(p[0]) + '</span>') + '</div>'; }).join('')
+      : '<div class="empty">' + (ad.usuarios.length ? 'Nadie coincide con la búsqueda.' : 'Todavía no hay cuentas registradas en la nube. Cuando un negocio cree su cuenta con correo aparece aquí.') + '</div>';
+  }
+  function usPintarLocales(){
+    const l = ad.locales || [];
+    $('usLocales').innerHTML = l.length ? l.map(e => '<div class="item"><div class="av">📱</div><div class="t"><b>' + esc(e.negocio || 'Sin nombre') + '</b><small>' +
+      esc([e.usuario ? 'usuario ' + e.usuario : '', e.plataforma === 'apk' ? 'app Android' : e.plataforma || '', e.version ? 'v' + e.version : '', 'última vez ' + hace(e.ultima), e.veces + ' veces'].filter(Boolean).join(' · ')) + '</small></div></div>').join('')
+      : '<div class="empty">Ninguno: todos usan cuenta en la nube.</div>';
+  }
+  $('usBuscar').oninput = () => usPintar(); $('usFiltro').onchange = () => usPintar(); $('usRef').onclick = () => usCargar(true);
+  document.addEventListener('click', e => { const it = e.target.closest('[data-us]'); if(it && !e.target.closest('button,a')) usAbrir(it.dataset.us); });
+  async function usAbrir(id){
+    $('usTit').textContent = 'Cuenta'; $('usCuerpo').innerHTML = '<div class="sx-carga"><span class="spin"></span> Cargando…</div>';
+    if(!$('dlgUs').open) $('dlgUs').showModal();
+    const j = await intentar(() => sxApi('usuario', { usuario: id }), $('usCuerpo')); if(!j) return;
+    const u = ad.us = j.usuario; const p = planDeUsuario(u);
+    $('usTit').textContent = (u.admin ? '👑 ' : '') + u.email;
+    const negs = (u.negocios || []).map(n => '<div class="item" data-neg="' + esc(n.id) + '"><div class="av">🏪</div><div class="t"><b>' + esc(n.nombre) + '</b><small>' + esc((SX_ROL[n.rol] || n.rol) + ' · plan ' + nomPlan(n.plan_efectivo)) + '</small></div><span class="pill ' + esc(sxEstadoSub(n.suscripcion)[1]) + '">' + esc(sxEstadoSub(n.suscripcion)[0]) + '</span></div>').join('');
+    const eqs = (u.equipos_lista || []).map(e => '<div>' + esc([e.plataforma === 'apk' ? '📱 App Android' : e.plataforma === 'web' ? '💻 Navegador' : (e.plataforma || 'Equipo'), e.modelo, e.version ? 'v' + e.version : ''].filter(Boolean).join(' · ')) + '<br><span class="soft">Primera vez ' + fCo(e.primera) + ' · última ' + hace(e.ultima) + ' · ' + e.veces + ' veces</span></div>').join('');
+    $('usCuerpo').innerHTML =
+      '<dl class="kv">' + kv('Correo', u.email) + kv('Celular', u.telefono || 'no lo ha puesto') + kv('Registrado', fCoHora(u.creado_en)) + kv('Último ingreso', u.ultimo_ingreso ? fCoHora(u.ultimo_ingreso) : 'nunca') +
+        kv('Correo confirmado', u.confirmado ? 'Sí' : 'No') + kv('Estado', u.bloqueado ? '⛔ Bloqueada' : 'Activa') + kv('Plan', p[0]) + '</dl>' +
+      '<h3>🏪 Negocios</h3>' + (negs || '<div class="soft">Todavía no tiene negocio en la nube.</div>') +
+      '<h3>📱 Equipos donde usa Vento (' + (u.equipos_lista || []).length + ')</h3><div class="hist">' + (eqs || '<div class="soft">Ninguno registrado.</div>') + '</div>' +
+      '<h3>🔑 Licencias</h3><div class="chips">' + ((u.licencias || []).map(l => '<span class="chip ok">' + esc(l.codigo + ' · ' + nomPlan(l.plan_id) + ' hasta ' + fCo(l.hasta)) + '</span>').join('') +
+        (u.licencias_pendientes || []).map(c => '<span class="chip">⏳ ' + esc(c) + ' (se activa al entrar)</span>').join('') || '<span class="soft">Ninguna.</span>') + '</div>' +
+      ((u.soporte || []).length ? '<h3>🎧 Soporte</h3>' + u.soporte.map(c => '<div class="item" data-caso="' + esc(c.id) + '"><div class="av">🎧</div><div class="t"><b>' + esc(c.asunto) + '</b><small>' + esc(hace(c.actualizado_en)) + '</small></div><span class="pill ' + (SP_EST[c.estado] || ['', 'soft'])[1] + '">' + esc((SP_EST[c.estado] || [c.estado])[0]) + '</span></div>').join('') : '') +
+      '<h3>🛟 Soporte de la cuenta</h3><div class="us-acc">' +
+        '<button class="b p" type="button" data-ua="temp">🔑 Contraseña temporal (para mandar por SMS / WhatsApp)</button>' +
+        '<button class="b" type="button" data-ua="enlace">📧 Mandar enlace para cambiar la contraseña</button>' +
+        '<button class="b" type="button" data-ua="lic">🎁 Darle una licencia</button>' +
+        (u.confirmado ? '' : '<button class="b" type="button" data-ua="confirmar">✅ Confirmar su correo</button>') +
+        (u.admin ? '' : '<button class="b" type="button" data-ua="bloq">' + (u.bloqueado ? '🔓 Desbloquear la cuenta' : '⛔ Bloquear la cuenta') + '</button>') +
+        (u.telefono ? '<a class="b" href="https://wa.me/' + esc(telWa(u.telefono)) + '" target="_blank" rel="noopener">💬 Escribirle por WhatsApp</a>' : '') +
+      '</div><div id="usRes"></div>';
+  }
+  $('usCuerpo').addEventListener('click', async e => {
+    const n = e.target.closest('[data-neg]'); if(n){ $('dlgUs').close(); sxAbrirNegocio(n.dataset.neg); return; }
+    const c = e.target.closest('[data-caso]'); if(c){ $('dlgUs').close(); spAbrir(c.dataset.caso); return; }
+    const b = e.target.closest('[data-ua]'); if(!b || !ad.us) return;
+    const u = ad.us, res = $('usRes'), a = b.dataset.ua;
+    if(a === 'lic'){ $('dlgUs').close(); irTab('licencias'); $('lsCorreos').value = u.email; $('lsCorreos').focus(); toast('Elige la duración y toca «Crear licencia».'); return; }
+    if(a === 'bloq' && !confirm(u.bloqueado ? '¿Desbloquear ' + u.email + '?' : '¿Bloquear ' + u.email + '? No va a poder entrar a Vento hasta que la desbloquees.')) return;
+    if(a === 'temp' && !confirm('¿Poner una contraseña temporal a ' + u.email + '? La que tiene deja de servir.')) return;
+    b.disabled = true;
+    try{
+      if(a === 'temp'){
+        const j = await sxApi('usuario_clave_temporal', { usuario: u.id });
+        const txt = 'Hola, soy del soporte de Vento. Tu contraseña temporal es: ' + j.clave + ' — entra con tu correo ' + u.email + ' y la app te pide poner una nueva.';
+        res.innerHTML = '<div class="card" style="margin-top:12px"><b>Contraseña temporal</b><div class="clave-temp">' + esc(j.clave) + '</div>' +
+          '<div class="row">' + (u.telefono ? '<a class="b p" href="sms:' + esc(u.telefono) + '?body=' + encodeURIComponent(txt) + '">📱 Mandar por mensaje de texto</a><a class="b" target="_blank" rel="noopener" href="https://wa.me/' + esc(telWa(u.telefono)) + '?text=' + encodeURIComponent(txt) + '">💬 WhatsApp</a>'
+            : '<a class="b p" href="sms:?body=' + encodeURIComponent(txt) + '">📱 Mandar por mensaje de texto</a>') + '<button class="b" type="button" data-copiar="' + esc(txt) + '">📋 Copiar</button></div>' +
+          '<p class="soft">Al entrar con ella, Vento le pide poner su propia contraseña.</p></div>';
+      }else if(a === 'enlace'){ await sxApi('usuario_enlace_clave', { email: u.email }); res.innerHTML = '<p class="ok-t">📧 Listo: le llegó un correo a ' + esc(u.email) + ' para cambiar la contraseña.</p>'; }
+      else if(a === 'confirmar'){ await sxApi('usuario_confirmar', { usuario: u.id }); toast('✅ Correo confirmado.'); usAbrir(u.id); usCargar(); }
+      else if(a === 'bloq'){ await sxApi('usuario_bloquear', { usuario: u.id, bloquear: !u.bloqueado }); toast(u.bloqueado ? '🔓 Cuenta desbloqueada.' : '⛔ Cuenta bloqueada.'); usAbrir(u.id); usCargar(); }
+    }catch(x){ if(!sxFallo(x)) res.innerHTML = '<p class="bad-t">⚠️ ' + esc(sxMsgError(x)) + '</p>'; }
+    finally{ b.disabled = false; }
+  });
+  document.addEventListener('click', e => { const b = e.target.closest('[data-copiar]'); if(b) copiar(b.dataset.copiar); });
+  // Crear cuenta de cliente
+  $('usNuevo').onclick = () => { ['unCorreo', 'unNombre', 'unNegocio', 'unTel'].forEach(i => $(i).value = ''); $('unLic').value = ''; $('unErr').textContent = ''; $('unRes').hidden = true; $('unGo').hidden = false; $('dlgUsNuevo').showModal(); };
+  $('unGo').onclick = async () => {
+    const email = $('unCorreo').value.trim().toLowerCase();
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ $('unErr').textContent = 'Escribe el correo del cliente.'; return; }
+    $('unGo').disabled = true; $('unErr').textContent = '';
+    try{
+      const j = await sxApi('usuario_crear', { email, nombre: $('unNombre').value.trim(), negocio: $('unNegocio').value.trim() || 'Mi negocio' });
+      let lic = null; const L = $('unLic').value;
+      if(L){ const r = await sxApi('licencia_crear', { licencia: Object.assign({ plan: 'pro', correos: [email], nota: 'Cuenta creada por el admin' }, L === 's' ? { para_siempre: true } : { dias: Math.round(+L * 30.44) }) }); lic = r.licencia; }
+      const tel = $('unTel').value.trim();
+      const txt = '¡Bienvenido a Vento! Entra en ' + appUrl() + ' (o en la app) con tu correo ' + email + ' y la contraseña ' + j.clave + '. La app te pide poner una tuya.' + (lic ? ' Tu plan ' + nomPlan(lic.plan_id) + ' se activa solo al entrar.' : '');
+      $('unRes').innerHTML = '<div class="card"><b>✅ Cuenta creada</b><div class="clave-temp">' + esc(j.clave) + '</div><div class="row">' +
+        (tel ? '<a class="b p" href="sms:' + esc(tel) + '?body=' + encodeURIComponent(txt) + '">📱 Mensaje de texto</a><a class="b" target="_blank" rel="noopener" href="https://wa.me/' + esc(telWa(tel)) + '?text=' + encodeURIComponent(txt) + '">💬 WhatsApp</a>' : '') +
+        '<a class="b" href="mailto:' + esc(email) + '?subject=' + encodeURIComponent('Tu cuenta de Vento') + '&body=' + encodeURIComponent(txt) + '">📧 Correo</a><button class="b" type="button" data-copiar="' + esc(txt) + '">📋 Copiar</button></div></div>';
+      $('unRes').hidden = false; $('unGo').hidden = true; usCargar();
+    }catch(x){ if(!sxFallo(x)) $('unErr').textContent = sxMsgError(x); }
+    finally{ $('unGo').disabled = false; }
+  };
+
+  // ---------- Soporte ----------
+  function spItem(c){
+    const est = SP_EST[c.estado] || [c.estado, 'soft'], ult = (c.mensajes || []).slice(-1)[0] || {};
+    return '<div class="item" data-caso="' + esc(c.id) + '"><div class="av">' + esc((SP_TIPO[c.tipo] || '💬').split(' ')[0]) + '</div><div class="t"><b>' + esc(c.asunto) + '</b><small>' +
+      esc([c.email || c.cuenta_email || '', c.telefono || '', c.negocio_nombre || '', hace(c.actualizado_en)].filter(Boolean).join(' · ')) + '<br>' + esc((ult.autor === 'admin' ? 'Tú: ' : '') + String(ult.texto || '').slice(0, 120)) + '</small></div>' +
+      (c.sin_leer ? '<span class="pill bad">' + c.sin_leer + ' nuevo' + (c.sin_leer === 1 ? '' : 's') + '</span>' : '') + '<span class="pill ' + est[1] + '">' + esc(est[0]) + '</span></div>';
+  }
+  async function spCargar(){
+    const j = await intentar(() => sxApi('soporte', { estado: $('spEstado').value }), $('spLista')); if(!j) return;
+    ad.casos = j.casos || []; spPintar();
+    spBadge(ad.casos.filter(c => c.estado === 'abierto').length || (ad.resumen && ad.resumen.soporte_abiertos) || 0);
+  }
+  function spPintar(){
+    const q = $('spBuscar').value.trim().toLowerCase();
+    const l = ad.casos.filter(c => !q || JSON.stringify([c.email, c.telefono, c.negocio_nombre, c.nombre, c.asunto, (c.mensajes || []).map(m => m.texto)]).toLowerCase().includes(q));
+    $('spLista').innerHTML = l.length ? l.map(spItem).join('') : '<div class="empty">' + (ad.casos.length ? 'Nada coincide.' : '🎉 No hay casos aquí.') + '</div>';
+  }
+  $('spEstado').onchange = spCargar; $('spBuscar').oninput = spPintar; $('spRef').onclick = spCargar;
+  document.addEventListener('click', e => { const it = e.target.closest('[data-caso]'); if(it && !it.closest('#usCuerpo') && !e.target.closest('button,a')) spAbrir(it.dataset.caso); });
+  const RAPIDAS = ['¡Hola! Ya lo reviso y te cuento.', 'Listo, ya quedó solucionado. ¿Me confirmas si te funciona?', 'Te mandé una contraseña temporal por mensaje de texto. Al entrar, la app te pide poner una nueva.',
+    'Actualiza la app: cierra Vento y vuelve a abrirla.', 'Tu licencia ya está activa. Cierra y abre Vento para verla.'];
+  async function spAbrir(id){
+    let c = ad.casos.find(x => x.id === id);
+    if(!c){ const j = await intentar(() => sxApi('soporte', { estado: 'todos' })); if(j){ ad.casos = j.casos || []; c = ad.casos.find(x => x.id === id); } }
+    if(!c){ toast('No encontré ese caso.'); return; }
+    ad.caso = c; spPintarCaso();
+    if(!$('dlgSp').open) $('dlgSp').showModal();
+    if(c.sin_leer) intentar(() => sxApi('soporte_responder', { caso: c.id, texto: '' })).then(j => { if(j){ Object.assign(c, j.caso); spPintar(); } });
+  }
+  function spPintarCaso(){
+    const c = ad.caso; if(!c) return;
+    $('spTit').textContent = (SP_TIPO[c.tipo] || '') + ' · ' + c.asunto;
+    const tel = c.telefono || c.telefono_perfil || c.telefono_de_la_cuenta || '';
+    const cuenta = c.usuario_id || c.cuenta_por_correo;
+    $('spInfo').innerHTML = '<dl class="kv">' + kv('Quién', [c.nombre, c.email || c.cuenta_email].filter(Boolean).join(' · ') || 'sin datos') + kv('Celular', tel || '—') +
+      kv('Negocio', c.negocio_nombre || '—') + kv('Cuenta en la nube', cuenta ? 'Sí' : 'No (equipo sin cuenta)') + kv('Estado', (SP_EST[c.estado] || [c.estado])[0]) + kv('Creado', fCoHora(c.creado_en)) + '</dl>' +
+      (c.tipo === 'clave' && tel && c.telefono_de_la_cuenta && telWa(c.telefono_de_la_cuenta) !== telWa(c.telefono) ? '<p class="warn-t">⚠️ El celular que escribió (' + esc(c.telefono) + ') NO es el que tiene guardado la cuenta (' + esc(c.telefono_de_la_cuenta) + '). Verifica que sea el dueño antes de cambiar la contraseña.</p>' : '') +
+      (c.tipo === 'clave' && tel && c.telefono_de_la_cuenta && telWa(c.telefono_de_la_cuenta) === telWa(c.telefono) ? '<p class="ok-t">✅ El celular coincide con el de la cuenta.</p>' : '');
+    $('spHilo').innerHTML = (c.mensajes || []).map(m => '<div class="sp-m' + (m.autor === 'admin' ? ' adm' : '') + '">' + esc(m.texto) + '<small>' + (m.autor === 'admin' ? 'Tú · ' : '') + esc(fCoHora(m.creado_en)) + '</small></div>').join('');
+    setTimeout(() => { $('spHilo').scrollTop = 1e6; }, 30);
+    $('spRapidas').innerHTML = RAPIDAS.map((t, i) => '<button type="button" data-rap="' + i + '">' + esc(t.slice(0, 34)) + '…</button>').join('');
+    $('spWa').hidden = !tel; if(tel) $('spWa').href = 'https://wa.me/' + telWa(tel);
+    $('spSms').hidden = !tel; if(tel) $('spSms').href = 'sms:' + tel;
+    $('spCerrar').textContent = c.estado === 'cerrado' ? '↩️ Abrir otra vez' : '✅ Cerrar caso';
+    $('spAcciones').innerHTML = cuenta ? '<button class="b" type="button" data-sp="cuenta">👤 Ver la cuenta</button><button class="b" type="button" data-sp="temp">🔑 Contraseña temporal</button><button class="b" type="button" data-sp="enlace">📧 Enlace de contraseña al correo</button>' : '';
+  }
+  $('spRapidas').addEventListener('click', e => { const b = e.target.closest('[data-rap]'); if(b){ $('spTexto').value = RAPIDAS[+b.dataset.rap]; $('spTexto').focus(); } });
+  async function spEnviar(texto, estado){
+    const c = ad.caso; if(!c) return;
+    const j = await intentar(() => sxApi('soporte_responder', { caso: c.id, texto, estado }));
+    if(!j) return false;
+    Object.assign(c, j.caso); spPintarCaso(); spPintar(); return true;
+  }
+  $('spResponder').onclick = async () => {
+    const t = $('spTexto').value.trim(); if(!t){ $('spTexto').focus(); return; }
+    $('spResponder').disabled = true;
+    if(await spEnviar(t)){ $('spTexto').value = ''; toast('📨 Respuesta enviada: le aparece en su app.'); }
+    $('spResponder').disabled = false;
+  };
+  $('spCerrar').onclick = () => spEnviar($('spTexto').value.trim(), ad.caso && ad.caso.estado === 'cerrado' ? 'abierto' : 'cerrado').then(ok => { if(ok) $('spTexto').value = ''; });
+  $('spAcciones').addEventListener('click', async e => {
+    const b = e.target.closest('[data-sp]'); const c = ad.caso; if(!b || !c) return;
+    const id = c.usuario_id || c.cuenta_por_correo;
+    if(b.dataset.sp === 'cuenta'){ $('dlgSp').close(); usAbrir(id); return; }
+    if(b.dataset.sp === 'enlace'){ const j = await intentar(() => sxApi('usuario_enlace_clave', { email: c.email || c.cuenta_email })); if(j) spEnviar('Te mandé a tu correo un enlace para cambiar la contraseña.'); return; }
+    if(b.dataset.sp === 'temp'){
+      if(!confirm('¿Poner una contraseña temporal a esta cuenta? La que tiene deja de servir.')) return;
+      const j = await intentar(() => sxApi('usuario_clave_temporal', { usuario: id })); if(!j) return;
+      const tel = c.telefono || c.telefono_perfil || c.telefono_de_la_cuenta || '';
+      const txt = 'Hola, soy del soporte de Vento. Tu contraseña temporal es: ' + j.clave + ' — entra con tu correo y la app te pide poner una nueva.';
+      $('spAcciones').insertAdjacentHTML('afterend', '<div class="card" style="margin-top:10px"><div class="clave-temp">' + esc(j.clave) + '</div><div class="row">' +
+        '<a class="b p" href="sms:' + esc(tel) + '?body=' + encodeURIComponent(txt) + '">📱 Mandar por mensaje de texto</a>' + (tel ? '<a class="b" target="_blank" rel="noopener" href="https://wa.me/' + esc(telWa(tel)) + '?text=' + encodeURIComponent(txt) + '">💬 WhatsApp</a>' : '') +
+        '<button class="b" type="button" data-copiar="' + esc(txt) + '">📋 Copiar</button></div></div>');
+      spEnviar('Te puse una contraseña temporal y te la mandé por mensaje de texto. Al entrar, la app te pide poner una nueva.');
+    }
+  });
+  // Casos nuevos: revisa cada minuto (con el panel a la vista)
+  setInterval(() => { if($('lock').hidden && document.visibilityState === 'visible' && !document.querySelector('dialog[open]')) intentar(() => sxApi('resumen')).then(j => { if(j){ ad.resumen = j.resumen; spBadge(j.resumen.soporte_abiertos); } }); }, 60000);
+
+  // ---------- Licencias ----------
+  function lsPlanes(){ const pl = sx.planes.filter(p => p.id !== 'free' && p.active !== false); if(pl.length) $('lsPlan').innerHTML = pl.map(p => '<option value="' + esc(p.id) + '">' + esc(p.name || p.id) + '</option>').join(''); }
+  async function lsCargar(){
+    if(!sx.planes.length){ const pl = await intentar(() => sxApi('planes')); if(pl){ sx.planes = pl.planes || []; sx.ents = pl.entitlements || []; sx.cfg = pl.config || {}; } }
+    lsPlanes();
+    const j = await intentar(() => sxApi('licencias'), $('lsLista')); if(!j) return;
+    ad.lics = j.licencias || []; lsPintar();
+  }
+  function lsDur(l){ if(l.hasta) return 'hasta el ' + fCo(l.hasta); if(l.dias >= 36500) return 'para siempre'; if(l.dias % 365 === 0) return (l.dias / 365) + ' año' + (l.dias === 365 ? '' : 's'); const m = l.dias / 30.44; if(l.dias >= 28 && Math.abs(m - Math.round(m)) < 0.05) return Math.round(m) + ' mes' + (Math.round(m) === 1 ? '' : 'es'); return l.dias + ' día' + (l.dias === 1 ? '' : 's'); }
+  function lsPintar(){
+    const q = $('lsBuscar').value.trim().toLowerCase(), f = $('lsFiltro').value;
+    const l = ad.lics.filter(x => (!f || x.estado === f) && (!q || JSON.stringify([x.codigo, x.nota, x.correos.map(c => c.email), x.activaciones.map(a => a.negocio)]).toLowerCase().includes(q)));
+    $('lsLista').innerHTML = l.length ? l.map(x => '<div class="sxc" data-lic="' + esc(x.id) + '"><div class="ph"><div class="t"><b class="lic-cod">' + esc(x.codigo) + '</b><small class="soft"> ' + esc(nomPlan(x.plan_id) + ' · ' + lsDur(x)) + '</small></div>' +
+      '<span class="pill ' + (x.estado === 'activa' ? 'ok' : 'bad') + '">' + (x.estado === 'activa' ? 'Activa' : 'Anulada') + '</span></div>' +
+      (x.nota ? '<div class="soft">📝 ' + esc(x.nota) + '</div>' : '') +
+      '<div class="soft">Usada ' + x.usos + ' de ' + x.usos_max + ' · creada ' + fCo(x.creada_en) + '</div>' +
+      '<div class="chips">' + (x.correos.length ? x.correos.map(c => '<span class="chip' + (c.usada ? ' ok' : '') + (x.estado === 'activa' ? ' x' : '') + '" data-quitar="' + esc(c.email) + '" title="' + (c.usada ? 'Ya la activó' : c.registrado ? 'Tiene cuenta; se activa al entrar' : 'Todavía no tiene cuenta') + '">' + (c.usada ? '✅ ' : c.registrado ? '👤 ' : '✉️ ') + esc(c.email) + (x.estado === 'activa' ? ' ✕' : '') + '</span>').join('') : '<span class="soft">Por código (cualquier cuenta)</span>') + '</div>' +
+      (x.activaciones.length ? '<div class="soft">🏪 ' + x.activaciones.map(a => esc((a.negocio || '¿?') + ' (' + (a.email || '') + ') hasta ' + fCo(a.hasta))).join(' · ') + '</div>' : '') +
+      (x.estado === 'activa' ? '<div class="row" style="margin-top:4px"><button class="b" type="button" data-la="correo">➕ Correo</button><button class="b" type="button" data-la="enviar">📤 Enviar</button><button class="b" type="button" data-la="anular">⛔ Anular</button></div>' : '') +
+      '</div>').join('') : '<div class="empty">' + (ad.lics.length ? 'Nada coincide.' : 'Todavía no has creado licencias.') + '</div>';
+  }
+  $('lsBuscar').oninput = lsPintar; $('lsFiltro').onchange = lsPintar; $('lsRef').onclick = lsCargar;
+  $('lsTipo').onchange = () => { const t = $('lsTipo').value; $('lsCantBox').hidden = t === 'f' || t === 's'; $('lsFechaBox').hidden = t !== 'f'; };
+  const lsCorreosDe = t => Array.from(new Set(String(t || '').split(/[\s,;]+/).map(x => x.trim().toLowerCase()).filter(x => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x))));
+  function lsTexto(x){
+    return '🔑 Tu licencia de Vento ' + nomPlan(x.plan_id) + ' (' + lsDur(x) + '): ' + x.codigo + '\n' +
+      (x.correos.length ? 'Se activa sola al entrar a Vento con tu correo (' + x.correos.map(c => c.email).join(', ') + ').' : 'Actívala en Vento → ⋯ Más → 💳 Mi plan → «Tengo un código».') + '\n' + appUrl() + '#lic=' + x.codigo;
+  }
+  let lsUltima = null;
+  function lsMostrar(x){
+    lsUltima = x; const t = lsTexto(x);
+    $('lsRes').textContent = t; $('lsRes').hidden = false; $('lsResBtns').hidden = false;
+    $('lsWa').href = 'https://wa.me/?text=' + encodeURIComponent(t);
+    $('lsMail').href = 'mailto:' + encodeURIComponent(x.correos.map(c => c.email).join(',')) + '?subject=' + encodeURIComponent('Tu licencia de Vento') + '&body=' + encodeURIComponent(t);
+  }
+  $('lsCopiar').onclick = () => lsUltima && copiar(lsTexto(lsUltima));
+  $('lsCrear').onclick = async () => {
+    const t = $('lsTipo').value, n = Math.max(1, Math.round(+$('lsCant').value || 0)), correos = lsCorreosDe($('lsCorreos').value);
+    const L = { plan: $('lsPlan').value || 'pro', correos, nota: $('lsNota').value.trim() };
+    if(t === 'd') L.dias = n; else if(t === 'm') L.dias = Math.round(n * 30.44); else if(t === 'a') L.dias = n * 365; else if(t === 's') L.para_siempre = true;
+    else { const f = $('lsFecha').value; if(!f){ toast('Elige la fecha de vencimiento.'); return; } L.hasta = new Date(f + 'T23:59:59-05:00').toISOString(); }
+    if(+$('lsUsos').value) L.usos_max = Math.round(+$('lsUsos').value);
+    if(!correos.length && !confirm('Sin correos, cualquiera que tenga el código la puede activar (' + (L.usos_max || 1) + ' vez/veces). ¿Seguro? Con correos nadie más la puede usar.')) return;
+    $('lsCrear').disabled = true;
+    const j = await intentar(() => sxApi('licencia_crear', { licencia: L }));
+    $('lsCrear').disabled = false;
+    if(!j) return;
+    toast('🔑 Licencia creada.'); lsMostrar(j.licencia); $('lsCorreos').value = ''; $('lsNota').value = ''; $('lsUsos').value = '';
+    ad.lics.unshift(j.licencia); lsPintar();
+  };
+  $('lsLista').addEventListener('click', async e => {
+    const card = e.target.closest('[data-lic]'); if(!card) return;
+    const x = ad.lics.find(l => l.id === card.dataset.lic); if(!x) return;
+    const ch = e.target.closest('[data-quitar]');
+    if(ch && x.estado === 'activa'){ if(!confirm('¿Quitar ' + ch.dataset.quitar + ' de esta licencia?')) return; const j = await intentar(() => sxApi('licencia_correos', { licencia: x.id, quitar: [ch.dataset.quitar] })); if(j){ Object.assign(x, j.licencia); lsPintar(); } return; }
+    const b = e.target.closest('[data-la]'); if(!b) return;
+    if(b.dataset.la === 'enviar'){ lsMostrar(x); $('lsRes').scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+    if(b.dataset.la === 'correo'){ const c = lsCorreosDe(prompt('Correo(s) con los que compartir esta licencia:') || ''); if(!c.length) return; const j = await intentar(() => sxApi('licencia_correos', { licencia: x.id, agregar: c })); if(j){ Object.assign(x, j.licencia); lsPintar(); toast('✅ Agregado. Se le activa sola al entrar a Vento.'); } return; }
+    if(b.dataset.la === 'anular'){
+      if(!confirm('¿Anular la licencia ' + x.codigo + '? Ya no se podrá activar.')) return;
+      const quitar = x.usos > 0 && confirm('¿También quitarle el plan a los negocios que ya la activaron? (Aceptar = sí, Cancelar = que les dure hasta su fecha)');
+      const j = await intentar(() => sxApi('licencia_revocar', { licencia: x.id, quitar_acceso: quitar })); if(j){ Object.assign(x, j.licencia); lsPintar(); toast('⛔ Licencia anulada.'); }
+    }
+  });
+
+  // ---------------- Entrar: correo y contraseña del administrador (Vento Nube) ----------------
+  function lkVista(v){ $('lkEntrar').hidden = v !== 'entrar'; $('lkCrearBox').hidden = v !== 'crear'; $('lkOlvBox').hidden = v !== 'olvide'; $('lkMsg').textContent = ''; }
+  document.querySelectorAll('[data-lk]').forEach(b => b.onclick = () => lkVista(b.dataset.lk));
+  $('lkCrear').onclick = () => { lkVista('crear'); $('lkNCorreo').value = $('lkCorreo').value; $('lkNCorreo').focus(); };
+  $('lkOlvide').onclick = () => { lkVista('olvide'); $('lkOCorreo').value = $('lkCorreo').value; $('lkOPaso2').hidden = true; $('lkOCorreo').focus(); };
+  const lkMsg = (t, malo) => { $('lkMsg').innerHTML = t ? '<span class="' + (malo ? 'bad-t' : 'soft') + '">' + t + '</span>' : ''; };
+  function bloquear(msg){
+    $('lock').hidden = false; lkVista('entrar'); if(msg) lkMsg(esc(msg), true);
+    document.querySelectorAll('dialog[open]').forEach(d => d.close());
+  }
+  async function adminListo(){
+    let j; try{ j = await sxApi('yo'); }
+    catch(e){
+      if(e && e.codigo === 'no_admin'){ try{ const c = await sxCliente(); await c.auth.signOut({ scope: 'local' }); }catch(x){} lkMsg('⛔ Esa cuenta no es administradora de Vento. Entra con el correo del administrador.', true); return false; }
+      lkMsg(esc(sxMsgError(e)), true); return false;
+    }
+    sx.yo = j; $('sxQuien').textContent = j.email || '';
+    $('lock').hidden = true;
+    const t = document.querySelector('#tabs button.on'); const tab = t ? t.dataset.t : 'resumen';
+    if(tab === 'resumen') rsCargar(); else if(tab === 'usuarios') usCargar(); else if(tab === 'soporte') spCargar(); else if(tab === 'licencias') lsCargar();
+    if(tab !== 'resumen') rsCargar();
+    return true;
+  }
+  const claveOk = c => String(c || '').length >= 8;
+  $('lkGo').onclick = async () => {
+    const correo = $('lkCorreo').value.trim().toLowerCase(), clave = $('lkClave').value;
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo) || !clave){ lkMsg('Escribe tu correo y tu contraseña.', true); return; }
+    $('lkGo').disabled = true; lkMsg('<span class="spin"></span> Entrando…');
+    try{
+      const c = await sxCliente(); const r = await c.auth.signInWithPassword({ email: correo, password: clave });
+      if(r && r.error) throw r.error;
+      $('lkClave').value = ''; await adminListo();
+    }catch(e){ lkMsg(esc(sxMsgError(e)), true); }
+    finally{ $('lkGo').disabled = false; }
+  };
+  $('lkClave').onkeydown = e => { if(e.key === 'Enter') $('lkGo').click(); };
+  $('lkCorreo').onkeydown = e => { if(e.key === 'Enter') $('lkClave').focus(); };
+  $('lkNGo').onclick = async () => {
+    const correo = $('lkNCorreo').value.trim().toLowerCase(), clave = $('lkNClave').value;
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)){ lkMsg('Escribe el correo del administrador.', true); return; }
+    if(!claveOk(clave)){ lkMsg('La contraseña debe tener al menos 8 caracteres.', true); return; }
+    if(clave !== $('lkNClave2').value){ lkMsg('Las dos contraseñas no son iguales.', true); return; }
+    $('lkNGo').disabled = true; lkMsg('<span class="spin"></span> Creando la cuenta…');
+    try{
+      const c = await sxCliente();
+      const es = await c.rpc('es_correo_admin', { p_email: correo });
+      if(!es.error && es.data === false){ lkMsg('Ese correo no es de un administrador de Vento.', true); return; }
+      const r = await c.auth.signUp({ email: correo, password: clave });
+      if(r && r.error){ if(/already|registered/i.test(r.error.message || '')){ lkMsg('Ese correo ya tiene cuenta: entra con su contraseña o toca «¿Olvidaste la contraseña?».', true); lkVista('entrar'); $('lkCorreo').value = correo; } else throw r.error; return; }
+      if(!r.data || !r.data.session){ lkMsg('📧 Te llegó un correo para confirmar la cuenta. Ábrelo y después entra aquí.'); lkVista('entrar'); $('lkCorreo').value = correo; return; }
+      $('lkNClave').value = $('lkNClave2').value = '';
+      await adminListo();
+    }catch(e){ lkMsg(esc(sxMsgError(e)), true); }
+    finally{ $('lkNGo').disabled = false; }
+  };
+  $('lkOEnviar').onclick = async () => {
+    const correo = $('lkOCorreo').value.trim().toLowerCase();
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)){ lkMsg('Escribe tu correo.', true); return; }
+    $('lkOEnviar').disabled = true;
+    try{ const c = await sxCliente(); const r = await c.auth.signInWithOtp({ email: correo, options: { shouldCreateUser: false } }); if(r && r.error) throw r.error;
+      lkMsg('📧 Te mandamos el código a ' + esc(correo) + '. Revisa también «Spam».'); $('lkOPaso2').hidden = false; $('lkOCodigo').focus(); }
+    catch(e){ lkMsg(esc(sxMsgError(e)), true); }
+    finally{ $('lkOEnviar').disabled = false; }
+  };
+  $('lkOGo').onclick = async () => {
+    const correo = $('lkOCorreo').value.trim().toLowerCase(), cod = $('lkOCodigo').value.replace(/\D/g, ''), clave = $('lkOClave').value;
+    if(cod.length < 6){ lkMsg('Escribe el código de 6 números.', true); return; }
+    if(!claveOk(clave)){ lkMsg('La contraseña nueva debe tener al menos 8 caracteres.', true); return; }
+    $('lkOGo').disabled = true;
+    try{
+      const c = await sxCliente();
+      const v = await c.auth.verifyOtp({ email: correo, token: cod, type: 'email' }); if(v && v.error) throw v.error;
+      const u = await c.auth.updateUser({ password: clave }); if(u && u.error) throw u.error;
+      $('lkOClave').value = ''; toast('✅ Contraseña cambiada.'); await adminListo();
+    }catch(e){ lkMsg(/token|otp|expired|invalid/i.test(String(e && e.message)) ? 'El código no sirve o ya venció. Pide otro.' : esc(sxMsgError(e)), true); }
+    finally{ $('lkOGo').disabled = false; }
+  };
+  (async function arranque(){
+    $('lock').hidden = false; lkVista('entrar');
+    try{ if(await sxSesion()){ lkMsg('<span class="spin"></span> Entrando…'); if(await adminListo()) return; } }catch(e){}
+    if(!$('lkMsg').textContent) lkMsg('');
+    setTimeout(() => $('lkCorreo').focus(), 100);
+  })();
+
   // ---------------- Respaldo ----------------
   function bajar(nombre, texto, tipo){ if(window.VentoAdmin && typeof texto === 'string'){ try{ window.VentoAdmin.guardar(nombre, tipo || 'application/json', texto); return; }catch(e){} } const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([texto], { type: tipo || 'application/json' })); a.download = nombre; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500); }
   $('dBajar').onclick = () => { let h = []; try{ h = JSON.parse(localStorage.getItem(HIST_LS) || '[]'); }catch(e){} bajar('vento-admin-' + new Date().toISOString().slice(0, 10) + '.json', JSON.stringify({ tipo: 'vento-admin', db, licencias: h, config: cfgLeerForm() }, null, 2)); db.respaldo = Date.now(); guardar(); };
@@ -1634,26 +2177,24 @@
     try{
       privKey = await abrirBoveda(codigo); usandoBoveda = true;
       if(recordar){ try{ localStorage.setItem(CODIGO_LS, String(codigo).trim().toUpperCase()); }catch(e){} }
-      $('lock').hidden = true;
       $('keyState').innerHTML = '<span class="ok-t">✅ Firma lista: desbloqueada con tu código personal.</span>';
       return true;
     }catch(e){ return false; }
   }
-  (async function bloqueo(){
-    $('lock').hidden = false;
+  // Firma sin internet (sistema anterior): se desbloquea con el código personal dentro de 🔑 Licencias.
+  (async function firmaSinInternet(){
     let g = ''; try{ g = localStorage.getItem(CODIGO_LS) || ''; }catch(e){}
-    if(g && await entrar(g, false)) return;
-    setTimeout(() => $('lockPin').focus(), 100);
+    if(g) entrar(g, false);
     const ir = async () => {
-      $('lockGo').disabled = true; $('lockTxt').textContent = 'Revisando…';
+      $('lockGo').disabled = true; $('keyState').textContent = 'Revisando…';
       const ok = await entrar($('lockPin').value, $('lockRec').checked);
       $('lockGo').disabled = false;
-      if(!ok){ $('lockTxt').innerHTML = '<span class="bad-t">Código incorrecto.</span>'; $('lockPin').value = ''; }
+      if(!ok){ $('keyState').innerHTML = '<span class="bad-t">Código incorrecto.</span>'; $('lockPin').value = ''; } else $('lockPin').value = '';
     };
     $('lockGo').onclick = ir; $('lockPin').onkeydown = e => { if(e.key === 'Enter') ir(); };
   })();
   // Cerrar el panel también cierra (en este equipo) la cuenta de Vento Nube de 💳 Suscripciones.
-  $('salir').onclick = () => { try{ localStorage.removeItem(CODIGO_LS); localStorage.removeItem(SX_SESION); }catch(e){} location.reload(); };
+  $('salir').onclick = async () => { try{ const c = await sxCliente(); await c.auth.signOut({ scope: 'local' }); }catch(e){} try{ localStorage.removeItem(SX_SESION); }catch(e){} location.reload(); };
 
   function copiar(t){ if(!t) return; (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => toast('📋 Copiado.'), () => prompt('Copia esto:', t)); }
   try{ $('guiaBox').appendChild($('tplGuia').content.cloneNode(true)); }catch(e){}
