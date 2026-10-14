@@ -78,6 +78,24 @@ Basado en lo que funciona en los celulares y apps para mayores (BIG Launcher, Ba
   detectar.
 - La foto original de cada página queda guardada en el equipo para poder corregirla después.
 
+## 6. Música por QR: ya no se frena por el cupo diario de Google
+- **El «límite» era el cupo diario de la API de Google** (YouTube Data API). Pasaba con Google conectado y la música en
+  la lista de YouTube Music:
+  - cada canción pedida por QR se agrega a esa lista y gasta 50 unidades;
+  - Google da 10.000 unidades al día, compartidas por todos los negocios;
+  - al llegar al tope salía «YouTube no deja agregar más canciones a tu lista por hoy» y las canciones quedaban sin
+    sonar.
+- **Ahora, cuando Google dice «cupo agotado»:**
+  - Vento pasa sola la música al **reproductor de la app** (o al TV si hay uno conectado), que no gasta cupo;
+  - las canciones siguen sonando en orden;
+  - avisa una sola vez: «La lista de YouTube Music llegó al tope de Google por hoy, pero la música NO se detiene».
+- Al otro día, cuando Google renueva el cupo, vuelve sola a como estaba.
+- El tope de 10 canciones por mesa no cambió.
+
+## 7. Arreglos
+- **Fotos:** al abrir la app, antes de entrar a la cuenta, la sincronización de fotos podía mostrar el error «Cannot read
+  properties of null». Ya no pasa: espera a que estén los datos.
+
 ## Pruebas nuevas
 
 | Prueba | Resultado |
@@ -87,4 +105,5 @@ Basado en lo que funciona en los celulares y apps para mayores (BIG Launcher, Ba
 | guia (modo para mayores) | 47 / 47 |
 | subbarra (suscripción) | 15 / 15 |
 | esquinas (CamScanner) | 22 / 22 |
-| Batería completa | ver abajo |
+| sincupo (música sin el cupo de Google) | 11 / 11 |
+| **Batería completa (37 pruebas)** | **1.130 bien, 0 mal** |
