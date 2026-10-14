@@ -102,7 +102,11 @@ public class VentoApp extends Application {
             return web;
         }
         envoltura = new MutableContextWrapper(base != null ? base : app);
-        web = new WebView(envoltura);
+        // La página siempre se da por «visible»: con Vento minimizada o la pantalla apagada YouTube no pausa la
+        // música y los relojes de la página no se frenan (la música sigue sola, una canción tras otra).
+        web = new WebView(envoltura) {
+            @Override protected void onWindowVisibilityChanged(int visibility) { super.onWindowVisibilityChanged(android.view.View.VISIBLE); }
+        };
         web.setBackgroundColor(0xFF0B0A12);
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);

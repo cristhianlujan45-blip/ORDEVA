@@ -22021,7 +22021,7 @@ function crearPlayer(){
   if(yPl)return;
   yPl=new YT.Player('ytPlayer',{width:'100%',height:'200',playerVars:{playsinline:1,rel:0},events:{
     onReady:()=>{yListo=true;crearTest();siguienteAuto();},
-    onStateChange:e=>{if(e.data===1)cargadoEn=0;if(e.data===0){sonando=false;const a=mzActual();if(a&&a.fuente==='app')mzTermino(a.id,'played',a.dur||null);if(!ordenJusto(cola()).some(y=>y.vid))ytMostrar(false);siguienteAuto();}},
+    onStateChange:e=>{if(e.data===1){cargadoEn=0;pausaManual=false;}if(e.data===2)pausaManual=window.__ventoAlFrente!==false&&!document.hidden;if(e.data===0){sonando=false;const a=mzActual();if(a&&a.fuente==='app')mzTermino(a.id,'played',a.dur||null);if(!ordenJusto(cola()).some(y=>y.vid))ytMostrar(false);siguienteAuto();}},
     onError:()=>{reemplazarBloqueada();}}});
 }
 // El video que sonaba está bloqueado para reproductores fuera de YouTube: se busca otra versión
@@ -22128,13 +22128,33 @@ function vigilarAtascado(){
   if(Date.now()-cargadoEn<7000)return;
   const st=yPl.getPlayerState();
   if(st===1||st===3)return; // 1=reproduciendo, 3=cargando/buffering: va bien, solo tarda
+  // Con la app minimizada el celular puede frenar el video un momento: se le da play otra vez en vez de
+  // marcar la canción como mala (antes se descartaban canciones buenas por estar en segundo plano).
+  if(fondoMusica()){try{yPl.playVideo();}catch(e){}cargadoEn=Date.now();return;}
   reemplazarBloqueada();
 }
 /* Música automática: RECIBIR → ENCOLAR → REPRODUCIR → DETECTAR EL FINAL → SIGUIENTE, sin tocar Play.
    Los navegadores no dejan sonar con audio hasta que la persona toca la pantalla una vez (es una
    protección del navegador que no se salta): por eso hay un solo toque inicial («Música automática»
    o cualquier toque en la app); después todo sigue solo. En el TV (tv.html) pasa igual con «Empezar música». */
-let gestoUsuario=false;
+// En la app de Android no hace falta el primer toque (la app deja sonar sola): así, si Android reinicia Vento con la
+// app minimizada, la música sigue sola.
+let gestoUsuario=!!window.VentoAndroid,pausaManual=false;
+// ¿Vento está minimizada (o con la pantalla apagada)?
+const fondoMusica=()=>window.__ventoAlFrente===false||document.hidden;
+/* Música con la app minimizada (app de Android): el servicio de fondo despierta a Vento cada 5 s (ventoLatido) y
+   aquí se revisa que siga sonando: si el celular frenó el video se le da play; si terminó, pone la siguiente. */
+window.vitoMusicaLatido=()=>{
+  try{
+    if(!AUTO()||tvOn())return;
+    if(!yPl||!yListo){cargarAPI();return;}
+    const st=yPl.getPlayerState?yPl.getPlayerState():-1,a=mzActual(),deApp=!!(a&&a.fuente==='app');
+    if((sonando||deApp)&&st===2&&!pausaManual){yPl.playVideo();sonando=true;return;}
+    if((sonando||deApp)&&st===0){sonando=false;if(deApp)mzTermino(a.id,'played',a.dur||null);}
+    if(!sonando)siguienteAuto();
+    verificarCola();
+  }catch(e){}
+};
 ['pointerdown','keydown','touchstart'].forEach(ev=>document.addEventListener(ev,()=>{if(gestoUsuario)return;gestoUsuario=true;try{if(AUTO())siguienteAuto();}catch(e){}mzAutoPintar();},{capture:true,passive:true}));
 function mzAutoPintar(){
   const t=$('mzAutoTxt'),b=$('mzAutoGo');if(!t||!b)return;
@@ -22154,7 +22174,10 @@ function iniAutoPlay(){
   $('autoPlay').checked=AUTO();$('ytBox').hidden=!AUTO();
   $('autoPlay').onchange=e=>{
     SS('vito_auto_play',{on:e.target.checked});SS('vito_auto_por_cupo',0);$('ytBox').hidden=!e.target.checked;
-    if(e.target.checked)cargarAPI();else{sonando=false;cargadoEn=0;if(yPl&&yPl.pauseVideo)yPl.pauseVideo();}
+    if(e.target.checked){cargarAPI();pausaManual=false;try{const a=mzActual();if(a&&a.fuente==='app'&&yPl&&yPl.getPlayerState&&yPl.getPlayerState()===2){yPl.playVideo();sonando=true;}}catch(x){}}
+    else{sonando=false;cargadoEn=0;if(yPl&&yPl.pauseVideo)yPl.pauseVideo();}
+    // App de Android: para que la música siga con la app minimizada, Vento queda trabajando de fondo.
+    try{const A=window.VentoAndroid;if(e.target.checked&&A&&A.fondo&&A.fondoActivar&&!A.fondo()){A.fondoActivar(true);showToast('🎶 La música seguirá sonando con Vento minimizada (verás un aviso fijo «Vento está trabajando»).',7000);}}catch(x){}
     yEstado();
   };
   if(AUTO()||tvOn())cargarAPI();
@@ -26089,6 +26112,7 @@ window.ventoLatido = () => {
   try{ if(lngOn() && latidoN % 3 === 0) lngVigilar(); }catch(e){}
   try{ if(vm().tvOn && vm().tvOn() && latidoN % 4 === 0 && typeof tvPublicar === 'function') tvPublicar(); }catch(e){}
   try{ if(latidoN % 3 === 0 && window.vitoDespertarPedidos) window.vitoDespertarPedidos(); }catch(e){}
+  try{ if(window.vitoMusicaLatido) window.vitoMusicaLatido(); }catch(e){}   // música del reproductor de la app con Vento minimizada
 };
 // «Saltar» en Vento cuando suena en el YouTube del TV: el TV pasa a la siguiente de su cola.
 function lngSaltar(){ if(lngOn()) lngCmd('next', {}).then(() => { lng.ultimoEnvio = Date.now(); }).catch(e => lngLog('   ⚠️ saltar: ' + (e.message || e))); }

@@ -124,13 +124,14 @@ public class MainActivity extends Activity {
         VentoApp.alFrente = true;
         VentoApp.motor(this);
         try { web.onResume(); } catch (Exception ignorado) { }
-        VentoApp.js("try{document.dispatchEvent(new Event('visibilitychange'))}catch(e){}");
+        VentoApp.js("try{window.__ventoAlFrente=true;document.dispatchEvent(new Event('visibilitychange'))}catch(e){}");
     }
 
     @Override
     protected void onPause() {
         // OJO: no se llama web.onPause(): con eso la página dejaría de trabajar de fondo.
         VentoApp.alFrente = false;
+        VentoApp.js("try{window.__ventoAlFrente=false}catch(e){}");   // la música sabe que está minimizada (no confunde una pausa del celular con una de la persona)
         super.onPause();
     }
 
