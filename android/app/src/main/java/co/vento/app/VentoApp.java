@@ -66,6 +66,32 @@ public class VentoApp extends Application {
     public void onCreate() {
         super.onCreate();
         app = this;
+        crearCanales();
+    }
+
+    /**
+     * Las categorías de notificaciones de Vento se crean apenas abre la app (antes se creaban con el primer aviso:
+     * «Canciones pedidas» no existía hasta que pedían una canción y no se podía prender en el celular).
+     */
+    void crearCanales() {
+        if (Build.VERSION.SDK_INT < 26) return;
+        try {
+            android.app.NotificationManager nm = (android.app.NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+            if (nm == null) return;
+            String[][] cs = {
+                {"vento_pedidos2", "Pedidos y cuentas", "alto"},
+                {"vento_musica2", "Canciones pedidas", "alto"},
+                {"vento_avisos2", "Avisos de Vento (IA y soporte)", "normal"}};
+            for (String[] c : cs) {
+                if (nm.getNotificationChannel(c[0]) != null) continue;
+                android.app.NotificationChannel ch = new android.app.NotificationChannel(c[0], c[1],
+                        "alto".equals(c[2]) ? android.app.NotificationManager.IMPORTANCE_HIGH : android.app.NotificationManager.IMPORTANCE_DEFAULT);
+                ch.setDescription("Suena aunque Vento esté cerrada.");
+                ch.enableVibration("alto".equals(c[2]));
+                ch.setLockscreenVisibility(android.app.Notification.VISIBILITY_PUBLIC);
+                nm.createNotificationChannel(ch);
+            }
+        } catch (Exception e) { /* sin notificaciones no pasa nada */ }
     }
 
     /** Crea la página de Vento si todavía no existe. Siempre en el hilo principal. */
@@ -473,15 +499,7 @@ public class VentoApp extends Application {
                 if (nm == null) return false;
                 if (Build.VERSION.SDK_INT >= 33 && !tiene("android.permission.POST_NOTIFICATIONS")) return false;
                 String id = "musica".equals(canal) ? "vento_musica2" : "avisos".equals(canal) ? "vento_avisos2" : "vento_pedidos2";
-                if (Build.VERSION.SDK_INT >= 26 && nm.getNotificationChannel(id) == null) {
-                    int imp = "avisos".equals(canal) ? android.app.NotificationManager.IMPORTANCE_DEFAULT : android.app.NotificationManager.IMPORTANCE_HIGH;
-                    android.app.NotificationChannel ch = new android.app.NotificationChannel(id,
-                            "musica".equals(canal) ? "Canciones pedidas" : "avisos".equals(canal) ? "Avisos de Laya" : "Pedidos y cuentas", imp);
-                    ch.setDescription("Suena aunque Vento esté cerrada.");
-                    ch.enableVibration(!"avisos".equals(canal));
-                    ch.setLockscreenVisibility(android.app.Notification.VISIBILITY_PUBLIC);
-                    nm.createNotificationChannel(ch);
-                }
+                crearCanales();
                 int flags = Build.VERSION.SDK_INT >= 23 ? android.app.PendingIntent.FLAG_IMMUTABLE : 0;
                 android.app.PendingIntent abrir = android.app.PendingIntent.getActivity(VentoApp.this, 2,
                         new Intent(VentoApp.this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_NEW_TASK), flags);

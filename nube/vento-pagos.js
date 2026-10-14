@@ -427,11 +427,15 @@
     return api('config', { negocio: n.id, accion: 'estado' }).then(function(j){ est.info = j; est.resumen = j.resumen; var b = document.getElementById('vpCobrarCuenta'); if(b) b.hidden = !(j.resumen.nequi.estado === 'conectado' || j.resumen.daviplata.estado === 'conectado'); return j; }).catch(function(e){ est.errorEstado = e.message; return null; });
   }
   function crearCategoria(){
-    var cats = document.getElementById('ajustesCats'); if(!cats || cats.querySelector('[data-cat="pagos"]')) return;
-    var b = document.createElement('button'); b.type = 'button'; b.className = 'ajustes-cat'; b.dataset.cat = 'pagos'; b.setAttribute('data-novocab', '');
-    b.innerHTML = '<span class="ac-icon">💜</span><span class="ac-label">Pagos: Nequi y DaviPlata</span><span class="ac-arrow">›</span>';
-    var ref = cats.querySelector('[data-cat="pedidos"]'); cats.insertBefore(b, ref ? ref.nextSibling : null);
-    b.addEventListener('click', function(){ if(window.mostrarCategoriaAjustes) window.mostrarCategoriaAjustes('pagos'); pintarAjustes(); });
+    var cats = document.getElementById('ajustesCats'); if(!cats || document.getElementById('vpGrupo')) return;
+    var b = cats.querySelector('[data-cat="pagos"]');   // la categoría ya viene en index.html (ahí están también la pasarela y los avisos de pagos)
+    if(!b){
+      b = document.createElement('button'); b.type = 'button'; b.className = 'ajustes-cat'; b.dataset.cat = 'pagos'; b.setAttribute('data-novocab', '');
+      b.innerHTML = '<span class="ac-icon">💜</span><span class="ac-label">Pagos: Nequi y DaviPlata</span><span class="ac-arrow">›</span>';
+      var ref = cats.querySelector('[data-cat="pedidos"]'); cats.insertBefore(b, ref ? ref.nextSibling : null);
+      b.addEventListener('click', function(){ if(window.mostrarCategoriaAjustes) window.mostrarCategoriaAjustes('pagos'); });
+    }
+    b.addEventListener('click', function(){ pintarAjustes(); });
     var g = document.createElement('div'); g.className = 'settings-group'; g.id = 'vpGrupo'; g.dataset.cat = 'pagos'; g.hidden = true; g.setAttribute('data-novocab', '');
     var otro = document.querySelector('#view-ajustes .settings-group[data-cat]'); if(otro) otro.parentNode.insertBefore(g, otro); else return;
   }

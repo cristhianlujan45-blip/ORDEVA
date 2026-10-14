@@ -3732,6 +3732,7 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
       <button type="button" class="ajustes-cat" data-cat="avisos"><span class="ac-icon">🔔</span><span class="ac-label">Notificaciones del celular</span><span class="ac-arrow">›</span></button>
       <button type="button" class="ajustes-cat" data-cat="negocio"><span class="ac-icon">🏢</span><span class="ac-label">Negocio y facturación</span><span class="ac-arrow">›</span></button>
       <button type="button" class="ajustes-cat" data-cat="pedidos"><span class="ac-icon">🛎️</span><span class="ac-label">Pedidos, QR y caja</span><span class="ac-arrow">›</span></button>
+      <button type="button" class="ajustes-cat" data-cat="pagos" data-novocab><span class="ac-icon">💜</span><span class="ac-label">Pagos: Nequi y DaviPlata</span><span class="ac-arrow">›</span></button>
       <button type="button" class="ajustes-cat" data-cat="apariencia"><span class="ac-icon">🎨</span><span class="ac-label">Apariencia</span><span class="ac-arrow">›</span></button>
       <button type="button" class="ajustes-cat" data-cat="voz"><span class="ac-icon">🎤</span><span class="ac-label">Voz</span><span class="ac-arrow">›</span></button>
       <button type="button" class="ajustes-cat" data-cat="sonidos"><span class="ac-icon">🔊</span><span class="ac-label">Sonidos</span><span class="ac-arrow">›</span></button>
@@ -3844,6 +3845,7 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
     </div>
     <div class="settings-group" hidden data-cat="voz">
       <h2>Micrófono</h2>
+      <div class="settings-row"><div class="settings-row-text"><strong>🗣️ Anunciar los pedidos en voz alta</strong><span>Cuando llega un pedido o una canción, Vento lo dice en voz alta (lo mismo de la campana → Ajustes de voz).</span></div><label class="switch"><input type="checkbox" id="vozPedidosOn" checked><span class="switch-slider"></span></label></div>
       <div class="settings-desc">Activa o desactiva el botón flotante de comando por voz.</div>
       <div class="settings-row">
         <div class="settings-row-text">
@@ -4001,7 +4003,7 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
       </div>
     </div>
 
-    <div class="settings-group" hidden data-cat="negocio" id="domGrupoWeb" data-dom="1">
+    <div class="settings-group" hidden data-cat="pedidos" id="domGrupoWeb" data-dom="1">
       <h2>🌐 Domicilios por tu página web y WhatsApp <span class="tvp-badge">Nuevo</span></h2>
       <div class="settings-desc">Enlaza los pedidos a domicilio que ya te llegan por fuera. Vento te da un <b>link de pedidos a domicilio</b> (el mismo QR de las mesas, pero sin mesa): lo pegas como botón en tu página web, en tu Instagram o se lo mandas al cliente por WhatsApp. El cliente escoge de tu carta y escribe su dirección, y el pedido <b>entra solo a la app</b>, con su nombre, teléfono y dirección, listo para facturar. Si el pedido te llegó escrito por WhatsApp o por otra plataforma, usa el botón de abajo y la IA lo convierte en domicilio.</div>
 
@@ -4038,7 +4040,7 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
       </div>
     </div>
 
-    <div class="settings-group" hidden data-cat="negocio">
+    <div class="settings-group" hidden data-cat="pagos">
       <h2>💜 Pasarela de pago (Nequi)</h2>
       <div class="settings-desc">Muestra tu número de Nequi en el QR de la mesa cuando el cliente pide la cuenta, con el valor exacto a pagar, para que transfiera directo desde su celular. No es un cobro automático: el cliente transfiere desde su propia app Nequi y avisa con un botón; tú confirmas el pago cuando lo veas llegar a tu cuenta. Un cobro automático de verdad (sin que tú confirmes) requiere que Nequi te dé una cuenta de comercio con API, que se tramita directo con ellos, fuera de la app.</div>
       <div class="settings-row">
@@ -4130,11 +4132,23 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
       <button class="btn-ghost" id="avBateria" type="button" style="width:100%;margin:0 0 6px">⚡ Quitar el ahorro de batería para Vento</button>
       <div class="settings-desc" id="avWeb" hidden>En el navegador los avisos solo llegan con Vento abierta. Para recibirlos con la app cerrada y la pantalla bloqueada, instala la <b>app Vento para Android</b>.</div>
     </div>
+    <div class="settings-group" hidden data-cat="avisos" id="avTipos">
+      <h2>🔔 Qué avisos quieres recibir</h2>
+      <div class="settings-desc">Prende o apaga cada aviso. Cada uno sale en la pantalla con sonido y, en la <b>app Vento para Android</b>, también como notificación del celular aunque Vento esté cerrada.</div>
+      <div class="settings-row"><div class="settings-row-text"><strong>🍺 Pedidos de las mesas</strong><span>Cuando una mesa pide algo por el QR o un mesero manda un pedido.</span></div><label class="switch"><input type="checkbox" id="notifPedidosOn" data-notif="pedidos" checked><span class="switch-slider"></span></label></div>
+      <div class="settings-row"><div class="settings-row-text"><strong>🧾 Piden la cuenta o avisan que pagaron</strong><span>Cuando una mesa pide la cuenta o dice que ya pagó.</span></div><label class="switch"><input type="checkbox" id="notifCuentaOn" data-notif="cuenta" checked><span class="switch-slider"></span></label></div>
+      <div class="settings-row"><div class="settings-row-text"><strong>🛵 Domicilios</strong><span>Cuando llega un pedido para entregar.</span></div><label class="switch"><input type="checkbox" id="notifDomOn" data-notif="domicilios" checked><span class="switch-slider"></span></label></div>
+      <div class="settings-row"><div class="settings-row-text"><strong>🎵 Canciones pedidas</strong><span>Cuando piden una canción por el QR, o hay canciones nuevas para el TV.</span></div><label class="switch"><input type="checkbox" id="notifMusicaOn" data-notif="musica" checked><span class="switch-slider"></span></label></div>
+      <div class="settings-row"><div class="settings-row-text"><strong>🎧 Respuestas del soporte de Vento</strong><span>Cuando el soporte te responde.</span></div><label class="switch"><input type="checkbox" id="notifSoporteOn" data-notif="soporte" checked><span class="switch-slider"></span></label></div>
+      <div class="settings-row"><div class="settings-row-text"><strong>🧠 Avisos de Vento IA</strong><span>Consejos e informes de tu negocio (precios, inventario, cuentas olvidadas…).</span></div><label class="switch"><input type="checkbox" id="notifIaOn" data-notif="ia" checked><span class="switch-slider"></span></label></div>
+      <div class="mz-actions" style="flex-wrap:wrap"><button class="btn-ghost" type="button" data-notif-probar="pedidos">🔔 Probar pedido</button><button class="btn-ghost" type="button" data-notif-probar="musica">🎵 Probar canción</button><button class="btn-ghost" type="button" data-notif-probar="avisos">🧠 Probar aviso</button></div>
+      <div class="settings-desc" id="avTiposMsg"></div>
+    </div>
     <div class="settings-group" hidden data-cat="pedidos">
       <h2>🛎️ Personalizar la página de pedidos</h2>
       <div class="settings-desc">Esto lo ve el cliente en pedido.html: un mensaje tuyo, datos de contacto/info extra y el horario (con reloj y aviso de abierto/cerrado en vivo). Se publica junto con el catálogo — se actualiza sola en unos segundos (o toca «📤 Publicar en QR» en Carta).</div>
       <div class="settings-row" style="flex-direction:column;align-items:stretch">
-        <div class="settings-row-text"><strong>Mensaje para tus clientes</strong><span>Aparece arriba en la página de pedidos. Ej: "¡Bienvenidos! Hoy 2x1 en cerveza hasta las 8pm."</span></div>
+        <div class="settings-row-text"><strong>Mensaje fijo de la página</strong><span>Sale siempre arriba en la página de pedidos. Ej: "¡Bienvenidos! Pregunta por el plato del día." (Para promociones de un día usa «Mensaje de la ocasión», más arriba.)</span></div>
         <textarea id="orderMessageInput" class="mz-in" style="width:100%;min-height:50px;resize:vertical" maxlength="200" placeholder="Ej: ¡Bienvenidos a La Tienda de Vito!"></textarea>
       </div>
       <div class="settings-row" style="flex-direction:column;align-items:stretch">
@@ -4191,12 +4205,6 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
       <div id="qrGrid" data-mod="q"></div>
     </div>
 
-    <div class="settings-group" hidden data-cat="pedidos">
-      <h2>🔔 Avisos dentro de la app</h2>
-      <div class="settings-desc">Controla, por separado, los mensajes y sonidos que aparecen mientras Vento está abierta: los de pedidos (mesas, cuentas) y los de música (canciones pedidas, avisos del TV).</div>
-      <div class="settings-row"><div class="settings-row-text"><strong>Avisos de pedidos</strong><span>Cuando una mesa pide algo, pide la cuenta, o avisa que ya pagó.</span></div><label class="switch"><input type="checkbox" id="notifPedidosOn" checked><span class="switch-slider"></span></label></div>
-      <div class="settings-row"><div class="settings-row-text"><strong>Avisos de música</strong><span>Cuando piden una canción, o hay canciones nuevas para el TV.</span></div><label class="switch"><input type="checkbox" id="notifMusicaOn" checked><span class="switch-slider"></span></label></div>
-    </div>
 
     <div class="settings-group" hidden data-cat="pedidos">
       <h2>🎧 Atención al cliente (casos)</h2>
@@ -4227,7 +4235,7 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
       <div class="settings-desc">Cambia la tipografía, el color y el tamaño del texto de toda la app.</div>
       <div class="settings-row"><div class="settings-row-text"><strong>Tipografía</strong></div>
         <select id="tyFont" class="mz-in"><option value="manrope">Manrope (nueva, recomendada)</option><option value="orig">Terminal (original)</option><option value="sans">Moderna</option><option value="serif">Con serifas</option><option value="round">Redondeada</option><option value="mono">Máquina de escribir</option></select></div>
-      <div class="settings-row"><div class="settings-row-text"><strong>Color de las letras</strong><span>Solo el texto; el acento de botones se cambia arriba.</span></div>
+      <div class="settings-row"><div class="settings-row-text"><strong>Color de las letras</strong><span>Solo el texto; el color de los botones se cambia más abajo, en «Fondo de la aplicación».</span></div>
         <input type="color" id="tyColor" value="#7c3aed" style="width:56px;height:40px;border:none;background:none;padding:0"></div>
       <div class="settings-row"><div class="settings-row-text"><strong>Tamaño: <span id="tySizeLbl">100%</span></strong></div>
         <input type="range" id="tySize" min="80" max="150" step="5" value="100"></div>
@@ -4271,7 +4279,7 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
         </select>
       </div>
       <div class="settings-row">
-        <div class="settings-row-text"><strong>Restablecer colores</strong><span>Vuelve al verde original.</span></div>
+        <div class="settings-row-text"><strong>Restablecer colores</strong><span>Vuelve a los colores originales de Vento.</span></div>
         <button class="btn-ghost" id="colorResetBtn" type="button">Restablecer</button>
       </div>
     </div>
@@ -14850,10 +14858,12 @@ function domRecibir(cuerpo){
   const d = { id: Date.now() + '' + Math.random().toString(36).slice(2, 5), ts: Date.now(),
               nombre: p[0] || '', tel: p[1] || '', dir: p[2] || '', texto: p.slice(3).join(', ').trim() };
   const l = domisPend(); l.push(d); domisGuardar(l);
-  showToast('🛵 Domicilio nuevo' + (d.nombre ? ' de ' + d.nombre : '') + (d.texto ? ': ' + d.texto : '') + (d.dir ? ' · ' + d.dir : ''), 10000);
-  ventoAvisoCel('🛵 Domicilio nuevo' + (d.nombre ? ' de ' + d.nombre : ''), (d.texto || '') + (d.dir ? ' · ' + d.dir : ''), 'pedidos');
-  try{ if(window.vitoDecir) window.vitoDecir('Nuevo domicilio' + (d.nombre ? ' de ' + d.nombre : '')); }catch(e){}
-  if(navigator.vibrate) navigator.vibrate([200, 100, 200]);
+  if(!window.ventoAvisoOn || window.ventoAvisoOn('domicilios')){
+    showToast('🛵 Domicilio nuevo' + (d.nombre ? ' de ' + d.nombre : '') + (d.texto ? ': ' + d.texto : '') + (d.dir ? ' · ' + d.dir : ''), 10000);
+    ventoAvisoCel('🛵 Domicilio nuevo' + (d.nombre ? ' de ' + d.nombre : ''), (d.texto || '') + (d.dir ? ' · ' + d.dir : ''), 'pedidos');
+    try{ if(window.vitoDecir) window.vitoDecir('Nuevo domicilio' + (d.nombre ? ' de ' + d.nombre : '')); }catch(e){}
+    if(navigator.vibrate) navigator.vibrate([200, 100, 200]);
+  }
   // Solo se abre solo si no hay otra cosa abierta, para no interrumpir lo que esté haciendo.
   if(!document.querySelector('.overlay.show')) domAbrir(d.id);
 }
@@ -15514,8 +15524,12 @@ const ASIS_NAV = [
   { view: 'ajustes', re: /\b(ajustes|configuracion)\b/, name: 'Ajustes' }
 ];
 const ASIS_AJ = [
-  { cat: 'negocio', re: /\b(clientes frecuentes|fidelizacion|propinas?|domicilios?|nequi|facturacion|sedes?)\b/, name: 'Negocio y facturación' },
-  { cat: 'pedidos', re: /\b(atencion al cliente|casos|reclamos|quejas|codigos? qr|qr|cierre automatico|alertas)\b/, name: 'Pedidos, QR y caja' },
+  { cat: 'avisos', re: /\b(notificaciones?|alertas|avisos del celular|avisos)\b/, name: 'Notificaciones del celular' },
+  { cat: 'pagos', re: /\b(nequi|daviplata|pasarela|pagos? (recibidos|al instante)|macrodroid)\b/, name: 'Pagos: Nequi y DaviPlata' },
+  { cat: 'negocio', re: /\b(clientes frecuentes|fidelizacion|propinas?|facturacion|sedes?|plan|suscripcion|usuarios)\b/, name: 'Negocio y facturación' },
+  { cat: 'pedidos', re: /\b(atencion al cliente|casos|reclamos|quejas|codigos? qr|qr|cierre automatico|domicilios?|whatsapp|meseros?|pantalla de preparacion|cocina)\b/, name: 'Pedidos, QR y caja' },
+  { cat: 'sonidos', re: /\b(sonidos?|volumen de los sonidos)\b/, name: 'Sonidos' },
+  { cat: 'nube', re: /\b(nube|vento nube|sincronizar|varios celulares)\b/, name: 'Nube y usuarios' },
   { cat: 'apariencia', re: /\b(apariencia|diseno|tema|colores|tipo de letra|letra|fondo|modo facil)\b/, name: 'Apariencia' },
   { cat: 'voz', re: /\b(microfono|ajustes de voz)\b/, name: 'Voz' },
   { cat: 'datos', re: /\b(respaldo|copia de seguridad|transferir datos|calculadoras?)\b/, name: 'Datos y herramientas' },
@@ -19847,6 +19861,8 @@ bootApp();
   const getSongList=()=>{try{return (JSON.parse(localStorage.getItem(CKEY))||[]).filter(x=>!x.done&&!x.fondo)}catch(e){return[]}};   // la música de fondo (tu playlist) no es un pedido: no suena la campana
   const getCfg=()=>{try{return Object.assign({voz:true,volumen:1},JSON.parse(localStorage.getItem(NKEY))||{})}catch(e){return{voz:true,volumen:1}}};
   const setCfg=c=>{try{localStorage.setItem(NKEY,JSON.stringify(c));}catch(e){}};
+  // El mismo interruptor está en Ajustes → Voz («Anunciar los pedidos en voz alta»).
+  setTimeout(()=>{const t=document.getElementById('vozPedidosOn');if(!t)return;t.checked=getCfg().voz!==false;t.onchange=()=>{const c=getCfg();c.voz=t.checked;setCfg(c);};},0);
 
   function previewPedido(items){
     return (items||[]).map(it=>{
@@ -20200,8 +20216,8 @@ bootApp();
     }
     const nuevosPed=pendList.filter(x=>lastPendIds.indexOf(x.id)===-1);
     const nuevasCan=songList.filter(x=>lastSongIds.indexOf(x.id)===-1);
-    // Avisos de pedidos y de música se pueden apagar por separado (Ajustes → Pedidos, QR y
-    // caja → Avisos dentro de la app); si ambos están apagados, ni siquiera suena la campana.
+    // Avisos de pedidos y de música se pueden apagar por separado (Ajustes → Notificaciones del
+    // celular → Qué avisos quieres recibir); si ambos están apagados, ni siquiera suena la campana.
     const avisaPed=(!window.notifPedidos||window.notifPedidos())&&nuevosPed.length;
     const avisaMus=(!window.notifMusica||window.notifMusica())&&nuevasCan.length;
     if(lastTotal>=0 && (avisaPed||avisaMus)){
@@ -20294,7 +20310,7 @@ window.volverACategoriasAjustes = volverACategoriasAjustes;
 window.mostrarCategoriaAjustes = mostrarCategoriaAjustes;
 /* 🔎 Buscador de ajustes: busca en todos los títulos, opciones, botones y explicaciones de Ajustes y lleva directo. */
 function ajNorm(t){ return String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9ñ ]+/g, ' ').replace(/\s+/g, ' ').trim(); }
-const AJ_SINON = { notificacion: 'avisos alertas sonido bloqueo segundo plano', clave: 'contrasena', contrasena: 'clave password', qr: 'codigo mesas pedidos', iva: 'impuesto factura', musica: 'cancion youtube tv', tv: 'televisor transmitir musica', correo: 'email recuperar' };
+const AJ_SINON = { notificacion: 'avisos alertas sonido notificaciones', aviso: 'notificaciones alertas', nequi: 'pagos daviplata pasarela', pago: 'nequi daviplata pasarela', voz: 'hablar anunciar microfono', clave: 'contrasena', contrasena: 'clave password', qr: 'codigo mesas pedidos', iva: 'impuesto factura', musica: 'cancion youtube tv', tv: 'televisor transmitir musica', correo: 'email recuperar' };
 function ajIndice(){
   const out = [], cats = {};
   document.querySelectorAll('#ajustesCats .ajustes-cat').forEach(b => { cats[b.dataset.cat] = (b.querySelector('.ac-label') || b).textContent.trim(); });
@@ -20316,10 +20332,17 @@ function ajBuscar(q){
   const box = document.getElementById('ajBuscarRes'); if(!box) return;
   const qn = ajNorm(q);
   if(qn.length < 2){ box.hidden = true; box.innerHTML = ''; return; }
-  const palabras = qn.split(' ').map(w => w + ' ' + (AJ_SINON[w.replace(/(es|s)$/, '')] || AJ_SINON[w] || ''));
+  // Palabras sueltas como «de», «la» no cuentan; cada palabra (o su sinónimo) tiene que estar al COMIENZO de una
+  // palabra del ajuste («tv» no encuentra «actividad»). Si la categoría o el grupo también la nombran, suma más.
+  const VACIAS = new Set(['de', 'la', 'el', 'los', 'las', 'del', 'y', 'en', 'a', 'al', 'para', 'con', 'mi', 'mis', 'un', 'una', 'que', 'como', 'por']);
+  const palabras = qn.split(' ').filter(w => w && !VACIAS.has(w)).map(w => w + ' ' + (AJ_SINON[w.replace(/(es|s)$/, '')] || AJ_SINON[w] || ''));
+  if(!palabras.length){ box.hidden = true; box.innerHTML = ''; return; }
+  const esta = (t, a) => (' ' + t).includes(' ' + a);
   const res = ajIndice().map(x => {
-    let p = 0;
-    palabras.forEach(w => { const alt = w.trim().split(' '); if(alt.some(a => a && x.n.includes(a))) p += x.n.indexOf(alt[0]) >= 0 ? 2 : 1; else p -= 5; });
+    let p = 0; const lugar = ajNorm(x.catNom + ' ' + (x.grupo || ''));
+    palabras.forEach(w => { const alt = w.trim().split(' ').filter(Boolean);
+      if(alt.some(a => esta(x.n, a))) p += esta(x.n, alt[0]) ? 2 : 1; else p -= 5;
+      if(esta(lugar, alt[0])) p += 2; else if(alt.some(a => esta(lugar, a))) p += 1; });
     if(ajNorm(x.titulo).includes(qn)) p += 4;
     return [p, x];
   }).filter(r => r[0] > 0).sort((a, b) => b[0] - a[0]);
@@ -20955,7 +20978,7 @@ function procesar(txt){
        detectaba la palabra "nequi", así que pagar con cualquier otra app (Bancolombia,
        Daviplata) mostraba solo "pide la cuenta" sin el monto ni con qué pagó. */
     const avisoPago = /ya pag[oó]/i.test(cuerpo);
-    if(notifPedidos()){
+    if(window.ventoAvisoOn('cuenta')){
       showToast(avisoPago ? (tableLabel(id) + ': ' + cuerpo) : ('🧾 ' + tableLabel(id) + ' pide la cuenta'));
       ventoAvisoCel(avisoPago ? '💜 ' + tableLabel(id) + ' avisa que pagó' : '🧾 ' + tableLabel(id) + ' pide la cuenta', avisoPago ? cuerpo : (cuerpo || 'Toca para abrir Vento.'), 'pedidos');
       if(avisoPago) try{ speakVoice(tableLabel(id) + ' dice que ya pagó.'); }catch(e){}
@@ -21068,18 +21091,25 @@ setTimeout(()=>{try{
 // para no confundirlos con las alertas del canal de Vento (esas sí avisan con la pantalla
 // bloqueada; estas son mientras Vento está abierta).
 const NOTIF_KEY='vito_notif';
-const notifCfg=()=>Object.assign({pedidos:true,musica:true},LS(NOTIF_KEY,{}));
+const notifCfg=()=>Object.assign({pedidos:true,musica:true,cuenta:true,domicilios:true,soporte:true,ia:true},LS(NOTIF_KEY,{}));
 const notifPedidos=()=>notifCfg().pedidos;
 const notifMusica=()=>notifCfg().musica;
 window.notifPedidos=notifPedidos;window.notifMusica=notifMusica;   // para el módulo de la campana, que corre en otro cierre
+window.ventoAvisoOn=tipo=>notifCfg()[tipo]!==false;               // cada aviso se puede apagar (Ajustes → Notificaciones)
 function iniQR(){
   const c=qCfg();
-  const np=$('notifPedidosOn'),nm=$('notifMusicaOn');
-  if(np&&nm){
-    const nc=notifCfg();np.checked=nc.pedidos;nm.checked=nc.musica;
-    np.onchange=()=>{const x=notifCfg();x.pedidos=np.checked;SS(NOTIF_KEY,x);};
-    nm.onchange=()=>{const x=notifCfg();x.musica=nm.checked;SS(NOTIF_KEY,x);};
-  }
+  // Interruptores de cada aviso (Ajustes → Notificaciones del celular → Qué avisos quieres recibir)
+  const nc=notifCfg();
+  document.querySelectorAll('input[data-notif]').forEach(i=>{
+    i.checked=nc[i.dataset.notif]!==false;
+    i.onchange=()=>{const x=notifCfg();x[i.dataset.notif]=i.checked;SS(NOTIF_KEY,x);showToast(i.checked?'🔔 Aviso prendido.':'🔕 Aviso apagado: ya no te sale ni suena.');};
+  });
+  document.querySelectorAll('[data-notif-probar]').forEach(b=>{b.onclick=()=>{
+    const k=b.dataset.notifProbar,T={pedidos:['🍺 Prueba · Mesa 1','2 Águila (así te llegan los pedidos)'],musica:['🎵 Prueba · Mesa 1','Karol G - Provenza (así te llegan las canciones)'],avisos:['🧠 Vento','Así te llegan los avisos de Vento IA y del soporte.']}[k];
+    showToast(T[0]+': '+T[1],5000);try{window.vitoTimbre&&window.vitoTimbre();}catch(e){}
+    let cel=false;try{const A=window.VentoAndroid;if(A&&A.notificar)cel=A.notificar(T[0],T[1],k,true);}catch(e){}
+    const m=$('avTiposMsg');if(m)m.textContent=window.VentoAndroid?(cel?'✅ Te llegó la notificación al celular. Si no sonó, toca «📲 Abrir las notificaciones de Vento en el celular» y prende la categoría «'+({pedidos:'Pedidos y cuentas',musica:'Canciones pedidas',avisos:'Avisos de Vento'}[k])+'».':'⚠️ El celular no dejó mostrar la notificación: toca «🔔 Activar las notificaciones».'):'En el navegador el aviso sale solo con Vento abierta.';
+  };});
   // Si esta misma app está servida desde GitHub Pages, el link de la página de
   // pedidos debe ser justo esta misma dirección. Se corrige sola si quedó
   // desactualizada (ej. cambió la rama que publica GitHub Pages) — esto NO
@@ -27819,7 +27849,7 @@ let fotosListas = false;
     const ancla = $p('nequiOnToggle'); const grupo = ancla && ancla.closest('.settings-group');
     if(!grupo) return false;
     const g = document.createElement('div');
-    g.className = 'settings-group'; g.id = 'pgGrupo'; g.hidden = true; g.dataset.cat = 'negocio';
+    g.className = 'settings-group'; g.id = 'pgGrupo'; g.hidden = true; g.dataset.cat = 'pagos';
     const enApp = !!AND();
     g.innerHTML = '<h2>🔔 Pagos de Nequi y DaviPlata al instante <span class="tvp-badge">Nuevo</span></h2>' +
       (enApp
@@ -28002,7 +28032,7 @@ let fotosListas = false;
     const ancla = $w('domIaBtn'); const grupo = ancla && ancla.closest('.settings-group');
     if(!grupo) return false;
     const g = document.createElement('div');
-    g.className = 'settings-group'; g.id = 'waGrupo'; g.hidden = true; g.dataset.cat = 'negocio';
+    g.className = 'settings-group'; g.id = 'waGrupo'; g.hidden = true; g.dataset.cat = 'pedidos';
     g.innerHTML = '<h2>💬 WhatsApp con IA (recibir pedidos) <span class="tvp-badge">Nuevo</span></h2>' +
       '<div class="settings-desc">Necesitas una app de WhatsApp Business en Meta for Developers (gratis, lo tramitas tú con tu número). Una vez la tengas, este puente conecta esos mensajes con Vento: la IA lee cada pedido, lo deja listo para facturar y redacta la respuesta — que se envía sola si activas "Responder automáticamente", o la revisas tú primero.</div>' +
       '<div class="settings-row"><div class="settings-row-text"><strong>Escuchar mensajes de WhatsApp</strong><span id="waEstado"></span></div><label class="switch"><input type="checkbox" id="waOn"><span class="switch-slider"></span></label></div>' +
@@ -28011,7 +28041,7 @@ let fotosListas = false;
       '<details class="settings-desc" open><summary><b>Cómo conectarlo (una vez)</b></summary><ol style="margin:8px 0 0;padding-left:20px;line-height:1.55">' +
       '<li>En <b>developers.facebook.com</b>, crea una app de tipo "Negocio" y agrégale el producto <b>WhatsApp</b>. Ahí Meta te da un <b>token de acceso</b> y el <b>ID del número de teléfono</b> (Phone Number ID) — dan uno de prueba gratis para empezar.</li>' +
       '<li>Publica el puente: <b>dash.cloudflare.com</b> → Workers & Pages → Create Worker → Deploy → Edit code → borra todo, pega el código de abajo → Deploy.</li>' +
-      '<li>En el Worker, <b>Settings → Variables and Secrets</b>, agrega <b>WHATSAPP_TOKEN</b>, <b>PHONE_NUMBER_ID</b>, y una palabra tuya como <b>VERIFY_TOKEN</b>. Copia también <b>VENTO_CANAL</b> y <b>MESORA_SECRET</b> de aquí abajo. <i>(Si tu puente es de antes y tiene NTFY_TOPIC, vuelve a pegar el código y agrega VENTO_CANAL.)</i></li>' +
+      '<li>En el Worker, <b>Settings → Variables and Secrets</b>, agrega <b>WHATSAPP_TOKEN</b>, <b>PHONE_NUMBER_ID</b>, y una palabra tuya como <b>VERIFY_TOKEN</b>. Copia también <b>VENTO_CANAL</b> y <b>MESORA_SECRET</b> de aquí abajo. <i>(Si tu puente es de antes, vuelve a pegar el código del puente y agrega VENTO_CANAL.)</i></li>' +
       '<li>En Meta, en la configuración del <b>Webhook</b> de tu app de WhatsApp, pega la dirección del Worker (termina en <b>.workers.dev/webhook</b>) y el mismo VERIFY_TOKEN. Suscríbete al campo <b>messages</b>.</li>' +
       '<li>Pega abajo la dirección de tu Worker (sin <b>/webhook</b> al final) y activa "Escuchar mensajes".</li></ol></details>' +
       '<div class="mz-actions"><button type="button" class="btn-ghost" id="waCopyCode">📋 Copiar código del puente</button></div>' +
@@ -28869,6 +28899,7 @@ window.mesoraCelebrar = function(emojis){
     vistos[k] = Date.now(); recientes.unshift({ t: Date.now(), txt }); recientes.length = Math.min(recientes.length, 30);
     if(Date.now() - ultimoToast < 45000) return;                 // máximo un aviso cada 45 s
     if(typeof data !== 'undefined' && data && data.layaAuto && data.layaAuto.avisos === false) return;   // avisos de Vento apagados (quedan en «Avisos recientes»)
+    if(window.ventoAvisoOn && !window.ventoAvisoOn('ia')) return;                                         // apagado en Ajustes → Notificaciones
     ultimoToast = Date.now(); try{ showToast('🧠 Vento: ' + txt, 7000); }catch(e){}
     try{ window.ventoAvisoCel && window.ventoAvisoCel('🧠 Vento', txt, 'avisos'); }catch(e){}
   }
@@ -30078,7 +30109,7 @@ window.mesoraCelebrar = function(emojis){
       '<div class="settings-row" style="flex-direction:column;align-items:stretch;gap:8px"><div class="settings-row-text"><strong>Ocasión</strong><span>Cambia colores, adornos que caen, banner y saludo.</span></div>' +
       '<select id="vitOc" class="mz-in">' + OCASIONES.map(([k, l]) => '<option value="' + k + '">' + l + '</option>').join('') + '</select>' +
       '<input id="vitNom" class="mz-in" maxlength="30" placeholder="Nombre (ej. «Ana» para el cumpleaños, «5 años» para el aniversario)"></div>' +
-      '<div class="settings-row" style="flex-direction:column;align-items:stretch;gap:6px"><div class="settings-row-text"><strong>Mensaje para tus clientes</strong><span>Sale en el banner, grande y animado.</span></div>' +
+      '<div class="settings-row" style="flex-direction:column;align-items:stretch;gap:6px"><div class="settings-row-text"><strong>Mensaje de la ocasión</strong><span>Sale en el banner, grande y animado.</span></div>' +
       '<input id="vitMsg" class="mz-in" maxlength="140" placeholder="Ej. ¡Hoy 2x1 en cócteles hasta las 10 pm!"></div>' +
       '<div class="settings-row"><div class="settings-row-text"><strong>Saludo animado al abrir</strong><span>Una tarjeta de bienvenida con celebración, una vez por visita.</span></div><label class="switch"><input type="checkbox" id="vitSal"><span class="switch-slider"></span></label></div>' +
       '<div class="settings-row" style="flex-direction:column;align-items:stretch;gap:8px"><div class="settings-row-text"><strong>📣 Promociones (publicidad)</strong><span>Hasta 6. Si la vinculas a un producto, el cliente la pide con un toque (y sale su foto si tiene).</span></div>' +
