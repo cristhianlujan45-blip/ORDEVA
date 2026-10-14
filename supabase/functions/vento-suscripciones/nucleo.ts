@@ -7,6 +7,7 @@
 import type { Db } from "../vento-pagos/db.ts";
 import { b64url, deB64url, ErrorVento, hex } from "../vento-pagos/util.ts";
 import type { ConfigCobro, PagoPublico } from "./proveedores/tipos.ts";
+import { MENSAJES_EXTRA } from "./cuentas.ts";
 
 export const VERSION = "1.0.0";
 // El token sirve sin internet como máximo 72 horas (o hasta que venza el plan, lo que pase primero).
@@ -57,6 +58,7 @@ const MENSAJES: Record<string, [number, string]> = {
   fechas_invalidas: [400, "Las fechas no son válidas."],
   source_invalido: [400, "Origen de la suscripción inválido."],
   accion_invalida: [400, "Acción desconocida."],
+  ...MENSAJES_EXTRA,
 };
 const CODIGOS = new RegExp("\\b(" + Object.keys(MENSAJES).join("|") + ")\\b");
 

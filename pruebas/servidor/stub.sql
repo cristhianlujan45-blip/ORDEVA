@@ -44,6 +44,8 @@ create table if not exists auth.users (
   raw_app_meta_data   jsonb not null default '{"provider":"email","providers":["email"]}'::jsonb,
   raw_user_meta_data  jsonb not null default '{}'::jsonb,
   last_sign_in_at     timestamptz,
+  phone               text,
+  banned_until        timestamptz,
   created_at          timestamptz not null default now(),
   updated_at          timestamptz not null default now()
 );

@@ -127,6 +127,7 @@ async function iniciar(opts = {}) {
   const fallos = { storage: 0 };                    // sb.fallos.storage = n → las próximas n subidas fallan (503)
   const objetos = new Map();                        // 'bucket/ruta' → { bytes, mime }
   const refrescos = new Map();                      // refresh_token → id del usuario
+  const recuperaciones = [];                        // pedidos de /otp y /recover (para revisar en las pruebas)
   const modulos = {};
 
   const admin = await conectar(PG_URL);
@@ -185,6 +186,7 @@ async function iniciar(opts = {}) {
       [String(email || '').trim(), String(clave || '')]);
     if (!r[0]) return null;
     if (!r[0].email_confirmed_at) throw errAuth(400, 'email_not_confirmed', 'Email not confirmed');
+    if (r[0].banned_until && new Date(r[0].banned_until) > new Date()) throw errAuth(400, 'user_banned', 'User is banned');
     return (await sql('update auth.users set last_sign_in_at = now() where id = $1 returning *', [r[0].id]))[0];
   }
 
@@ -459,7 +461,28 @@ async function iniciar(opts = {}) {
       return usuarioPub(usr);
     }
     if (r === '/logout') return null;
-    if (r === '/otp' || r === '/recover') return {};
+    // Administración de cuentas (como GoTrue /admin/users): solo con la llave de servicio.
+    const adm = /^\/admin\/users(?:\/([0-9a-f-]{36}))?$/.exec(r);
+    if (adm) {
+      const { rol } = quien(req);
+      if (rol !== 'service_role') throw errAuth(403, 'not_admin', 'User not allowed');
+      if (!adm[1] && req.method === 'POST') {
+        if (!b.email || !b.password) throw errAuth(400, 'validation_failed', 'Missing email or password');
+        let usr; try { usr = await crearUsuario(b.email, b.password, b.user_metadata, !!b.email_confirm); } catch (e) {
+          if (e.code === '23505') throw errAuth(422, 'email_exists', 'A user with this email address has already been registered'); throw e; }
+        return usuarioPub(usr);
+      }
+      if (adm[1] && req.method === 'PUT') {
+        if (b.password) await sql("update auth.users set encrypted_password = extensions.crypt($2, extensions.gen_salt('bf', 4)), updated_at = now() where id = $1", [adm[1], String(b.password)]);
+        if (b.email_confirm) await sql('update auth.users set email_confirmed_at = coalesce(email_confirmed_at, now()) where id = $1', [adm[1]]);
+        if (b.ban_duration) await sql("update auth.users set banned_until = case when $2 = 'none' then null else now() + interval '100 years' end where id = $1", [adm[1], String(b.ban_duration)]);
+        const usr = (await sql('select * from auth.users where id = $1', [adm[1]]))[0];
+        if (!usr) throw errAuth(404, 'user_not_found', 'User not found');
+        return usuarioPub(usr);
+      }
+      if (adm[1] && req.method === 'GET') { const usr = (await sql('select * from auth.users where id = $1', [adm[1]]))[0]; if (!usr) throw errAuth(404, 'user_not_found', 'User not found'); return usuarioPub(usr); }
+    }
+    if (r === '/otp' || r === '/recover') { recuperaciones.push({ ruta: r, email: b.email || null, phone: b.phone || null, en: Date.now() }); return {}; }
     throw errAuth(404, 'not_found', 'Ruta de auth no soportada en supabase-local: ' + r);
   }
 
@@ -534,7 +557,7 @@ async function iniciar(opts = {}) {
   }
 
   return {
-    url, anonKey, serviceKey, jwtSecret: secreto, cron, base: nombre, pgUrl: urlBase.toString(), migraciones: aplicadas, env, fallos, objetos, sql, cerrar,
+    url, anonKey, serviceKey, jwtSecret: secreto, cron, base: nombre, pgUrl: urlBase.toString(), migraciones: aplicadas, env, fallos, objetos, recuperaciones, sql, cerrar,
     firmarJwt: (p) => firmarJwt(p, secreto),
     // Atajos para las pruebas (no pasan por HTTP): crear/entrar usuarios y obtener su sesión.
     async usuario(email, clave = 'clave123', meta = {}, confirmado = true) {

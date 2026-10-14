@@ -8,7 +8,8 @@
 //    POST /estado   {negocio}        estado de la suscripción + token firmado        (sesión; cualquier miembro)
 //    POST /pago     {negocio, plan, metodo, monto, referencia, fecha, nombre, telefono, idem, comprobante:{base64, tipo}}
 //                                    envía un pago con su comprobante                (sesión; dueño o administrador)
-//    POST /admin/*                   panel del proveedor de Vento                    (sesión de un platform_admin)
+//    POST /licencia {negocio, codigo}  activa una licencia con su código              (sesión; dueño o administrador)
+//    POST /admin/*                   panel del proveedor de Vento                    (sesión de un administrador de Vento)
 //    POST /vencer                    vence las suscripciones con fecha pasada        (cabecera x-vento-cron)
 //    POST /google-play/rtdn          notificaciones de Google Play                   (501 mientras sea beta)
 //  El plan lo decide SIEMPRE la base de datos; la app solo consulta.
@@ -19,6 +20,7 @@ import * as N from "./nucleo.ts";
 import { firmar } from "./almacen.ts";
 import { disponibles, elegir, googlePlay } from "./proveedores/index.ts";
 import type { EntradaPago } from "./proveedores/tipos.ts";
+import { accionAdmin } from "./cuentas.ts";
 
 export const VERSION = N.VERSION;
 const MAX_CUERPO = 6 * 1024 * 1024;   // la foto (3 MB) en base64 + los datos
@@ -86,11 +88,28 @@ async function cuerpo(req: Request): Promise<Record<string, unknown>> {
 // ---------- /estado ----------
 async function estado(req: Request, env: Env, b: Record<string, unknown>) {
   const negocio = negocioDe(b);
-  const rol = await usuario(req, env).rpc<string>("sub_puedo", { p_negocio: negocio, p_accion: "ver" });
+  const yo = usuario(req, env);
+  const rol = await yo.rpc<string>("sub_puedo", { p_negocio: negocio, p_accion: "ver" });
   const db = servidor(env);
+  // Licencias que el proveedor compartió con el correo de quien entra: se activan solas (dueño o administrador).
+  let licencias: unknown = [];
+  if (rol === "dueno" || rol === "admin") {
+    try { const me = await yo.rpc<{ id: string }>("sub_yo"); licencias = await db.rpc("srv_lic_auto", { p_negocio: negocio, p_usuario: me.id }); }
+    catch (x) { log("warn", "lic_auto", { negocio, error: x instanceof Error ? x.message : String(x) }); }
+  }
   const e = await N.estado(db, negocio);
   const token = await N.firmarToken(db, negocio, e, cacheId(env));
-  return { ok: true, ...N.paraRol(e, rol), rol, token };
+  return { ok: true, ...N.paraRol(e, rol), rol, token, ...(Array.isArray(licencias) && licencias.length ? { licencias_activadas: licencias } : {}) };
+}
+
+// ---------- /licencia ----------
+async function licencia(req: Request, env: Env, b: Record<string, unknown>) {
+  const negocio = negocioDe(b);
+  const me = await usuario(req, env).rpc<{ id: string }>("sub_yo");
+  const db = servidor(env);
+  const r = await db.rpc<Record<string, unknown>>("srv_lic_canjear", { p_codigo: String(b.codigo || ""), p_negocio: negocio, p_usuario: me.id });
+  log("info", "licencia_canjeada", { negocio, codigo: String(r.codigo || "") });
+  return { ...r, ok: true, estado: await N.estado(db, negocio) };
 }
 
 // ---------- /pago ----------
@@ -129,6 +148,8 @@ async function admin(req: Request, env: Env, accion: string, b: Record<string, u
   }
   if (!es) throw new ErrorVento("no_admin", "Esta cuenta no es administradora de Vento.", 403);
   const a = me.id;
+  const extra = await accionAdmin(env, db, a, accion, b);
+  if (extra) return extra;
   switch (accion) {
     case "yo":
       return { ok: true, admin: true, id: me.id, email: me.email };
@@ -198,6 +219,7 @@ export async function manejar(req: Request, env: Env): Promise<Response> {
     const b = await cuerpo(req);
     if (r0 === "estado") return json(200, await estado(req, env, b), cors);
     if (r0 === "pago") return json(200, await pago(req, env, b), cors);
+    if (r0 === "licencia") return json(200, await licencia(req, env, b), cors);
     if (r0 === "admin") return json(200, await admin(req, env, ruta[1] || "yo", b), cors);
     return json(404, { ok: false, error: "ruta" }, cors);
   } catch (e) {

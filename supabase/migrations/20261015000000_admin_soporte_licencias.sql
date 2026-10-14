@@ -395,7 +395,7 @@ declare l licencias%rowtype; v_email text := lower((select email from auth.users
 begin
   if not exists (select 1 from miembros where negocio_id = p_negocio and usuario_id = p_usuario and rol in ('dueno','admin')) then raise exception 'sin_permiso'; end if;
   select * into l from licencias where codigo = upper(regexp_replace(trim(coalesce(p_codigo, '')), '\s+', '', 'g')) for update;
-  if not found then raise exception 'licencia_no_existe'; end if;
+  if not found then raise exception 'licencia_inexistente'; end if;
   return srv_lic_activar(l, p_negocio, p_usuario, v_email);
 end $$;
 
