@@ -5,7 +5,8 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
 (async()=>{ const b=await chromium.launch(); let ok=0,mal=0; const chk=(n,c,x)=>{ if(c){ok++;console.log('✅ '+n);} else {mal++;console.log('❌ '+n+(x?' → '+x:''));} };
  const nuevo=async(vp)=>{ const ctx=await b.newContext({viewport:vp||{width:390,height:844}});
   await ctx.route('**/*', r=>{const u=new URL(r.request().url()); return u.hostname==='localhost'?r.continue():r.abort();});
-  await ctx.addInitScript(()=>{ try{ localStorage.setItem('vento-hola','0'); }catch(e){} });
+  // El recorrido de bienvenida de la guía (lib/vento-guia.js) se prueba aparte (guia.test.js).
+  await ctx.addInitScript(()=>{ try{ localStorage.setItem('vento-hola','0'); localStorage.setItem('vento-guia-tour','1'); }catch(e){} });
   const p=await ctx.newPage(); p.errs=[]; p.on('pageerror',e=>p.errs.push(e.message)); return p; };
  const visible=(p,sel)=>p.evaluate(s=>{ const e=document.querySelector(s); return !!e && e.checkVisibility(); }, sel);
  const pausa=()=>new Promise(r=>setTimeout(r,170));   // más que los 120 ms en que se juntan sonidos iguales
@@ -102,7 +103,7 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
  // ---------- MÁS → Productos: agregar y cambiar precio ----------
  await p.click('#facilApp [data-fz="mas"]'); await p.waitForTimeout(200);
  r=await p.evaluate(()=>[...document.querySelectorAll('#facilApp .fz-btn')].map(b=>b.dataset.ir).join(','));
- chk('MÁS: Productos, Libreta, Ayuda por WhatsApp y Salir del modo fácil', r==='productos,libreta,ayuda,salir', r);
+ chk('MÁS: tareas grandes (agregar producto, llegó mercancía, foto, precio, factura, mis facturas), Libreta, Mis productos, Ayúdame, Ayuda por WhatsApp y Salir', r===('g-producto,g-llego,g-foto,g-precio,g-factura,g-facturas,'+(await p.evaluate(()=>data.musicOn?'musica,':''))+'libreta,productos,ayudame,ayuda,salir'), r);
  await p.click('#facilApp [data-ir="productos"]'); await p.waitForTimeout(200);
  await p.click('#facilApp [data-nuevo]'); await p.waitForTimeout(150);
  await p.fill('#facilApp .fz-nombre','Tamal'); await p.fill('#facilApp .fz-precio','5000'); await p.click('#facilApp .fz-ok'); await p.waitForTimeout(300);
