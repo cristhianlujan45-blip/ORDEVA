@@ -3330,6 +3330,7 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
 #overlay .mesa-sec .persona-add{ margin:0 0 6px; }
 #overlay .mesa-sec + .section-divider{ margin-top:14px; }
 </style>
+<script src="lib/vento-canal.js"></script><!-- canales en vivo por el servidor de Vento (pedidos QR, canciones, meseros, TV…) -->
 </head>
 <body>
 <div id="splashScreen" role="img" aria-label="Vento">
@@ -4198,22 +4199,6 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
     </div>
 
     <div class="settings-group" hidden data-cat="pedidos">
-      <h2>🔔 Alertas con el celular bloqueado</h2>
-      <div class="settings-desc">Un navegador no puede avisar con la pantalla apagada. Para eso usa la app gratuita <b>ntfy</b>: cada pedido, cuenta o canción te llega como notificación con sonido aunque esta app esté cerrada.</div>
-      <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:8px">
-        <div class="settings-desc" style="margin:0">
-          <b>1.</b> Instala <b>ntfy</b> (Play Store o App Store) en el celular donde quieres las alertas.<br>
-          <b>2.</b> Toca <b>📲 Abrir en ntfy</b>. Si no abre, en ntfy toca <b>+</b>, deja el servidor <b>ntfy.sh</b> y pega el canal.<br>
-          <b>3.</b> Toca <b>🔔 Enviar prueba</b>: debe sonar en el celular aunque esté bloqueado.<br>
-          <b>4.</b> En los ajustes del celular deja las notificaciones de ntfy activadas (en Android, sin ahorro de batería).
-        </div>
-        <input id="ntfyTopic" class="mz-in" readonly>
-        <div class="mz-actions"><button class="btn-warn" id="ntfyOpen" type="button">📲 Abrir en ntfy</button><button class="btn-warn" id="ntfyCopy" type="button">📋 Copiar canal</button><button class="btn-warn" id="ntfyTest" type="button">🔔 Enviar prueba</button></div>
-        <div class="auth-hint" id="ntfyEstado">El canal es como una contraseña: no lo compartas. La alerta solo avisa; para confirmar o despachar el pedido abre la app.</div>
-      </div>
-    </div>
-
-    <div class="settings-group" hidden data-cat="pedidos">
       <h2>🎧 Atención al cliente (casos)</h2>
       <div class="settings-desc">Anota aquí los reclamos o problemas de tus clientes (pedido equivocado, demora, calidad, un domicilio que no llegó) para que ninguno se te quede sin resolver. Si el cliente ya está en Clientes frecuentes, el caso queda relacionado con él automáticamente.</div>
       <div class="add-row" style="flex-direction:column;align-items:stretch;gap:8px">
@@ -5001,8 +4986,8 @@ export default {
 <script type="text/plain" id="waWorkerSrc">/* Puente de Vento para WhatsApp (Cloudflare Worker, gratis).
    Vento es una página web y no puede recibir directamente los mensajes que WhatsApp Business
    manda por su "webhook" (necesita un servidor con dirección fija). Este puente sí la tiene:
-   1) Cuando llega un mensaje de un cliente, lo reenvía a un canal privado de ntfy que Vento
-      escucha, para que la IA lo lea y arme el pedido.
+   1) Cuando llega un mensaje de un cliente, lo reenvía al canal privado de Vento (en el servidor
+      de Vento) que la app escucha, para que la IA lo lea y arme el pedido.
    2) Cuando Vento quiere responder, le pide a este puente que la envíe por WhatsApp (con tu
       token, que nunca queda visible en la app ni en el celular del cliente).
    No guarda ningún mensaje: solo los pasa de un lado a otro.
@@ -5016,7 +5001,7 @@ export default {
         PHONE_NUMBER_ID    el ID del número de WhatsApp de tu negocio (lo ves en Meta)
         VERIFY_TOKEN       una palabra que TÚ inventes (la misma que pongas al configurar el
                             webhook en Meta, en "Token de verificación")
-        NTFY_TOPIC         pégalo desde Vento (Ajustes → WhatsApp con IA)
+        VENTO_CANAL        pégalo desde Vento (Ajustes → WhatsApp con IA)
         MESORA_SECRET      pégalo desde Vento (el mismo campo de arriba)
    4) En Meta (developers.facebook.com → tu app → WhatsApp → Configuration → Webhook):
       URL de devolución de llamada = la dirección de este Worker (termina en .workers.dev);
@@ -5034,18 +5019,18 @@ export default {
       return new Response('Token de verificación equivocado', { status: 403 });
     }
 
-    // 2) Llega un mensaje nuevo de un cliente: se reenvía a Vento por ntfy.
+    // 2) Llega un mensaje nuevo de un cliente: se reenvía al canal privado de Vento.
     if (req.method === 'POST' && u.pathname === '/webhook') {
       try {
         const body = await req.json();
         const value = body?.entry?.[0]?.changes?.[0]?.value;
         const msg = value?.messages?.[0];
-        if (msg && msg.type === 'text' && env.NTFY_TOPIC) {
+        if (msg && msg.type === 'text' && env.VENTO_CANAL) {
           const de = String(msg.from || '').replace(/\D/g, '');
           const nombre = value?.contacts?.[0]?.profile?.name || '';
           const texto = String(msg.text?.body || '').slice(0, 1500);
           const paquete = JSON.stringify({ de, nombre, texto, id: msg.id });
-          await fetch('https://ntfy.sh/' + env.NTFY_TOPIC, { method: 'POST', body: paquete, headers: { 'Content-Type': 'application/json' } });
+          await fetch(env.VENTO_CANAL, { method: 'POST', body: paquete, headers: { 'Content-Type': 'text/plain' } });
         }
       } catch (e) { /* si el mensaje no trae texto (foto, audio, sticker…) no hay nada que reenviar */ }
       return new Response('EVENT_RECEIVED', { status: 200 }); // WhatsApp exige 200 rápido, si no reintenta y duplica
@@ -14839,7 +14824,7 @@ document.getElementById('qsEnvio').addEventListener('input', qsRenderCart);
 /* ---------- Domicilios que entran solos (página web, Instagram o WhatsApp) ----------
    Es el mismo link de pedidos de las mesas pero con dom=1 y sin mesa: el negocio lo pone
    en su página web, en su Instagram o lo manda por WhatsApp. El cliente pide ahí y el
-   pedido llega por el mismo canal de ntfy que las mesas, con esta forma:
+   pedido llega por el mismo canal de Vento que las mesas, con esta forma:
        DOMICILIO: nombre | teléfono | dirección | productos
    Queda guardado como pendiente (no se pierde aunque se cierre la app) y abre la
    factura de domicilio ya llena, con los productos emparejados con el inventario. */
@@ -14908,7 +14893,7 @@ function aplicarDomicilios(){
 function domLinkUrl(){
   const c = window.vitoQCfg ? window.vitoQCfg() : {};
   if(!c.url) return '';
-  // Se manda también el WhatsApp: si ntfy llegara a fallar, el cliente puede enviarte el
+  // Se manda también el WhatsApp: si el canal de Vento llegara a fallar, el cliente puede enviarte el
   // pedido por WhatsApp con un toque en vez de perderse.
   return c.url.split('?')[0].trim() + '?dom=1&c=' + c.topic + (c.wa ? '&w=' + c.wa : '');
 }
@@ -20679,7 +20664,7 @@ function qrFijoDialogo(){
       if(!r.c){$('qrFijoMsg').textContent='⚠️ No encontré ningún link de QR de Vento (deben tener «c=» y «mesa=»).';return;}
       const cur=LS('vito_qr',{});
       if(cur.topic&&cur.topic!==r.c){
-        const ok=await showConfirm({title:'¿Cambiar al canal de tus QR impresos?',message:'Este celular usa el canal '+cur.topic+' y tus QR usan '+r.c+'. Se va a usar el de los QR (los pedidos por QR y la app de meseros quedan con ese). Si tenías la app ntfy suscrita al canal viejo, suscríbela al nuevo.',confirmText:'Sí, usar el de mis QR',icon:'📌'});
+        const ok=await showConfirm({title:'¿Cambiar al canal de tus QR impresos?',message:'Este celular usa el canal '+cur.topic+' y tus QR usan '+r.c+'. Se va a usar el de los QR (los pedidos por QR y la app de meseros quedan con ese). Si tenías la app el canal de Vento suscrita al canal viejo, suscríbela al nuevo.',confirmText:'Sí, usar el de mis QR',icon:'📌'});
         if(!ok)return;
       }
       qrFijoAplicar(r);ov.classList.remove('show');
@@ -20733,7 +20718,7 @@ function estado(s){
   ['mzEstado','qrEstado'].forEach(i=>{if($(i))$(i).textContent=t;});
 }
 const esTouch=()=>{esAct=Date.now();};
-/* Un mensaje de ntfy (por el canal en vivo o por la consulta de respaldo): se procesa una sola vez */
+/* Un mensaje del canal de Vento (por el canal en vivo o por la consulta de respaldo): se procesa una sola vez */
 function recibir(m){
   if(!m||m.event!=='message')return;
   if(m.time&&m.time>esTime)esTime=m.time;
@@ -20742,11 +20727,11 @@ function recibir(m){
   if(m.topic&&m.topic===mTopic()){try{procesarMesero(String(m.message||'').slice(0,1500));}catch(e){console.error(e);}return;}
   if(m.topic&&m.topic===pTopic()+'r'){try{procesarPrep(String(m.message||'').slice(0,1500));}catch(e){console.error(e);}return;}
   // 600: un domicilio (nombre + teléfono + dirección + productos) es más largo que un pedido de mesa.
-  window.__ntfyMsgId=m.id;window.__ntfyTopic=m.topic||'';
+  window.__canalMsgId=m.id;window.__canalTopic=m.topic||'';
   try{procesar(String(m.message||'').slice(0,4000));}catch(e){console.error(e);}
 }
 /* ---------- App de meseros (mesero.html) ----------
-   Cada mesero usa la app en SU celular. Manda los pedidos por un canal privado de ntfy
+   Cada mesero usa la app en SU celular. Manda los pedidos por un canal privado de Vento
    (topic + 'm' + código secreto) que los clientes no conocen; aquí se aplican directo, sin
    confirmar, con el mismo entendedor de la voz clásica (así sirven todos los comandos: "mesa 2
    dos águilas", "misma ronda para la mesa 3", "crea la mesa Juan con dos póker"…). Este celular
@@ -20763,7 +20748,7 @@ function mEstado(){
     return{i:id,n:String(tableLabel(id)).slice(0,24),t:Math.round(tableBalance(id)),it:its.slice(0,10).map(x=>[String(x.name).slice(0,24),x.qty])};
   });
   const m={e:1,b:String(data.businessName||'').slice(0,40),m:tabs,t:Date.now()};
-  // ntfy acepta ~4 KB por mensaje: si no cabe, se quitan los detalles de las mesas más grandes.
+  // el canal de Vento acepta ~4 KB por mensaje: si no cabe, se quitan los detalles de las mesas más grandes.
   let s=JSON.stringify(m);
   for(let k=tabs.length-1;s.length>3800&&k>=0;k--){tabs[k].it=tabs[k].it.slice(0,2);s=JSON.stringify(m);}
   for(let k=tabs.length-1;s.length>3800&&k>=0;k--){tabs[k].it=[];s=JSON.stringify(m);}
@@ -20774,7 +20759,7 @@ function mPublicar(force){
   const s=mEstado(),h=s.replace(/"t":\d+/,'');
   if(!force&&h===mHash)return;
   mHash=h;
-  fetch('https://ntfy.sh/'+mTopic()+'s',{method:'POST',body:s}).catch(()=>{mHash='';});
+  fetch('https://canal.vento.local/'+mTopic()+'s',{method:'POST',body:s}).catch(()=>{mHash='';});
 }
 /* ---------- Pantalla de preparación en otro equipo (preparacion.html) ----------
    Canal privado topic+'p'+código: la app le publica los pedidos activos; la pantalla responde por
@@ -20788,14 +20773,14 @@ function prepPublicar(force){
   clearTimeout(prepT);
   prepT=setTimeout(()=>{
     if(typeof data==='undefined'||!data||!prepOn())return;
-    if(Date.now()-(LS('vito_prep_visto',0)||0)>24*36e5)return;   // ninguna pantalla externa abierta: no se gasta el cupo de ntfy
+    if(Date.now()-(LS('vito_prep_visto',0)||0)>24*36e5)return;   // ninguna pantalla externa abierta: no se gasta mensajes de más
     const act=pedidosLista().filter(p=>['nuevo','recibido','preparacion','listo'].includes(p.estado)).slice(-30);
     const m={t:'prep',n:prepNombre(),b:String(data.businessName||'').slice(0,40),o:act.map(p=>({i:p.id,m:String(window.vitoGrupos?window.vitoGrupos.etiquetaDe(p.mesa):tableLabel(p.mesa)).slice(0,40),e:p.estado,a:p.recibidoEn||p.at,g:String(p.origen||'').slice(0,20),x:String(p.nota||'').slice(0,80),it:p.items.slice(0,15).map(i=>[String(i.name).slice(0,30),i.qty])})),at:Date.now()};
     let s2=JSON.stringify(m);
     while(s2.length>3800&&m.o.length){m.o.shift();s2=JSON.stringify(m);}
     if(!force&&s2.replace(/"at":\d+/,'')===prepHash)return;
     prepHash=s2.replace(/"at":\d+/,'');
-    fetch('https://ntfy.sh/'+pTopic(),{method:'POST',body:s2}).catch(()=>{prepHash='';});
+    fetch('https://canal.vento.local/'+pTopic(),{method:'POST',body:s2}).catch(()=>{prepHash='';});
   },force?0:700);
 }
 window.prepPublicar=prepPublicar;
@@ -20852,7 +20837,7 @@ async function procesarMesero(txt){
   try{await handleVoiceTranscript(texto);}catch(e){capt.push('⚠️ '+(e.message||e));}
   finally{showToast=oT;speakVoice=oV;window.__pedidoOrigen=null;}
   const r={r:o.id,ok:capt.length?capt:['✅ Listo.'],t:Date.now()};
-  try{await fetch('https://ntfy.sh/'+mTopic()+'s',{method:'POST',body:JSON.stringify(r)});}catch(e){}
+  try{await fetch('https://canal.vento.local/'+mTopic()+'s',{method:'POST',body:JSON.stringify(r)});}catch(e){}
   mPublicar(true);
 }
 function esProgramar(){
@@ -20867,7 +20852,7 @@ function conectar(){
   try{qCanalRegistrar();}catch(e){}
   esCanales=qCanales().join(',');
   const tops=esCanales+(mCfg().on?','+mTopic():'')+(prepOn()?','+pTopic()+'r':'');
-  try{es=new EventSource('https://ntfy.sh/'+tops+'/sse?since='+(esTime||'12h'));}catch(e){estado('err');esProgramar();return;}
+  try{es=new EventSource('https://canal.vento.local/'+tops+'/sse?since='+(esTime||'12h'));}catch(e){estado('err');esProgramar();return;}
   const mine=es;esTouch();
   es.onopen=()=>{esTouch();esRetry=0;estado('on');};
   es.onerror=()=>{
@@ -20875,15 +20860,15 @@ function conectar(){
     if(mine.readyState===2){mine.close();es=null;esProgramar();}   // el navegador se rindió: reintenta nosotros
   };
   es.onmessage=ev=>{esTouch();let m;try{m=JSON.parse(ev.data);}catch(e){return;}recibir(m);};
-  ['open','keepalive'].forEach(n=>es.addEventListener(n,esTouch));   // ntfy avisa que sigue vivo cada ~45 s
+  ['open','keepalive'].forEach(n=>es.addEventListener(n,esTouch));   // el canal de Vento avisa que sigue vivo cada ~45 s
 }
-/* Respaldo: consulta directa a ntfy. Cubre el caso en que el celular deja la conexión "muerta"
+/* Respaldo: consulta directa al canal de Vento. Cubre el caso en que el celular deja la conexión "muerta"
    (pantalla apagada, otra app, cambio de WiFi/datos) y el navegador no avisa nada. */
 async function sondear(){
   const c=qCfg();if(!c.live||esPolling||!esOn)return;esPolling=true;
   try{
     const ctrl=new AbortController(),tmo=setTimeout(()=>ctrl.abort(),8000);
-    const r=await fetch('https://ntfy.sh/'+qCanales().join(',')+(mCfg().on?','+mTopic():'')+(prepOn()?','+pTopic()+'r':'')+'/json?poll=1&since='+(esTime||Math.floor(Date.now()/1000)-1800),{signal:ctrl.signal,cache:'no-store'});
+    const r=await fetch('https://canal.vento.local/'+qCanales().join(',')+(mCfg().on?','+mTopic():'')+(prepOn()?','+pTopic()+'r':'')+'/json?poll=1&since='+(esTime||Math.floor(Date.now()/1000)-1800),{signal:ctrl.signal,cache:'no-store'});
     clearTimeout(tmo);
     if(!r.ok)return;
     (await r.text()).split('\n').forEach(l=>{if(!l.trim())return;try{recibir(JSON.parse(l));}catch(e){}});
@@ -20897,8 +20882,8 @@ async function qProbarPedidos(){
   out.push('📡 Escuchando '+can.length+(can.length===1?' canal':' canales')+' de pedidos: '+can.map(t=>t.slice(0,8)+'…').join(', ')+'.');
   const id='pr'+Date.now().toString(36);window.__qPrueba=window.__qPrueba||{};
   const llego=new Promise(res=>{window.__qPrueba[id]=res;setTimeout(()=>res(null),15000);});
-  try{const r=await fetch('https://ntfy.sh/'+c.topic,{method:'POST',body:JSON.stringify({t:'prueba',id,at:Date.now()})});
-    if(!r.ok)out.push('❌ ntfy no dejó enviar (error '+r.status+(r.status===429?': se acabó el cupo de mensajes de hoy en esta conexión; prueba con datos móviles':'')+').');}
+  try{const r=await fetch('https://canal.vento.local/'+c.topic,{method:'POST',body:JSON.stringify({t:'prueba',id,at:Date.now()})});
+    if(!r.ok)out.push('❌ El canal de Vento no dejó enviar (error '+r.status+(r.status===429?': demasiados mensajes seguidos, espera un minuto':'')+').');}
   catch(e){out.push('❌ Sin internet para enviar la prueba.');}
   setTimeout(()=>{try{sondear();}catch(e){}},2500);
   const t=await llego;delete window.__qPrueba[id];
@@ -20941,7 +20926,7 @@ async function pedirWakeLock(){
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&!wakeLock)pedirWakeLock();});
 pedirWakeLock();
 // Mesas con clientes usando el QR (últimas 12 h): solo a esas se les publica la cuenta en vivo.
-// Antes se publicaba CADA cambio de CADA mesa a ntfy y eso gastaba el cupo diario gratis de la conexión
+// Antes se publicaba CADA cambio de CADA mesa al canal de Vento y eso gastaba el límite de mensajes
 // del local; si el cliente estaba en el mismo Wi-Fi, sus pedidos salían «Sin conexión».
 function mesaQRActiva(id,marcar){const a=LS('vito_qr_act',{});if(marcar){a[id]=Date.now();Object.keys(a).forEach(k=>{if(Date.now()-a[k]>12*36e5)delete a[k];});SS('vito_qr_act',a);return true;}return Date.now()-(a[id]||0)<12*36e5;}
 function procesar(txt){
@@ -20952,7 +20937,7 @@ function procesar(txt){
     if(o&&o.t==='pedido'){pedidoEntrante(o,'qr');return;}
     if(o&&o.t==='cancion'){const id=parseInt(o.mesa,10);if(!id)return;const r=agregarCancion(id,String(o.s||'').slice(0,120),String(o.id||'').slice(0,40));if(r.nuevo!==false&&notifMusica()){showToast(r.msg);ventoAvisoCel('🎵 Canción · '+tableLabel(id),String(o.s||'').slice(0,120),'musica');}renderMusica();return;}
     if(o&&o.t==='estado')return;                                   // eco de nuestros propios avisos
-    if(o&&o.t==='prueba'){if(o.id&&window.__qPrueba&&window.__qPrueba[o.id])window.__qPrueba[o.id](window.__ntfyTopic);return;}
+    if(o&&o.t==='prueba'){if(o.id&&window.__qPrueba&&window.__qPrueba[o.id])window.__qPrueba[o.id](window.__canalTopic);return;}
   }
   const dm=/^DOMICILIO\s*:?\s*([\s\S]*)$/i.exec(txt.trim());
   if(dm){ domRecibir(dm[1]); if(navigator.vibrate)navigator.vibrate(200); return; }
@@ -20962,7 +20947,7 @@ function procesar(txt){
   // Antes, si la mesa del QR no existía en la app (ej. se bajó el número de mesas), el pedido se
   // botaba en silencio. Ahora la mesa se crea sola para no perder nada.
   if(!data.tables[id])asegurarMesa(id);
-  if(tp==='CANCION'){const r=agregarCancion(id,cuerpo,window.__ntfyMsgId?'t'+window.__ntfyMsgId:null);if(r.nuevo!==false&&notifMusica()){showToast(r.msg);ventoAvisoCel('🎵 Canción · '+tableLabel(id),cuerpo,'musica');}renderMusica();}
+  if(tp==='CANCION'){const r=agregarCancion(id,cuerpo,window.__canalMsgId?'t'+window.__canalMsgId:null);if(r.nuevo!==false&&notifMusica()){showToast(r.msg);ventoAvisoCel('🎵 Canción · '+tableLabel(id),cuerpo,'musica');}renderMusica();}
   else if(tp==='CUENTA'){
     /* Si el cliente avisó que ya pagó (botón "Ya pagué" del QR o de Nequi en pedido.html), el
        aviso trae el MONTO y la APP (Nequi, Bancolombia, Daviplata, Bre-B…) en el cuerpo — se
@@ -20982,7 +20967,7 @@ function procesar(txt){
     // Formato viejo en texto (QR de una versión anterior de pedido.html o WhatsApp): mismo camino.
     const p=parseVoiceCommand('mesa '+id+', '+m[3].replace(/\n+/g,', '));
     if(!p.items||!p.items.length){if(notifPedidos())showToast('⚠️ '+tableLabel(id)+' mandó un pedido que no entendí: '+cuerpo);}
-    else pedidoEntrante({id:'t'+(window.__ntfyMsgId||Date.now().toString(36)),mesa:id,items:p.items.map(x=>({n:x.productText,q:x.qty||1}))},'qr');
+    else pedidoEntrante({id:'t'+(window.__canalMsgId||Date.now().toString(36)),mesa:id,items:p.items.map(x=>({n:x.productText,q:x.qty||1}))},'qr');
   }
   if(navigator.vibrate)navigator.vibrate(200);
 }
@@ -21005,7 +20990,7 @@ function pedidoProducto(nombre){
   return data.products.find(p=>!p.oculto&&normVoiceText(p.name)===k)||data.products.find(p=>normVoiceText(p.name+' '+(p.size||''))===k)||matchProductVoice(nombre)||null;
 }
 function pedidoPublicar(p){
-  try{fetch('https://ntfy.sh/'+(p.canal&&qCanalOk(p.canal)?p.canal:qCfg().topic)+'e',{method:'POST',body:JSON.stringify({t:'estado',id:p.id,e:p.estado,m:p.mesa,n:PEDIDO_EST[p.estado],at:Date.now()})}).catch(()=>{});}catch(e){}
+  try{fetch('https://canal.vento.local/'+(p.canal&&qCanalOk(p.canal)?p.canal:qCfg().topic)+'e',{method:'POST',body:JSON.stringify({t:'estado',id:p.id,e:p.estado,m:p.mesa,n:PEDIDO_EST[p.estado],at:Date.now()})}).catch(()=>{});}catch(e){}
 }
 function pedidoAplicar(p){
   if(p.aplicado)return;
@@ -21036,7 +21021,7 @@ function pedidoEntrante(o,origen){
   }).filter(x=>x.name);
   if(!items.length)return null;
   const p={id,mesa,mesaNombre:tableLabel(mesa),items,total:items.reduce((s,i)=>s+i.qty*i.price,0),nota:String(o.nota||'').slice(0,140),
-    at:Number(o.at)||Date.now(),recibidoEn:Date.now(),estado:'nuevo',origen:origen||'qr',negocio:qCfg().topic,canal:qCanalOk(window.__ntfyTopic)?window.__ntfyTopic:qCfg().topic,hist:[{e:'nuevo',at:Date.now()}]};
+    at:Number(o.at)||Date.now(),recibidoEn:Date.now(),estado:'nuevo',origen:origen||'qr',negocio:qCfg().topic,canal:qCanalOk(window.__canalTopic)?window.__canalTopic:qCfg().topic,hist:[{e:'nuevo',at:Date.now()}]};
   pedidosLista().push(p);
   try{const g=window.vitoGrupos&&window.vitoGrupos.de(mesa);if(g&&window.ventoAuditar)window.ventoAuditar('pedido en grupo','Nuevo pedido de '+tableLabel(mesa)+' agregado al grupo '+window.vitoGrupos.etiqueta(g)+': '+items.map(i=>i.qty+' '+i.name).join(', '),[mesa]);}catch(e){}
   if(pedidosAuto()){pedidoAplicar(p);p.estado='recibido';p.hist.push({e:'recibido',at:Date.now()});}
@@ -21080,7 +21065,7 @@ setTimeout(()=>{try{
 }catch(e){}},2500);
 
 // Avisos (toasts/sonidos) dentro de la app, por separado para pedidos y música —
-// para no confundirlos con las alertas de ntfy (esas sí avisan con la pantalla
+// para no confundirlos con las alertas del canal de Vento (esas sí avisan con la pantalla
 // bloqueada; estas son mientras Vento está abierta).
 const NOTIF_KEY='vito_notif';
 const notifCfg=()=>Object.assign({pedidos:true,musica:true},LS(NOTIF_KEY,{}));
@@ -21114,28 +21099,6 @@ function iniQR(){
   $('qrUrl').oninput=e=>g('url',e.target.value.trim());
   $('qrWa').oninput=e=>g('wa',e.target.value.replace(/\D/g,''));
   $('liveOn').onchange=e=>{g('live',e.target.checked);conectar();};
-  // Alertas en el celular con la pantalla bloqueada (app ntfy suscrita al mismo canal)
-  const nt=$('ntfyTopic');
-  if(nt){
-    const tp=()=>qCfg().topic,say=m=>{$('ntfyEstado').textContent=m;};
-    nt.value=tp();
-    $('ntfyOpen').onclick=()=>{
-      location.href='ntfy://ntfy.sh/'+tp();
-      say('Si no se abrió ntfy, instálala y agrega el canal a mano: en ntfy toca + y pega «'+tp()+'».');
-    };
-    $('ntfyCopy').onclick=async()=>{
-      try{await navigator.clipboard.writeText(tp());}catch(e){nt.select();try{document.execCommand('copy');}catch(x){}}
-      say('📋 Canal copiado. En ntfy toca + y pégalo (servidor ntfy.sh).');
-    };
-    $('ntfyTest').onclick=async()=>{
-      const b=$('ntfyTest');b.disabled=true;say('Enviando prueba…');
-      try{
-        const r=await fetch('https://ntfy.sh/'+tp(),{method:'POST',body:'🔔 Prueba: las alertas de Cuentas de mesa funcionan.',headers:{'Title':'Prueba de alerta','Priority':'high','Tags':'bell'}});
-        say(r.ok?'✅ Prueba enviada. Si ya agregaste el canal en ntfy, debe sonar en el celular (pruébalo con la pantalla bloqueada).':'❌ No se pudo enviar la prueba ('+r.status+').');
-      }catch(e){say('❌ No se pudo enviar la prueba. Revisa el internet.');}
-      b.disabled=false;
-    };
-  }
   $('qrGen').onclick=()=>pintarQR($('qrGrid'));
   $('qrFijoBtn').onclick=qrFijoDialogo;
   $('qrProbar').onclick=async()=>{const b=$('qrProbar'),r=$('qrProbarRes');b.disabled=true;b.textContent='⏳ Probando…';r.hidden=false;r.textContent='Mandando un pedido de prueba por el canal de tus QR…';
@@ -21518,7 +21481,7 @@ function mzSaltar(){
   const x=mzActual();
   if(!x){const o=ordenJusto(cola());if(!o.length)return showToast('No hay canciones en cola.');return reproducir(o[0]);}
   mzTermino(x.id,'skipped');
-  if(x.fuente==='tv'){try{fetch('https://ntfy.sh/'+tvTopic(),{method:'POST',body:JSON.stringify({skip:x.id,t:Date.now()})}).catch(()=>{});}catch(e){}tvPublicar(true);}
+  if(x.fuente==='tv'){try{fetch('https://canal.vento.local/'+tvTopic(),{method:'POST',body:JSON.stringify({skip:x.id,t:Date.now()})}).catch(()=>{});}catch(e){}tvPublicar(true);}
   else if(x.fuente==='app'&&yPl&&yPl.stopVideo){try{yPl.stopVideo();}catch(e){}sonando=false;siguienteAuto();}
   else if(x.fuente==='tvyt'&&typeof lngSaltar==='function')lngSaltar();
   else if(x.fuente==='cc'&&typeof ccSes!=='undefined'&&ccSes){try{const ms=ccSes.getMediaSession&&ccSes.getMediaSession();if(ms)ms.stop(null,()=>{},()=>{});}catch(e){}}
@@ -22170,7 +22133,7 @@ function iniAutoPlay(){
 
 /* ---------- Pantalla del TV: el propio TV es el reproductor ----------
    En el navegador del TV (LG webOS, Samsung, Android TV, TV Box) se abre tv.html con un
-   código. El celular le manda la cola por ntfy (canal "mesoratv"+código) y el TV la
+   código. El celular le manda la cola por el canal de Vento (canal "mesoratv"+código) y el TV la
    reproduce en orden, en vivo: cada canción que piden las mesas entra sola, sin Google, sin
    transmitir y sin tocar nada. El TV le avisa al celular qué está sonando y si una versión
    no se deja reproducir (se busca otra). */
@@ -22191,14 +22154,14 @@ function tvPublicar(force){
   const s=JSON.stringify(msg);
   if(!force&&s===tvHash&&Date.now()-tvHashT<5*6e4)return;
   tvHash=s;tvHashT=Date.now();
-  fetch('https://ntfy.sh/'+tvTopic(),{method:'POST',body:JSON.stringify(Object.assign(msg,{t:Date.now()}))})
-    .then(r=>{if(!r.ok)throw new Error('ntfy '+r.status);})
+  fetch('https://canal.vento.local/'+tvTopic(),{method:'POST',body:JSON.stringify(Object.assign(msg,{t:Date.now()}))})
+    .then(r=>{if(!r.ok)throw new Error('canal '+r.status);})
     .catch(()=>{tvHash='';clearTimeout(tvReintT);tvReintT=setTimeout(()=>{try{tvPublicar(true);}catch(e){}},6000);});   // no salió: se reintenta en 6 s
 }
 function tvEscuchar(){
   if(tvES){try{tvES.close();}catch(e){}tvES=null;}
   if(!tvOn())return;
-  try{tvES=new EventSource('https://ntfy.sh/'+tvTopic()+'r/sse?since=1m');}catch(e){return;}
+  try{tvES=new EventSource('https://canal.vento.local/'+tvTopic()+'r/sse?since=1m');}catch(e){return;}
   tvES.onmessage=ev=>{
     let m;try{m=JSON.parse(JSON.parse(ev.data).message);}catch(e){return;}
     if(!m)return;
@@ -22320,11 +22283,11 @@ async function publicarCatalogo(force){
     mz: musicaOn() ? 1 : 0,
     mo: (data.motivo || '')
   };
-  while(list.length && new Blob([JSON.stringify(m)]).size > 3800) list.pop();   // tope de ntfy (~4 KB)
+  while(list.length && new Blob([JSON.stringify(m)]).size > 3800) list.pop();   // tope del canal de Vento (~4 KB)
   const s = JSON.stringify(m);
   if(!force && s === catHash && Date.now() - catT < 3 * 36e5) return;           // se reenvía cada 3 h para que no caduque
   try{
-    const r = await fetch('https://ntfy.sh/' + c.topic + 'k', { method: 'POST', body: s });
+    const r = await fetch('https://canal.vento.local/' + c.topic + 'k', { method: 'POST', body: s });
     if(!r.ok) throw new Error('error ' + r.status);
     catHash = s; catT = Date.now();
     catEstado('✅ Publicado: ' + list.length + ' productos · ' + new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }));
@@ -22521,7 +22484,7 @@ function ypMiniPintar(){
 }
 document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-yp-abrir]');if(b){e.preventDefault();ypAbrir();}});
 window.vitoPanel={abrir:ypAbrir,cerrar:ypCerrar,agregar:ypAgregar,abierto:()=>ypAbierto};
-window.vitoMod = { yRenovarServidor, linkMesa, mCfg, mUrl, mVistos, mPublicar, reconectarPedidos: () => { try{conectar();}catch(e){} }, qCanales, qProbarPedidos, tvOn, tvUrl, LS, SS, qCfg, yCfg, yTok, yConectar, cola, ordenJusto, mzEmpezo, mzTermino, mzProgreso, yLista, ytAgregar, ySearch, yGet, AUTO, renderMusica, esperarYT: () => cadena, yFuente: () => yFuente, ytDur, ytPosicionSiguiente, ytTanda: () => ytTanda, procesar, notifPedidos, notifMusica };
+window.vitoMod = { yRenovarServidor, linkMesa, mCfg, mUrl, prepUrl: () => { try{ return prepUrl(); }catch(e){ return ''; } }, prepPublicar: f => { try{ prepPublicar(f); }catch(e){} }, mVistos, mPublicar, reconectarPedidos: () => { try{conectar();}catch(e){} }, qCanales, qProbarPedidos, tvOn, tvUrl, LS, SS, qCfg, yCfg, yTok, yConectar, cola, ordenJusto, mzEmpezo, mzTermino, mzProgreso, yLista, ytAgregar, ySearch, yGet, AUTO, renderMusica, esperarYT: () => cadena, yFuente: () => yFuente, ytDur, ytPosicionSiguiente, ytTanda: () => ytTanda, procesar, notifPedidos, notifMusica };
 function publicarCuentas(){
   if(typeof data==='undefined'||!data)return;
   try{publicarCatalogo();}catch(e){}             // la carta se publica siempre (aunque "en vivo" esté apagado)
@@ -22532,7 +22495,7 @@ function publicarCuentas(){
     if(pubHash[id]===undefined&&!mesaQRActiva(id))return;      // nadie la está viendo por QR
     const primera=pubHash[id]===undefined;pubHash[id]=h;
     if(primera&&!sn.i.length)return;
-    fetch('https://ntfy.sh/'+vTopic(id),{method:'POST',body:JSON.stringify(sn)}).catch(()=>{delete pubHash[id];});
+    fetch('https://canal.vento.local/'+vTopic(id),{method:'POST',body:JSON.stringify(sn)}).catch(()=>{delete pubHash[id];});
   });
 }
 const _saveData=saveData;
@@ -24337,8 +24300,8 @@ function iniFotosProductos(){
 }
 
 // La carta del cliente (pedido.html) recibe una miniatura de cada foto por un canal
-// aparte de ntfy (topic + 'f'), una por mensaje (ntfy admite ~4 KB por mensaje).
-// Se reenvían cada 10 h porque ntfy guarda los mensajes 12 h.
+// aparte del canal de Vento (topic + 'f'), una por mensaje (el canal de Vento admite ~4 KB por mensaje).
+// Se reenvían cada 10 h porque el canal de Vento guarda los mensajes 12 h.
 const FOTO_PUB_KEY = 'vito_fotos_pub';
 let fotoPubCorriendo = false;
 function fotoMiniatura(url){
@@ -24377,14 +24340,14 @@ async function publicarFotosCarta(){
       if(it.borrar) msgs.push({ n: it.n, i: '' });
       else { const mini = await fotoMiniatura(it.url); if(!mini) continue; if(it.oldN) msgs.push({ n: it.oldN, i: '' }); msgs.push({ n: String(it.n).slice(0, 40), i: mini }); }
       for(const m of msgs){
-        const r = await fetch('https://ntfy.sh/' + c.topic + 'f', { method: 'POST', body: JSON.stringify(m) });
-        if(!r.ok) throw new Error('ntfy ' + r.status);
-        await new Promise(r2 => setTimeout(r2, 2500));        // sin saturar el límite de ntfy
+        const r = await fetch('https://canal.vento.local/' + c.topic + 'f', { method: 'POST', body: JSON.stringify(m) });
+        if(!r.ok) throw new Error('canal ' + r.status);
+        await new Promise(r2 => setTimeout(r2, 2500));        // sin saturar el límite del canal de Vento
       }
       if(it.borrar) delete pub[it.id]; else pub[it.id] = { k: it.k, n: it.n, t: Date.now() };
       SS(FOTO_PUB_KEY, pub);
     }
-  }catch(e){ /* sin internet o ntfy ocupado: se reintenta en el próximo ciclo */ }
+  }catch(e){ /* sin internet o el canal de Vento ocupado: se reintenta en el próximo ciclo */ }
   finally{ fotoPubCorriendo = false; }
 }
 
@@ -27680,7 +27643,7 @@ let fotosListas = false;
    Nequi y Daviplata no tienen una API pública para cuentas personales, así que la app no
    puede preguntarle al banco. Lo que sí llega al instante es la NOTIFICACIÓN en el celular del
    dueño («¡Te llegó plata! JUAN PÉREZ te envió $20.000»). Una app gratis (MacroDroid) la
-   reenvía a un canal privado de ntfy y Vento la lee aquí: avisa con voz, la guarda y la
+   reenvía a un canal privado de Vento y Vento la lee aquí: avisa con voz, la guarda y la
    cruza con la mesa que debe ese valor o que dijo «Ya pagué por Nequi». */
 (function(){
   const $p = id => document.getElementById(id);
@@ -27694,7 +27657,9 @@ let fotosListas = false;
     if(!g.espera) g.espera = {};
     return g;
   };
-  const url = () => 'https://ntfy.sh/' + PG().topic;
+  const url = () => 'https://canal.vento.local/' + PG().topic;
+  // La dirección para MacroDroid (afuera de la app): el canal en el servidor de Vento.
+  const urlExterna = () => (window.ventoCanal && window.ventoCanal.url(PG().topic)) || '';
 
   // ---------- Leer la notificación ----------
   const APPS = [[/daviplata/i, 'Daviplata'], [/nequi/i, 'Nequi'], [/bancolombia/i, 'Bancolombia'], [/movii/i, 'Movii'], [/\bdale\b/i, 'Dale'], [/davivienda/i, 'Davivienda'], [/bre-?b/i, 'Bre-B']];
@@ -27894,7 +27859,7 @@ let fotosListas = false;
       } else if(andOn.checked) showToast('✅ Listo: los avisos de plata que te lleguen a DaviPlata o Nequi en este celular aparecen en Vento.', 7000);
       pgPintar();
     };
-    $p('pgCopiar').onclick = async () => { try{ await navigator.clipboard.writeText(url()); showToast('📋 Dirección copiada. Pégala en MacroDroid (Solicitud HTTP → URL).', 7000); }catch(e){ $p('pgUrl').select(); showToast('Mantén presionada la dirección para copiarla.'); } };
+    $p('pgCopiar').onclick = async () => { try{ await navigator.clipboard.writeText(urlExterna()); showToast('📋 Dirección copiada. Pégala en MacroDroid (Solicitud HTTP → URL).', 7000); }catch(e){ $p('pgUrl').select(); showToast('Mantén presionada la dirección para copiarla.'); } };
     $p('pgProbar').onclick = async () => {
       try{ await fetch(url(), { method: 'POST', body: 'Nequi | ¡Te llegó plata! | PRUEBA VENTO te envió $1.000' }); showToast('Enviado. En unos segundos debe salir el aviso de $1.000.'); pgConectar(); setTimeout(pgSondear, 2500); }
       catch(e){ showToast('No se pudo enviar la prueba. Revisa el internet.'); }
@@ -27905,7 +27870,7 @@ let fotosListas = false;
   function pgPintar(){
     if(!data || !pgCrearUI()) return;
     const g = PG();
-    $p('pgOn').checked = !!g.on; $p('pgCaja').hidden = !g.on; $p('pgUrl').value = url();
+    $p('pgOn').checked = !!g.on; $p('pgCaja').hidden = !g.on; $p('pgUrl').value = urlExterna();
     const ea = AND() ? andEstado() : null;
     $p('pgEstado').textContent = !g.on ? 'Apagado.' : ea && ea.on ? (ea.permiso ? '🟢 La app lee directo los avisos de pagos de este celular.' : '🟠 Falta el permiso «Acceso a notificaciones» para Vento.') : (es && es.readyState === 1 ? '🟢 Escuchando los avisos de pagos.' : '🟠 Conectando…');
     if($p('pgAndOn')){
@@ -27931,7 +27896,7 @@ let fotosListas = false;
    WhatsApp Business tiene una API oficial (de Meta) para negocios, pero solo habla con un
    servidor de verdad, no con una página web como Vento. El "puente" (un Cloudflare Worker
    gratis, igual que el del TV) hace ese papel: recibe los mensajes de WhatsApp y se los pasa
-   a Vento por un canal privado de ntfy; cuando Vento quiere contestar, le pide al puente que
+   a Vento por un canal privado de Vento; cuando Vento quiere contestar, le pide al puente que
    la envíe. La IA lee cada mensaje, arma el pedido (cliente, dirección, productos) y redacta
    una respuesta — que se manda sola si activas "Responder automáticamente", o que tú revisas
    y envías con un toque si prefieres tener el control. */
@@ -27949,7 +27914,8 @@ let fotosListas = false;
     if(!Array.isArray(g.vistos)) g.vistos = [];
     return g;
   };
-  const waUrl = () => 'https://ntfy.sh/' + WA().topic;
+  const waUrl = () => 'https://canal.vento.local/' + WA().topic;
+  const waUrlExterna = () => (window.ventoCanal && window.ventoCanal.url(WA().topic)) || '';
 
   // ---------- La IA lee el mensaje, entiende el pedido y redacta la respuesta ----------
   const WA_IA_PROMPT = 'Eres el asistente de WhatsApp de un restaurante/tienda colombiano que recibe pedidos por este medio. ' +
@@ -28045,13 +28011,13 @@ let fotosListas = false;
       '<details class="settings-desc" open><summary><b>Cómo conectarlo (una vez)</b></summary><ol style="margin:8px 0 0;padding-left:20px;line-height:1.55">' +
       '<li>En <b>developers.facebook.com</b>, crea una app de tipo "Negocio" y agrégale el producto <b>WhatsApp</b>. Ahí Meta te da un <b>token de acceso</b> y el <b>ID del número de teléfono</b> (Phone Number ID) — dan uno de prueba gratis para empezar.</li>' +
       '<li>Publica el puente: <b>dash.cloudflare.com</b> → Workers & Pages → Create Worker → Deploy → Edit code → borra todo, pega el código de abajo → Deploy.</li>' +
-      '<li>En el Worker, <b>Settings → Variables and Secrets</b>, agrega <b>WHATSAPP_TOKEN</b>, <b>PHONE_NUMBER_ID</b>, y una palabra tuya como <b>VERIFY_TOKEN</b>. Copia también <b>NTFY_TOPIC</b> y <b>MESORA_SECRET</b> de aquí abajo.</li>' +
+      '<li>En el Worker, <b>Settings → Variables and Secrets</b>, agrega <b>WHATSAPP_TOKEN</b>, <b>PHONE_NUMBER_ID</b>, y una palabra tuya como <b>VERIFY_TOKEN</b>. Copia también <b>VENTO_CANAL</b> y <b>MESORA_SECRET</b> de aquí abajo. <i>(Si tu puente es de antes y tiene NTFY_TOPIC, vuelve a pegar el código y agrega VENTO_CANAL.)</i></li>' +
       '<li>En Meta, en la configuración del <b>Webhook</b> de tu app de WhatsApp, pega la dirección del Worker (termina en <b>.workers.dev/webhook</b>) y el mismo VERIFY_TOKEN. Suscríbete al campo <b>messages</b>.</li>' +
       '<li>Pega abajo la dirección de tu Worker (sin <b>/webhook</b> al final) y activa "Escuchar mensajes".</li></ol></details>' +
       '<div class="mz-actions"><button type="button" class="btn-ghost" id="waCopyCode">📋 Copiar código del puente</button></div>' +
       '<div class="settings-row" style="flex-direction:column;align-items:stretch"><div class="settings-row-text"><strong>Dirección de tu puente</strong></div>' +
       '<input id="waPuente" class="mz-in" style="width:100%" placeholder="https://mesora-whatsapp.tu-usuario.workers.dev"></div>' +
-      '<div class="settings-row" style="flex-direction:column;align-items:stretch"><div class="settings-row-text"><strong>NTFY_TOPIC</strong><span>Pégalo tal cual en el Worker.</span></div><input id="waTopicVal" class="mz-in" style="width:100%" readonly onclick="this.select()"></div>' +
+      '<div class="settings-row" style="flex-direction:column;align-items:stretch"><div class="settings-row-text"><strong>VENTO_CANAL</strong><span>Pégalo tal cual en el Worker (es la dirección privada por donde llegan los mensajes a Vento).</span></div><input id="waTopicVal" class="mz-in" style="width:100%" readonly onclick="this.select()"></div>' +
       '<div class="settings-row" style="flex-direction:column;align-items:stretch"><div class="settings-row-text"><strong>MESORA_SECRET</strong><span>No lo compartas: protege que solo Vento pueda mandar mensajes por tu número.</span></div><input id="waSecretoVal" class="mz-in" style="width:100%" readonly onclick="this.select()"></div>' +
       '<div class="settings-row" style="flex-direction:column;align-items:stretch"><div class="settings-row-text"><strong>Mensajes recientes</strong></div><div id="waLista"></div></div></div>';
     grupo.insertAdjacentElement('afterend', g);
@@ -28074,7 +28040,7 @@ let fotosListas = false;
     if(!data || !waCrearUI()) return;
     const g = WA();
     $w('waOn').checked = !!g.on; $w('waCaja').hidden = !g.on; $w('waAuto').checked = !!g.auto;
-    $w('waPuente').value = g.puente || ''; $w('waTopicVal').value = g.topic; $w('waSecretoVal').value = g.secreto;
+    $w('waPuente').value = g.puente || ''; $w('waTopicVal').value = waUrlExterna(); $w('waSecretoVal').value = g.secreto;
     $w('waEstado').textContent = !g.on ? 'Apagado.' : (es && es.readyState === 1 ? '🟢 Escuchando WhatsApp.' : '🟠 Conectando…');
     $w('waLista').innerHTML = g.lista.length ? g.lista.slice(0, 15).map(x => {
       const items = x.items.map(i => i.cantidad + ' ' + escw(i.nombre)).join(', ');
@@ -28200,7 +28166,7 @@ window.mesoraCelebrar = function(emojis){
     const ult = (() => { try{ return JSON.parse(localStorage.getItem('mesora_qp_pub') || '{}'); }catch(e){ return {}; } })();
     if(!forzar && ult.k === k && Date.now() - ult.t < 10 * 36e5) return;
     const msg = q ? Object.assign({ n: '__qrpago__', q: q.tipo || '', l: (q.llave || '').slice(0, 60) }, q.mz ? { s: q.mz.s, m: q.mz.m } : { i: q.img }) : { n: '__qrpago__', i: '' };
-    try{ const r = await fetch('https://ntfy.sh/' + cfg.topic + 'f', { method: 'POST', body: JSON.stringify(msg) }); if(r.ok) localStorage.setItem('mesora_qp_pub', JSON.stringify({ k, t: Date.now() })); }catch(e){}
+    try{ const r = await fetch('https://canal.vento.local/' + cfg.topic + 'f', { method: 'POST', body: JSON.stringify(msg) }); if(r.ok) localStorage.setItem('mesora_qp_pub', JSON.stringify({ k, t: Date.now() })); }catch(e){}
   }
   function qpPintar(){
     if(!$q('qpSubir') || !data) return;
@@ -28682,7 +28648,7 @@ window.mesoraCelebrar = function(emojis){
     duplicados().filter(x => x.conf >= 90).slice(0, 3).forEach(x => out.push('📦 Productos duplicados: ' + x.productos.map(p => p.name).join(' = ') + '.'));
     data.products.filter(p => p.stock != null && p.stock < 0).forEach(p => out.push('📦 ' + p.name + ' tiene stock negativo (' + p.stock + ').'));
     data.products.filter(p => p.cost > 0 && p.price > 0 && p.price < p.cost).forEach(p => out.push('💰 ' + p.name + ' se vende por debajo del costo (' + plata(p.price) + ' < ' + plata(p.cost) + ').'));
-    if(window.__ventoSinConexionDesde) out.push('📶 Sin conexión desde ' + new Date(window.__ventoSinConexionDesde).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' }) + ': los pedidos esperan en ntfy (hasta 12 h).');
+    if(window.__ventoSinConexionDesde) out.push('📶 Sin conexión desde ' + new Date(window.__ventoSinConexionDesde).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' }) + ': los pedidos esperan en el canal de Vento (hasta 12 h).');
     return [...new Set(out)];
   }
   // ---------- Centro de control ----------
@@ -28918,7 +28884,7 @@ window.mesoraCelebrar = function(emojis){
     activos().filter(p => p.items.some(i => !i.ok)).slice(0, 1).forEach(p => avisar('pmal-' + p.id, tableLabel(p.mesa) + ' pidió algo que no está en tus productos: ' + p.items.filter(i => !i.ok).map(i => i.name).join(', ') + '.', DIA));
     const m = M(); if(m){ m.hist().filter(x => x.status === 'error' && Date.now() - (x.endedAt || 0) < 15 * 6e4).slice(0, 1).forEach(x => avisar('mzerr-' + x.id, 'no se pudo reproducir «' + (x.title || x.song) + '» de ' + tableLabel(x.mesa) + '; pasé a la siguiente.', DIA)); }
     const est = document.getElementById('qrEstado') || document.getElementById('liveEstado');
-    if(window.__ventoSinConexionDesde && Date.now() - window.__ventoSinConexionDesde > 3 * 6e4) avisar('sync', 'no hay conexión para recibir pedidos y canciones. Se reconecta sola; los pedidos quedan guardados en ntfy hasta 12 horas.', 30 * 6e4);
+    if(window.__ventoSinConexionDesde && Date.now() - window.__ventoSinConexionDesde > 3 * 6e4) avisar('sync', 'no hay conexión para recibir pedidos y canciones. Se reconecta sola; los pedidos quedan guardados en el canal de Vento hasta 12 horas.', 30 * 6e4);
   }
   setInterval(() => { try{ revisar(); }catch(e){} }, 90000);
   setTimeout(() => { try{ revisar(); }catch(e){} }, 20000);
@@ -30091,14 +30057,14 @@ window.mesoraCelebrar = function(emojis){
   let hash = '', hashT = 0;
   async function publicar(forzar){
     if(typeof data === 'undefined' || !data || !window.vitoQCfg) return;
-    if(!data.vitrina && !forzar) return;   // nunca configurada: no gastar cupo de ntfy
+    if(!data.vitrina && !forzar) return;   // nunca configurada: no gastar mensajes de más
     const c = window.vitoQCfg(); if(!c || !c.topic) return;
     const v = V(), hoy = new Date().toISOString().slice(0, 10);
     const pr = (v.promos || []).filter(x => !x.hasta || x.hasta >= hoy).slice(0, 6).map(x => [x.e || '', String(x.t || '').slice(0, 40), String(x.d || '').slice(0, 90), Math.round(+x.p || 0), String(x.prod || '').slice(0, 60)]);
     const m = { v: 1, oc: v.ocasion || '', nom: String(v.nombre || '').slice(0, 30), msg: String(v.mensaje || '').slice(0, 140), sal: v.saludo !== false ? 1 : 0, pr };
     const s = JSON.stringify(m);
     if(!forzar && s === hash && Date.now() - hashT < 6 * 36e5) return;
-    try{ const r = await fetch('https://ntfy.sh/' + c.topic + 'a', { method: 'POST', body: s }); if(r.ok){ hash = s; hashT = Date.now(); } }catch(e){}
+    try{ const r = await fetch('https://canal.vento.local/' + c.topic + 'a', { method: 'POST', body: s }); if(r.ok){ hash = s; hashT = Date.now(); } }catch(e){}
   }
   window.vitrinaPublicar = publicar;
   setInterval(() => publicar(false), 10 * 60000); setTimeout(() => publicar(false), 8000);

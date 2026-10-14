@@ -10,7 +10,7 @@
 <style>
   /* Pantalla del TV: se abre en el navegador del televisor (LG webOS, Samsung, Android TV,
      TV Box) con tv.html#código. Reproduce la cola de canciones que le manda Vento desde
-     el celular por ntfy. Código sencillo a propósito: los navegadores de los TV son viejos. */
+     el celular por el canal de Vento. Código sencillo a propósito: los navegadores de los TV son viejos. */
   :root{ --bg:#0b0a12; --card:#16151f; --line:#2a2838; --ink:#f4f2fb; --soft:#a19dba; --acc:#8b5cf6; --ok:#34d399; --bad:#fb7185; }
   *{ box-sizing:border-box; }
   html,body{ margin:0; height:100%; background:var(--bg); color:var(--ink); font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif; overflow:hidden; }
@@ -69,6 +69,7 @@
   <p>Toca OK en el control. Deja esta página abierta: las canciones que pidan las mesas suenan aquí solas.</p>
   <div id="err"></div>
 </div>
+<script src="nube/config.js"></script>
 <script>
 (function(){
   var code = (location.hash || '').replace(/[^a-z0-9]/gi, '');
@@ -89,8 +90,21 @@
     var ks = Object.keys(tocadas); if(ks.length > 300){ ks.sort(function(a, b){ return tocadas[a] - tocadas[b]; }).slice(0, ks.length - 300).forEach(function(k){ delete tocadas[k]; }); }
     try{ localStorage.setItem('tv_tocadas_' + code, JSON.stringify(tocadas)); }catch(e){}
   }
+  // Canal en vivo por el servidor de Vento (funciones canal_publicar / canal_leer). Con XMLHttpRequest: los
+  // navegadores de los TV son viejos.
+  function vcCfg(){ var c = null; try{ c = JSON.parse(localStorage.getItem('vento_nube_cfg') || 'null'); }catch(e){} if(!c || !c.url || !c.key) c = window.VENTO_NUBE_DEFAULT || null; return c && c.url && c.key ? c : null; }
+  function vcRpc(fn, args, cb){
+    var c = vcCfg(); if(!c){ if(cb) cb(null); return; }
+    try{
+      var x = new XMLHttpRequest(); x.open('POST', String(c.url).replace(/\/+$/, '') + '/rest/v1/rpc/' + fn);
+      x.setRequestHeader('apikey', c.key); x.setRequestHeader('Authorization', 'Bearer ' + c.key); x.setRequestHeader('Content-Type', 'application/json');
+      x.onload = function(){ var j = null; try{ j = JSON.parse(x.responseText); }catch(e){} if(cb) cb(x.status < 300 ? j : null); };
+      x.onerror = function(){ if(cb) cb(null); };
+      x.send(JSON.stringify(args));
+    }catch(e){ if(cb) cb(null); }
+  }
   function avisar(obj){                       // respuesta al celular (qué suena, versión mala, "sigo vivo")
-    try{ var x = new XMLHttpRequest(); x.open('POST', 'https://ntfy.sh/' + TOPIC + 'r'); x.send(JSON.stringify(obj)); }catch(e){}
+    vcRpc('canal_publicar', { p_canal: TOPIC + 'r', p_cuerpo: JSON.stringify(obj) });
   }
   function esc(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){ return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]; }); }
   function pendientes(){ return cola.filter(function(x){ return !tocadas[x.i] && !malos[x.v] && (!actual || x.i !== actual.i); }); }
@@ -214,34 +228,19 @@
     if(m.b) $('biz').textContent = m.b;
     if(!actual) siguiente(); else pintar();
   }
-  // Canal en vivo (ntfy). Si el navegador del TV no soporta EventSource, se consulta cada 5 s.
-  var desde = '10m';
+  // Canal en vivo: se revisa cada 3 s lo nuevo que mandó el celular (desde 10 min atrás la primera vez).
+  var ultId = null, revisando = false, ultOk = 0;
   function sondear(){
-    var x = new XMLHttpRequest();
-    x.open('GET', 'https://ntfy.sh/' + TOPIC + '/json?poll=1&since=' + desde);
-    x.onload = function(){
-      var ls = String(x.responseText || '').split('\n');
-      for(var i = 0; i < ls.length; i++){ try{ var j = JSON.parse(ls[i]); if(j.event === 'message'){ desde = j.id; recibir(j.message); } }catch(e){} }
-    };
-    x.send();
+    if(revisando) return; revisando = true;
+    vcRpc('canal_leer', { p_canales: [TOPIC], p_desde_id: ultId, p_desde: ultId == null ? Math.floor(Date.now() / 1000) - 600 : null, p_limite: 100 }, function(l){
+      revisando = false;
+      if(!l) return;
+      ultOk = Date.now();
+      for(var i = 0; i < l.length; i++){ var j = l[i]; if(ultId == null || +j.id > ultId) ultId = +j.id; try{ recibir(j.message); }catch(e){} }
+    });
   }
-  // Una sola conexión a la vez. Algunos navegadores de TV dejan la conexión «abierta» pero muda (sin
-  // avisar error): si en 7 min no llega nada del celular (que manda la cola al menos cada ~5 min),
-  // se reconecta sola.
-  var es = null, esT = null, esDesde = 0;
-  function conectar(){
-    clearTimeout(esT); esT = null;
-    if(es){ try{ es.close(); }catch(e){} es = null; }
-    esDesde = Date.now();
-    var yo = es = new EventSource('https://ntfy.sh/' + TOPIC + '/sse?since=10m');
-    yo.onmessage = function(ev){ try{ recibir(JSON.parse(ev.data).message); }catch(e){} };
-    yo.onerror = function(){ if(es !== yo) return; try{ yo.close(); }catch(e){} es = null; if(!esT) esT = setTimeout(conectar, 5000); };
-  }
-  if(window.EventSource){
-    conectar();
-    setInterval(function(){ if(Date.now() - Math.max(ultimoMsg, esDesde) > 7 * 60000) conectar(); }, 30000);
-    window.addEventListener('online', function(){ conectar(); });
-  } else { sondear(); setInterval(sondear, 5000); }
+  sondear(); setInterval(sondear, 3000);
+  window.addEventListener('online', function(){ sondear(); });
 
   $('go').onclick = function(){
     empezado = true;

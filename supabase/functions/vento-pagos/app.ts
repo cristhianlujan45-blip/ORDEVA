@@ -4,6 +4,7 @@
 //  Rutas (todas bajo /functions/v1/vento-pagos):
 //    GET  /salud                       estado del servidor
 //    GET  /push-clave                  llave pública VAPID para activar notificaciones
+//    POST /canal/<canal>               publica en un canal en vivo (MacroDroid, puente de WhatsApp)
 //    POST /config                      estado / conectar / probar / desconectar integraciones   (sesión, dueño o admin)
 //    POST /cobro                       crear un cobro: link Wompi, push Nequi, QR Nequi o DaviPlata con código (sesión)
 //    POST /confirmar                   confirmar un cobro DaviPlata con el código OTP del cliente  (sesión)
@@ -563,6 +564,14 @@ export async function manejar(req: Request, env: Env): Promise<Response> {
     if (r0 === "salud") return json(200, { ok: true, servicio: "vento-pagos", version: VERSION, integraciones: ["wompi", "nequi_conecta", "daviplata_api", "avisos_dispositivo", "google_youtube"], push: true }, cors);
     if (r0 === "webhook" && ruta[1] === "wompi" && ruta[2] && req.method === "POST") return await webhookWompi(req, env, ruta[2]);
     if (r0 === "aviso" && req.method === "POST") return await aviso(req, env, ruta[1] || null);
+    // Canal en vivo para quien publica desde afuera (MacroDroid con los avisos de pagos, el puente de WhatsApp):
+    // POST /canal/<canal> con el texto en el cuerpo, igual que antes con ntfy.
+    if (r0 === "canal" && ruta[1] && req.method === "POST") {
+      const txt = await req.text();
+      if (txt.length > 32768) return json(413, { ok: false, error: "mensaje_grande" }, cors);
+      const m = await servidor(env).rpc<Record<string, unknown>>("canal_publicar", { p_canal: ruta[1], p_cuerpo: txt, p_titulo: req.headers.get("title") || req.headers.get("x-title") || null });
+      return json(200, m, cors);
+    }
     if (r0 === "push-clave") { const v = await vapid(servidor(env), env.VENTO_SITIO || SITIO); return json(200, { publica: v.publica }, cors); }
     if (req.method !== "POST") return json(405, { ok: false, error: "metodo" }, cors);
     if (r0 === "sync" && env.VENTO_CRON_SECRETO && req.headers.get("x-vento-cron") === env.VENTO_CRON_SECRETO) {

@@ -182,7 +182,7 @@
     else if(nuevoAprobado && enVivo && !x._yaAvisado){ try{ window.pagoLlego && window.pagoLlego(x); }catch(e){} }
   }
 
-  // Los avisos que llegan por MacroDroid (canal ntfy de siempre) también se mandan al Servidor Vento:
+  // Los avisos que llegan por MacroDroid (canal privado de Vento) también se mandan al Servidor Vento:
   // quedan guardados en la nube, se cruzan entre celulares sin duplicarse y avisan con push aunque Vento esté cerrada.
   window.ventoPagosReenviarAviso = function(txt){
     var d = miDispositivo();

@@ -39,6 +39,8 @@
   #err{ color:var(--nuevo); padding:30px 18px; font-size:18px; }
 </style>
 <style>html,button,a,input,select{touch-action:manipulation}input,select,textarea{font-size:max(16px,1em)}</style>
+<script src="nube/config.js"></script>
+<script src="lib/vento-canal.js"></script><!-- canales en vivo por el servidor de Vento -->
 </head>
 <body>
 <header>
@@ -57,7 +59,7 @@
   var SIG = { nuevo: ['✅ Aceptar', 'recibido'], recibido: ['👩‍🍳 En preparación', 'preparacion'], preparacion: ['🔔 Listo', 'listo'], listo: ['🍽️ Entregado', 'entregado'] };
   var COLS = [['nuevo', '🆕 Por aceptar'], ['recibido', '📥 Recibidos'], ['preparacion', '👩‍🍳 En preparación'], ['listo', '🔔 Listos']];
   function esc(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){ return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]; }); }
-  function enviar(obj){ try{ var x = new XMLHttpRequest(); x.open('POST', 'https://ntfy.sh/' + CANAL + 'r'); x.send(JSON.stringify(obj)); }catch(e){} }
+  function enviar(obj){ try{ var x = new XMLHttpRequest(); x.open('POST', 'https://canal.vento.local/' + CANAL + 'r'); x.send(JSON.stringify(obj)); }catch(e){} }
   function pintar(){
     var vivo = Date.now() - ultimo < 30 * 60000;
     $('dot').className = 'dot ' + (vivo ? 'ok' : 'bad');
@@ -97,13 +99,13 @@
   var desde = '1h';
   function sondear(){
     var x = new XMLHttpRequest();
-    x.open('GET', 'https://ntfy.sh/' + CANAL + '/json?poll=1&since=' + desde);
+    x.open('GET', 'https://canal.vento.local/' + CANAL + '/json?poll=1&since=' + desde);
     x.onload = function(){ String(x.responseText || '').split('\n').forEach(function(l){ try{ var j = JSON.parse(l); if(j.event === 'message'){ desde = j.id; recibir(j.message); } }catch(e){} }); };
     x.send();
   }
   function conectar(){
     if(window.EventSource){
-      var es = new EventSource('https://ntfy.sh/' + CANAL + '/sse?since=1h');
+      var es = new EventSource('https://canal.vento.local/' + CANAL + '/sse?since=1h');
       es.onmessage = function(ev){ try{ var j = JSON.parse(ev.data); if(j.event === 'message') recibir(j.message); }catch(e){} };
       es.onerror = function(){ try{ es.close(); }catch(e){} setTimeout(conectar, 5000); };
     } else { sondear(); setInterval(sondear, 5000); }

@@ -94,11 +94,10 @@ function fxSet(kind){
 <title>Vento Meseros</title>
 <link rel="icon" type="image/png" href="icons/vento-64.png">
 <link rel="apple-touch-icon" href="icons/vento-180.png">
-<link rel="preconnect" href="https://ntfy.sh">
 <style>
   /* App de meseros: cada mesero la usa en SU celular. Recibe el estado de las mesas y la carta
      del celular principal (Vento, index.html) y le manda los pedidos por un canal privado de
-     ntfy. El celular principal los aplica con el mismo entendedor de la voz clásica. */
+     el canal de Vento. El celular principal los aplica con el mismo entendedor de la voz clásica. */
   :root{ --bg:#0f0f16; --card:#17171f; --card2:#1e1e29; --line:#2a2a38; --ink:#f2f1f7; --soft:#9a97ad; --acc:#7c3aed; --acc2:#c4b5fd; --ok:#34d399; --bad:#fb7185; --font:-apple-system,'Segoe UI',Roboto,sans-serif; }
   *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html{ -webkit-text-size-adjust:100%; text-size-adjust:100%; }
@@ -177,6 +176,8 @@ button:not(:disabled):active{transform:scale(.95);filter:brightness(1.08)}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}#fxLayer{display:none}}
 </style>
 <style>html,button,a,input,select{touch-action:manipulation}input,select,textarea{font-size:max(16px,1em)}</style>
+<script src="nube/config.js"></script>
+<script src="lib/vento-canal.js"></script><!-- canales en vivo por el servidor de Vento -->
 </head>
 <body>
 <div id="setup" class="setup" hidden></div>
@@ -242,7 +243,7 @@ button:not(:disabled):active{transform:scale(.95);filter:brightness(1.08)}
     var id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     pendientes[id] = { at: Date.now(), texto: texto };
     toast('📤 Enviando: ' + texto);
-    fetch('https://ntfy.sh/' + T_MES, { method: 'POST', body: JSON.stringify({ k: 'voz', texto: texto, mesero: yo, id: id }) })
+    fetch('https://canal.vento.local/' + T_MES, { method: 'POST', body: JSON.stringify({ k: 'voz', texto: texto, mesero: yo, id: id }) })
       .catch(function(){ delete pendientes[id]; toast('⚠️ Sin internet: no se envió. Intenta de nuevo.', 5000); });
     setTimeout(function(){ if(pendientes[id]){ delete pendientes[id]; toast('⚠️ El celular principal no respondió. Revisa que Vento esté abierta allá (y con internet). Tu pedido llegará cuando se abra.', 7000); } }, 15000);
   }
@@ -255,7 +256,7 @@ button:not(:disabled):active{transform:scale(.95);filter:brightness(1.08)}
   }
   function conectar(){
     var es;
-    try{ es = new EventSource('https://ntfy.sh/' + T_EST + '/sse?since=2h'); }catch(e){ return; }
+    try{ es = new EventSource('https://canal.vento.local/' + T_EST + '/sse?since=2h'); }catch(e){ return; }
     es.onopen = function(){ $('dot').className = 'dot ok'; pintarEstado(); };
     es.onmessage = function(ev){ try{ recibir(JSON.parse(ev.data).message); }catch(e){} };
     es.onerror = function(){ $('dot').className = 'dot bad'; $('estado').textContent = 'Reconectando…'; if(es.readyState === 2){ setTimeout(conectar, 4000); } };
@@ -266,7 +267,7 @@ button:not(:disabled):active{transform:scale(.95);filter:brightness(1.08)}
     $('estado').textContent = 'Conectado' + (min > 5 ? ' · última noticia hace ' + min + ' min' : '');
   }
   function cargarCarta(){
-    fetch('https://ntfy.sh/' + T_CAT + '/json?poll=1&since=12h', { cache: 'no-store' }).then(function(r){ return r.text(); }).then(function(t){
+    fetch('https://canal.vento.local/' + T_CAT + '/json?poll=1&since=12h', { cache: 'no-store' }).then(function(r){ return r.text(); }).then(function(t){
       var ls = t.trim().split('\n'), last = null;
       ls.forEach(function(l){ try{ var j = JSON.parse(l); if(j.event === 'message') last = j; }catch(e){} });
       if(last){ var c = JSON.parse(last.message); cat = c.p || []; try{ fxSet(c.mo === 'ninguno' ? null : (c.mo || c.th)); }catch(e){} try{ localStorage.setItem('mes_carta', JSON.stringify(cat)); }catch(e){} if(c.n && !estado) $('biz').textContent = c.n; pintarProds(); }
@@ -381,10 +382,10 @@ button:not(:disabled):active{transform:scale(.95);filter:brightness(1.08)}
     $('yo').textContent = '🧑‍🍳 ' + yo;
     conectar(); cargarCarta();
     // Saluda al celular principal (así sabe quién está conectado y publica las mesas).
-    fetch('https://ntfy.sh/' + T_MES, { method: 'POST', body: JSON.stringify({ k: 'hola', mesero: yo }) }).catch(function(){});
+    fetch('https://canal.vento.local/' + T_MES, { method: 'POST', body: JSON.stringify({ k: 'hola', mesero: yo }) }).catch(function(){});
     setInterval(cargarCarta, 2 * 60000);
     setInterval(pintarEstado, 30000);
-    document.addEventListener('visibilitychange', function(){ if(!document.hidden){ cargarCarta(); fetch('https://ntfy.sh/' + T_MES, { method: 'POST', body: JSON.stringify({ k: 'hola', mesero: yo }) }).catch(function(){}); } });
+    document.addEventListener('visibilitychange', function(){ if(!document.hidden){ cargarCarta(); fetch('https://canal.vento.local/' + T_MES, { method: 'POST', body: JSON.stringify({ k: 'hola', mesero: yo }) }).catch(function(){}); } });
   }
   if(!yo) pedirNombre(); else iniciar();
 })();
