@@ -369,6 +369,30 @@ async function pruebas(sb) {
   chk('Panel de suscripciones lista ambos negocios con su plan efectivo', r.st === 200 && r.j.suscripciones.some((x) => x.business_id === neg && x.plan_efectivo === 'pro') &&
     r.j.suscripciones.some((x) => x.business_id === neg2 && x.status === 'canceled'), r.j);
 
+  // =========================== Activar desde el panel ===========================
+  const antesRe = await uno('select expiry_date, plan_id from subscriptions where business_id = $1', [neg2]);
+  r = await api('/admin/reactivar', { negocio: neg2 }, curioso.token);
+  chk('Un no-admin no puede reactivar', r.st === 403, r);
+  r = await api('/admin/reactivar', { negocio: neg2 }, jefe.token);
+  e = (await api('/estado', { negocio: neg2 }, otro.token)).j;
+  chk('Reactivar la cancelada: vuelve «active» con la MISMA fecha y el plan PRO encendido', r.st === 200 && r.j.repetido === false && e.subscription.status === 'active' &&
+    e.subscription.expiry_date === antesRe.expiry_date && e.plan_efectivo === 'pro' && e.entitlements.voice === true && await eventos(neg2, 'subscription_reactivated') === 1, { r: r.j, e });
+  r = await api('/admin/reactivar', { negocio: neg2 }, jefe.token);
+  chk('Reactivar otra vez = repetido (no cambia nada)', r.st === 200 && r.j.repetido === true && await eventos(neg2, 'subscription_reactivated') === 1, r.j);
+  await api('/admin/cancelar', { negocio: neg2, motivo: 'otra vez' }, jefe.token);
+  await sb.sql("update subscriptions set expiry_date = now() - interval '1 day' where business_id = $1", [neg2]);
+  r = await api('/admin/reactivar', { negocio: neg2 }, jefe.token);
+  chk('Reactivar sin días por delante → 409 sin_periodo (hay que activar por meses)', r.st === 409 && r.j.error === 'sin_periodo', r);
+  r = await api('/admin/activar', { negocio: neg2, plan: 'pro', meses: 3 }, jefe.token);
+  const susA = await uno("select status, source, plan_id, start_date > now() - interval '1 minute' as hoy, expiry_date = sub_sumar_meses(start_date, 3) as tres from subscriptions where business_id = $1", [neg2]);
+  e = (await api('/estado', { negocio: neg2 }, otro.token)).j;
+  chk('Activar por 3 meses: PRO activo desde HOY hasta +3 meses', r.st === 200 && susA.status === 'active' && susA.plan_id === 'pro' && susA.source === 'admin' && susA.hoy && susA.tres &&
+    e.plan_efectivo === 'pro', { r: r.j, susA });
+  r = await api('/admin/activar', { negocio: neg2, plan: 'free', meses: 3 }, jefe.token);
+  chk('Activar el plan Gratis → plan_invalido', r.st === 400 && r.j.error === 'plan_invalido', r);
+  r = await api('/admin/activar', { negocio: neg2, plan: 'pro', meses: 1 }, curioso.token);
+  chk('Un no-admin no puede activar', r.st === 403, r);
+
   // =========================== Cron /vencer ===========================
   await sb.sql("update subscriptions set expiry_date = now() - interval '1 minute' where business_id = $1", [neg]);
   r = await api('/vencer', {});

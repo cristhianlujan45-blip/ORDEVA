@@ -179,6 +179,14 @@ async function admin(req: Request, env: Env, accion: string, b: Record<string, u
       return { ok: true, ...(await db.rpc<Record<string, unknown>>("srv_sub_cambiar_plan", { p_negocio: negocioDe(b), p_plan: String(b.plan || ""), p_admin: a })) };
     case "dar":
       return { ok: true, ...(await db.rpc<Record<string, unknown>>("srv_sub_dar", { p_negocio: negocioDe(b), p_plan: String(b.plan || ""), p_meses: Math.round(Number(b.meses) || 0), p_admin: a })) };
+    // Activar desde el panel: por N meses (desde hoy, o sumados al final si ya tiene ese plan vigente) por el mismo
+    // punto único que la cortesía, o «reactivar» una cancelada con el período que todavía le quedaba.
+    case "activar":
+      log("info", "sub_activada_admin", { negocio: negocioDe(b), plan: String(b.plan || ""), meses: Number(b.meses) || 0, admin: a });
+      return { ok: true, ...(await db.rpc<Record<string, unknown>>("srv_sub_dar", { p_negocio: negocioDe(b), p_plan: String(b.plan || ""), p_meses: Math.round(Number(b.meses) || 0), p_admin: a })) };
+    case "reactivar":
+      log("info", "sub_reactivada", { negocio: negocioDe(b), admin: a });
+      return { ok: true, ...(await db.rpc<Record<string, unknown>>("srv_sub_reactivar", { p_negocio: negocioDe(b), p_admin: a })) };
     case "planes":
       return { ok: true, ...(await db.rpc<Record<string, unknown>>("srv_admin_planes")) };
     case "plan_guardar":

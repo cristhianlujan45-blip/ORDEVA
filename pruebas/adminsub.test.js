@@ -75,6 +75,9 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
      case 'negocios': return [200, { ok: true, negocios: S.negocios }];
      case 'negocio': return [200, Object.assign({ ok: true }, detalle(body.negocio))];
      case 'cancelar': { const s = sub(); Object.assign(s, { status: 'canceled', canceled_at: iso(0) }); return [200, { ok: true, subscription: s, repetido: false }]; }
+     case 'activar': { const s = sub(); Object.assign(s, { status: 'active', plan_id: body.plan, source: 'admin', trial: false, canceled_at: null, start_date: iso(0), expiry_date: '2027-04-15T15:00:00Z', dias_restantes: 182 }); return [200, { ok: true, subscription: s }]; }
+     case 'reactivar': { const s = sub(); if(!(Date.parse(s.expiry_date) > Date.now())) return [409, { ok: false, error: 'sin_periodo', mensaje: 'A esta suscripción ya no le quedan días: actívala por meses.' }];
+       Object.assign(s, { status: 'active', canceled_at: null }); return [200, { ok: true, subscription: s, repetido: false }]; }
      case 'cambiar_plan': { const s = sub(); s.plan_id = body.plan; return [200, { ok: true, subscription: s, repetido: false }]; }
      case 'dar': { const s = sub(); Object.assign(s, { status: 'active', plan_id: body.plan, source: 'admin', trial: false, expiry_date: '2027-01-08T15:00:00Z', dias_restantes: 95 }); return [200, { ok: true, subscription: s }]; }
      case 'planes': return [200, { ok: true, planes: S.planes, entitlements: ENTS.map((k, i) => ({ key: k, description: k, sort: i })), config: S.config }];
@@ -197,6 +200,17 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
  await p.selectOption('#sxSubsFiltro', 'expired');
  chk('Suscripciones: filtro por estado (vencidas)', (await p.$$('#sxSubs .sxc')).length === 1 && /Doña Rosa/.test(await texto('#sxSubs')));
  await p.selectOption('#sxSubsFiltro', '');
+ // Activar: vencida → por meses desde hoy (sin «reactivar con su fecha»: ya no le quedan días)
+ chk('Activar: aparece en la vencida, no en la paga vigente (Bar La 70 ya se aprobó)', await esperar(() => !!document.querySelector('#sxSubs [data-sxa="activar"][data-id="' + '33333333-3333-4333-8333-333333333333' + '"]')) &&
+   !(await p.$('#sxSubs [data-sxa="activar"][data-id="' + NEG1 + '"]')) && !!(await p.$('#sxSubs [data-sxa="cancelar"][data-id="' + NEG1 + '"]')));
+ await p.click('#sxSubs [data-sxa="activar"][data-id="' + NEG3 + '"]');
+ await esperar(() => document.getElementById('dlgSxAcc').open);
+ chk('Activar vencida: pide plan y meses (no ofrece reactivar)', await p.evaluate(() => document.getElementById('sxAccModoBox').hidden && !document.getElementById('sxAccPlanBox').hidden && !document.getElementById('sxAccMesesBox').hidden &&
+   document.getElementById('sxAccMesesTit').textContent === 'Meses' && /Activar suscripción/.test(document.getElementById('sxAccTit').textContent)));
+ await p.click('#sxAccMesesRap [data-m="6"]'); await p.click('#sxAccGo');
+ chk('Activar por meses: envía negocio, plan y meses', await esperar(() => !document.getElementById('dlgSxAcc').open) && JSON.stringify((llamadas('activar')[0] || {}).body) === JSON.stringify({ negocio: NEG3, plan: 'pro', meses: 6 }), JSON.stringify(llamadas('activar')));
+ chk('Activar por meses: avisa hasta cuándo y la tarjeta queda activa sin «Activar»', /quedó activo con el plan PRO hasta el 15\/04\/2027/.test(await texto('#sxAvisoTxt')) &&
+   await esperar(() => !document.querySelector('#sxSubs [data-sxa="activar"][data-id="33333333-3333-4333-8333-333333333333"]')), await texto('#sxAvisoTxt'));
  await p.click('#sxSubs [data-sxa="dar"][data-id="' + NEG3 + '"]');
  await esperar(() => document.getElementById('dlgSxAcc').open);
  await p.click('#sxAccMesesRap [data-m="3"]'); await p.click('#sxAccGo');
@@ -211,6 +225,17 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
  await p.fill('#sxAccMotivo', 'Lo pidió el dueño'); await p.click('#sxAccGo');
  chk('Cancelar: envía negocio y motivo', await esperar(() => !document.getElementById('dlgSxAcc').open) && JSON.stringify((llamadas('cancelar')[0] || {}).body) === JSON.stringify({ negocio: NEG3, motivo: 'Lo pidió el dueño' }));
  chk('Cancelar: la tarjeta queda «Cancelada» sin botón de cancelar', await esperar(() => /Cancelada/.test(document.getElementById('sxSubs').textContent) && !document.querySelector('#sxSubs [data-sxa="cancelar"][data-id="33333333-3333-4333-8333-333333333333"]')));
+ // Activar una cancelada que todavía tiene días: «reactivar con su fecha» (sin plan ni meses)
+ chk('Cancelada: muestra «✅ Activar»', await esperar(() => !!document.querySelector('#sxSubs [data-sxa="activar"][data-id="33333333-3333-4333-8333-333333333333"]')));
+ await p.click('#sxSubs [data-sxa="activar"][data-id="' + NEG3 + '"]');
+ await esperar(() => document.getElementById('dlgSxAcc').open);
+ chk('Activar cancelada: ofrece reactivar con su fecha (marcado) y oculta plan y meses', await p.evaluate(() => !document.getElementById('sxAccModoBox').hidden && document.querySelector('input[name="sxAccModo"][value="reactivar"]').checked &&
+   /vence 08\/01\/2027/.test(document.getElementById('sxAccModoRe').textContent) && document.getElementById('sxAccPlanBox').hidden && document.getElementById('sxAccMesesBox').hidden));
+ await p.click('input[name="sxAccModo"][value="meses"]');
+ chk('…al elegir «por meses» aparecen plan y meses', await p.evaluate(() => !document.getElementById('sxAccPlanBox').hidden && !document.getElementById('sxAccMesesBox').hidden));
+ await p.click('input[name="sxAccModo"][value="reactivar"]'); await p.click('#sxAccGo');
+ chk('Reactivar: envía solo el negocio', await esperar(() => !document.getElementById('dlgSxAcc').open) && JSON.stringify((llamadas('reactivar')[0] || {}).body) === JSON.stringify({ negocio: NEG3 }), JSON.stringify(llamadas('reactivar')));
+ chk('Reactivar: la tarjeta vuelve a «Activa» con «Cancelar»', await esperar(() => !document.querySelector('#sxSubs [data-sxa="activar"][data-id="33333333-3333-4333-8333-333333333333"]') && !!document.querySelector('#sxSubs [data-sxa="cancelar"][data-id="33333333-3333-4333-8333-333333333333"]')));
 
  // Negocios: resumen y detalle (con pagos y eventos)
  await p.click('#sxNav [data-s="negocios"]');

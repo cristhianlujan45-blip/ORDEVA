@@ -797,9 +797,13 @@
   <div class="dh"><h2 id="sxAccTit">Suscripción</h2><button class="x" type="button" data-cerrar>✕</button></div>
   <div class="db">
     <p class="soft" id="sxAccInfo" style="margin:10px 0 0"></p>
+    <div id="sxAccModoBox" class="motivos" style="flex-direction:column;align-items:stretch" hidden>
+      <label style="display:flex;gap:8px;align-items:center;font-weight:600"><input type="radio" name="sxAccModo" value="reactivar" style="width:auto"><span id="sxAccModoRe">↩️ Reactivar con la fecha que ya tenía</span></label>
+      <label style="display:flex;gap:8px;align-items:center;font-weight:600"><input type="radio" name="sxAccModo" value="meses" style="width:auto"><span>📅 Activar por meses desde hoy</span></label>
+    </div>
     <div id="sxAccPlanBox"><label for="sxAccPlan">Plan</label><select id="sxAccPlan"></select></div>
     <div id="sxAccMesesBox">
-      <label for="sxAccMeses">Meses de cortesía</label><input id="sxAccMeses" type="number" min="1" max="36" value="1" inputmode="numeric">
+      <label for="sxAccMeses" id="sxAccMesesTit">Meses de cortesía</label><input id="sxAccMeses" type="number" min="1" max="36" value="1" inputmode="numeric">
       <div class="motivos" id="sxAccMesesRap"><button type="button" data-m="1">1 mes</button><button type="button" data-m="3">3 meses</button><button type="button" data-m="6">6 meses</button><button type="button" data-m="12">12 meses</button></div>
     </div>
     <div id="sxAccMotivoBox"><label for="sxAccMotivo">Motivo (opcional)</label><textarea id="sxAccMotivo" maxlength="200" placeholder="Ej: Lo pidió el dueño."></textarea></div>
@@ -1231,7 +1235,7 @@
   const SX_ROL = { dueno: 'Dueño', admin: 'Administrador', cajero: 'Caja', mesero: 'Mesero' };
   const SX_ENT = { pos_basic: 'Ventas (POS)', inventory: 'Inventario', tables: 'Mesas', expenses: 'Gastos', invoices: 'Facturas de compra', ocr: 'Leer facturas (OCR)',
     ai_camera: 'Cámara con IA', voice: 'Pedidos por voz', advanced_reports: 'Reportes avanzados', multi_branch: 'Varias sedes', employee_management: 'Equipo y empleados' };
-  const SX_EVENTO = { trial_started: '🎁 Empezó la prueba gratis', payment_submitted: '📨 Envió un pago', duplicate_blocked: '🚫 Pago repetido bloqueado', payment_approved: '✅ Pago aprobado',
+  const SX_EVENTO = { subscription_reactivated: '↩️ Suscripción reactivada', trial_started: '🎁 Empezó la prueba gratis', payment_submitted: '📨 Envió un pago', duplicate_blocked: '🚫 Pago repetido bloqueado', payment_approved: '✅ Pago aprobado',
     payment_rejected: '❌ Pago rechazado', subscription_activated: '⚡ Suscripción activada', subscription_renewed: '🔁 Suscripción renovada', subscription_expired: '⌛ Venció',
     subscription_canceled: '⛔ Suscripción cancelada', plan_changed: '🔀 Cambio de plan' };
   const sx = { sb: null, sdk: null, yo: null, pend: [], pagos: [], subs: [], negocios: null, planes: [], ents: [], cfg: null, negAct: null, negPagos: [],
@@ -1250,6 +1254,10 @@
   const nomPlan = id => { const p = sxPlan(id); return p && p.name ? p.name : (id ? String(id).toUpperCase() : '—'); };
   const nomEnt = k => SX_ENT[k] || (sx.ents.find(e => e.key === k) || {}).description || k;
   const sxVigente = s => !!s && s.status === 'active' && !(s.expiry_date && new Date(s.expiry_date).getTime() <= Date.now());
+  // ¿Se puede activar? Todo lo que no esté pagado y vigente: cancelada, vencida, rechazada, en revisión, en prueba o sin suscripción.
+  function sxActivable(s){ return !s || !s.status || !(s.status === 'active' && sxVigente(s) && !s.trial && s.source !== 'trial'); }
+  // ¿Se puede reactivar con su período de antes? Cancelada (o no activa) con días por delante y un plan pago.
+  function sxReactivable(s){ return !!(s && s.status && s.status !== 'active' && s.expiry_date && Date.parse(s.expiry_date) > Date.now() && s.plan_id && s.plan_id !== 'free'); }
   function sxEstadoSub(s){
     if(!s) return ['Sin suscripción', 'soft'];
     if(s.status === 'active' && !sxVigente(s)) return SX_EST.expired;
@@ -1590,7 +1598,8 @@
       '<dl class="kv">' + kv('Plan', nomPlan(s.plan_id) + (s.plan_efectivo && s.plan_efectivo !== s.plan_id ? ' (hoy usa ' + nomPlan(s.plan_efectivo) + ')' : '')) +
         kv('Vence', s.expiry_date ? fCo(s.expiry_date) + (sxVigente(s) && s.dias_restantes != null ? ' · faltan ' + s.dias_restantes + ' día' + (s.dias_restantes === 1 ? '' : 's') : '') : '—') +
         kv('Origen', SX_ORIGEN[s.source] || s.source) + (u ? kv('Último pago', plata(u.amount) + ' · ' + (SX_PAGO[u.status] || [u.status])[0] + ' · ' + fCo(u.created_at)) : '') + '</dl>' +
-      '<div class="acc3"><button class="b" type="button" data-sxa="plan" data-id="' + id + '">🔀 Plan</button><button class="b" type="button" data-sxa="dar" data-id="' + id + '">🎁 Dar meses</button>' +
+      '<div class="acc3">' + (sxActivable(s) ? '<button class="b p" type="button" data-sxa="activar" data-id="' + id + '">✅ Activar</button>' : '') +
+        '<button class="b" type="button" data-sxa="plan" data-id="' + id + '">🔀 Plan</button><button class="b" type="button" data-sxa="dar" data-id="' + id + '">🎁 Dar meses</button>' +
         (s.status === 'canceled' ? '' : '<button class="b no" type="button" data-sxa="cancelar" data-id="' + id + '">⛔ Cancelar</button>') + '</div></article>';
   }
   function sxPintarSubs(){
@@ -1606,20 +1615,33 @@
     if(!s && sx.negAct && sx.negAct.negocio && sx.negAct.negocio.id === negocio) s = Object.assign({ business_id: negocio, negocio: sx.negAct.negocio.nombre }, sx.negAct.suscripcion || {});
     if(!s) return;
     sx.acc = { tipo, negocio, s };
-    $('sxAccTit').textContent = { plan: '🔀 Cambiar plan', dar: '🎁 Dar meses de cortesía', cancelar: '⛔ Cancelar suscripción' }[tipo];
+    $('sxAccTit').textContent = { plan: '🔀 Cambiar plan', dar: '🎁 Dar meses de cortesía', cancelar: '⛔ Cancelar suscripción', activar: '✅ Activar suscripción' }[tipo];
     $('sxAccInfo').textContent = '«' + (s.negocio || 'Negocio') + '» · ' + (s.plan_id ? 'plan ' + nomPlan(s.plan_id) + ' · ' : '') + sxEstadoSub(s.status ? s : null)[0] + (s.expiry_date ? ' · vence ' + fCo(s.expiry_date) : '');
-    $('sxAccPlanBox').hidden = tipo === 'cancelar'; $('sxAccMesesBox').hidden = tipo !== 'dar'; $('sxAccMotivoBox').hidden = tipo !== 'cancelar';
+    const re = tipo === 'activar' && sxReactivable(s);
+    $('sxAccModoBox').hidden = !re;
+    if(re){ $('sxAccModoRe').textContent = '↩️ Reactivar ' + nomPlan(s.plan_id) + ' con su fecha de antes (vence ' + fCo(s.expiry_date) + ')'; document.querySelector('input[name="sxAccModo"][value="reactivar"]').checked = true; }
+    $('sxAccMesesTit').textContent = tipo === 'activar' ? 'Meses' : 'Meses de cortesía';
+    $('sxAccMotivoBox').hidden = tipo !== 'cancelar';
+    sxAccModo();
     const lista = sx.planes.filter(p => tipo === 'plan' || p.id !== 'free');
     $('sxAccPlan').innerHTML = lista.map(p => '<option value="' + esc(p.id) + '">' + esc((p.name || p.id) + (p.price ? ' · ' + plata(p.price) : '') + (p.active ? '' : ' (inactivo)')) + '</option>').join('');
-    const pre = tipo === 'dar' ? (s.plan_id && s.plan_id !== 'free' ? s.plan_id : 'pro') : s.plan_id;
+    const pre = tipo === 'dar' || tipo === 'activar' ? (s.plan_id && s.plan_id !== 'free' ? s.plan_id : 'pro') : s.plan_id;
     if(lista.some(p => p.id === pre)) $('sxAccPlan').value = pre;
     $('sxAccMeses').value = 1; $('sxAccMotivo').value = ''; $('sxAccErr').textContent = '';
     $('sxAccNota').textContent = tipo === 'plan' ? 'Conserva las mismas fechas: solo cambia lo que el negocio puede usar.'
       : tipo === 'dar' ? 'Activa el plan sin pago (cortesía). Si ya tiene ese plan pagado y vigente, los meses se suman al final.'
+      : tipo === 'activar' ? 'Se activa de inmediato y el negocio lo ve al instante en todos sus celulares.'
       : 'El negocio pasa al plan Gratis de inmediato. Sus datos no se borran.';
-    const go = $('sxAccGo'); go.textContent = { plan: '🔀 Cambiar plan', dar: '🎁 Dar meses', cancelar: '⛔ Cancelar suscripción' }[tipo]; go.className = 'b ' + (tipo === 'cancelar' ? 'no' : 'p');
+    const go = $('sxAccGo'); go.textContent = { plan: '🔀 Cambiar plan', dar: '🎁 Dar meses', cancelar: '⛔ Cancelar suscripción', activar: '✅ Activar' }[tipo]; go.className = 'b ' + (tipo === 'cancelar' ? 'no' : 'p');
     $('dlgSxAcc').showModal();
   }
+  // Activar: «reactivar con su fecha» no pide plan ni meses.
+  function sxAccModo(){
+    const a = sx.acc, re = !!(a && a.tipo === 'activar' && !$('sxAccModoBox').hidden && (document.querySelector('input[name="sxAccModo"]:checked') || {}).value === 'reactivar');
+    $('sxAccPlanBox').hidden = !a || a.tipo === 'cancelar' || re;
+    $('sxAccMesesBox').hidden = !a || !(a.tipo === 'dar' || (a.tipo === 'activar' && !re));
+  }
+  $('sxAccModoBox').addEventListener('change', sxAccModo);
   $('sxAccMesesRap').addEventListener('click', e => { const b = e.target.closest('[data-m]'); if(b) $('sxAccMeses').value = b.dataset.m; });
   $('sxAccGo').onclick = async () => {
     const a = sx.acc; if(!a) return;
@@ -1634,6 +1656,14 @@
       if(!(m >= 1 && m <= 36)) return err('Los meses van de 1 a 36.');
       if(!$('sxAccPlan').value) return err('Elige un plan.');
       ruta = 'dar'; cuerpo = { negocio: a.negocio, plan: $('sxAccPlan').value, meses: m };
+    }else if(a.tipo === 'activar'){
+      if(!$('sxAccModoBox').hidden && (document.querySelector('input[name="sxAccModo"]:checked') || {}).value === 'reactivar'){ ruta = 'reactivar'; cuerpo = { negocio: a.negocio }; }
+      else{
+        const m = Math.round(+$('sxAccMeses').value);
+        if(!(m >= 1 && m <= 36)) return err('Los meses van de 1 a 36.');
+        if(!$('sxAccPlan').value) return err('Elige un plan.');
+        ruta = 'activar'; cuerpo = { negocio: a.negocio, plan: $('sxAccPlan').value, meses: m };
+      }
     }else{ ruta = 'cancelar'; cuerpo = { negocio: a.negocio, motivo: $('sxAccMotivo').value.trim() }; }
     const b = $('sxAccGo'); b.disabled = true; err('');
     try{
@@ -1641,6 +1671,7 @@
       $('dlgSxAcc').close();
       const txt = a.tipo === 'plan' ? '🔀 «' + nom + '» ahora tiene el plan ' + nomPlan(s.plan_id || cuerpo.plan) + '.'
         : a.tipo === 'dar' ? '🎁 Listo: «' + nom + '» tiene ' + nomPlan(s.plan_id || cuerpo.plan) + ' hasta el ' + fCo(s.expiry_date) + '.'
+        : a.tipo === 'activar' ? '✅ «' + nom + '» quedó activo con el plan ' + nomPlan(s.plan_id || cuerpo.plan || a.s.plan_id) + ' hasta el ' + fCo(s.expiry_date) + '.'
         : '⛔ Suscripción de «' + nom + '» cancelada.';
       sxHecho(txt, a.tipo === 'cancelar', a.tipo === 'cancelar' ? '⛔ Suscripción cancelada.' : '✅ Listo.');
       await sxRecargar();
@@ -1705,7 +1736,8 @@
         '<div class="chips" style="margin-top:12px">' + pillDe(sxEstadoSub(s)) + '<span class="pill ' + (j.plan_efectivo && j.plan_efectivo !== 'free' ? 'ok' : 'soft') + '">' + esc('Usa hoy: ' + nomPlan(j.plan_efectivo || 'free')) + '</span></div>' +
         '<dl class="kv" style="margin-top:12px">' + kv('Creado por', n.creado_por_email) + kv('Creado', fCo(n.creado_en)) +
           (s ? kv('Plan', nomPlan(s.plan_id)) + kv('Origen', SX_ORIGEN[s.source] || s.source) + kv('Inicio', fCo(s.start_date)) + kv('Vence', fCo(s.expiry_date)) : kv('Suscripción', 'Todavía no tiene')) + '</dl>' +
-        '<div class="acc3" style="margin-top:12px">' + (s ? '<button class="b" type="button" data-sxa="plan" data-id="' + nid + '">🔀 Plan</button>' : '') +
+        '<div class="acc3" style="margin-top:12px">' + (sxActivable(s) ? '<button class="b p" type="button" data-sxa="activar" data-id="' + nid + '">✅ Activar</button>' : '') +
+          (s ? '<button class="b" type="button" data-sxa="plan" data-id="' + nid + '">🔀 Plan</button>' : '') +
           '<button class="b" type="button" data-sxa="dar" data-id="' + nid + '">🎁 Dar meses</button>' + (s && s.status !== 'canceled' ? '<button class="b no" type="button" data-sxa="cancelar" data-id="' + nid + '">⛔ Cancelar</button>' : '') + '</div>' +
         '<div class="sx-sec"><h3>Datos del negocio</h3>' + sxStats(j.resumen) + '</div>' +
         '<div class="sx-sec"><h3>Lo que puede usar hoy</h3><div class="chips">' + (Object.keys(ents).map(k => '<span class="chip' + (ents[k] ? '' : ' no') + '">' + (ents[k] ? '✓ ' : '') + esc(nomEnt(k)) + '</span>').join('') || '<span class="soft">—</span>') + '</div></div>' +
@@ -1804,7 +1836,7 @@
       const p = sxPagoDe(id); if(!p) return;
       if(a === 'ver') sxVerComprobante(p); else if(a === 'aprobar') sxAbrirAprobar(p); else sxAbrirRechazo(p);
     }else if(a === 'detalle') sxAbrirNegocio(id);
-    else if(a === 'plan' || a === 'dar' || a === 'cancelar') sxAbrirAccion(a, id);
+    else if(a === 'plan' || a === 'dar' || a === 'cancelar' || a === 'activar') sxAbrirAccion(a, id);
     else if(a === 'editarplan') sxAbrirPlan(id);
   }
   $('sxPanel').addEventListener('click', sxClic);
