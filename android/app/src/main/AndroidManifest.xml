@@ -60,6 +60,13 @@
             </intent-filter>
         </activity>
 
+        <!-- Entrar a YouTube con la cuenta Premium dentro de la app (para que el reproductor no ponga comerciales) -->
+        <activity
+            android:name=".EntrarYouTube"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|uiMode|density"
+            android:windowSoftInputMode="adjustResize" />
+
         <!-- Ver la música que ya suena desde el celular y, si el dueño lo activa, los avisos de plata recibida de
              DaviPlata/Nequi/bancos (solo si da «Acceso a notificaciones») -->
         <service

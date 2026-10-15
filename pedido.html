@@ -507,7 +507,7 @@ const dom=P.get('dom')==='1';
 const SUF=dom?'dom':mesa;
 // Canciones por mesa cada 15 min: lo decide el negocio (Ajustes → Música) y llega con la carta (cat.cl) o con la cuenta
 // en vivo de la mesa (snap.cm). 0 = sin límite.
-const MAXC=()=>{try{if(snap&&+snap.cm>0)return +snap.cm;}catch(e){}try{if(cat&&cat.cl!=null)return +cat.cl>0?+cat.cl:0;}catch(e){}return 0;};
+const MAXC=()=>{try{if(snap&&+snap.cm>0)return +snap.cm;}catch(e){}try{if(cat&&cat.cl!=null)return +cat.cl>0?+cat.cl:0;}catch(e){}return 10;};   // sin dato: 10 (lo que trae Vento)
 const V=15*6e4,K='canc_'+SUF,KR='rondas_'+SUF,KH='hist_'+SUF,VIDA_RONDA=12*36e5;
 const $=i=>document.getElementById(i);
 const jget=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))||d}catch(e){return d}};
@@ -922,9 +922,10 @@ async function ytCancionesDeArtista(channelId,nombre){
   if(ytArtistCache[channelId]) return ytArtistCache[channelId];
   // Si la API no responde (sin cupo), las canciones del artista salen de la búsqueda sin cupo con su nombre.
   const porNombre=async()=>{ const sj=nombre?await ytSrvBuscar(nombre,'video'):null; return sj?sj.items.filter(it=>it.id&&it.id.videoId).slice(0,8).map(it=>({title:it.snippet.title,channelTitle:it.snippet.channelTitle,thumb:ytThumb(it.snippet),views:0})):[]; };
-  const r=await ytCancionesDeArtistaApi(channelId);
+  // Primero por el Servidor Vento (sin el cupo de Google); la API de YouTube (con cupo) solo si el servidor no trae nada.
+  const r=await porNombre();
   if(r.length) return ytArtistCache[channelId]=r;
-  const r2=await porNombre();
+  const r2=await ytCancionesDeArtistaApi(channelId);
   if(r2.length) ytArtistCache[channelId]=r2;
   return r2;
 }

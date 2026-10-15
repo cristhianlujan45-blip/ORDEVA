@@ -103,7 +103,7 @@ const video = (id, t, c) => ({ id: { videoId: id }, snippet: { title: t, channel
     if(await p.isVisible('#ypSc')) await p.click('#ypSc'); else await p.evaluate(() => window.vitoSinComerciales());
     await p.waitForSelector('#mzScOv.show');
     const g = await p.textContent('#mzScOv');
-    chk('6. Explica por qué salen (Google no deja usar Premium dentro de apps) y que la solución es el YouTube del TV', /no sabe que tienes Premium/.test(g) && /YouTube de tu TV/.test(g) && /sin comerciales y sin límite/.test(g), g.slice(0, 300));
+    chk('6. Explica por qué salen (YouTube necesita tu cuenta Premium en el reproductor) y ofrece el TV', /cuenta Premium iniciada/.test(g) && /siempre funciona, sin límites/.test(g) && /sin comerciales y sin límite/.test(g) && /youtube\.com/.test(g), g.slice(0, 300));
     chk('6. Botones para vincular el TV y conectar la cuenta', await p.isVisible('#mzScOv [data-sc="tv"]') && await p.isVisible('#mzScOv [data-sc="codigo"]') && await p.isVisible('#mzScOv [data-sc="cuenta"]'));
     await p.click('#mzScOv [data-sc="codigo"]');
     await p.waitForTimeout(800);
@@ -111,6 +111,28 @@ const video = (id, t, c) => ({ id: { videoId: id }, snippet: { title: t, channel
     chk('6. En Música está «🚫 Sin comerciales con tu YouTube Premium»', await p.evaluate(() => !!document.getElementById('mzScBtn')));
     const r = await p.evaluate(() => { const x = window.Laya.responder('por qué me salen comerciales en la música si tengo youtube premium'); return x && { t: x.text, run: typeof x.run }; });
     chk('6. Asistente: «¿por qué salen comerciales si tengo Premium?» → la guía', r && /SIN comerciales/.test(r.t) && r.run === 'function', r);
+
+    // ===== 7. App Android: entrar con la cuenta Premium dentro de la app =====
+    const ctx2 = await b.newContext({ viewport: { width: 390, height: 844 } });
+    await ctx2.route('**/*', r => new URL(r.request().url()).hostname === 'localhost' ? r.continue() : r.abort());
+    await ctx2.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); }catch(e){}
+      window.__and = { entrar: 0, ses: false };
+      window.VentoAndroid = { youtubeEntrar: () => { window.__and.entrar++; }, youtubeSesion: () => window.__and.ses, notificar: () => true }; });
+    const q = await ctx2.newPage(); q.on('pageerror', e => errs.push('apk: ' + e.message));
+    await q.goto(BASE + '/index.html'); await q.waitForTimeout(1500);
+    await q.fill('#authBiz', 'Bar App'); await q.fill('#authUser', 'ana'); await q.fill('#authPass', 'clave123'); await q.click('#authBtn'); await q.waitForTimeout(1200);
+    await q.click('#onbSaltar').catch(() => {});
+    await q.evaluate(() => { document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')); window.__toasts = []; const s = window.showToast; window.showToast = (m, ms) => { window.__toasts.push(String(m)); s(m, ms); }; window.vitoSinComerciales(); });
+    await q.waitForSelector('#mzScOv.show');
+    chk('7. En la app: primer paso «🔑 Entrar con mi YouTube Premium» (y aviso honesto si Google no deja)', await q.isVisible('#mzScOv [data-sc="entrar"]') && /no es seguro/.test(await q.textContent('#mzScOv')));
+    await q.click('#mzScOv [data-sc="entrar"]');
+    chk('7. El botón abre la pantalla de Google dentro de la app', await q.evaluate(() => window.__and.entrar === 1));
+    await q.evaluate(() => { window.__and.ses = true; window.ventoYouTubeSesion(true); window.vitoSinComerciales(); });
+    chk('7. Al volver con la sesión: «Entraste con tu YouTube Premium… ya no pone comerciales»', await q.evaluate(() => window.__toasts.some(t => /Entraste con tu YouTube Premium/.test(t))));
+    chk('7. La guía lo marca «✅ Ya entraste» y ya no pide entrar', /Ya entraste/.test(await q.textContent('#mzScOv')) && !(await q.isVisible('#mzScOv [data-sc="entrar"]')));
+    await q.evaluate(() => { window.__and.ses = false; window.ventoYouTubeSesion(false); });
+    chk('7. Si Google no deja entrar: lo dice claro y ofrece el TV', await q.evaluate(() => window.__toasts.some(t => /No quedó la sesión de YouTube/.test(t) && /TV/.test(t))));
+    await ctx2.close();
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.stack || e)); }
   chk('Sin errores de página', !errs.length, errs);
   await b.close();

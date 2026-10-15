@@ -33,6 +33,19 @@ const CANALES = [ch('UCkarolg000000000000000a', 'KAROL G'), ch('UCkarolgtopic000
     const lc = YT.leerResultados(pagina(VIDEOS.concat(CANALES)), 'canal', 10);
     chk('1. Lee los canales con su foto (https)', lc.length === 2 && lc[0].id.channelId === 'UCkarolg000000000000000a' && /^https:\/\/yt3/.test(lc[0].snippet.thumbnails.default.url), lc);
     chk('1. Página sin resultados → lista vacía (sin error)', YT.leerResultados('<html>nada</html>', 'video').length === 0);
+    // 1b. Si la página de resultados falla, se busca por el servicio interno de YouTube (también sin cupo de Google);
+    //     si los dos fallan, sale lo último que se encontró para esa búsqueda.
+    const datosJson = items => ({ contents: { twoColumnSearchResultsRenderer: { primaryContents: { sectionListRenderer: { contents: [{ itemSectionRenderer: { contents: items } }] } } } } });
+    const pedidos1b = [];
+    let caido = false;
+    const traer1b = async (url, op) => { pedidos1b.push(url); if(caido) return { ok: false, status: 503, text: async () => '', json: async () => null };
+      if(/\/results\?/.test(url)) return { ok: false, status: 429, text: async () => '' };
+      return { ok: true, status: 200, json: async () => datosJson(VIDEOS), text: async () => '' }; };
+    let r1b = await YT.buscar('respaldo uno', 'video', traer1b);
+    chk('1b. YouTube bloquea la página de resultados (429) → igual encuentra por el otro camino (sin cupo de Google)', r1b.items.length === 3 && pedidos1b.some(u => /youtubei\/v1\/search/.test(u)), pedidos1b);
+    caido = true;
+    let r1c = null; try{ r1c = await YT.buscar('respaldo uno', 'video', traer1b); }catch(e){ r1c = { error: e.message }; }
+    chk('1b. Con YouTube caído del todo sale lo último encontrado para esa búsqueda (no queda vacío)', r1c && r1c.items && r1c.items.length === 3, r1c);
 
     // Simulación: youtube.com (página de resultados) y la API de YouTube SIN CUPO.
     const usos = { api: [], yt: [] };

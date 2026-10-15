@@ -42,7 +42,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     await A.p.evaluate(base => {
       document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show'));
       for(let i = 1; i <= 3; i++) data.tables[i] = data.tables[i] || { items: [], people: [] };
-      data.cancionesMesa = 10;                                       // Ajustes → Música: 10 por mesa (así viene: sin límite)
+      // Ajustes → Música: 10 por mesa (así viene)
       saveData();
       const M = window.vitoMod, c = M.qCfg(); c.url = base + '/pedido.html'; c.live = true; M.SS('vito_qr', c);
       M.reconectarPedidos();

@@ -139,6 +139,14 @@ public class VentoApp extends Application {
 
     static String q(String s) { return JSONObject.quote(s == null ? "" : s); }
 
+    /** ¿Hay una sesión de YouTube en las cookies de la app? (las del reproductor de Vento) */
+    static boolean youtubeSesion() {
+        try {
+            String c = CookieManager.getInstance().getCookie("https://www.youtube.com");
+            return c != null && (c.contains("LOGIN_INFO=") || c.contains("SAPISID=") || c.contains("__Secure-3PAPISID="));
+        } catch (Exception e) { return false; }
+    }
+
     static boolean tiene(String permiso) {
         return Build.VERSION.SDK_INT < 23 || app.checkSelfPermission(permiso) == PackageManager.PERMISSION_GRANTED;
     }
@@ -604,6 +612,19 @@ public class VentoApp extends Application {
         /** Los avisos que llegaron y la página todavía no ha tomado: [{id, txt, t}]. */
         @JavascriptInterface
         public String pagosAvisosTomar() { return VentoEscucha.tomar(getSharedPreferences("vento", MODE_PRIVATE)); }
+
+        /** YouTube Premium en el reproductor de Vento: abre la página de Google para entrar con la cuenta (dentro de la app). */
+        @JavascriptInterface
+        public void youtubeEntrar() {
+            ui.post(() -> {
+                Context x = ventana != null ? ventana : VentoApp.this;
+                try { Intent i = new Intent(x, EntrarYouTube.class); if (ventana == null) i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); x.startActivity(i); } catch (Exception ignorado) { }
+            });
+        }
+
+        /** ¿Ya entró a YouTube dentro de la app? */
+        @JavascriptInterface
+        public boolean youtubeSesion() { return VentoApp.youtubeSesion(); }
 
         /** Abre el permiso «Acceso a notificaciones» para Vento. */
         @JavascriptInterface

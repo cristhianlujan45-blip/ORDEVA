@@ -130,14 +130,31 @@ export function leerDatos(raiz: any, tipo: "video" | "canal" | "lista", max = 10
   return out;
 }
 
+// Búsqueda SIN el cupo de Google, por dos caminos (si uno falla o viene vacío, el otro):
+//  1. la página pública de resultados (youtube.com/results);
+//  2. el mismo servicio interno con el que la página de YouTube pide más resultados (youtubei/v1/search, sin clave de API).
+// Si los dos fallan (YouTube caído o bloqueando un rato), se devuelve lo último que se encontró para esa búsqueda, aunque
+// sea viejo: mejor una canción de hace un rato que nada.
+const VERSION_WEB = "2.20250101.00.00";
 export async function buscar(q: string, tipo: "video" | "canal" | "lista", traer: typeof fetch = fetch): Promise<Resultado> {
   const clave = tipo + ":" + q.toLowerCase();
   const c = cache.get(clave);
   if (c && Date.now() - c.t < CACHE_MS) return c.r;
-  const url = "https://www.youtube.com/results?hl=es&gl=CO&search_query=" + encodeURIComponent(q) + "&sp=" + FILTRO[tipo];
-  const r = await traer(url, { headers: { "User-Agent": UA, "Accept-Language": "es-CO,es;q=0.9", "Cookie": "CONSENT=YES+1" } });
-  if (!r.ok) throw new Error("YouTube respondió " + r.status);
-  const items = leerResultados(await r.text(), tipo, 10);
+  const h = { "User-Agent": UA, "Accept-Language": "es-CO,es;q=0.9", "Cookie": "CONSENT=YES+1" };
+  let items: Array<Video | Canal | Lista> = [], error = "";
+  try {
+    const r = await traer("https://www.youtube.com/results?hl=es&gl=CO&search_query=" + encodeURIComponent(q) + "&sp=" + FILTRO[tipo], { headers: h });
+    if (r.ok) items = leerResultados(await r.text(), tipo, 10); else error = "YouTube respondió " + r.status;
+  } catch (e) { error = e instanceof Error ? e.message : String(e); }
+  if (!items.length) {
+    try {
+      const r = await traer("https://www.youtube.com/youtubei/v1/search?prettyPrint=false", { method: "POST", headers: { ...h, "Content-Type": "application/json" },
+        body: JSON.stringify({ context: { client: { clientName: "WEB", clientVersion: VERSION_WEB, hl: "es", gl: "CO" } }, query: q, params: decodeURIComponent(FILTRO[tipo]) }) });
+      if (r.ok) items = leerDatos(await r.json().catch(() => null), tipo, 10); else error = error || "YouTube respondió " + r.status;
+    } catch (e) { error = error || (e instanceof Error ? e.message : String(e)); }
+  }
+  if (!items.length && c) return c.r;                       // lo último que se encontró (aunque sea viejo)
+  if (!items.length && error) throw new Error(error);
   const res: Resultado = { items, fuente: "youtube.com" };
   if (items.length) { cache.set(clave, { t: Date.now(), r: res }); if (cache.size > 3000) cache.clear(); }
   return res;

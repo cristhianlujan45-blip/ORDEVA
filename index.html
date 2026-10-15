@@ -4087,7 +4087,7 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
       </div>
       <div class="settings-row">
         <div class="settings-row-text"><strong>🎵 Canciones que puede pedir cada mesa por QR</strong><span>Cuántas puede pedir una mesa (sumando todos sus celulares) cada 15 minutos. «Sin límite»: piden las que quieran; igual suenan por turnos justos entre las mesas.</span></div>
-        <select id="cancionesMesaSel" class="mz-in" style="max-width:150px"><option value="0">Sin límite</option><option value="3">3</option><option value="5">5</option><option value="10">10</option><option value="15">15</option><option value="20">20</option></select>
+        <select id="cancionesMesaSel" class="mz-in" style="max-width:150px"><option value="0">Sin límite</option><option value="3">3</option><option value="5">5</option><option value="10">10 (recomendado)</option><option value="15">15</option><option value="20">20</option></select>
       </div>
     </div>
 
@@ -19561,7 +19561,7 @@ function wireAccountUI(){
   }
   const cmSel = document.getElementById('cancionesMesaSel');
   if(cmSel){
-    const v = Number(data.cancionesMesa) || 0; cmSel.value = String([0, 3, 5, 10, 15, 20].includes(v) ? v : 0);
+    const v = data.cancionesMesa == null ? 10 : (Number(data.cancionesMesa) || 0); cmSel.value = String([0, 3, 5, 10, 15, 20].includes(v) ? v : 10);
     cmSel.onchange = () => {
       data.cancionesMesa = Number(cmSel.value) || 0; saveData();
       try{ if(window.vitoPublicarCatalogo) window.vitoPublicarCatalogo(true); }catch(e){}            // el QR de las mesas lo sabe de una vez
@@ -21252,8 +21252,8 @@ function iniQR(){
 }
 
 /* ---------- Música: máximo 5 por mesa y turnos equitativos ---------- */
-// Canciones por mesa cada 15 min (Ajustes → Negocio → Música). 0 = sin límite (así viene).
-const mzMax=()=>{const n=Number(typeof data!=='undefined'&&data?data.cancionesMesa:0);return n>0?n:0;};
+// Canciones por mesa cada 15 min (Ajustes → Negocio → Música): 10 (así viene); 0 = sin límite.
+const mzMax=()=>{const v=typeof data!=='undefined'&&data?data.cancionesMesa:undefined;if(v==null||v==='')return 10;const n=Number(v);return n>0?n:0;};
 const cola=()=>LS('vito_cola',[]);
 const VENT=15*6e4;
 /* ---------- Una sola cola con estados (vito_cola) ----------
@@ -22704,12 +22704,19 @@ function mzSinComerciales(){
       const ir=()=>{try{ypCerrar();}catch(x){}const b=document.querySelector('nav button[data-view="musica"]')||document.querySelector('.more-tile[data-go="musica"]');if(b)b.click();};
       if(a.dataset.sc==='tv'){ir();setTimeout(()=>{try{tvTransmitirToque();}catch(x){const t=$('tvTransmitir');t&&t.click();}},350);}
       if(a.dataset.sc==='codigo'){ir();setTimeout(()=>{try{tvSinLista('En el TV: abre YouTube con tu cuenta Premium → Configuración → «Vincular con código de TV» y escribe aquí los 12 números.');}catch(x){}},350);}
+      if(a.dataset.sc==='entrar'){try{window.VentoAndroid.youtubeEntrar();}catch(x){}return;}
       if(a.dataset.sc==='cuenta'){try{yConectar(false,()=>{try{ypMiasCache=null;ypMioCache={};}catch(x){}showToast('✅ Tu cuenta de YouTube quedó vinculada.');});}catch(x){showToast('No pude abrir Google. Revisa el internet.');}}
     });}
-  const app=!!window.VentoAndroid,tv=mzHayTV(),con=!!yTok();
+  const A=window.VentoAndroid,app=!!(A&&A.youtubeEntrar),ses=ytSesionApp(),tv=mzHayTV(),con=!!yTok();
   ov.innerHTML='<div class="modal gp-modal"><h2>🚫 Música sin comerciales con tu YouTube Premium</h2>'+
-    '<div class="modal-sub"><b>Por qué salen comerciales:</b> el reproductor que va dentro de Vento es el de YouTube para otras páginas y apps. Google no deja iniciar sesión con tu cuenta dentro de apps (lo bloquea por seguridad), así que ese reproductor <b>no sabe que tienes Premium</b>. Tu Premium sí funciona en las apps de YouTube: por eso la solución es que suene en el <b>YouTube de tu TV</b>.</div>'+
+    '<div class="modal-sub"><b>Por qué salen comerciales:</b> el reproductor de Vento es el de YouTube, y YouTube solo quita los comerciales cuando sabe que eres tú, con tu cuenta Premium iniciada <b>en ese mismo reproductor</b>.</div>'+
+    (app?'<div class="gp-paso" style="margin:10px 0;border-color:'+(ses?'#22c55e':'#ff0033')+'"><div class="gp-n">★</div><div><b>Entra con tu cuenta Premium en esta app</b>'+
+        (ses?'<span class="gp-e gp-si">✅ Ya entraste</span><div class="gp-c">YouTube ya sabe que eres tú: con tu Premium, el reproductor de Vento no pone comerciales (desde la próxima canción).</div>'
+            :'<div class="gp-c">Se abre la página de Google de siempre; entra con tu correo y contraseña de YouTube Premium (Vento no los ve). Queda guardado en la app.<br><button type="button" class="btn-primary gp-btn" data-sc="entrar">🔑 Entrar con mi YouTube Premium</button><br><small>Si Google dice <i>«Este navegador o app no es seguro»</i>, Google no deja entrar desde apps en tu celular: usa el TV (abajo), donde tu Premium siempre funciona.</small></div>')+
+      '</div></div>'
+      :'<div class="gp-alerta" style="border-color:#22c55e">💻 En este navegador: entra a <b>youtube.com</b> con tu cuenta Premium (en este mismo navegador) y vuelve a Vento: el reproductor usa tu sesión.</div>')+
     (tv?'<div class="gp-alerta" style="border-color:#22c55e">✅ Ya tienes un TV vinculado: la música suena allá. Si el TV tiene tu cuenta Premium, no salen comerciales.</div>':'')+
+    '<div class="yp-sub" style="margin-top:12px">También en el TV (siempre funciona, sin límites)</div>'+
     '<ol class="gp-lista">'+
     '<li class="gp-paso"><div class="gp-n">1</div><div><b>En el TV, entra a YouTube con tu cuenta Premium</b><div class="gp-c">Abre la app de <b>YouTube</b> del TV → tu foto (arriba a la izquierda) → elige o agrega <b>tu cuenta con Premium</b>.</div></div></li>'+
     '<li class="gp-paso"><div class="gp-n">2</div><div><b>Vincula el TV con Vento</b><div class="gp-c">Una sola vez: queda vinculado. Las canciones que pidan las mesas por QR y las que pongas tú suenan allá solas, una tras otra, <b>sin comerciales y sin límite</b> (no gasta el cupo de Google).'+
@@ -22718,11 +22725,20 @@ function mzSinComerciales(){
       (con?'<br>✅ <b>Ya está conectada.</b>':'<br><button type="button" class="btn-ghost gp-btn" data-sc="cuenta">🔗 Conectar mi cuenta de YouTube</button>')+'</div></div></li>'+
     '</ol>'+
     '<div class="settings-desc" style="margin-top:8px"><b>¿Sin TV?</b> Conecta el celular o el computador a un parlante Bluetooth y usa <b>YouTube Music</b> con tu Premium: Vento pasa las canciones a tu lista «Música '+esc((typeof data!=='undefined'&&data&&data.businessName)||'del local')+'» (Música → «Lista de YouTube Music»). Ojo: Google pone un tope diario a esa forma; cuando se llena, Vento sigue con su reproductor (con comerciales) hasta el otro día.'+
-      (app?'<br><small>En la app Android el reproductor de Vento seguirá mostrando comerciales: Google no permite usar tu Premium ahí.</small>':'')+'</div>'+
+'</div>'+
     '<div class="modal-actions"><button type="button" class="btn-close" data-sc="x">Listo</button></div></div>';
   ov.classList.add('show');
 }
 window.vitoSinComerciales=mzSinComerciales;
+// ¿La app Android ya tiene la sesión de YouTube (las cookies del reproductor)?
+function ytSesionApp(){try{const A=window.VentoAndroid;return !!(A&&A.youtubeSesion&&A.youtubeSesion());}catch(e){return false;}}
+// La app Android avisa al cerrar la pantalla de Google.
+window.ventoYouTubeSesion=ok=>{
+  if(ok){showToast('✅ Entraste con tu YouTube Premium en la app: desde la próxima canción el reproductor de Vento no pone comerciales.',9000);try{ypPintar();}catch(e){}}
+  else{showToast('⚠️ No quedó la sesión de YouTube. Si Google dijo que la app no es segura, Google no deja entrar desde apps en tu celular: usa el YouTube de tu TV (sin comerciales y sin límite).',11000);
+    try{window.ventoError&&window.ventoError('musica','No se pudo entrar a YouTube dentro de la app',{},'musica|login-youtube-app');}catch(e){}}
+  try{if($('mzScOv')&&$('mzScOv').classList.contains('show'))mzSinComerciales();}catch(e){}
+};
 function ypCrear(){
   if($('ypOv'))return;
   const ov=document.createElement('div');ov.id='ypOv';ov.className='overlay yp-ov';
@@ -22736,7 +22752,7 @@ function ypCrear(){
         '<div class="yp-video" id="ypVideo"><img id="ypPortada" alt=""><div class="yp-nada" id="ypNada">🎵 No está sonando nada.<br><small>Busca una canción o pon una de tus listas.</small></div></div>'+
         '<div class="yp-ahora"><div class="yp-info"><div class="yp-titulo" id="ypTitulo"></div><div class="yp-quien" id="ypQuien"></div><div class="yp-donde" id="ypDonde"></div><div class="yp-bar"><i id="ypBar"></i></div><div class="yp-tiempo" id="ypTiempo"></div></div>'+
         '<div class="yp-ctrl"><button type="button" class="yp-cor" id="ypCor" hidden>🤍</button><button type="button" class="btn-ghost" id="ypPausa">⏯<span class="yp-bt-txt"> Pausa</span></button><button type="button" class="btn-primary" id="ypSig">⏭<span class="yp-bt-txt"> Siguiente</span></button></div></div>'+
-        '<button type="button" class="yp-sc" id="ypSc" hidden>🚫 ¿Salen comerciales? Usa tu YouTube Premium en el TV <b>›</b></button>'+
+        '<button type="button" class="yp-sc" id="ypSc" hidden>🚫 ¿Salen comerciales? Entra con tu YouTube Premium <b>›</b></button>'+
         '<div class="yp-sigue" id="ypSigue"></div>'+
       '</section>'+
       '<div class="yp-cuerpo" id="ypCuerpo"></div>'+
@@ -22782,7 +22798,7 @@ function ypPintar(){
   $('ypBar').style.width=(x&&x.dur?Math.min(100,t/x.dur*100):0).toFixed(1)+'%';
   $('ypTiempo').textContent=x?mmss(t)+' / '+(x.dur?mmss(x.dur):'--:--'):'';
   $('ypPausa').hidden=!(f==='app'||f==='tvyt'||f==='cc'||f==='remoto');
-  $('ypSc').hidden=!(f==='app'||(!x&&!mzHayTV()));
+  $('ypSc').hidden=!(f==='app'||(!x&&!mzHayTV()))||ytSesionApp();
   const cor=$('ypCor');cor.hidden=!(x&&x.vid);if(x&&x.vid){const si=ypEsFav(x.vid);cor.textContent=si?'❤️':'🤍';cor.title=si?'Quitar de Mis canciones':'Guardar en Mis canciones';cor.setAttribute('aria-label',cor.title);}
   const o=ordenJusto(cola());$('ypNCola').textContent=o.length?String(o.length):'';
   // «A continuación» (solo se vuelve a pintar si cambió)
