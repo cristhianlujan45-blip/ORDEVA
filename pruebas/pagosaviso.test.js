@@ -7,6 +7,11 @@
 //  4. Un pago propio enlazado al servidor no se come el segundo pago igual; uno que reenvió OTRO celular sí evita repetirlo.
 //  5. El aviso se reenvía al servidor con su ID; el interruptor «Avisos de pagos» llega a Android (pagosNotif).
 //  6. Nequi: «… desde Nequi».
+//  7. Publicidad del banco («¿Te llegó la prima?…») NO es un pago: ni se registra ni suena.
+//  8. Aviso de una app con nombre de banco que NO es la oficial (Android lo marca «revisar") → «⚠️ Revisar», nunca «confirmado».
+//  9. Volumen de la voz de los pagos (Ajustes → Pagos): se guarda, llega a Android y «▶ Probar» la dice; hasta 150 % en la app.
+// 10. En la app, los pagos que llegan por otro camino (otro celular / servidor) también usan la voz de pagos de Android.
+// 11. En el navegador, la voz de los pagos sale con el volumen elegido.
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 
@@ -24,6 +29,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
         pagosAvisosTomar: () => { const s = JSON.stringify(A.cola); A.cola = []; return s; },
         mediosPermiso: () => {}, notificar: (t, x, c) => { A.notifs.push({ t, x, c }); return true; },
         pagosNotif: v => { A.notifPagos.push(!!v); },
+        pagosVolumen: v => { A.vol = v; }, pagosProbarVoz: () => { A.probo = (A.probo || 0) + 1; },
       };
     });
     const p = await ctx.newPage(); p.on('pageerror', e => errs.push(e.message));
@@ -87,6 +93,62 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     await p.evaluate(() => { window.__and.notifPagos = []; });
     const cambio = await p.evaluate(() => { const i = document.querySelector('[data-notif="pagos"]'); if(!i) return 'sin interruptor'; i.checked = false; i.dispatchEvent(new Event('change')); return 'ok'; });
     chk('5. Apagar «Avisos de pagos» le avisa a Android (no saca el aviso del celular)', cambio === 'ok' && (await p.evaluate(() => window.__and.notifPagos)).includes(false), cambio);
+
+    // 7. Publicidad
+    const antes7 = await p.evaluate(() => ({ n: data.pagos.lista.length, v: window.__and.voz.length }));
+    await llega('k7:1:-7', false, 'Nequi | Nequi | ¿Te llegó la prima? Guárdala en un colchón y gana hasta $50.000');
+    await llega('k7:2:-7', false, 'DaviPlata | DaviPlata | Te prestamos hasta $5.000.000, ¡le llegó la oportunidad!');
+    const desp7 = await p.evaluate(() => ({ n: data.pagos.lista.length, v: window.__and.voz.length }));
+    chk('7. Publicidad del banco que parece pago → no se registra ni suena', desp7.n === antes7.n && desp7.v === antes7.v, { antes7, desp7 });
+
+    // 8. App que no es la oficial
+    await llega('k8:9:-1', true, 'DaviPlata | ¡Le llegó plata! | PEDRO le pasó $33.000 a su DaviPlata');
+    await p.evaluate(() => { window.__and.cola.push({ id: 'k8:10:-1', txt: 'DaviPlata | ¡Le llegó plata! | LUIS le pasó $44.000 a su DaviPlata', t: Date.now(), voz: true, revisar: 'La app «DaviPlata» de este celular no es la oficial (no se instaló desde la tienda): míralo en la app del banco' }); window.ventoAvisosNativos(); });
+    const r8 = await p.evaluate(() => (data.pagos.lista || []).find(x => x.monto === 44000));
+    const t8 = await p.evaluate(() => window.__toasts.slice(-3).join(' | '));
+    chk('8. App que no es la oficial → pago «⚠️ Revisar» (no «confirmado»), con el motivo', r8 && r8.estado === 'revisar' && /no es la oficial/.test(r8.fuente), r8);
+    chk('8. … y en pantalla sale «⚠️», no «Pago confirmado»', /⚠️ DaviPlata: \$44\.000/.test(t8) && !/Pago confirmado · \$44\.000/.test(t8), t8);
+    chk('8. La app oficial sí queda confirmada', await p.evaluate(() => { const x = data.pagos.lista.find(y => y.monto === 33000); return !!x && x.estado === 'app'; }));
+
+    // 9. Volumen
+    const ui9 = await p.evaluate(() => { const v = document.getElementById('pgVol'); return v ? { max: v.max, min: v.min, txt: document.getElementById('pgVolTxt').textContent, desc: document.getElementById('pgVolFila').textContent } : null; });
+    chk('9. Ajustes → Pagos: «🔊 Volumen de la voz de los pagos» de 10 a 150 % en la app (más fuerte de lo normal)', ui9 && ui9.min === '10' && ui9.max === '150' && /100 %/.test(ui9.txt) && /más fuerte de lo normal/i.test(ui9.desc), ui9);
+    await p.evaluate(() => { const v = document.getElementById('pgVol'); v.value = '130'; v.dispatchEvent(new Event('input')); v.dispatchEvent(new Event('change')); });
+    let v9 = await p.evaluate(() => ({ ls: localStorage.getItem('vento_pagos_vol'), and: window.__and.vol, txt: document.getElementById('pgVolTxt').textContent }));
+    chk('9. Subirlo a 130 % → se guarda, le llega a Android y dice «más fuerte de lo normal»', v9.ls === '130' && v9.and === 130 && /130 % · más fuerte de lo normal/.test(v9.txt), v9);
+    await p.evaluate(() => { document.getElementById('pgVolMas').click(); document.getElementById('pgVolMas').click(); document.getElementById('pgVolMas').click(); });
+    v9 = await p.evaluate(() => ({ ls: localStorage.getItem('vento_pagos_vol'), and: window.__and.vol }));
+    chk('9. «🔊 Más alto» sube de a 10 y no pasa de 150 %', v9.ls === '150' && v9.and === 150, v9);
+    await p.evaluate(() => { document.getElementById('pgVolMenos').click(); });
+    chk('9. «🔉 Más bajo» lo baja', await p.evaluate(() => localStorage.getItem('vento_pagos_vol') === '140' && window.__and.vol === 140));
+    await p.evaluate(() => document.getElementById('pgVolProbar').click());
+    chk('9. «▶ Probar la voz» la dice en Android con ese volumen', await p.evaluate(() => window.__and.probo === 1));
+
+    // 10. Con la voz de pagos de Android: los pagos de otro camino también la usan
+    await p.evaluate(() => { window.__and.decir = []; window.VentoAndroid.pagosDecir = t => window.__and.decir.push(String(t)); });
+    const v10 = (await estado()).voz.length;
+    await llega('k10:1:-1', false, 'Nequi | Nequi | SARA te envió $12.000');
+    await p.evaluate(() => window.ventoPagos && window.ventoPagos.recibir({ id: 'p-srv-10', estado: 'aprobado', confianza: 'app', verificado: false, proveedor: 'dispositivo', metodo: 'DAVIPLATA', monto: 7000, creado_en: new Date().toISOString(), actualizado_en: new Date().toISOString() }, true));
+    const d10 = await p.evaluate(() => window.__and.decir.slice());
+    chk('10. En la app, «Pago confirmado» sale por la voz de pagos de Android (con su volumen), no por la de la página', d10.some(t => /^Pago confirmado\. 12000 pesos desde Nequi/.test(t)) && d10.some(t => /^Pago confirmado\. 7000 pesos desde DaviPlata/.test(t)) && (await estado()).voz.length === v10, d10);
+
+    // 11. Navegador (sin la app): la voz sale con el volumen elegido (hasta 100 %)
+    const ctx2 = await b.newContext({ viewport: { width: 1200, height: 900 } });
+    await ctx2.route('**/*', r => new URL(r.request().url()).hostname === 'localhost' ? r.continue() : r.abort());
+    await ctx2.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '' })); localStorage.setItem('vento_pagos_vol', '50'); }catch(e){} });
+    const p2 = await ctx2.newPage(); p2.on('pageerror', e => errs.push(e.message));
+    await p2.goto(BASE + '/index.html'); await p2.waitForTimeout(1500);
+    await p2.fill('#authBiz', 'Bar Web'); await p2.fill('#authUser', 'leo'); await p2.fill('#authPass', 'clave123'); await p2.click('#authBtn'); await p2.waitForTimeout(1500);
+    const r11 = await p2.evaluate(() => {
+      const voces = []; window.ventoHablar = (t, o) => voces.push({ t: String(t), vol: o && o.volumen });
+      data.pagos = data.pagos || {}; data.pagos.on = true;
+      window.pagosRecibirTexto('Nequi | Nequi | MARTA te envió $5.000', 'web-1');
+      const v = document.getElementById('pgVol');
+      return { voces, max: v && v.max };
+    });
+    chk('11. En el navegador: «Pago confirmado. 5000 pesos desde Nequi» al 50 %', r11.voces.some(x => /^Pago confirmado\. 5000 pesos desde Nequi/.test(x.t) && x.vol === 0.5), r11);
+    chk('11. En el navegador el volumen llega hasta 100 % (más de eso es en la app Android)', r11.max === '100', r11.max);
+    await ctx2.close();
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.stack || e)); }
   chk('Sin errores de página', !errs.length, errs);
   await b.close();

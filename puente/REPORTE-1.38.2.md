@@ -33,18 +33,51 @@
 - **Hay que instalar la app Android nueva** para la voz en segundo plano. La página sigue funcionando con la app vieja,
   pero entonces la voz depende de la página, como antes.
 
+## Volumen de la voz de los pagos (nuevo)
+- **Dónde:** Ajustes → 💜 Pagos → **«🔊 Volumen de la voz de los pagos»**, con barra, botones «🔉 Más bajo» / «🔊 Más
+  alto» y **«▶ Probar la voz»**.
+- **En la app Android:**
+  - va de 10 % a **150 %**;
+  - suena a ese volumen aunque la música o el celular estén bajitos, porque usa el canal de la alarma, y después deja el
+    volumen del celular como estaba;
+  - **más de 100 % suena más fuerte de lo normal:** al máximo del celular y además reforzada (hasta +12 dB);
+  - los pagos que llegan de otros celulares o del servidor también usan esta voz.
+- **En el navegador:** hasta 100 %.
+
+## Que lleguen todos los pagos, y solo los de verdad
+- **Pagos perdidos mientras Vento no escuchaba:** si el celular cerró a Vento o se reinició, al volver a conectarse lee
+  los avisos de pago de los **últimos 30 minutos** que siguen en la barra. Los de más de 3 minutos se registran sin
+  decirlos en voz alta.
+- **Si Android desconecta a Vento** (ahorro de batería, actualización), Vento pide que la vuelvan a conectar sola.
+- **Solo plata de verdad:**
+  - **la publicidad del banco no es un pago:** «¿Te llegó la prima? Guárdala en un colchón», «Te prestamos hasta
+    $5.000.000», créditos preaprobados, descuentos, cashback… no se registran ni suenan (en la app, la página y el
+    servidor);
+  - **«Pago confirmado» solo de la app oficial del banco**, o de una app de banco instalada desde Play Store (o Galaxy
+    Store, AppGallery…). Si una app con nombre de banco se instaló por fuera, su aviso queda **«⚠️ Revisar»**, nunca
+    confirmado, y Vento dice «Ojo… revísalo en la aplicación del banco».
+  - Siguen igual: nunca toma códigos, claves, compras ni plata que sale, y el SMS desde un celular común es **🚨 FALSO**.
+- **También se entiende «COP 45.000»** como valor.
+
 ## Pruebas de los pagos
-- **`pagosaviso` (nueva),** 15 comprobaciones:
+- **`pagosaviso` (nueva),** 27 comprobaciones:
   - dos pagos iguales seguidos suenan los dos;
   - el mismo aviso no se repite;
   - si Android ya habló, la página no repite la voz;
   - un pago propio enlazado al servidor no se come el siguiente;
   - lo que reenvió otro celular no se duplica;
   - la frase «desde DaviPlata» / «desde Nequi»;
-  - el interruptor del aviso.
-- **`servidor/avisos` (nueva),** 15 comprobaciones contra PostgreSQL real: dos pagos iguales con su número son dos, el
-  mismo aviso es uno, MacroDroid igual que antes y DaviPlata de «usted».
-- **`AvisoPagoPrueba` (Java, nueva),** 26 comprobaciones: qué es plata recibida, el valor y la frase.
+  - el interruptor del aviso;
+  - la publicidad que no es pago;
+  - la app que no es la oficial queda «Revisar»;
+  - el volumen (se guarda, llega a Android, más alto / más bajo, hasta 150 %, «Probar»);
+  - los pagos de otros celulares con la voz de Android;
+  - en el navegador, la voz al volumen elegido.
+- **`servidor/avisos` (nueva),** 17 comprobaciones contra PostgreSQL real: dos pagos iguales con su número son dos, el
+  mismo aviso es uno, MacroDroid igual que antes, DaviPlata de «usted», la publicidad no es pago y «COP».
+- **`AvisoPagoPrueba` (Java, nueva),** 45 comprobaciones: qué es plata recibida, la publicidad, el valor, la frase,
+  la app oficial y el volumen.
+- **El código de Android se compiló** contra Android 14 (API completa) antes de publicar.
 - **Actualizadas:** `avisosandroid`, `pagosguia`, `daviplatacobro`, `mesapersonas` y `canalvivo` pasan.
 
 # B. La música del panel de YouTube sí suena (navegadores que bloquean la reproducción automática)

@@ -156,11 +156,28 @@ public class VentoApp extends Application {
     // Su propia voz: la de la página se calla cada vez que la página va a decir otra cosa (y cortaba el «Pago confirmado»).
     // Los pagos que llegan mientras la voz se prepara quedan en fila (antes el segundo se perdía) y, mientras habla, la
     // música baja un momento para que se oiga en el negocio.
+    // Volumen propio (Ajustes → Pagos → «Volumen de la voz de los pagos»): suena por el canal de la ALARMA, al nivel elegido
+    // (no depende de qué tan alta esté la música) y luego deja el volumen del celular como estaba. Más de 100 % = al máximo
+    // y reforzada (LoudnessEnhancer): más fuerte de lo normal.
     private static TextToSpeech ttsPago;
     private static boolean ttsPagoListo = false;
     private static final ArrayList<String> pagosEnFila = new ArrayList<>();
     private static int pagosHablando = 0;
     private static Object focoPago;
+    private static int volGuardado = -1;
+    private static final java.util.HashMap<String, Object[]> archivosPago = new java.util.HashMap<>();
+    private static final ArrayList<Object[]> porTocar = new ArrayList<>();
+    private static boolean tocando = false;
+    static final String PREF_VOL = "pagosVolumen";
+
+    static int volPagos() {
+        try { return AvisoPago.volumen(app.getSharedPreferences("vento", MODE_PRIVATE).getInt(PREF_VOL, 100)); } catch (Exception e) { return 100; }
+    }
+
+    private static android.media.AudioAttributes atributosPago() {
+        return new android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_ALARM)
+                .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH).build();
+    }
 
     static void decirPago(final String frase) {
         ui.post(() -> {
@@ -178,10 +195,11 @@ public class VentoApp extends Application {
                         for (String f : fila) try { app.new Puente().hablar(f, "es-CO", 1f); } catch (Exception ignorado) { }
                         return;
                     }
+                    try { ttsPago.setAudioAttributes(atributosPago()); } catch (Exception ignorado) { }
                     ttsPago.setOnUtteranceProgressListener(new UtteranceProgressListener() {
                         @Override public void onStart(String u) { }
-                        @Override public void onDone(String u) { ui.post(VentoApp::pagoTermino); }
-                        @Override public void onError(String u) { ui.post(VentoApp::pagoTermino); }
+                        @Override public void onDone(String u) { ui.post(() -> terminoVoz(u, true)); }
+                        @Override public void onError(String u) { ui.post(() -> terminoVoz(u, false)); }
                     });
                     for (String f : fila) hablarPago(f);
                 }));
@@ -199,14 +217,97 @@ public class VentoApp extends Application {
             if (r == TextToSpeech.LANG_MISSING_DATA || r == TextToSpeech.LANG_NOT_SUPPORTED) ttsPago.setLanguage(new Locale("es"));
             ttsPago.setSpeechRate(1f);
             bajarMusica();
+            ponerVolumen();
             pagosHablando++;
-            if (ttsPago.speak(frase, TextToSpeech.QUEUE_ADD, null, "pago" + System.nanoTime()) != TextToSpeech.SUCCESS) pagoTermino();
-            // Por si el motor de voz nunca avisa que terminó: la música vuelve sola.
-            ui.postDelayed(() -> { if (pagosHablando > 0) { pagosHablando = 0; subirMusica(); } }, 20000);
+            // Por si el motor de voz nunca avisa que terminó: la música y el volumen vuelven solos.
+            ui.postDelayed(() -> { if (pagosHablando > 0) { pagosHablando = 0; subirMusica(); } }, 25000);
+            if (AvisoPago.refuerzo(volPagos()) > 0) {
+                // Más fuerte de lo normal: se graba la frase y se toca reforzada.
+                java.io.File f = new java.io.File(app.getCacheDir(), "pago" + System.nanoTime() + ".wav");
+                String id = "arch" + System.nanoTime();
+                archivosPago.put(id, new Object[]{f, frase});
+                if (ttsPago.synthesizeToFile(frase, null, f, id) == TextToSpeech.SUCCESS) return;
+                archivosPago.remove(id);
+            }
+            decirDirecto(frase);
         } catch (Exception e) {
             pagoTermino();
             try { app.new Puente().hablar(frase, "es-CO", 1f); } catch (Exception ignorado) { }
         }
+    }
+
+    private static void decirDirecto(String frase) {
+        if (ttsPago == null || ttsPago.speak(frase, TextToSpeech.QUEUE_ADD, null, "pago" + System.nanoTime()) != TextToSpeech.SUCCESS) pagoTermino();
+    }
+
+    private static void terminoVoz(String u, boolean bien) {
+        if (u != null && u.startsWith("arch")) {
+            Object[] o = archivosPago.remove(u);
+            if (o == null) return;
+            if (bien) { porTocar.add(o); if (!tocando) siguienteArchivo(); }
+            else decirDirecto((String) o[1]);                  // no se pudo grabar: se dice normal
+            return;
+        }
+        pagoTermino();
+    }
+
+    private static void siguienteArchivo() {
+        if (porTocar.isEmpty()) { tocando = false; return; }
+        tocando = true;
+        Object[] o = porTocar.remove(0);
+        final java.io.File f = (java.io.File) o[0];
+        final String frase = (String) o[1];
+        android.media.MediaPlayer mp = null;
+        try {
+            mp = new android.media.MediaPlayer();
+            mp.setAudioAttributes(atributosPago());
+            mp.setDataSource(f.getPath());
+            mp.prepare();
+            android.media.audiofx.LoudnessEnhancer le = null;
+            try {
+                le = new android.media.audiofx.LoudnessEnhancer(mp.getAudioSessionId());
+                le.setTargetGain(AvisoPago.refuerzo(volPagos()));
+                le.setEnabled(true);
+            } catch (Throwable ignorado) { }
+            final android.media.audiofx.LoudnessEnhancer refuerzo = le;
+            final android.media.MediaPlayer jugador = mp;
+            Runnable fin = () -> {
+                try { if (refuerzo != null) refuerzo.release(); } catch (Throwable ignorado) { }
+                try { jugador.release(); } catch (Throwable ignorado) { }
+                try { f.delete(); } catch (Throwable ignorado) { }
+                pagoTermino();
+                siguienteArchivo();
+            };
+            mp.setOnCompletionListener(m -> fin.run());
+            mp.setOnErrorListener((m, w, e) -> { fin.run(); return true; });
+            mp.start();
+        } catch (Exception e) {
+            try { if (mp != null) mp.release(); } catch (Throwable ignorado) { }
+            try { f.delete(); } catch (Throwable ignorado) { }
+            decirDirecto(frase);                               // no se pudo tocar reforzada: se dice normal
+            siguienteArchivo();
+        }
+    }
+
+    /** El volumen de la alarma al nivel elegido para los pagos (se guarda el que tenía para devolverlo). */
+    private static void ponerVolumen() {
+        try {
+            android.media.AudioManager am = (android.media.AudioManager) app.getSystemService(Context.AUDIO_SERVICE);
+            if (am == null) return;
+            int max = am.getStreamMaxVolume(android.media.AudioManager.STREAM_ALARM);
+            if (volGuardado < 0) volGuardado = am.getStreamVolume(android.media.AudioManager.STREAM_ALARM);
+            am.setStreamVolume(android.media.AudioManager.STREAM_ALARM, AvisoPago.nivel(volPagos(), max), 0);
+        } catch (Exception ignorado) { }
+    }
+
+    private static void devolverVolumen() {
+        try {
+            if (volGuardado < 0) return;
+            int v = volGuardado;
+            volGuardado = -1;
+            android.media.AudioManager am = (android.media.AudioManager) app.getSystemService(Context.AUDIO_SERVICE);
+            if (am != null) am.setStreamVolume(android.media.AudioManager.STREAM_ALARM, v, 0);
+        } catch (Exception ignorado) { }
     }
 
     private static void pagoTermino() {
@@ -235,6 +336,7 @@ public class VentoApp extends Application {
     }
 
     private static void subirMusica() {
+        devolverVolumen();
         try {
             Object f = focoPago;
             focoPago = null;
@@ -919,6 +1021,21 @@ public class VentoApp extends Application {
                 }));
             });
         }
+
+        /** Volumen de la voz de los pagos (10 a 150 %; más de 100 % = más fuerte de lo normal). */
+        @JavascriptInterface
+        public void pagosVolumen(int v) { getSharedPreferences("vento", MODE_PRIVATE).edit().putInt(PREF_VOL, AvisoPago.volumen(v)).apply(); }
+
+        @JavascriptInterface
+        public int pagosVolumenActual() { return volPagos(); }
+
+        /** Un aviso de pago que llega por otro camino (otro celular, el Servidor Vento, MacroDroid): con la voz de los pagos. */
+        @JavascriptInterface
+        public void pagosDecir(String frase) { if (frase != null && !frase.isEmpty()) decirPago(frase); }
+
+        /** «▶ Probar»: dice un pago de prueba con el volumen elegido. */
+        @JavascriptInterface
+        public void pagosProbarVoz() { decirPago("Pago confirmado. 200 pesos desde DaviPlata."); }
 
         @JavascriptInterface
         public void callar() { ui.post(() -> { try { if (tts != null) tts.stop(); } catch (Exception ignorado) { } }); }

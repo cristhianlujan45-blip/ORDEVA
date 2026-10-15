@@ -55,6 +55,9 @@ async function pruebas(sb) {
     ['Bancolombia | Bancolombia | Ha recibido una transferencia por $1.500.000', 1500000, 'BANCOLOMBIA', ''],
   ];
   for (const [t, m, met, de] of casos) { const a = A.leerAviso(t); chk('6. «' + t.split('|')[2].trim() + '» → ' + m + ' ' + met + (de ? ' de ' + de : ''), a && a.monto === m && a.metodo === met && a.de === de && a.confianza === 'app', a); }
+  chk('6. Publicidad del banco («¿Te llegó la prima?…», «Te prestamos hasta $5.000.000») no es un pago',
+    A.leerAviso('Nequi | Nequi | ¿Te llegó la prima? Guárdala en un colchón') === null && A.leerAviso('DaviPlata | DaviPlata | Te prestamos hasta $5.000.000, ¡le llegó la oportunidad!') === null);
+  chk('6. «Recibiste COP 45.000 de ANA RUIZ» → 45000', (A.leerAviso('Bancolombia | Bancolombia | Recibiste COP 45.000 de ANA RUIZ') || {}).monto === 45000, A.leerAviso('Bancolombia | Bancolombia | Recibiste COP 45.000 de ANA RUIZ'));
   chk('6. «Usted envió $5.000» (plata que SALE) no es un pago', A.leerAviso('DaviPlata | DaviPlata | Usted envió $5.000 a PEDRO') === null);
   l = await pagos(NEG);
   chk('Total: 4 pagos (2 de $200, $15.000 y $7.500)', l.length === 4, l);

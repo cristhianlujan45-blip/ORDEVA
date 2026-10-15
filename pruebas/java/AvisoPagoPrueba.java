@@ -21,6 +21,26 @@ public class AvisoPagoPrueba {
         }
         String[] noSon = { "Usted pasó $10.000 a JUAN PEREZ", "Su código de seguridad es 123456 para recibir $5.000", "Compraste $20.000 en Tienda", "Enviaste $50.000 a MARIA", "Tu clave dinámica es 4455" };
         for (String n : noSon) chk("No es plata recibida: «" + n + "»", !AvisoPago.esRecibido(n), n);
+        // Publicidad del banco que parece pago: NO es plata que llegó
+        String[] promos = { "¿Te llegó la prima? Guárdala en un colchón de Nequi", "Te prestamos hasta $5.000.000 con tu DaviPlata, ¡te llegó la oportunidad!",
+                "Le llegó un crédito pre aprobado por $2.000.000", "Te llegó un descuento de $10.000 en tu próxima compra", "¡Te llegó la oferta! Recibe cashback de $5.000" };
+        for (String n : promos) chk("Publicidad, no es pago: «" + n + "»", !AvisoPago.esRecibido(n), n);
+        chk("Valor con COP: «Recibiste COP 45.000 de ANA» → 45000", AvisoPago.esRecibido("Recibiste COP 45.000 de ANA") && AvisoPago.monto("Recibiste COP 45.000 de ANA") == 45000, AvisoPago.monto("Recibiste COP 45.000 de ANA"));
+        chk("Plata a un bolsillo de Nequi sigue siendo pago: «Te llegó plata: $9.000 a tu bolsillo»", AvisoPago.esRecibido("Te llegó plata: $9.000 a tu bolsillo"), "");
+        // ¿La app es la de verdad?
+        chk("DaviPlata oficial (com.davivienda.daviplataapp) → confiable", AvisoPago.confiable("com.davivienda.daviplataapp", null, false), "");
+        chk("Nequi oficial (com.nequi.MobileApp) → confiable", AvisoPago.confiable("com.nequi.MobileApp", null, false), "");
+        chk("App de banco instalada desde Play Store → confiable", AvisoPago.confiable("co.banco.nuevo", "com.android.vending", false), "");
+        chk("App «DaviPlata» instalada por fuera (APK suelto) → NO confiable", !AvisoPago.confiable("com.falsa.daviplata", "com.google.android.packageinstaller", false), "");
+        chk("App «DaviPlata» sin instalador → NO confiable", !AvisoPago.confiable("com.falsa.daviplata", null, false), "");
+        chk("App del celular (sistema) → confiable", AvisoPago.confiable("com.samsung.pay", null, true), "");
+        // Volumen
+        chk("Volumen: sin elegir = 100 %", AvisoPago.volumen(0) == 100, AvisoPago.volumen(0));
+        chk("Volumen: entre 10 y 150 %", AvisoPago.volumen(5) == 10 && AvisoPago.volumen(400) == 150, AvisoPago.volumen(400));
+        chk("Volumen 50 % de 7 niveles → nivel 4", AvisoPago.nivel(50, 7) == 4, AvisoPago.nivel(50, 7));
+        chk("Volumen 100 % y 150 % → nivel máximo", AvisoPago.nivel(100, 7) == 7 && AvisoPago.nivel(150, 7) == 7, AvisoPago.nivel(150, 7));
+        chk("Volumen 10 % → al menos nivel 1 (nunca mudo)", AvisoPago.nivel(10, 7) == 1, AvisoPago.nivel(10, 7));
+        chk("Refuerzo: 100 % = nada; 150 % = +12 dB (más fuerte de lo normal)", AvisoPago.refuerzo(100) == 0 && AvisoPago.refuerzo(150) == 1200 && AvisoPago.refuerzo(120) == 480, AvisoPago.refuerzo(150));
         chk("Banco: DaviPlata", AvisoPago.esBanco("DaviPlata"), "");
         chk("Banco: Nequi", AvisoPago.esBanco("Nequi"), "");
         chk("No es banco: WhatsApp", !AvisoPago.esBanco("WhatsApp"), "");

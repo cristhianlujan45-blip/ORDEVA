@@ -23,6 +23,8 @@
   function lsSet(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
   function toast(t, ms){ try{ window.showToast && window.showToast(t, ms || 5000); }catch(e){} }
   function hablar(t){ try{ (window.ventoHablar || window.speakVoice || function(){})(t); }catch(e){} }
+  // Los avisos de PAGOS con la voz de los pagos (su volumen propio; en la app Android, aunque esté minimizada).
+  function hablarPago(t){ try{ if(window.ventoDecirPago) return window.ventoDecirPago(t); }catch(e){} hablar(t); }
   function nube(){ return window.ventoNube || null; }
   function negocio(){ var n = nube(); return n && n.negocio ? n.negocio() : null; }
   function etiquetaMesa(m){ try{ return window.tableLabel ? window.tableLabel(m) : 'Mesa ' + m; }catch(e){ return 'Mesa ' + m; } }
@@ -136,7 +138,7 @@
       plata(p.monto) + ' por ' + nombreMetodo(p.metodo) + (p.pagador ? ' de ' + p.pagador : '') + m + (p.verificado ? ' · ✅ verificado' + (p.aprobacion ? ' (N.º ' + p.aprobacion + ')' : '') : ''));
     if(p.confianza === 'falso'){
       toast('🚨 OJO, PAGO FALSO: ' + plata(p.monto) + '. ' + (p.detalle || 'No entregues nada.'), 15000);
-      hablar('Ojo. Llegó un mensaje de pago sospechoso por ' + p.monto + ' pesos. Parece falso.');
+      hablarPago('Ojo. Llegó un mensaje de pago sospechoso por ' + p.monto + ' pesos. Parece falso.');
       try{ navigator.vibrate && navigator.vibrate([500, 150, 500]); }catch(e){}
       return;
     }
@@ -147,7 +149,7 @@
     // Como el parlante de Bold: sonido de éxito y «Pago confirmado» en voz alta.
     toast('✅ Pago confirmado · ' + plata(p.monto) + ' por ' + nombreMetodo(p.metodo) + (p.pagador ? ' de ' + p.pagador : '') + m + (p.aprobacion ? ' · N.º ' + p.aprobacion : ''), 9000);
     try{ window.ventoSonidos && window.ventoSonidos.success(); }catch(e){}
-    hablar('Pago confirmado. ' + p.monto + ' pesos desde ' + nombreMetodo(p.metodo) + (p.pagador ? ', de ' + p.pagador : '') + (p.mesa ? ', de la ' + etiquetaMesa(p.mesa) : ''));
+    hablarPago('Pago confirmado. ' + p.monto + ' pesos desde ' + nombreMetodo(p.metodo) + (p.pagador ? ', de ' + p.pagador : '') + (p.mesa ? ', de la ' + etiquetaMesa(p.mesa) : ''));
     try{ navigator.vibrate && navigator.vibrate([150, 80, 150]); }catch(e){}
     try{ window.mesoraCelebrar && window.mesoraCelebrar(['💜', '💰', '✨']); }catch(e){}
   }
