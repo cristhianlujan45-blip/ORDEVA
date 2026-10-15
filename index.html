@@ -21335,6 +21335,8 @@ setTimeout(()=>{try{
 // bloqueada; estas son mientras Vento está abierta).
 const NOTIF_KEY='vito_notif';
 const notifCfg=()=>Object.assign({pedidos:true,musica:true,cuenta:true,pagos:true,domicilios:true,soporte:true,ia:true},LS(NOTIF_KEY,{}));
+// La app Android avisa los pagos por su cuenta (también con Vento cerrada): se le dice si el aviso de pagos está prendido.
+try{const A=window.VentoAndroid;if(A&&A.pagosNotif)A.pagosNotif(notifCfg().pagos!==false);}catch(e){}
 const notifPedidos=()=>notifCfg().pedidos;
 const notifMusica=()=>notifCfg().musica;
 window.notifPedidos=notifPedidos;window.notifMusica=notifMusica;   // para el módulo de la campana, que corre en otro cierre
@@ -21345,7 +21347,7 @@ function iniQR(){
   const nc=notifCfg();
   document.querySelectorAll('input[data-notif]').forEach(i=>{
     i.checked=nc[i.dataset.notif]!==false;
-    i.onchange=()=>{const x=notifCfg();x[i.dataset.notif]=i.checked;SS(NOTIF_KEY,x);showToast(i.checked?'🔔 Aviso prendido.':'🔕 Aviso apagado: ya no te sale ni suena.');};
+    i.onchange=()=>{const x=notifCfg();x[i.dataset.notif]=i.checked;SS(NOTIF_KEY,x);if(i.dataset.notif==='pagos')try{window.VentoAndroid&&window.VentoAndroid.pagosNotif&&window.VentoAndroid.pagosNotif(i.checked);}catch(e){}showToast(i.checked?'🔔 Aviso prendido.':'🔕 Aviso apagado: ya no te sale ni suena.');};
   });
   document.querySelectorAll('[data-notif-probar]').forEach(b=>{b.onclick=()=>{
     const k=b.dataset.notifProbar,T={pedidos:['🍺 Prueba · Mesa 1','2 Águila (así te llegan los pedidos)'],musica:['🎵 Prueba · Mesa 1','Karol G - Provenza (así te llegan las canciones)'],avisos:['🧠 Vento','Así te llegan los avisos de Vento IA y del soporte.']}[k];
@@ -28397,7 +28399,7 @@ let fotosListas = false;
   const urlExterna = () => (window.ventoCanal && window.ventoCanal.url(PG().topic)) || '';
 
   // ---------- Leer la notificación ----------
-  const APPS = [[/daviplata/i, 'Daviplata'], [/nequi/i, 'Nequi'], [/bancolombia/i, 'Bancolombia'], [/movii/i, 'Movii'], [/\bdale\b/i, 'Dale'], [/davivienda/i, 'Davivienda'], [/bre-?b/i, 'Bre-B']];
+  const APPS = [[/daviplata/i, 'DaviPlata'], [/nequi/i, 'Nequi'], [/bancolombia/i, 'Bancolombia'], [/movii/i, 'Movii'], [/\bdale\b/i, 'Dale'], [/davivienda/i, 'Davivienda'], [/bre-?b/i, 'Bre-B']];
   function pgLeer(txt){
     const t = String(txt || '').replace(/\s+/g, ' ').trim();
     if(!t) return null;
@@ -28451,7 +28453,9 @@ let fotosListas = false;
     return { nivel: 'revisar', txt: 'Llegó por SMS' + (quien ? ' (' + quien + ')' : '') + ': confírmalo en la app del banco antes de entregar' };
   }
   const pgConfirmado = x => !x.estado || x.estado === 'app' || x.estado === 'ok';
-  function pgRecibir(txt, id){
+  // op.voz: la app Android ya dijo «Pago confirmado…» y sacó el aviso del celular (aquí no se repite).
+  function pgRecibir(txt, id, op){
+    op = op || {};
     const g = PG();
     if(id){ if(g.vistos.includes(id)) return; g.vistos.push(id); g.vistos = g.vistos.slice(-300); }
     const p = pgLeer(txt);
@@ -28467,9 +28471,11 @@ let fotosListas = false;
     const via = String(id || '').startsWith('and-') ? 'and' : 'canal', mismo = String(txt).slice(0, 200).replace(/^\s*[^|]*\|/, '');
     if((g.lista || []).some(x => x.via && x.via !== via && Date.now() - (x.t || 0) < 3 * 60e3 && x.monto === p.monto && String(x.txt || '').replace(/^\s*[^|]*\|/, '') === mismo)){ saveData(); return; }
     // ¿Ya llegó este mismo pago por el Servidor Vento (otro celular lo reenvió)? Entonces no se repite.
-    const yaSrv = (g.lista || []).find(x => x.srv && Number(x.monto) === p.monto && Math.abs((x.t || 0) - Date.now()) < 3 * 60e3 && String(x.app).toLowerCase() === String(p.app).toLowerCase());
+    // Solo un pago que vino DEL servidor (otro celular lo reenvió): uno propio enlazado al servidor no cuenta. Antes, el
+    // segundo pago igual al primero (mismo valor, en 3 min) se tomaba como repetido y no sonaba.
+    const yaSrv = (g.lista || []).find(x => x.srv && String(x.id || '').startsWith('srv-') && Number(x.monto) === p.monto && Math.abs((x.t || 0) - Date.now()) < 3 * 60e3 && String(x.app).toLowerCase() === String(p.app).toLowerCase());
     if(yaSrv){ saveData(); return; }
-    try{ window.ventoPagosReenviarAviso && window.ventoPagosReenviarAviso(txt); }catch(e){}   // también al Servidor Vento
+    try{ window.ventoPagosReenviarAviso && window.ventoPagosReenviarAviso(txt, id); }catch(e){}   // también al Servidor Vento
     const f = pgFuente(txt);
     const mesa = f.nivel === 'falso' ? null : pgMesaPara(p.monto);
     const reg = { id: id || Date.now().toString(36), via, t: Date.now(), monto: p.monto, app: p.app, de: p.de, mesa: mesa ? Number(mesa) : null, estado: f.nivel, fuente: f.txt, txt: String(txt).slice(0, 200) };
@@ -28492,9 +28498,10 @@ let fotosListas = false;
     const msg = '✅ Pago confirmado · ' + plata(p.monto) + ' por ' + p.app + (p.de ? ' de ' + p.de : '') + (mesa ? ' · ' + tableLabel(mesa) : '');
     try{ showToast(msg, 9000); }catch(e){}
     // Aviso del celular (con Vento minimizada o la pantalla apagada): «💜 Pagaron $20.000 por DaviPlata».
-    try{ if(!window.ventoAvisoOn || window.ventoAvisoOn('pagos')) window.ventoAvisoCel && window.ventoAvisoCel('💜 Pagaron ' + plata(p.monto) + ' por ' + p.app, (p.de ? 'De ' + p.de + '. ' : '') + (mesa ? tableLabel(mesa) + '. ' : '') + 'Confirmado por la app de ' + p.app + '.', 'pedidos'); }catch(e){}
+    if(!op.voz) try{ if(!window.ventoAvisoOn || window.ventoAvisoOn('pagos')) window.ventoAvisoCel && window.ventoAvisoCel('💜 Pagaron ' + plata(p.monto) + ' por ' + p.app, (p.de ? 'De ' + p.de + '. ' : '') + (mesa ? tableLabel(mesa) + '. ' : '') + 'Confirmado por la app de ' + p.app + '.', 'pedidos'); }catch(e){}
     try{ window.ventoSonidos && window.ventoSonidos.success(); }catch(e){}
-    try{ speakVoice('Pago confirmado. ' + p.monto + ' pesos por ' + p.app + (p.de ? ', de ' + p.de : '') + (mesa ? ', de la ' + tableLabel(mesa) : '')); }catch(e){}
+    // «Pago confirmado. 200 pesos desde DaviPlata» (o «desde Nequi»…), con quién pagó y la mesa si se sabe.
+    if(!op.voz) try{ speakVoice('Pago confirmado. ' + p.monto + ' pesos desde ' + p.app + (p.de ? ', de ' + p.de : '') + (mesa ? ', de la ' + tableLabel(mesa) : '')); }catch(e){}
     if(navigator.vibrate) try{ navigator.vibrate([150, 80, 150]); }catch(e){}
     try{ window.mesoraCelebrar && window.mesoraCelebrar(['💜', '💰', '✨']); }catch(e){}
     pgPintar();
@@ -28511,7 +28518,7 @@ let fotosListas = false;
   window.ventoAvisosNativos = function(){
     if(!AND() || typeof authUser === 'undefined' || !authUser || typeof data === 'undefined' || !data) return;
     let l = []; try{ l = JSON.parse(AND().pagosAvisosTomar() || '[]'); }catch(e){}
-    l.forEach(a => { try{ if(a && a.txt) pgRecibir(a.txt, 'and-' + a.id); }catch(e){} });
+    l.forEach(a => { try{ if(a && a.txt) pgRecibir(a.txt, 'and-' + a.id, { voz: !!a.voz }); }catch(e){} });
     if(l.length) try{ pgPintar(); }catch(e){}
   };
   setInterval(() => window.ventoAvisosNativos(), 5000);

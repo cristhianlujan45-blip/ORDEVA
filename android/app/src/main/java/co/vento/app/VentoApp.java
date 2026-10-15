@@ -60,6 +60,7 @@ public class VentoApp extends Application {
     boolean vozPendiente = false;
     private TextToSpeech tts;
     private boolean ttsListo = false;
+    private final ArrayList<Runnable> hablarFila = new ArrayList<>();
     private boolean vozMuda = false;
 
     @Override
@@ -138,6 +139,112 @@ public class VentoApp extends Application {
     }
 
     static String q(String s) { return JSONObject.quote(s == null ? "" : s); }
+
+    /** Llegó plata (aviso de DaviPlata, Nequi…): se dice en voz alta YA desde Android —también con Vento minimizada o la
+     *  pantalla apagada— «Pago confirmado. 200 pesos desde DaviPlata.» y, si Vento no se está viendo, sale el aviso del
+     *  celular «💜 Pagaron $200 por DaviPlata». La página lo registra después (sin volver a decirlo). */
+    static void anunciarPago(String appBanco, long monto, boolean notif) {
+        if (app == null || monto <= 0) return;
+        decirPago(AvisoPago.frase(appBanco, monto));
+        try {
+            if (notif) app.new Puente().notificar("💜 Pagaron " + AvisoPago.plata(monto) + " por " + AvisoPago.nombreApp(appBanco),
+                    "Pago confirmado por la app de " + AvisoPago.nombreApp(appBanco) + ".", "pedidos", false);
+        } catch (Exception ignorado) { }
+    }
+
+    // ---------------------------------------------------------------- Voz de los pagos
+    // Su propia voz: la de la página se calla cada vez que la página va a decir otra cosa (y cortaba el «Pago confirmado»).
+    // Los pagos que llegan mientras la voz se prepara quedan en fila (antes el segundo se perdía) y, mientras habla, la
+    // música baja un momento para que se oiga en el negocio.
+    private static TextToSpeech ttsPago;
+    private static boolean ttsPagoListo = false;
+    private static final ArrayList<String> pagosEnFila = new ArrayList<>();
+    private static int pagosHablando = 0;
+    private static Object focoPago;
+
+    static void decirPago(final String frase) {
+        ui.post(() -> {
+            if (ttsPago != null && ttsPagoListo) { hablarPago(frase); return; }
+            pagosEnFila.add(frase);
+            if (ttsPago != null) return;                        // ya se está preparando: la dice apenas quede lista
+            try {
+                ttsPago = new TextToSpeech(app, st -> ui.post(() -> {
+                    ttsPagoListo = st == TextToSpeech.SUCCESS && ttsPago != null;
+                    ArrayList<String> fila = new ArrayList<>(pagosEnFila);
+                    pagosEnFila.clear();
+                    if (!ttsPagoListo) {                       // sin voz propia: la de siempre
+                        try { if (ttsPago != null) ttsPago.shutdown(); } catch (Exception ignorado) { }
+                        ttsPago = null;
+                        for (String f : fila) try { app.new Puente().hablar(f, "es-CO", 1f); } catch (Exception ignorado) { }
+                        return;
+                    }
+                    ttsPago.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+                        @Override public void onStart(String u) { }
+                        @Override public void onDone(String u) { ui.post(VentoApp::pagoTermino); }
+                        @Override public void onError(String u) { ui.post(VentoApp::pagoTermino); }
+                    });
+                    for (String f : fila) hablarPago(f);
+                }));
+            } catch (Exception e) {
+                ttsPago = null;
+                for (String f : new ArrayList<>(pagosEnFila)) try { app.new Puente().hablar(f, "es-CO", 1f); } catch (Exception ignorado) { }
+                pagosEnFila.clear();
+            }
+        });
+    }
+
+    private static void hablarPago(String frase) {
+        try {
+            int r = ttsPago.setLanguage(Locale.forLanguageTag("es-CO"));
+            if (r == TextToSpeech.LANG_MISSING_DATA || r == TextToSpeech.LANG_NOT_SUPPORTED) ttsPago.setLanguage(new Locale("es"));
+            ttsPago.setSpeechRate(1f);
+            bajarMusica();
+            pagosHablando++;
+            if (ttsPago.speak(frase, TextToSpeech.QUEUE_ADD, null, "pago" + System.nanoTime()) != TextToSpeech.SUCCESS) pagoTermino();
+            // Por si el motor de voz nunca avisa que terminó: la música vuelve sola.
+            ui.postDelayed(() -> { if (pagosHablando > 0) { pagosHablando = 0; subirMusica(); } }, 20000);
+        } catch (Exception e) {
+            pagoTermino();
+            try { app.new Puente().hablar(frase, "es-CO", 1f); } catch (Exception ignorado) { }
+        }
+    }
+
+    private static void pagoTermino() {
+        if (pagosHablando > 0) pagosHablando--;
+        if (pagosHablando == 0) subirMusica();
+    }
+
+    private static void bajarMusica() {
+        try {
+            if (focoPago != null) return;
+            android.media.AudioManager am = (android.media.AudioManager) app.getSystemService(Context.AUDIO_SERVICE);
+            if (am == null) return;
+            if (Build.VERSION.SDK_INT >= 26) {
+                android.media.AudioFocusRequest f = new android.media.AudioFocusRequest.Builder(android.media.AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+                        .setAudioAttributes(new android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_ASSISTANT)
+                                .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH).build())
+                        .setOnAudioFocusChangeListener(c -> { }).build();
+                am.requestAudioFocus(f);
+                focoPago = f;
+            } else {
+                android.media.AudioManager.OnAudioFocusChangeListener l = c -> { };
+                am.requestAudioFocus(l, android.media.AudioManager.STREAM_MUSIC, android.media.AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK);
+                focoPago = l;
+            }
+        } catch (Exception ignorado) { }
+    }
+
+    private static void subirMusica() {
+        try {
+            Object f = focoPago;
+            focoPago = null;
+            if (f == null) return;
+            android.media.AudioManager am = (android.media.AudioManager) app.getSystemService(Context.AUDIO_SERVICE);
+            if (am == null) return;
+            if (Build.VERSION.SDK_INT >= 26 && f instanceof android.media.AudioFocusRequest) am.abandonAudioFocusRequest((android.media.AudioFocusRequest) f);
+            else if (f instanceof android.media.AudioManager.OnAudioFocusChangeListener) am.abandonAudioFocus((android.media.AudioManager.OnAudioFocusChangeListener) f);
+        } catch (Exception ignorado) { }
+    }
 
     /** ¿Hay una sesión de YouTube en las cookies de la app? (las del reproductor de Vento) */
     static boolean youtubeSesion() {
@@ -609,7 +716,11 @@ public class VentoApp extends Application {
             } catch (Exception e) { return "{}"; }
         }
 
-        /** Los avisos que llegaron y la página todavía no ha tomado: [{id, txt, t}]. */
+        /** Ajustes → Notificaciones → «💜 Pagos que te llegan»: si sale (o no) el aviso del celular de cada pago. */
+        @JavascriptInterface
+        public void pagosNotif(boolean si) { getSharedPreferences("vento", MODE_PRIVATE).edit().putBoolean(VentoEscucha.PREF_NOTIF, si).apply(); }
+
+        /** Los avisos que llegaron y la página todavía no ha tomado: [{id, txt, t, voz}]. */
         @JavascriptInterface
         public String pagosAvisosTomar() { return VentoEscucha.tomar(getSharedPreferences("vento", MODE_PRIVATE)); }
 
@@ -791,16 +902,21 @@ public class VentoApp extends Application {
                     } catch (Exception e) { js("window.__ventoHabla&&window.__ventoHabla('end')"); }
                 };
                 if (tts != null && ttsListo) { decir.run(); return; }
-                tts = new TextToSpeech(VentoApp.this, st -> {
+                // Mientras la voz se prepara, lo que llegue queda en fila (antes se creaba otra voz y lo primero se perdía).
+                hablarFila.add(decir);
+                if (tts != null) return;
+                tts = new TextToSpeech(VentoApp.this, st -> ui.post(() -> {
                     ttsListo = st == TextToSpeech.SUCCESS;
-                    if (!ttsListo) { js("window.__ventoHabla&&window.__ventoHabla('end')"); return; }
+                    ArrayList<Runnable> fila = new ArrayList<>(hablarFila);
+                    hablarFila.clear();
+                    if (!ttsListo) { tts = null; js("window.__ventoHabla&&window.__ventoHabla('end')"); return; }
                     tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
                         @Override public void onStart(String u) { js("window.__ventoHabla&&window.__ventoHabla('start')"); }
                         @Override public void onDone(String u) { js("window.__ventoHabla&&window.__ventoHabla('end')"); }
                         @Override public void onError(String u) { js("window.__ventoHabla&&window.__ventoHabla('end')"); }
                     });
-                    decir.run();
-                });
+                    for (Runnable r : fila) r.run();
+                }));
             });
         }
 

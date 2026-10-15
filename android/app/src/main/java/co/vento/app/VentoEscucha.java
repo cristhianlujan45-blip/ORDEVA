@@ -9,7 +9,6 @@ import android.service.notification.StatusBarNotification;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.util.regex.Pattern;
 
 /**
  * Permiso «Acceso a notificaciones» (lo da el dueño en Ajustes del celular). Con él Vento puede:
@@ -26,13 +25,9 @@ public class VentoEscucha extends NotificationListenerService {
     static volatile VentoEscucha activa;
 
     static final String PREF_ON = "pagosAvisos", PREF_COLA = "pagosAvisosCola";
-    // Apps de bancos y billeteras (por el nombre que muestra el celular).
-    private static final Pattern BANCO = Pattern.compile("daviplata|nequi|bancolombia|davivienda|movii|\\bdale\\b|bre-?b|banco|\\bnu\\b|lulo|rappipay|powwi|ual[aá]|bbva|scotiabank|av villas|colpatria|occidente|caja social", Pattern.CASE_INSENSITIVE);
-    // Plata que ENTRA (igual que pgLeer en la página). DaviPlata escribe de «usted»: «Le llegó plata», «Le pasaron».
-    private static final Pattern RECIBIDO = Pattern.compile("recibiste|has recibido|ha recibido|(te|le) lleg[oó]|(te|le) llegaron|(te|le) pas[oó]|(te|le) pasaron|pasaron plata|(te|le) envi[oó]|(te|le) enviaron|(te|le) transfiri|(te|le) pag[oó]|(te|le) pagaron|(te|le) consign|(te|le) abon|consignaron|abonaron|entr[oó] plata|lleg[oó] plata|ingres[oó]|recibi[oó]|recepci[oó]n|pago recibido|dinero recibido|transferencia recibida|abono a (tu|su) cuenta", Pattern.CASE_INSENSITIVE);
-    // Nunca se toman códigos, claves ni avisos de plata que SALE.
-    private static final Pattern PRIVADO = Pattern.compile("c[oó]digo|clave|otp|contrase|token|enviaste|pagaste|transferiste|retiraste|compraste|sacaste|usted (envi|pag|transfiri|pas)", Pattern.CASE_INSENSITIVE);
+    // Las reglas (qué es plata recibida, el valor y la frase) están en AvisoPago (se prueban sin Android).
     private static final long VIGENCIA = 6 * 3600_000L;   // un aviso que la página no alcanzó a tomar en 6 h ya no sirve
+    static final String PREF_VISTOS = "pagosAvisosVistos", PREF_NOTIF = "pagosNotif";
 
     @Override public void onListenerConnected() { activa = this; }
     @Override public void onListenerDisconnected() { if (activa == this) activa = null; }
@@ -50,30 +45,68 @@ public class VentoEscucha extends NotificationListenerService {
             String app;
             try { app = String.valueOf(getPackageManager().getApplicationLabel(getPackageManager().getApplicationInfo(pkg, 0))); }
             catch (Exception e) { return; }
-            if (!BANCO.matcher(app).find()) return;
+            if (!AvisoPago.esBanco(app)) return;
             Bundle x = n.extras;
             if (x == null) return;
             String titulo = texto(x.getCharSequence(Notification.EXTRA_TITLE));
             CharSequence grande = x.getCharSequence(Notification.EXTRA_BIG_TEXT);
-            String cuerpo = texto(grande != null ? grande : x.getCharSequence(Notification.EXTRA_TEXT));
-            String todo = titulo + " " + cuerpo;
-            if (!RECIBIDO.matcher(todo).find()) return;
-            // «Recibiste $20.000» siempre pasa; si además habla de códigos o plata que sale, no se toma.
-            if (PRIVADO.matcher(todo).find() && !Pattern.compile("recibiste|recibi[oó]|ha recibido|(te|le) lleg", Pattern.CASE_INSENSITIVE).matcher(todo).find()) return;
-            String txt = app + " | " + titulo + " | " + cuerpo;
-            guardar(sp, sbn.getKey() + ":" + txt.hashCode(), txt);
-            // La página (aunque la ventana esté cerrada, la mantiene viva VentoServicio) lo toma ya.
-            VentoApp.ui.post(() -> {
-                VentoApp.motor(null);
-                VentoApp.js("try{window.ventoAvisosNativos&&window.ventoAvisosNativos()}catch(e){}");
-            });
+            String principal = texto(grande != null ? grande : x.getCharSequence(Notification.EXTRA_TEXT));
+            // Cuando llega otro pago con el primero todavía en la barra, la app los junta («2 mensajes nuevos»): cada
+            // aviso viene en una línea (InboxStyle) o en un mensaje (MessagingStyle). Antes solo se leía el resumen.
+            java.util.List<String> otros = new java.util.ArrayList<>();
+            CharSequence[] lineas = x.getCharSequenceArray(Notification.EXTRA_TEXT_LINES);
+            if (lineas != null) for (CharSequence l : lineas) otros.add(texto(l));
+            try {
+                android.os.Parcelable[] msgs = x.getParcelableArray(Notification.EXTRA_MESSAGES);
+                if (msgs != null) for (android.os.Parcelable m : msgs) if (m instanceof Bundle) otros.add(texto(((Bundle) m).getCharSequence("text")));
+            } catch (Exception ignorado) { }
+            // La misma notificación actualizada (mismo «cuándo» y mismo texto) no se repite; dos pagos iguales (mismo valor,
+            // misma persona) SÍ son dos pagos: cada uno trae su propio «cuándo». Antes se tomaban como uno solo.
+            long cuando = n.when != 0 ? n.when : sbn.getPostTime();
+            boolean alguno = false;
+            if (procesar(sp, app, titulo, principal, sbn.getKey() + ":" + cuando + ":")) alguno = true;
+            for (String l : otros) if (!l.isEmpty() && !l.equals(principal) && procesar(sp, app, titulo, l, "L:")) alguno = true;
+            if (alguno) {
+                // La página (aunque la ventana esté cerrada, la mantiene viva VentoServicio) lo toma ya.
+                VentoApp.ui.post(() -> {
+                    VentoApp.motor(null);
+                    VentoApp.js("try{window.ventoAvisosNativos&&window.ventoAvisosNativos()}catch(e){}");
+                });
+            }
         } catch (Exception ignorado) { }
+    }
+
+    /** Un aviso: si es plata recibida y no se había visto, se dice en voz alta YA (aunque Vento esté minimizada o la
+     *  pantalla apagada), sale el aviso del celular y queda en la cola para la página (que lo registra). */
+    private boolean procesar(SharedPreferences sp, String app, String titulo, String cuerpo, String prefijo) throws Exception {
+        String todo = titulo + " " + cuerpo;
+        if (!AvisoPago.esRecibido(todo)) return false;
+        String txt = app + " | " + titulo + " | " + cuerpo;
+        String id = prefijo + txt.hashCode();
+        if (!marcarVisto(sp, id)) return false;
+        long monto = AvisoPago.monto(todo);
+        boolean voz = monto > 0;
+        if (voz) VentoApp.anunciarPago(app, monto, sp.getBoolean(PREF_NOTIF, true));
+        guardar(sp, id, txt, voz);
+        return true;
+    }
+
+    /** Avisos ya vistos (12 h): el mismo aviso no se dice dos veces aunque la app del banco lo vuelva a publicar. */
+    private static synchronized boolean marcarVisto(SharedPreferences sp, String id) throws Exception {
+        JSONObject v = new JSONObject(sp.getString(PREF_VISTOS, "{}")), out = new JSONObject();
+        if (v.has(id)) return false;
+        long ahora = System.currentTimeMillis();
+        java.util.Iterator<String> it = v.keys();
+        while (it.hasNext()) { String k = it.next(); long t = v.optLong(k); if (ahora - t < 12 * 3600_000L) out.put(k, t); }
+        out.put(id, ahora);
+        sp.edit().putString(PREF_VISTOS, out.toString()).apply();
+        return true;
     }
 
     private static String texto(CharSequence c) { return c == null ? "" : c.toString().replaceAll("\\s+", " ").trim(); }
 
     /** Cola de avisos para la página (sobrevive si la página todavía no ha cargado). */
-    private static synchronized void guardar(SharedPreferences sp, String id, String txt) throws Exception {
+    private static synchronized void guardar(SharedPreferences sp, String id, String txt, boolean voz) throws Exception {
         JSONArray l = new JSONArray(sp.getString(PREF_COLA, "[]")), out = new JSONArray();
         long ahora = System.currentTimeMillis();
         for (int i = 0; i < l.length(); i++) {
@@ -81,7 +114,7 @@ public class VentoEscucha extends NotificationListenerService {
             if (id.equals(o.optString("id"))) return;                     // el mismo aviso actualizado: no se repite
             if (ahora - o.optLong("t") < VIGENCIA) out.put(o);
         }
-        out.put(new JSONObject().put("id", id).put("txt", txt).put("t", ahora));
+        out.put(new JSONObject().put("id", id).put("txt", txt).put("t", ahora).put("voz", voz));   // voz: ya se dijo en voz alta aquí
         while (out.length() > 30) out.remove(0);
         sp.edit().putString(PREF_COLA, out.toString()).apply();
     }

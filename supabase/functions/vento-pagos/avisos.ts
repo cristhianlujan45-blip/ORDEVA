@@ -10,18 +10,20 @@ export type Aviso = { monto: number; metodo: string; de: string; confianza: "app
 export function leerAviso(txt: string): Aviso | null {
   const t = String(txt || "").replace(/\s+/g, " ").trim();
   if (!t) return null;
-  const recibido = /(recibiste|te lleg(?:[oó]|aron)|te pas(?:[oó]|aron)|pasaron plata|te envi(?:[oó]|aron)|te transfiri(?:[oó]|eron)|te pag(?:[oó]|aron)|te consign|te abon|consignaron|abonaron|entr[oó] plata|ingres[oó]|recibi[oó]|recepci[oó]n|pago recibido|dinero recibido|transferencia recibida|abono a tu cuenta)/i.test(t);
-  const salida = /(enviaste|pagaste|transferiste|retiraste|compraste|sacaste|c[oó]digo|clave din|otp|contrase)/i.test(t);
-  if (!recibido || (salida && !/(recibiste|te lleg)/i.test(t))) return null;
+  // Nequi habla de «tú» («Te llegó plata»); DaviPlata y varios bancos de «usted» («Le llegó plata», «Le pasaron», «Recibió»,
+  // «Ha recibido»). Antes el servidor solo entendía la forma de «tú»: los pagos de DaviPlata no llegaban a los demás celulares.
+  const recibido = /(recibiste|has recibido|ha recibido|(?:te|le) lleg(?:[oó]|aron)|(?:te|le) pas(?:[oó]|aron)|pasaron plata|(?:te|le) envi(?:[oó]|aron)|(?:te|le) transfiri(?:[oó]|eron)|(?:te|le) pag(?:[oó]|aron)|(?:te|le) consign|(?:te|le) abon|consignaron|abonaron|entr[oó] plata|lleg[oó] plata|ingres[oó]|recibi[oó]|recepci[oó]n|pago recibido|dinero recibido|transferencia recibida|abono a (?:tu|su) cuenta)/i.test(t);
+  const salida = /(enviaste|pagaste|transferiste|retiraste|compraste|sacaste|usted (?:envi|pag|transfiri|pas)|c[oó]digo|clave din|otp|contrase)/i.test(t);
+  if (!recibido || (salida && !/(recibiste|recibi[oó]|ha recibido|(?:te|le) lleg)/i.test(t))) return null;
   const m = t.match(/\$\s?(\d{1,3}(?:[.,]\d{3})+|\d+)/) || t.match(/(\d{1,3}(?:[.,]\d{3})+|\d{4,})\s*(?:pesos|cop)\b/i) || t.match(/\b(?:recibiste|por|de)\s+(\d{1,3}(?:[.,]\d{3})+)\b/i);
   if (!m) return null;
   const monto = Number(m[1].replace(/[.,]/g, ""));
   if (!(monto > 0)) return null;
   const metodo = (APPS.find(([re]) => re.test(t)) || [null, "TRANSFERENCIA"])[1];
   const NOM = "[A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ'.]+(?:\\s+[A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ'.]+){0,3}";
-  let de = (t.match(new RegExp("(" + NOM + ")\\s+te\\s+(?:envi|transfiri|pag|pas|consign|abon)")) || [])[1] ||
+  let de = (t.match(new RegExp("(" + NOM + ")\\s+(?:te|le)\\s+(?:envi|transfiri|pag|pas|consign|abon)")) || [])[1] ||
     (t.match(new RegExp("\\bde\\s+(" + NOM + ")")) || [])[1] || "";
-  if (/^(nequi|daviplata|bancolombia|tu|su|la|el|dinero|plata|recibiste|te)$/i.test(de.split(" ")[0])) de = "";
+  if (/^(nequi|daviplata|bancolombia|tu|su|la|el|le|dinero|plata|recibiste|te|usted)$/i.test(de.split(" ")[0])) de = "";
   de = de.split(" ").map((x) => x.charAt(0).toUpperCase() + x.slice(1).toLowerCase()).join(" ");
   const f = fuente(txt);
   return { monto, metodo, de, confianza: f.nivel, fuente: f.txt };

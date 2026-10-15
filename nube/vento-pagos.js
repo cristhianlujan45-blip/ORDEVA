@@ -147,7 +147,7 @@
     // Como el parlante de Bold: sonido de éxito y «Pago confirmado» en voz alta.
     toast('✅ Pago confirmado · ' + plata(p.monto) + ' por ' + nombreMetodo(p.metodo) + (p.pagador ? ' de ' + p.pagador : '') + m + (p.aprobacion ? ' · N.º ' + p.aprobacion : ''), 9000);
     try{ window.ventoSonidos && window.ventoSonidos.success(); }catch(e){}
-    hablar('Pago confirmado. ' + p.monto + ' pesos por ' + nombreMetodo(p.metodo) + (p.pagador ? ', de ' + p.pagador : '') + (p.mesa ? ', de la ' + etiquetaMesa(p.mesa) : ''));
+    hablar('Pago confirmado. ' + p.monto + ' pesos desde ' + nombreMetodo(p.metodo) + (p.pagador ? ', de ' + p.pagador : '') + (p.mesa ? ', de la ' + etiquetaMesa(p.mesa) : ''));
     try{ navigator.vibrate && navigator.vibrate([150, 80, 150]); }catch(e){}
     try{ window.mesoraCelebrar && window.mesoraCelebrar(['💜', '💰', '✨']); }catch(e){}
   }
@@ -184,10 +184,12 @@
 
   // Los avisos que llegan por MacroDroid (canal privado de Vento) también se mandan al Servidor Vento:
   // quedan guardados en la nube, se cruzan entre celulares sin duplicarse y avisan con push aunque Vento esté cerrada.
-  window.ventoPagosReenviarAviso = function(txt){
+  // Con el ID del aviso: así dos pagos iguales seguidos (mismo valor y persona) llegan como DOS a los demás celulares.
+  window.ventoPagosReenviarAviso = function(txt, id){
     var d = miDispositivo();
     if(!d || !est.servidor || !puedeCaja() || !txt) return;
-    try{ fetch(base() + '/aviso/' + d.token, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: String(txt).slice(0, 1000), keepalive: true }).catch(function(){}); }catch(e){}
+    var cuerpo = id ? JSON.stringify({ text: String(txt).slice(0, 1000), id: String(id).slice(0, 160) }) : String(txt).slice(0, 1000);
+    try{ fetch(base() + '/aviso/' + d.token, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: cuerpo, keepalive: true }).catch(function(){}); }catch(e){}
   };
 
   // Al registrar a mano desde «Llegó un pago», el servidor también lo marca (y otro celular ya no lo repite).

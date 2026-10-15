@@ -4,7 +4,7 @@
 //  1. Ajustes → «Recibir avisos de pagos»: en la app lee DIRECTO los avisos del banco (sin MacroDroid); sin permiso abre «Acceso a notificaciones».
 //  2. Aviso «DaviPlata | ¡Recibiste plata! | JUAN PEREZ te envió $25.000» → pago confirmado, de la mesa que debe $25.000.
 //  3. El mismo aviso otra vez (Android lo vuelve a publicar) → no se repite.
-//  2b. Como el parlante de Bold: suena el sonido de éxito y dice en voz alta «Pago confirmado. 25000 pesos por Daviplata, de Juan Perez…».
+//  2b. Como el parlante de Bold: suena el sonido de éxito y dice en voz alta «Pago confirmado. 25000 pesos desde DaviPlata, de Juan Perez…».
 //  4. Un pago que llega por el Servidor Vento → aviso del celular «✅ Pago confirmado» y la voz (con N.º de aprobación de DaviPlata).
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
@@ -55,10 +55,10 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     });
     const x = await p.evaluate(() => (data.pagos.lista || [])[0] || null);
     const voz2 = await p.evaluate(() => window.__and.voz.slice());
-    chk('2b. Dice en voz alta «Pago confirmado» con el valor, DaviPlata y quién pagó', voz2.some(t => /^Pago confirmado\. 25000 pesos por Daviplata, de Juan Perez/.test(t)), voz2);
+    chk('2b. Dice en voz alta «Pago confirmado» con el valor, DaviPlata y quién pagó', voz2.some(t => /^Pago confirmado\. 25000 pesos desde DaviPlata, de Juan Perez/.test(t)), voz2);
     chk('2b. Suena el sonido de éxito (como el parlante de Bold)', await p.evaluate(() => window.__and.sonidos) >= 1);
-    chk('2b. En pantalla: «✅ Pago confirmado · $25.000 por Daviplata de Juan Perez»', /Pago confirmado · \$25\.000 por Daviplata de Juan Perez/.test(await p.evaluate(() => document.body.innerText)));
-    chk('2. Aviso de DaviPlata → pago de $25.000 confirmado por la app', x && x.monto === 25000 && x.app === 'Daviplata' && x.estado === 'app' && x.de === 'Juan Perez', x);
+    chk('2b. En pantalla: «✅ Pago confirmado · $25.000 por DaviPlata de Juan Perez»', /Pago confirmado · \$25\.000 por DaviPlata de Juan Perez/.test(await p.evaluate(() => document.body.innerText)));
+    chk('2. Aviso de DaviPlata → pago de $25.000 confirmado por la app', x && x.monto === 25000 && x.app === 'DaviPlata' && x.estado === 'app' && x.de === 'Juan Perez', x);
     chk('2. … y es de la mesa que debe $25.000', x && x.mesa === 1, x);
 
     // 3. El mismo aviso otra vez
@@ -71,7 +71,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     await p.evaluate(() => window.ventoPagos.recibir({ id: 'srv-77', estado: 'aprobado', confianza: 'ok', verificado: true, proveedor: 'daviplata', metodo: 'DAVIPLATA', monto: 18000, aprobacion: '604107', creado_en: new Date().toISOString(), actualizado_en: new Date().toISOString() }, true));
     A = await p.evaluate(() => window.__and);
     const n = A.notifs.find(y => /Pago confirmado/.test(y.t));
-    chk('4. Dice «Pago confirmado» en voz alta en los demás celulares', A.voz.some(t => /^Pago confirmado\. 18000 pesos por DaviPlata/.test(t)), A.voz);
+    chk('4. Dice «Pago confirmado» en voz alta en los demás celulares', A.voz.some(t => /^Pago confirmado\. 18000 pesos desde DaviPlata/.test(t)), A.voz);
     chk('4. Aviso del celular «✅ Pago confirmado» con valor, DaviPlata y N.º de aprobación', n && /\$18\.000/.test(n.x) && /DaviPlata/i.test(n.x) && /604107/.test(n.x) && n.c === 'pedidos', A.notifs);
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.stack || e)); }
   chk('Sin errores de página', !errs.length, errs);

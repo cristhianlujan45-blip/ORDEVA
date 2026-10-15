@@ -534,11 +534,20 @@ async function aviso(req: Request, env: Env, tokenRuta: string | null) {
   const d = await db.rpc<{ id: string; negocio_id: string; rol: string; nombre: string } | null>("srv_dispositivo_por_token", { p_token: tok });
   if (!d) return json(401, { ok: false, error: "dispositivo_no_autorizado" });
   if (!["dueno", "admin", "cajero"].includes(d.rol)) return json(403, { ok: false, error: "rol_sin_permiso" });
-  let txt = await req.text();
-  try { const j = JSON.parse(txt); if (j && typeof j === "object") txt = [j.app, j.titulo, j.texto].filter(Boolean).join(" | ") || String(j.text || ""); } catch { /* texto plano de MacroDroid */ }
+  let txt = await req.text(), idAviso = "";
+  try {
+    const j = JSON.parse(txt);
+    if (j && typeof j === "object") {
+      txt = [j.app, j.titulo, j.texto].filter(Boolean).join(" | ") || String(j.text || "");
+      if (typeof j.id === "string") idAviso = j.id.slice(0, 160);
+    }
+  } catch { /* texto plano de MacroDroid */ }
   txt = txt.slice(0, 1000);
   const a = leerAviso(txt);
-  const ventana = Math.floor(Date.now() / 120000); // dos minutos: la misma notificación repetida no cuenta dos veces
+  // La app Vento manda el ID de cada aviso: dos pagos iguales (mismo valor, misma persona, en el mismo par de minutos) son
+  // DOS pagos y el mismo aviso reenviado otra vez es uno. Sin ID (MacroDroid): dos minutos, la misma notificación repetida
+  // no cuenta dos veces.
+  const ventana = idAviso ? "id:" + idAviso : String(Math.floor(Date.now() / 120000));
   const huella = "aviso:" + await sha256(d.negocio_id + ":" + txt.replace(/\s+/g, " ").trim().toLowerCase() + ":" + ventana);
   const nuevo = await db.rpc<boolean>("srv_evento", { p_proveedor: "dispositivo", p_huella: huella, p_negocio: d.negocio_id, p_tipo: "notificacion", p_id_externo: null, p_referencia: null, p_firma_valida: true, p_resultado: a ? "recibido" : "ignorado", p_cuerpo: { texto: txt, dispositivo: d.id }, p_ip: req.headers.get("x-forwarded-for") || "", p_error: null });
   if (!nuevo) return json(200, { ok: true, duplicado: true });
