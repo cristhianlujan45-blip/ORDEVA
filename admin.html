@@ -1335,8 +1335,29 @@
     sxVista('panel');
     let s = 'pagos'; try{ s = sessionStorage.getItem(SX_SEC) || 'pagos'; }catch(e){}
     sxSeccion(s);
+    sxEscuchar();
     await sxCargar();
   }
+  /* Tiempo real: la base de datos avisa («vs-admin») cuando llega o cambia un pago o una suscripción (un negocio
+     pagó, se aprobó desde otro equipo, venció una suscripción…). El panel se pone al día solo, sin tocar 🔄. */
+  async function sxEscuchar(){
+    if(sx.rt || sx.rtAbriendo) return; sx.rtAbriendo = true;
+    try{
+      const c = await sxCliente(); if(!c || !c.channel) return;
+      let t = null;
+      const canal = c.channel('vs-admin').on('broadcast', { event: 'a' }, () => {
+        clearTimeout(t);
+        t = setTimeout(() => {
+          if(!sx.yo || sx.cargando) return;
+          if(document.querySelector('dialog[open]')){ sxCargarPagos().catch(() => {}); sxCargarSubs().catch(() => {}); }   // sin mover lo que está abierto
+          else sxRecargar();
+        }, 300);
+      }).subscribe(st => { sx.rtVivo = st === 'SUBSCRIBED'; });
+      sx.rt = { canal, c };
+    }catch(e){ sx.rt = null; }
+    finally{ sx.rtAbriendo = false; }
+  }
+  function sxDejarDeEscuchar(){ const r = sx.rt; sx.rt = null; sx.rtVivo = false; if(r) try{ Promise.resolve(r.c.removeChannel(r.canal)).catch(() => {}); }catch(e){} }
   $('tabs').addEventListener('click', e => { if(e.target.closest('button[data-t="subs"]')) sxArrancar(); });
   // Si la pestaña ya estaba abierta, arranca apenas se desbloquee el panel con el código personal.
   new MutationObserver(() => { if($('lock').hidden && document.querySelector('#tabs button.on[data-t="subs"]')) sxArrancar(); }).observe($('lock'), { attributes: true, attributeFilter: ['hidden'] });
@@ -1360,6 +1381,7 @@
     // scope 'local': solo este equipo (la misma cuenta puede estar abierta en la app de su negocio)
     try{ const c = await sxCliente(); await c.auth.signOut({ scope: 'local' }); }catch(e){}
     try{ localStorage.removeItem(SX_SESION); }catch(e){}
+    sxDejarDeEscuchar();
     Object.assign(sx, { yo: null, pend: [], pagos: [], subs: [], negocios: null, negAct: null, negPagos: [] });
     sxBadge(); sxAviso(''); sxVista('login');
   }

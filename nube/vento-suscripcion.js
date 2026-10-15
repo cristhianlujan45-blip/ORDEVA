@@ -3,7 +3,8 @@
 
    Vento es un servicio por suscripción. Con el negocio en Vento Nube, el SERVIDOR decide el plan
    (Edge Function «vento-suscripciones»); esta parte solo consulta el estado, lo muestra y manda pagos.
-   • POST /estado al abrir, cada 30 min, al volver a la app y después de enviar un pago.
+   • POST /estado al abrir, AL INSTANTE cuando la base de datos avisa un cambio (el administrador activó, canceló,
+     aprobó…: canal «vs-<negocio>» de Realtime), cada minuto como respaldo, al volver a la app y después de enviar un pago.
    • El servidor manda un token FIRMADO (ECDSA P-256). Se verifica con la llave pública de GET /clave
      (se fija la 1ª vez en este celular: «vento_sub_clave») y se guarda en «vento_sub_token:<negocio>»
      para seguir funcionando sin internet hasta su «h». Nunca se usa un dato sin firma: un flag puesto
@@ -20,7 +21,7 @@
   'use strict';
   var K_CLAVE = 'vento_sub_clave', K_TOKEN = 'vento_sub_token:', K_INFO = 'vento_sub_info:', K_IDEM = 'vento_sub_idem:',
       K_BORRADOR = 'vento_sub_borrador:', K_PAGADOR = 'vento_sub_pagador', K_CAT = 'vento_sub_catalogo';
-  var REFRESCO_MS = 30 * 60e3, H72 = 72 * 3600e3, DIA = 864e5;
+  var REFRESCO_MS = 60e3, H72 = 72 * 3600e3, DIA = 864e5;
   // Lo mínimo del plan gratis: con el token vencido y sin internet se sigue vendiendo (pero sin funciones PRO).
   var BASE_GRATIS = ['pos_basic', 'tables', 'inventory', 'expenses'];
   var BENEFICIOS = {
@@ -224,10 +225,42 @@
     }).then(function(){ E.cargando = null; avisar(); return estado(); });
     return E.cargando;
   }
+  /* Tiempo real: la base de datos avisa («vs-<negocio>») cuando cambia la suscripción o un pago de este negocio.
+     Cualquier rol y cualquier celular escucha; el aviso no trae datos, solo manda a pedir el estado firmado. */
+  var rt = { canal: null, neg: null, vivo: false, timer: null, espera: null };
+  function rtCerrar(){
+    clearTimeout(rt.timer); clearTimeout(rt.espera); rt.vivo = false;
+    var c = rt.canal; rt.canal = null; rt.neg = null;
+    if(c) nube().cliente().then(function(cl){ return cl.removeChannel(c); }).catch(function(){});
+  }
+  function rtAbrir(id){
+    if(rt.neg === id && rt.canal) return;
+    rtCerrar();
+    if(!id) return;
+    rt.neg = id;
+    nube().cliente().then(function(cl){
+      if(rt.neg !== id || !cl || !cl.channel) return;
+      var canal = cl.channel('vs-' + id), cerrado = false;
+      rt.canal = canal;
+      canal.on('broadcast', { event: 's' }, function(){
+        // Varios cambios seguidos (aprobar = pago + suscripción) = una sola consulta.
+        clearTimeout(rt.espera); rt.espera = setTimeout(function(){ if(E.neg === id) refrescar(true); }, 150);
+      }).subscribe(function(st){
+        rt.vivo = st === 'SUBSCRIBED';
+        if(rt.vivo) refrescar();                              // por si algo cambió mientras no se escuchaba
+        if(cerrado || !(st === 'CHANNEL_ERROR' || st === 'TIMED_OUT' || st === 'CLOSED')) return;
+        cerrado = true;
+        if(rt.canal === canal) rt.canal = null;
+        try{ Promise.resolve(cl.removeChannel(canal)).catch(function(){}); }catch(e){}
+        rt.timer = setTimeout(function(){ if(E.neg === id) rtAbrir(id); }, 10000);
+      });
+    }).catch(function(){ rt.timer = setTimeout(function(){ if(E.neg === id){ rt.neg = null; rtAbrir(id); } }, 15000); });
+  }
   function cambiarNegocio(id){
     var habia = !!E.neg;
     E = { neg: id, p: null, info: null, recibido: 0, ultimo: 0, error: '', cargando: null, cat: E.cat, catProm: null }; antes = '';
-    if(!id){ if(habia) avisar(); return; }                 // sin nube: no se toca nada de la app
+    if(!id){ rtCerrar(); if(habia) avisar(); return; }     // sin nube: no se toca nada de la app
+    rtAbrir(id);
     cargarGuardado().catch(function(){}).then(refrescar);
   }
 
@@ -649,8 +682,23 @@
   document.addEventListener('visibilitychange', function(){ if(!document.hidden && E.neg && Date.now() - E.ultimo > 60e3) refrescar(); });
   window.addEventListener('online', function(){ if(E.neg) refrescar(); });
 
+  /* Puerta: ¿esta app puede funcionar? Solo con la base de datos de Vento:
+       cuenta  → este equipo no está conectado a una cuenta/negocio de Vento Nube;
+       espera  → conectado, pero todavía no llegó el estado firmado del servidor;
+       sinconexion → el último estado firmado ya caducó (72 h) y no se pudo renovar.
+     Con internet caído se sigue con el último estado firmado hasta su vencimiento («h»: 72 h). */
+  function puerta(){
+    var n = negocio();
+    if(!nube() || !nube().configurada || !nube().configurada()) return { ok: false, motivo: 'cuenta', sinServidor: true };
+    if(!n) return { ok: false, motivo: 'cuenta' };
+    if(E.neg !== n.id || !E.p) return { ok: false, motivo: 'espera', error: E.error || '', cargando: !!E.cargando };
+    if(!vivo(E.p) && E.error) return { ok: false, motivo: 'sinconexion', error: E.error };
+    return { ok: true };
+  }
+
   // ---------- API ----------
   window.ventoSuscripcion = {
+    puerta: puerta,
     estado: estado, refrescar: refrescar, enCuenta: enCuenta, verificado: function(){ return !!E.p; },
     tiene: function(ent){ return ents().indexOf(String(ent)) >= 0; }, entitlements: ents,
     planEfectivo: function(){ return estado().plan; },

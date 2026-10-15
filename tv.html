@@ -99,11 +99,25 @@
     try{
       var x = new XMLHttpRequest(); x.open('POST', String(c.url).replace(/\/+$/, '') + '/rest/v1/rpc/' + fn);
       x.setRequestHeader('apikey', c.key); x.setRequestHeader('Authorization', 'Bearer ' + c.key); x.setRequestHeader('Content-Type', 'application/json');
-      x.onload = function(){ var j = null; try{ j = JSON.parse(x.responseText); }catch(e){} if(cb) cb(x.status < 300 ? j : null); };
-      x.onerror = function(){ if(cb) cb(null); };
+      x.onload = function(){ var j = null; try{ j = JSON.parse(x.responseText); }catch(e){} cx(x.status < 500); if(cb) cb(x.status < 300 ? j : null); };
+      x.onerror = function(){ cx(false); if(cb) cb(null); };
       x.send(JSON.stringify(args));
-    }catch(e){ if(cb) cb(null); }
+    }catch(e){ cx(false); if(cb) cb(null); }
   }
+  // El TV solo funciona conectado a la base de datos de Vento: sin respuesta se tapa con «Sin conexión con Vento»
+  // (la música que ya está sonando sigue) y se destapa sola al volver.
+  var cxOk = false, cxFallo = 0, cxIni = Date.now(), cxOv = null;
+  function cx(bien){ if(bien){ cxOk = true; cxFallo = 0; } else { cxOk = false; if(!cxFallo) cxFallo = Date.now(); } cxPintar(); }
+  function cxPintar(){
+    var sin = !cxOk && (cxFallo ? Date.now() - cxFallo > 4000 : Date.now() - cxIni > 12000);
+    if(!sin){ if(cxOv){ cxOv.parentNode && cxOv.parentNode.removeChild(cxOv); cxOv = null; } return; }
+    if(cxOv || !document.body) return;
+    cxOv = document.createElement('div'); cxOv.id = 'vcSinConexion';
+    cxOv.style.cssText = 'position:fixed;left:0;top:0;right:0;bottom:0;z-index:2147483000;background:rgba(10,10,10,.96);color:#fff;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;font-family:sans-serif';
+    cxOv.innerHTML = '<div style="max-width:420px"><div style="font-size:60px">📡</div><b style="display:block;font-size:26px;margin:8px 0">Sin conexión con Vento</b><div style="font-size:16px;line-height:1.5;opacity:.85">Este TV solo funciona conectado a la base de datos de Vento. Revisa el internet: apenas vuelva, sigue solo.</div></div>';
+    document.body.appendChild(cxOv);
+  }
+  setInterval(cxPintar, 1500);
   function avisar(obj){                       // respuesta al celular (qué suena, versión mala, "sigo vivo")
     vcRpc('canal_publicar', { p_canal: TOPIC + 'r', p_cuerpo: JSON.stringify(obj) });
   }
