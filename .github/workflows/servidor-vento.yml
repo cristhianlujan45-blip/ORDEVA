@@ -70,7 +70,7 @@ jobs:
           CRON=$(printf '%s' "vento-cron:${PROJECT_REF}:${SUPABASE_DB_PASSWORD}" | sha256sum | cut -c1-48)
           supabase secrets set --project-ref "$PROJECT_REF" \
             VENTO_SITIO="$SITIO" \
-            VENTO_ORIGENES="https://${OWNER}.github.io,http://localhost:8765,http://127.0.0.1:8765" \
+            VENTO_ORIGENES="https://${OWNER}.github.io" \
             VENTO_CRON_SECRETO="$CRON"
 
       - name: Correo para recuperar la contraseña

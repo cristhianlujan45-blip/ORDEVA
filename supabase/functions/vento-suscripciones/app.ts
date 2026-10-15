@@ -222,6 +222,9 @@ async function admin(req: Request, env: Env, accion: string, b: Record<string, u
     es = true;
   }
   if (!es) throw new ErrorVento("no_admin", "Esta cuenta no es administradora de Vento.", 403);
+  // La primera vez que entra por su correo, su cuenta queda amarrada como administradora (platform_admins): desde ahí,
+  // otra cuenta con el mismo correo (borrada y creada otra vez) ya no entra.
+  if (me.email) { try { await db.rpc("srv_admin_agregar", { p_usuario: me.id, p_email: me.email }); } catch (_) { /* ya estaba o sin confirmar */ } }
   const a = me.id;
   const extra = await accionAdmin(env, db, a, accion, b);
   if (extra) return extra;

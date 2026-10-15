@@ -258,10 +258,34 @@ async function pruebas(sb) {
   r = await api('/admin/resumen', {}, admin.token);
   chk('Resumen: licencias activas (3) y soporte abierto (2: la foto reabrió el del dueño)', r.j.resumen.licencias_activas === 3 && r.j.resumen.soporte_abiertos === 2, r.j.resumen);
 
+  // ===== Seguridad =====
+  chk('El administrador quedó AMARRADO a su cuenta la primera vez que entró (platform_admins)', (await uno('select count(*)::int n from platform_admins where user_id = $1', [admin.id])).n === 1);
+  await sb.sql("insert into admin_correos(email) values ('socio.admin@vento.co') on conflict do nothing");
+  let x = await signup('socio.admin@vento.co', 'clave-socio-1');
+  const socio1 = x.j.user.id;
+  r = await api('/admin/yo', {}, x.j.access_token);
+  chk('Un correo de administrador entra la primera vez y queda amarrado a esa cuenta', r.st === 200 && (await uno('select count(*)::int n from platform_admins where user_id = $1', [socio1])).n === 1, r);
+  await sb.sql('delete from auth.users where id = $1', [socio1]);
+  x = await signup('socio.admin@vento.co', 'clave-del-atacante');
+  r = await api('/admin/yo', {}, x.j.access_token);
+  chk('Si alguien vuelve a crear una cuenta con ese correo (la original se borró), NO entra al panel', r.st === 403, r);
+  const rest = (tabla, metodo, cuerpo, tok) => fetch(sb.url + '/rest/v1/' + tabla, { method: metodo, headers: { ...cab(tok || sb.anonKey), Prefer: 'return=representation' }, body: cuerpo ? JSON.stringify(cuerpo) : undefined }).then(async q => ({ st: q.status, j: await q.json().catch(() => null) }));
+  r = await rest('miembros', 'POST', { negocio_id: neg, usuario_id: sinNeg.id, rol: 'dueno' }, sinNeg.token);
+  chk('Nadie se puede meter como dueño de un negocio ajeno escribiendo directo en la tabla', r.st >= 400 && !(await uno('select count(*)::int n from miembros where negocio_id = $1 and usuario_id = $2', [neg, sinNeg.id])).n, r);
+  r = await rest('datos_negocio?negocio_id=eq.' + neg, 'PATCH', { datos: { hackeado: true } }, sinNeg.token);
+  chk('…ni cambiar los datos de otro negocio', r.st >= 400 || (Array.isArray(r.j) && r.j.length === 0), r);
+  r = await rest('negocios', 'GET', null, null);
+  chk('Sin cuenta no se lee ningún negocio', r.st >= 400 || (Array.isArray(r.j) && r.j.length === 0), r);
+  r = await rest('admin_correos', 'GET', null, dueno.token);
+  chk('Nadie lee la lista de correos de administradores', r.st >= 400 || (Array.isArray(r.j) && r.j.length === 0), r);
+  r = await rest('plans', 'POST', { id: 'gratis-para-mi', name: 'x', price: 0 }, dueno.token);
+  chk('Nadie crea planes escribiendo directo', r.st >= 400, r);
+
   // ===== La migración se puede volver a correr =====
   let errMig = null;
   try { await sb.sql(fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', '20261015000000_admin_soporte_licencias.sql'), 'utf8')); } catch (x) { errMig = x.message; }
-  try { if(!errMig) await sb.sql(fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', '20261020000000_licencias_un_negocio.sql'), 'utf8')); } catch (x) { errMig = x.message; }
+  for (const m of ['20261020000000_licencias_un_negocio.sql', '20261021000000_soporte_fotos_avisos.sql', '20261022000000_seguridad.sql'])
+    try { if(!errMig) await sb.sql(fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', m), 'utf8')); } catch (x) { errMig = m + ': ' + x.message; }
   r = await rpc('crear_negocio', { p_nombre: 'Otra más', p_datos: {} }, dueno.token);
   chk('Las migraciones se vuelven a correr sin errores ni perder datos (y la regla sigue)', !errMig && (await uno('select count(*) n from licencias')).n === 4 && r.st >= 400, errMig || r);
 }
