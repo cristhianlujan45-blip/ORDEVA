@@ -36,7 +36,7 @@ const video = (id, t, c) => ({ id: { videoId: id }, snippet: { title: t, channel
         constructor(id, o){ this.o = o; this.st = -1; this.id = id; if(id === 'ytPlayer') window.__yt.main = this; setTimeout(() => o.events && o.events.onReady && o.events.onReady(), 30); }
         loadVideoById(v){ this.vid = v; if(this.id === 'ytPlayer') window.__yt.cargados.push(v);
           if(this.id === 'ytPlayer' && /anuncio|quieta|vetada/.test(v)){ this.st = -1; return; }
-          this.st = 1; setTimeout(() => this.o.events && this.o.events.onStateChange && this.o.events.onStateChange({ data: 1 }), 30); }
+          this.st = 1; setTimeout(() => { if(this.vid === v) this.o.events && this.o.events.onStateChange && this.o.events.onStateChange({ data: 1 }); }, 30); }   // como el de verdad: solo avisa del video actual
         pauseVideo(){ this.st = 2; } playVideo(){ if(this.id === 'ytPlayer') window.__yt.plays++; } stopVideo(){ this.st = 5; } mute(){}
         getPlayerState(){ return this.st; } getCurrentTime(){ return 0; } getDuration(){ return 200; }
         soltar(){ this.st = 1; this.o.events.onStateChange({ data: 1 }); }
@@ -73,12 +73,12 @@ const video = (id, t, c) => ({ id: { videoId: id }, snippet: { title: t, channel
     await p.evaluate(() => window.vitoPanel.cerrar());
 
     // ===== 1. Comercial: no es «bloqueada» =====
+    const plays0 = await p.evaluate(() => window.__yt.plays);
     chk('1. Empezó la canción (y YouTube está pasando un comercial: el video no arranca)', await poner('conanuncio1') && await ahora() === 'conanuncio1', await p.evaluate(() => window.__yt.cargados));
     await p.evaluate(() => { window.__ytAdelantar(8000); window.__ytVigilar(); });
     chk('1. A los 8 s ya NO la cambia ni dice «bloqueada»', await ahora() === 'conanuncio1' && !(await p.evaluate(() => window.__toasts.some(t => /bloqueada|no arrancó|no se deja/.test(t)))), await p.evaluate(() => window.__toasts));
-    const playsAntes = await p.evaluate(() => window.__yt.plays);
     await p.evaluate(() => { window.__ytAdelantar(5000); window.__ytVigilar(); window.__ytVigilar(); });
-    chk('1. A los 12 s le da play una sola vez (por si quedó en pausa)', await p.evaluate(() => window.__yt.plays) === playsAntes + 1);
+    chk('1. A los 12 s le da play una sola vez (por si quedó en pausa)', await p.evaluate(() => window.__yt.plays) === plays0 + 1, await p.evaluate(p0 => window.__yt.plays - p0, plays0));
     await p.evaluate(() => { window.__ytAdelantar(20000); window.__ytVigilar(); window.__yt.main.soltar(); });
     await p.waitForTimeout(300);
     chk('1. Terminó el comercial: la MISMA canción sigue sonando y no quedó en la lista negra', await ahora() === 'conanuncio1' && !(await bad()).includes('conanuncio1'), await bad());

@@ -2336,6 +2336,12 @@ body.mod-v #quickSaleBtn{ order:-1; background:var(--amber); color:#fff; border-
   .yp-sigue{ border-top:1px solid var(--line); padding-top:4px; }
   .yp-sc{ border:1px dashed color-mix(in srgb,#ff0033 60%,transparent); background:rgba(255,0,51,.08); color:var(--ink); border-radius:12px; padding:9px 12px; font:600 13.5px var(--font-main); text-align:left; cursor:pointer; }
   .yp-sc[hidden]{ display:none; }
+  .yp-tocar{ padding:14px; font-size:16px; font-weight:800; animation:ypLatir 1.2s ease-in-out infinite; }
+  .yp-tocar[hidden]{ display:none; }
+  @keyframes ypLatir{ 50%{ box-shadow:0 0 0 6px rgba(255,0,51,.35); } }
+  .yp-mq{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; font-size:13.5px; border:1px solid var(--line); border-radius:12px; padding:8px 10px; }
+  .yp-mq[hidden]{ display:none; }
+  .yp-mq span{ flex:1 1 160px; }
   .yp-mfila{ display:flex; gap:10px; align-items:center; padding:6px 0; }
   .yp-mfila img, .yp-mfila .yp-sinimg{ width:96px; aspect-ratio:16/9; height:auto; object-fit:cover; border-radius:8px; flex:0 0 auto; background:var(--surface-2); display:grid; place-items:center; }
   .yp-vermas{ border:0; background:transparent; color:#3ea6ff; font-weight:700; padding:6px 0; cursor:pointer; font-size:13.5px; }
@@ -22502,14 +22508,18 @@ function mzVigilar(){
     const a=mzActual(),listas=o.filter(y=>y.vid&&(y.ok||!yTestListo));
     const quieto=AUTO()&&!mzHayTV()&&listas.length>0&&!a&&!sonando;
     marca('quieto',quieto,9e4,()=>{let st=-2;try{st=yPl&&yPl.getPlayerState?yPl.getPlayerState():-2;}catch(e){}
-      window.ventoError&&window.ventoError('musica','Hay canciones listas pero el reproductor no arranca',{listas:listas.length,yListo:!!yListo,probador:!!yTestListo,toque:!!gestoUsuario,estado:st,visible:!document.hidden},'musica|no-arranca');});
+      window.ventoError&&window.ventoError('musica','Hay canciones listas pero el reproductor no arranca',{listas:listas.length,yListo:!!yListo,probador:!!yTestListo,toque:!!gestoUsuario,estado:st,visible:!document.hidden,navegador:(navigator.userAgent.match(/(Brave|Edg|OPR|SamsungBrowser|Firefox|Chrome|Safari)\/[\d.]+/)||[''])[0],app:!!window.VentoAndroid},'musica|no-arranca');});
     // 3) Sonando «de mentiras»: dice que suena pero el video lleva 2 min quieto (sin pausa a mano).
     let st=-2;try{st=yPl&&yPl.getPlayerState?yPl.getPlayerState():-2;}catch(e){}
     marca('pegada',AUTO()&&sonando&&!pausaManual&&st!==1&&st!==3,12e4,()=>window.ventoError&&window.ventoError('musica','El reproductor quedó pegado (no avanza)',{estado:st,cancion:String(a&&(a.title||a.song)||'').slice(0,80)},'musica|pegada'));
   }catch(e){}
 }
 setInterval(mzVigilar,15000);
-window.vitoMusicaVigilar=mzVigilar;window.__mzVigia=mzVigia;   // para las pruebas (adelantar el reloj del vigía)
+window.vitoMusicaVigilar=mzVigilar;window.__mzVigia=mzVigia;
+// Diagnóstico de la música (para el soporte y las pruebas): en qué está el reproductor y por qué no suena.
+window.vitoMusicaDiag=()=>{let st=-2,t=0,vd='';try{st=yPl&&yPl.getPlayerState?yPl.getPlayerState():-2;t=yPl&&yPl.getCurrentTime?yPl.getCurrentTime():0;vd=yPl&&yPl.getVideoData?(yPl.getVideoData()||{}).video_id:'';}catch(e){}
+  return {pausaManual,cargadoHace:cargadoEn?Math.round((Date.now()-cargadoEn)/1000):null,auto:AUTO(),guardado:!!LS('vito_auto_play',{}).on,otroEquipo:typeof mqOtro==='function'&&mqOtro(),tv:mzHayTV(),api:!!(window.YT&&YT.Player),yListo,probador:yTestListo,toque:gestoUsuario,sonando,estado:st,tiempo:t,video:vd,
+    cola:ordenJusto(cola()).slice(0,5).map(x=>({t:(x.title||x.song||'').slice(0,40),vid:x.vid,ok:!!x.ok,st:x.status})),actual:(mzActual()||{}).title||null,visible:!document.hidden};};   // para las pruebas (adelantar el reloj del vigía)
 function siguienteAuto(){
   if(!AUTO()||!yListo||sonando)return;
   if(!gestoUsuario)return;                            // sin el primer toque el navegador no deja sonar: se espera
@@ -22881,6 +22891,8 @@ function ypCrear(){
         '<div class="yp-video" id="ypVideo"><img id="ypPortada" alt=""><div class="yp-nada" id="ypNada">🎵 No está sonando nada.<br><small>Busca una canción o pon una de tus listas.</small></div></div>'+
         '<div class="yp-ahora"><div class="yp-info"><div class="yp-titulo" id="ypTitulo"></div><div class="yp-quien" id="ypQuien"></div><div class="yp-donde" id="ypDonde"></div><div class="yp-bar"><i id="ypBar"></i></div><div class="yp-tiempo" id="ypTiempo"></div></div>'+
         '<div class="yp-ctrl"><button type="button" class="yp-cor" id="ypCor" hidden>🤍</button><button type="button" class="btn-ghost" id="ypPausa">⏯<span class="yp-bt-txt"> Pausa</span></button><button type="button" class="btn-primary" id="ypSig">⏭<span class="yp-bt-txt"> Siguiente</span></button></div></div>'+
+        '<button type="button" class="btn-primary yp-tocar" id="ypTocar" hidden>▶ Toca aquí para que suene</button>'+
+        '<div class="yp-mq" id="ypMq" hidden><span id="ypMqTxt"></span><button type="button" class="btn-ghost" id="ypMqYo">🎶 Que suene aquí</button></div>'+
         '<button type="button" class="yp-sc" id="ypSc" hidden>🚫 ¿Salen comerciales? Entra con tu YouTube Premium <b>›</b></button>'+
         '<div class="yp-sigue" id="ypSigue"></div>'+
       '</section>'+
@@ -22892,11 +22904,27 @@ function ypCrear(){
   $('ypSig').onclick=()=>{if(!mzActual()&&!ordenJusto(cola()).length)return showToast('No hay más canciones en la cola.');mzSaltar();setTimeout(ypPintar,300);};
   $('ypPausa').onclick=ypPausa;
   $('ypSc').onclick=mzSinComerciales;
+  $('ypTocar').onclick=ypTocarSonar;
+  $('ypMqYo').onclick=()=>{mqElegir(true);ypSigueK='';ypPintar();};
   $('ypCor').onclick=()=>{const x=mzActual();if(x&&x.vid){ypFav(x);ypPintar();if(ypTab==='canciones')ypCuerpo();}};
   $('ypBuscarF').onsubmit=e=>{e.preventDefault();ypBuscar($('ypQ').value);};
   ov.querySelectorAll('[data-yp-tab]').forEach(b=>b.onclick=()=>{ypTab=b.dataset.ypTab;ypVer=null;ypCuerpo();if(ypTab==='buscar'&&!ypRes)setTimeout(()=>{try{$('ypQ').focus();}catch(e){}},30);});
   // El video sigue al recuadro aunque se mueva cualquier parte de la ventana (scroll no burbujea: se escucha en captura).
   ov.addEventListener('scroll',ypUbicar,{passive:true,capture:true});
+}
+// ¿El video de este equipo está cargado pero quieto (sin pausa a mano)? → el navegador no lo dejó arrancar solo.
+function ypNeedSt(){try{return yPl&&yPl.getPlayerState?yPl.getPlayerState():-2;}catch(e){return -2;}}
+function ypNecesitaToque(){
+  const a=mzActual();if(!a||a.fuente!=='app'||!sonando||!cargadoEn||pausaManual)return false;
+  const st=ypNeedSt();return (st===-1||st===5||st===2)&&Date.now()-cargadoEn>4000;
+}
+function ypTocarSonar(){
+  gestoUsuario=true;pausaManual=false;
+  const a=mzActual(),st=ypNeedSt();
+  try{if((st===-1||st===5)&&a&&a.vid)yPl.loadVideoById(a.vid);else yPl.playVideo();}catch(e){}   // dentro del toque: el navegador sí deja
+  cargadoEn=Date.now();
+  try{window.ventoError&&window.ventoError('musica','El navegador no dejó sonar solo: hubo que tocar',{estado:st,diag:window.vitoMusicaDiag&&window.vitoMusicaDiag()},'musica|autoplay');}catch(e){}
+  setTimeout(()=>{try{ypPintar();}catch(e){}},600);
 }
 function ypPausa(){
   if(mqOtro()){mqPub({t:'cmd',a:'pausa'});showToast('⏯ Enviado a «'+mqNombre()+'».');return;}
@@ -22928,6 +22956,10 @@ function ypPintar(){
   $('ypTiempo').textContent=x?mmss(t)+' / '+(x.dur?mmss(x.dur):'--:--'):'';
   $('ypPausa').hidden=!(f==='app'||f==='tvyt'||f==='cc'||f==='remoto');
   $('ypSc').hidden=!(f==='app'||(!x&&!mzHayTV()))||ytSesionApp();
+  // El navegador no dejó arrancar solo el video (bloqueo de reproducción automática): un toque lo arranca.
+  $('ypTocar').hidden=!ypNecesitaToque();
+  // Otro equipo pone la música: dónde suena y «Que suene aquí».
+  const mq=$('ypMq');if(mq){const otro=mqOtro();mq.hidden=!otro;if(otro)$('ypMqTxt').textContent='🔊 La música suena en «'+mqNombre()+'»'+(mqVisto&&Date.now()-mqVisto<9e4?'.':' (no responde).');}
   const cor=$('ypCor');cor.hidden=!(x&&x.vid);if(x&&x.vid){const si=ypEsFav(x.vid);cor.textContent=si?'❤️':'🤍';cor.title=si?'Quitar de Mis canciones':'Guardar en Mis canciones';cor.setAttribute('aria-label',cor.title);}
   const o=ordenJusto(cola());$('ypNCola').textContent=o.length?String(o.length):'';
   // «A continuación» (solo se vuelve a pintar si cambió)
@@ -22982,6 +23014,13 @@ function ypAgregar(v,primero,callado,idFijo){
   const it={id:idFijo||(now+'-'+Math.random().toString(36).slice(2,6)),reqId:null,mesa:0,mesaNombre:tableLabel(0),song:(conArt?v.artist+' - ':'')+v.title,pedido:v.title,
     title:String(v.title||'').slice(0,80),artist:String(v.artist||'').slice(0,60),vid:v.vid,dur:v.dur||ytDurCache[v.vid]||null,ts:now,done:false,status:'pending',panel:true};
   if(primero)it.primero=now;
+  // El equipo que pone la música no responde (cerrado o sin internet): este equipo la toma, para que no quede en silencio.
+  if(mqOtro()&&Date.now()-mqDesde>15e3&&Date.now()-mqVisto>9e4){const era=mqNombre();try{mqElegir(true);}catch(e){}
+    showToast('🎶 «'+era+'» no respondía: ahora la música suena en este equipo.',8000);}
+  // Nada suena en este equipo y la elegiste con «Que siga»: suena YA, dentro del mismo toque (sin esperar la revisión
+  // de fondo). Así el navegador (Brave, Chrome…) deja sonar con audio; si la versión no se deja poner, se cambia sola.
+  const yaSuena=mzActual();
+  if(primero&&!mqOtro()&&!mzHayTV()&&!(yaSuena&&yaSuena.fuente==='app'))it.ok=true;
   l.push(it);SS('vito_cola',l);mzRespaldo();
   // Otro equipo pone la música: se le manda allá (aquí queda en la cola mientras llega la respuesta).
   if(mqOtro()){mqPub({t:'cmd',a:'add',id:it.id,pr:primero?1:0,v:{vid:it.vid,title:it.title,artist:it.artist,dur:it.dur}});
