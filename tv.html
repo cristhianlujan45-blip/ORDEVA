@@ -118,6 +118,15 @@
     document.body.appendChild(cxOv);
   }
   setInterval(cxPintar, 1500);
+  // El TV nunca se apaga solo mientras Vento está abierto (Screen Wake Lock), y al despertar se pone al día al instante.
+  var luz = null;
+  function pedirLuz(){
+    if(luz || document.hidden || !(navigator.wakeLock && navigator.wakeLock.request)) return;
+    navigator.wakeLock.request('screen').then(function(l){ luz = l; l.addEventListener('release', function(){ luz = null; }); }).catch(function(){ luz = null; });
+  }
+  document.addEventListener('visibilitychange', function(){ if(!document.hidden) pedirLuz(); });
+  document.addEventListener('click', pedirLuz);
+  setTimeout(pedirLuz, 800);
   function avisar(obj){                       // respuesta al celular (qué suena, versión mala, "sigo vivo")
     vcRpc('canal_publicar', { p_canal: TOPIC + 'r', p_cuerpo: JSON.stringify(obj) });
   }
