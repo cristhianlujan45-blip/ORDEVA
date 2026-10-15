@@ -1,4 +1,28 @@
-# Vento 1.38.0 — Comerciales, canciones «bloqueadas», búsqueda sin el límite de Google y tu YouTube Premium en la app
+# Vento 1.38.0 — Mesas con varias personas (quién pagó), comerciales, canciones «bloqueadas», búsqueda sin el límite de Google y tu YouTube Premium en la app
+
+## 0. Mesa con varias personas: quién pagó, cuánto y cuánto le falta a cada uno
+- **Qué pasaba:**
+  - Cada persona solo contaba sus propios pagos. Si la cuenta principal pagaba toda la mesa, las personas seguían
+    saliendo como si debieran.
+  - Los pagos no decían quién pagó, y los chips de las personas mostraban el total, no lo que falta.
+- **Ahora:**
+  - **Lo que sobra de un pago cubre a los demás,** venga de la cuenta general o de alguien que pagó de más. Primero
+    cubre la cuenta general (lo de todos) y luego a las personas, en orden.
+  - **Si la cuenta principal paga toda la mesa,** cada persona queda «✅ Pagado por Cuenta general».
+  - **«👥 Quién pagó» en la mesa:** cuánto le toca a cada uno y su estado.
+    - Los estados son: «✅ Pagó $X», «✅ Pagado por Cuenta general», «⏳ Abonó $X · falta $Y», «⏳ Falta $Y» y
+      «📒 Quedó debiendo».
+    - Arriba dice cuántas cuentas ya están pagadas (por ejemplo «2 de 3»).
+    - Tocar a una persona abre su cuenta.
+  - **Cada pago dice quién lo hizo:** «👤 Ana», «👤 Cuenta general».
+  - **«¿Quién paga?»:** si se escribe el nombre de una persona de la mesa, el pago queda a nombre de ella.
+  - **Chips de las personas:** dicen «✅ pagó» o «debe $X».
+  - **En la cuenta de la persona:** el «Pagado» incluye lo que pagó otro por ella («Incluye $6.000 que pagó Cuenta
+    general»), y el saldo es el real.
+  - **Menú de mesas:** «👥 2/3 pagaron».
+  - **Cuenta de la mesa por voz:** también dice quién pagó.
+  - **Al cerrar la cuenta de una persona pagada por otro,** ese pago se va con ella a su historial («Pagado por Cuenta
+    general») y se descuenta de quien lo hizo. Así la mesa no queda descuadrada.
 
 ## 1. Canciones que salían «bloqueadas por el sello» sin estarlo
 - **Qué pasaba:**
@@ -49,6 +73,9 @@
 
 ## Pruebas
 - **Nuevas:**
+  - `mesapersonas`, 22 comprobaciones: sin pagos, cada uno paga lo suyo, la cuenta principal paga el resto, abono
+    parcial, alguien paga de más, cerrar la cuenta de una persona pagada por otro, menú, cuenta por voz y mesa sin
+    personas;
   - `musicaanuncios`, 22 comprobaciones: comercial que no se toma como bloqueo, video quieto de verdad, error real de
     YouTube, lista negra, título, guía, asistente, y entrar con Premium en la app (bien y cuando Google no deja).
 - **Actualizadas:**
