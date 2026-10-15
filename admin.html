@@ -322,6 +322,7 @@
       <button class="b" id="spRef" type="button" title="Actualizar">🔄</button>
       <button class="b" id="spAvisos" type="button" title="Recibir notificaciones de soporte y pagos en este equipo">🔔</button>
     </div>
+    <div id="tpBox" hidden></div>
     <div class="list" id="spLista"><div class="empty">Cargando…</div></div>
   </section>
 
@@ -2115,7 +2116,36 @@
   $('erResolver').onclick = () => erMarcar(true); $('erReabrir').onclick = () => erMarcar(false);
   async function erContar(){ const j = await intentar(() => sxApi('errores_abiertos')); if(j) erBadge(j.abiertos || 0); }
 
+  /* 🏷️ Cambios de tipo de negocio: los negocios no pueden cambiar su tipo sin permiso. Aquí se aprueban o rechazan;
+     aprobado, la app del negocio lo aplica sola al instante. */
+  async function tpCargar(){
+    let j; try{ j = await sxApi('tipos', { estado: 'pendiente' }); }catch(e){ return; }
+    const l = j.solicitudes || []; ad.tipos = l;
+    const box = $('tpBox'); box.hidden = !l.length;
+    box.innerHTML = l.length ? '<div class="card" style="margin-bottom:12px"><h3 style="margin:0 0 8px">🏷️ Cambios de tipo de negocio (' + l.length + ')</h3>' + l.map(x =>
+      '<div class="item" style="cursor:default;flex-wrap:wrap"><div class="av">🏷️</div><div class="t"><b>' + esc(x.negocio || 'Negocio') + '</b><small>' + esc((x.de_nombre || x.de || '—') + ' → ' + (x.a_nombre || x.a)) + ' · ' + esc(x.email || '') + ' · ' + esc(fCoHora(x.creado_en)) + '</small></div>' +
+      '<div class="row" style="margin:0"><button class="b p" type="button" data-tp="si" data-id="' + esc(x.id) + '">✅ Aprobar</button><button class="b no" type="button" data-tp="no" data-id="' + esc(x.id) + '">✕ Rechazar</button></div></div>').join('') + '</div>' : '';
+    return l;
+  }
+  $('tpBox').addEventListener('click', async e => {
+    const b = e.target.closest('[data-tp]'); if(!b) return;
+    const x = (ad.tipos || []).find(t => t.id === b.dataset.id); if(!x) return;
+    const si = b.dataset.tp === 'si';
+    let resp = '';
+    if(si){ if(!confirm('¿Aprobar que «' + (x.negocio || 'el negocio') + '» cambie a «' + (x.a_nombre || x.a) + '»? Su app cambia sola.')) return; }
+    else{ resp = prompt('¿Por qué no? (le llega al negocio, opcional)', '') ; if(resp === null) return; }
+    b.disabled = true;
+    const j = await intentar(() => sxApi('tipo_resolver', { solicitud: x.id, aprobar: si, respuesta: resp || '' }));
+    if(j) toast(si ? '✅ Aprobado: «' + (x.negocio || 'el negocio') + '» ahora es «' + (x.a_nombre || x.a) + '».' : '✕ Cambio de tipo rechazado.');
+    tpCargar();
+  });
+  window.addEventListener('vento-admin-cambio', async e => {
+    if(!(e.detail && e.detail.k === 'tipo' && sx.yo)) return;
+    const antes = new Set((ad.tipos || []).map(t => t.id)), l = await tpCargar() || [];
+    l.filter(t => !antes.has(t.id)).forEach(t => adminNotificar('🏷️ Cambio de tipo de negocio', (t.negocio || 'Un negocio') + ': ' + (t.de_nombre || t.de || '—') + ' → ' + (t.a_nombre || t.a), 'tipo-' + t.negocio_id));
+  });
   async function spCargar(){
+    tpCargar();
     const j = await intentar(() => sxApi('soporte', { estado: $('spEstado').value }), $('spLista')); if(!j) return;
     ad.casos = j.casos || []; spPintar();
     spBadge(ad.casos.filter(c => c.estado === 'abierto').length || (ad.resumen && ad.resumen.soporte_abiertos) || 0);
@@ -2330,7 +2360,7 @@
     const t = document.querySelector('#tabs button.on'); const tab = t ? t.dataset.t : 'resumen';
     if(tab === 'resumen') rsCargar(); else if(tab === 'usuarios') usCargar(); else if(tab === 'soporte') spCargar(); else if(tab === 'errores') erCargar(); else if(tab === 'licencias') lsCargar();
     if(tab !== 'resumen') rsCargar();
-    sxEscuchar(); spRevisarNuevos(true); adminPushActivar(false);
+    sxEscuchar(); spRevisarNuevos(true); adminPushActivar(false); tpCargar();
     const ancla = (location.hash || '').replace('#', '');
     if(['soporte', 'subs', 'licencias', 'usuarios'].includes(ancla)) irTab(ancla);
     return true;

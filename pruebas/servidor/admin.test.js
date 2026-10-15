@@ -258,6 +258,39 @@ async function pruebas(sb) {
   r = await api('/admin/resumen', {}, admin.token);
   chk('Resumen: licencias activas (3) y soporte abierto (2: la foto reabrió el del dueño)', r.j.resumen.licencias_activas === 3 && r.j.resumen.soporte_abiertos === 2, r.j.resumen);
 
+  // ===== Cambiar el tipo de negocio necesita permiso del administrador =====
+  r = await api('/tipo-pedir', { negocio: neg, de: 'bar', de_nombre: 'Bar / Cervecería', a: 'ropa_segunda_bar', a_nombre: 'Segunda Vuelta · Ropa de segunda y tragos' }, dueno.token);
+  chk('El dueño pide cambiar el tipo de negocio (queda pendiente)', r.st === 200 && r.j.solicitud.estado === 'pendiente' && r.j.solicitud.a === 'ropa_segunda_bar', r);
+  const solTipo = r.j.solicitud;
+  r = await api('/tipo-pedir', { negocio: neg, a: 'tienda' }, sinNeg.token);
+  chk('Alguien de otro negocio no puede pedirlo', r.st === 403, r);
+  r = await api('/tipo-pedir', { negocio: neg, a: '<script>' }, dueno.token);
+  chk('Un tipo inválido se rechaza', r.st === 400 && r.j.error === 'tipo_invalido', r);
+  r = await rpc('tipo_mi_cambio', { p_negocio: neg }, dueno.token);
+  chk('La app del negocio ve su solicitud pendiente', r.st === 200 && r.j && r.j.id === solTipo.id && r.j.estado === 'pendiente', r);
+  r = await rpc('tipo_mi_cambio', { p_negocio: neg }, sinNeg.token);
+  chk('…otra cuenta no la ve', r.st === 200 && r.j === null, r);
+  r = await api('/admin/tipos', {}, dueno.token);
+  chk('Un cliente no ve las solicitudes del panel', r.st === 403, r);
+  r = await api('/admin/tipos', {}, admin.token);
+  chk('El administrador ve la solicitud con el negocio y el cambio', r.st === 200 && r.j.solicitudes.some(x => x.id === solTipo.id && x.negocio === 'Bar Las Palmas' && x.de === 'bar'), r.j);
+  r = await api('/admin/tipo_resolver', { solicitud: solTipo.id, aprobar: true }, dueno.token);
+  chk('Un cliente no se lo puede aprobar a sí mismo', r.st === 403, r);
+  r = await api('/admin/tipo_resolver', { solicitud: solTipo.id, aprobar: true }, admin.token);
+  chk('El administrador lo aprueba', r.st === 200 && r.j.solicitud.estado === 'aprobado', r);
+  r = await api('/admin/tipo_resolver', { solicitud: solTipo.id, aprobar: false }, admin.token);
+  chk('Una solicitud resuelta no se vuelve a resolver', r.st === 409 && r.j.error === 'solicitud_resuelta', r);
+  r = await rpc('tipo_cambio_aplicado', { p_id: solTipo.id }, dueno.token);
+  const tras = (await rpc('tipo_mi_cambio', { p_negocio: neg }, dueno.token)).j;
+  chk('La app la marca como aplicada', r.st === 200 && r.j === true && tras.estado === 'aplicado', { r, tras });
+  r = await api('/tipo-pedir', { negocio: neg, de: 'ropa_segunda_bar', a: 'ropa_nueva_bar', a_nombre: 'Estreno & Brindis' }, dueno.token);
+  const sol2 = r.j.solicitud;
+  r = await api('/admin/tipo_resolver', { solicitud: sol2.id, aprobar: false, respuesta: 'Primero termina de vender la ropa de segunda' }, admin.token);
+  const rech = (await rpc('tipo_mi_cambio', { p_negocio: neg }, dueno.token)).j;
+  chk('Rechazada con motivo: la app lo ve', r.st === 200 && rech.estado === 'rechazado' && /ropa de segunda/.test(rech.respuesta), rech);
+  r = await rpc('srv_tipo_resolver', { p_id: sol2.id, p_aprobar: true, p_respuesta: null, p_admin: dueno.id }, dueno.token);
+  chk('Nadie puede aprobar llamando la base directo', r.st >= 400, r);
+
   // ===== Seguridad =====
   chk('El administrador quedó AMARRADO a su cuenta la primera vez que entró (platform_admins)', (await uno('select count(*)::int n from platform_admins where user_id = $1', [admin.id])).n === 1);
   await sb.sql("insert into admin_correos(email) values ('socio.admin@vento.co') on conflict do nothing");
@@ -284,7 +317,7 @@ async function pruebas(sb) {
   // ===== La migración se puede volver a correr =====
   let errMig = null;
   try { await sb.sql(fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', '20261015000000_admin_soporte_licencias.sql'), 'utf8')); } catch (x) { errMig = x.message; }
-  for (const m of ['20261020000000_licencias_un_negocio.sql', '20261021000000_soporte_fotos_avisos.sql', '20261022000000_seguridad.sql'])
+  for (const m of ['20261020000000_licencias_un_negocio.sql', '20261021000000_soporte_fotos_avisos.sql', '20261022000000_seguridad.sql', '20261023000000_cambio_tipo_negocio.sql'])
     try { if(!errMig) await sb.sql(fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', m), 'utf8')); } catch (x) { errMig = m + ': ' + x.message; }
   r = await rpc('crear_negocio', { p_nombre: 'Otra más', p_datos: {} }, dueno.token);
   chk('Las migraciones se vuelven a correr sin errores ni perder datos (y la regla sigue)', !errMig && (await uno('select count(*) n from licencias')).n === 4 && r.st >= 400, errMig || r);

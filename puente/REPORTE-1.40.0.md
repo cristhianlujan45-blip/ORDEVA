@@ -11,6 +11,20 @@
   - en la app, «Agregar sede» con cuenta de Vento dice que otra sede necesita otra cuenta con su propia suscripción.
   Las cuentas que ya tenían varios negocios los conservan.
 
+## 1b. Tipo de negocio fijo (cambiarlo necesita permiso del administrador) y tipos nuevos
+- **Al elegir el tipo** (registro y asistente): «⚠️ Elige bien: después, el tipo de negocio solo se puede cambiar con
+  permiso del administrador de Vento».
+- **Después,** en Ajustes o en el asistente, elegir otro tipo NO lo cambia: pide confirmación y manda una
+  **solicitud** al administrador, que le llega con notificación. En **🎧 Soporte → 🏷️ Cambios de tipo de negocio**
+  se aprueba o se rechaza (con motivo). Aprobada, la app del negocio cambia sola en todos sus equipos; rechazada, le
+  avisa el motivo. Los negocios que ya tenían su tipo también quedaron fijos. El equipo del proveedor lo cambia siempre.
+- **Tipos nuevos, con barra de tragos** (mesas, rondas y música por QR, como un bar):
+  - **🧥 Segunda Vuelta · Ropa de segunda y tragos:** ropa usada, paca, americana o vintage. Cada prenda con talla,
+    estado y marca.
+  - **🛍️ Estreno & Brindis · Ropa nueva y tragos:** ropa nueva con tallas, colores y marca.
+  Cada uno trae su carta de ejemplo (prendas y tragos). La «Tienda de ropa / Boutique» de siempre sigue igual.
+- Migración `20261023000000_cambio_tipo_negocio` y rutas `/tipo-pedir`, `/admin/tipos`, `/admin/tipo_resolver`.
+
 ## 2. Plan vencido → modo gratis; cancelada → solo pagar
 - **Vencida, pago rechazado, sin pagar o pago en revisión:** la app sigue en el plan **Gratis** con sus funciones
   limitadas (vender, mesas, inventario y gastos, según el plan Gratis del panel). Las PRO piden el plan.

@@ -478,6 +478,9 @@ window.esAndroid = function(){ var ua = navigator.userAgent || ''; if(/Android/i
     ['psicologia', 'Psicología / Terapias', '🧠', 'salud', 'psicologo, terapia, psicologia, coach, terapeuta', { esp: E.consultorio, n: 1, icE: 'persona', icP: 'salud' }, 'Sesiones y paquetes, pacientes frecuentes, confidencialidad.', 'Sesión:90000|Paquete 4 sesiones:320000'],
     ['repuestos', 'Repuestos de motos y carros', '⚙️', 'tienda', 'repuestos, autopartes, almacen de motos, lubricantes, llantas', { mod: 'vbn', icE: 'orden', icP: 'herramienta' }, 'Referencias por modelo, mecánicos a crédito.', 'Aceite 20W50:28000|Bujía:12000|Pastillas de freno:35000|Cadena de moto:70000'],
     ['restaurante', 'Restaurante', '🍽️', 'comida', 'restaurante, almuerzos, corrientazo, comida casera, menu del dia, asadero, platos, almuerzo, comedor, cocina, mesas, meseros, carta del dia', { n: 10 }, 'Mesas, comandas a cocina, almuerzo del día, domicilios y propina.', ''],
+    // Ropa con barra de tragos: se mira la ropa con algo de tomar en la mano (mesas, rondas y música como un bar).
+    ['ropa_segunda_bar', 'Segunda Vuelta · Ropa de segunda y tragos', '🧥', 'bar', 'ropa usada, ropa de segunda, segunda mano, paca, americana, ropa americana, pulguero, bazar, vintage, ropero, tienda de segunda, ropa usada y tragos, ropa y bar, cerveza, tragos, cocteles', { gastos: ['mercancia', 'licores', 'musica'], icP: 'prenda', campos: [['tallas','Talla','txt','Ej. M'],['estado','Estado de la prenda','txt','Ej. como nueva, buen estado'],['marca','Marca','txt','Ej. Levi\'s']] }, 'Prendas únicas (una de cada una) con su estado, pacas por lote, barra de tragos con rondas y música, apartados con abono.', 'Chaqueta de jean (segunda):45000|Camisa (segunda):18000|Pantalón (segunda):25000|Vestido vintage:35000|Cerveza:4000|Michelada:9000|Coctel de la casa:18000|Shot:7000'],
+    ['ropa_nueva_bar', 'Estreno & Brindis · Ropa nueva y tragos', '🛍️', 'bar', 'ropa nueva, boutique con bar, tienda de ropa y bar, concept store, moda y tragos, almacen de ropa con barra, ropa de marca, estrenar, cerveza, tragos, cocteles', { gastos: ['mercancia', 'licores', 'musica'], icP: 'prenda', campos: [['tallas','Tallas','txt','Ej. S, M, L, XL'],['colores','Colores','txt','Ej. negro, blanco'],['marca','Marca','txt','Ej. propia']] }, 'Colección con tallas y colores, cambios, apartados con abono y una barra de tragos con rondas y música para las clientas y los clientes.', 'Camiseta:35000|Jean:90000|Vestido:120000|Chaqueta:150000|Cerveza:4500|Coctel de la casa:20000|Copa de vino:15000|Gaseosa:3500'],
     ['ropa', 'Tienda de ropa / Boutique', '👕', 'tienda', 'ropa, boutique, almacen de ropa, calzado, zapatos, moda, vestidos, camisas, pantalones, tallas, almacen', { mod: 'vbn', icE: 'orden', icP: 'prenda', campos: [['tallas','Tallas','txt','Ej. S, M, L, XL'],['colores','Colores','txt','Ej. negro, blanco, azul'],['material','Material','txt','Ej. algodón']] }, 'Tallas y colores, cambios, apartados con abono.', 'Camiseta:35000|Jean:90000|Vestido:120000|Medias:8000'],
     ['salon_belleza', 'Salón de belleza', '💇‍♀️', 'servicio', 'salon de belleza, peluqueria de mujeres, tintes, cepillado, keratina, peluqueria, tinte, cabello, peinados, alisado', { icE: 'silla', icP: 'tijeras' }, 'Citas por estilista, tintes y productos, comisiones.', 'Cepillado:25000|Tinte:80000|Keratina:150000|Corte dama:30000'],
     ['salon_eventos', 'Salón de eventos / Finca', '🏛️', 'aloja', 'salon de eventos, salon social, finca para eventos, recepciones', { esp: E.evento, n: 2, carta: 'Paquetes', gastos: ['aseo', 'personal_ev', 'decoracion'], mod: 'n', prod: ['Paquete', 'Paquetes'], icE: 'carpa', icP: 'carpa', campos: [['personas','Para cuántas personas','num','80'],['horas','Horas incluidas','num','5'],['incluye','Incluye','txt','Ej. mesas, sillas y aseo'],['anticipo','Anticipo (%)','num','50']], inv: ['Cupos','cupos'] }, 'Reservas con anticipo, alquiler por horas, servicios extra.', 'Alquiler del salón (5 horas):800000|Hora adicional:120000'],
@@ -19342,7 +19345,7 @@ async function enterApp(user, setup){
   await loadData();
   if(setup){
     if(setup.biz) data.businessName = setup.biz;
-    data.businessType = setup.type;
+    data.businessType = setup.type; data.tipoFijo = true;   // elegido: después solo cambia con permiso del administrador
     if(setup.typeName) data.businessTypeName = setup.typeName; else delete data.businessTypeName;
     seedBusinessMenu(setup.type);
     await saveData(); renderAll();
@@ -19574,6 +19577,7 @@ function showAuth(firstRun){
   fillTypeSelect(document.getElementById('authType'), 'tienda');
   authTipoPropio = '';
   window.ventoTipoBoton(document.getElementById('authTypePick'), 'tienda', (k, propio) => { document.getElementById('authType').value = k; authTipoPropio = propio; });
+  { const hp = document.getElementById('authTypePick'); if(hp && !document.getElementById('authTipoAviso')){ const d = document.createElement('div'); d.id = 'authTipoAviso'; d.style.cssText = 'font-size:12px;color:var(--ink-soft);margin-top:4px;line-height:1.4'; d.textContent = TIPO_AVISO; hp.parentNode.insertBefore(d, hp.nextSibling); } }
   ov.hidden = false;
   const af = document.getElementById('authForm'), rf = document.getElementById('recForm'), g = i => document.getElementById(i);
   g('authForgot').hidden = firstRun;
@@ -19734,16 +19738,97 @@ function aplicarMusica(){
     if(act && act.dataset.view === 'musica'){ const b = document.querySelector('nav button[data-view="mesas"]'); if(b) b.click(); }
   }
 }
+/* ---------- Tipo de negocio FIJO ----------
+   Una vez elegido (registro o asistente), cambiar el tipo de negocio necesita permiso del administrador de Vento:
+   se le manda una solicitud (servidor: /tipo-pedir) y, cuando la aprueba, la app aplica el cambio sola en todos los
+   equipos del negocio (aviso al instante por el canal de la suscripción). Solo aplica con la cuenta de Vento; el
+   equipo del proveedor puede cambiarlo siempre. */
+const TIPO_AVISO = '⚠️ Elige bien: después, el tipo de negocio solo se puede cambiar con permiso del administrador de Vento.';
+const tipoNube = () => { try{ return (window.ventoNube && window.ventoNube.negocio && window.ventoNube.negocio()) || null; }catch(e){ return null; } };
+function tipoFijo(){
+  try{ if(typeof subEsProv === 'function' && subEsProv()) return false; }catch(e){}
+  return !!(typeof data !== 'undefined' && data && data.businessType && data.tipoFijo && tipoNube());
+}
+const tipoNombreDe = (k, propio) => (k === 'otro' && propio) ? propio : (BUSINESS_TYPES[k] || (VN.get(k) || {}).nombre || k);
+let tipoSolicitud = null;
+function pintarPickerTipo(){
+  const host = document.getElementById('accTypePick'); if(!host) return;
+  window.ventoTipoPicker(host, data.businessType || 'tienda', (k, propio) => {
+    if(tipoFijo()){ if(k !== data.businessType || (k === 'otro' && propio !== data.businessTypeName)) tipoPedirCambio(k, propio); pintarPickerTipo(); return; }
+    if(propio) data.businessTypeName = propio; else delete data.businessTypeName;
+    const sel = document.getElementById('accType'); sel.value = k; sel.dispatchEvent(new Event('change'));
+  }, { nombrePropio: data.businessType === 'otro' ? (data.businessTypeName || '') : '', max: 12 });
+  pintarTipoEstado();
+}
+function pintarTipoEstado(){
+  const host = document.getElementById('accTypePick'); if(!host) return;
+  let box = document.getElementById('accTipoEstado');
+  if(!box){ box = document.createElement('div'); box.id = 'accTipoEstado'; box.className = 'settings-desc'; box.style.marginTop = '6px'; host.parentNode.insertBefore(box, host.nextSibling); }
+  const e = t => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const s = tipoSolicitud;
+  box.innerHTML = (tipoFijo() ? '🔒 El tipo de negocio está fijo: para cambiarlo, elige el nuevo y se le pide permiso al administrador de Vento.' : '') +
+    (s && s.estado === 'pendiente' ? '<br>⏳ Pediste cambiar a <b>' + e(s.a_nombre || s.a) + '</b>: esperando la aprobación del administrador.' : '') +
+    (s && s.estado === 'rechazado' ? '<br>❌ El administrador no aprobó el cambio a <b>' + e(s.a_nombre || s.a) + '</b>' + (s.respuesta ? ': ' + e(s.respuesta) : '') + '.' : '');
+  box.hidden = !box.innerHTML;
+}
+async function tipoSesion(){ const c = await window.ventoNube.cliente(); const r = await c.auth.getSession(); return { c, tok: r && r.data && r.data.session ? r.data.session.access_token : null }; }
+async function tipoPedirCambio(k, propio){
+  const n = tipoNube();
+  if(!n){ showToast('🔒 Para cambiar el tipo de negocio entra con tu cuenta de Vento y pide permiso al administrador.', 8000); return false; }
+  if(!['dueno', 'admin'].includes(n.rol)){ showToast('🔒 Solo el dueño o el administrador del negocio puede pedir el cambio de tipo.', 7000); return false; }
+  const nom = tipoNombreDe(k, propio);
+  const ok = await showConfirm({ title: '🏷️ ¿Cambiar a «' + nom + '»?', message: 'Cambiar el tipo de negocio necesita permiso del administrador de Vento. Le mandamos la solicitud y, apenas la apruebe, tu app cambia sola en todos tus equipos.', confirmText: 'Pedir permiso', cancelText: 'Cancelar', icon: '🔒' });
+  if(!ok) return false;
+  try{
+    const { tok } = await tipoSesion(); const cfg = window.ventoNube.config();
+    const r = await fetch(cfg.url.replace(/\/+$/, '') + '/functions/v1/vento-suscripciones/tipo-pedir', { method: 'POST', headers: { apikey: cfg.key, Authorization: 'Bearer ' + (tok || cfg.key), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ negocio: n.id, a: k, a_nombre: nom, de: data.businessType || null, de_nombre: tipoNombre(data.businessType), propio: k === 'otro' ? (propio || '') : '' }) });
+    const j = await r.json().catch(() => ({}));
+    if(!r.ok || j.ok === false) throw new Error(j.mensaje || 'No se pudo enviar la solicitud.');
+    tipoSolicitud = j.solicitud; pintarTipoEstado();
+    showToast('📨 Solicitud enviada: el administrador de Vento te avisa cuando apruebe el cambio a «' + nom + '».', 8000);
+    return true;
+  }catch(e){ showToast('⚠️ ' + (e.message || 'Sin conexión: inténtalo otra vez.'), 7000); return false; }
+}
+// Revisa la solicitud: si el administrador la aprobó, el cambio se aplica solo (una vez) y se avisa; si la rechazó, se avisa.
+let tipoRevisando = false, tipoUltRev = 0, tipoOtra = false;
+async function tipoRevisar(forzar){
+  const n = tipoNube(); if(!n) return;
+  if(tipoRevisando){ if(forzar) tipoOtra = true; return; }
+  if(!forzar && Date.now() - tipoUltRev < 3000) return;
+  tipoRevisando = true; tipoUltRev = Date.now();
+  try{
+    const { c } = await tipoSesion();
+    const r = await c.rpc('tipo_mi_cambio', { p_negocio: n.id });
+    const s = r && !r.error ? r.data : null; tipoSolicitud = s;
+    if(s && s.estado === 'aprobado'){
+      data.businessType = s.a; data.tipoFijo = true;
+      if(s.a === 'otro' && s.propio) data.businessTypeName = s.propio; else delete data.businessTypeName;
+      try{ cartaLabel(); aplicarVocabulario(); pintarGuiaTipo(); }catch(e){}
+      await saveData();
+      try{ const sel = document.getElementById('accType'); if(sel) sel.value = s.a; pintarPickerTipo(); }catch(e){}
+      try{ await c.rpc('tipo_cambio_aplicado', { p_id: s.id }); }catch(e){}
+      showToast('✅ El administrador de Vento aprobó el cambio: tu negocio ahora es «' + tipoNombre(s.a) + '».', 9000);
+    }else if(s && s.estado === 'rechazado'){
+      let vistos = {}; try{ vistos = JSON.parse(localStorage.getItem('vento-tipo-avisados') || '{}') || {}; }catch(e){}
+      if(!vistos[s.id]){ vistos[s.id] = 1; try{ localStorage.setItem('vento-tipo-avisados', JSON.stringify(vistos)); }catch(e){}
+        showToast('❌ El administrador de Vento no aprobó el cambio de tipo de negocio' + (s.respuesta ? ': ' + s.respuesta : '.'), 9000); }
+    }
+    pintarTipoEstado();
+  }catch(e){}
+  finally{ tipoRevisando = false; if(tipoOtra){ tipoOtra = false; setTimeout(() => tipoRevisar(true), 50); } }
+}
+window.addEventListener('vento-suscripcion', () => setTimeout(tipoRevisar, 200));
+setTimeout(tipoRevisar, 5000);
+window.ventoTipo = { fijo: tipoFijo, pedir: tipoPedirCambio, revisar: () => tipoRevisar(true), solicitud: () => tipoSolicitud };
 function wireAccountUI(){
   document.getElementById('accUserLabel').textContent = authUser;
   const sel = document.getElementById('accType');
   if(data.businessType && VN.ALIAS[data.businessType]){ data.businessType = VN.ALIAS[data.businessType]; saveData(); }   // claves viejas → nuevas
   fillTypeSelect(sel, data.businessType || 'tienda');
-  sel.onchange = () => { data.businessType = sel.value; cartaLabel(); aplicarVocabulario(); saveData(); pintarGuiaTipo(); showToast('Tipo de negocio: ' + tipoNombre(sel.value)); };
-  window.ventoTipoPicker(document.getElementById('accTypePick'), data.businessType || 'tienda', (k, propio) => {
-    if(propio) data.businessTypeName = propio; else delete data.businessTypeName;
-    sel.value = k; sel.dispatchEvent(new Event('change'));
-  }, { nombrePropio: data.businessType === 'otro' ? (data.businessTypeName || '') : '', max: 12 });
+  sel.onchange = () => { if(tipoFijo()){ sel.value = data.businessType; return; } data.businessType = sel.value; cartaLabel(); aplicarVocabulario(); saveData(); pintarGuiaTipo(); showToast('Tipo de negocio: ' + tipoNombre(sel.value)); };
+  if(data.businessType && !data.tipoFijo){ data.tipoFijo = true; saveData(); }   // los negocios que ya lo habían elegido también quedan fijos
+  pintarPickerTipo();
   const mc = document.getElementById('modoCompletoToggle');
   if(mc){
     mc.checked = !!data.modoCompleto;
@@ -30286,7 +30371,8 @@ window.mesoraCelebrar = function(emojis){
     $b('onbAtras').hidden = n === 0; $b('onbSig').textContent = n === 3 ? '✅ Listo, empezar' : 'Siguiente →';
     if(n === 0){
       cuerpo.innerHTML = '<h2>👋 ¡Bienvenido a Vento!</h2><div class="modal-sub">¿Qué tipo de negocio tienes? <b>Escribe una palabra</b> (ej. lavandería, uñas, pollo, taller) y elígelo. Así Vento usa tus palabras (mesas, sillas, órdenes, habitaciones…) y te deja listo lo que necesitas.</div><div id="onbTipo"></div><div class="tp-guia" id="onbGuia"></div>';
-      const guia = () => { $b('onbGuia').innerHTML = '<p><b>' + tipoDe(st.tipo).icono + ' ' + escb(nombreTipo()) + '</b></p><p>🎯 ' + escb(tipoDe(st.tipo).necesita) + '</p>'; };
+      const guia = () => { $b('onbGuia').innerHTML = '<p><b>' + tipoDe(st.tipo).icono + ' ' + escb(nombreTipo()) + '</b></p><p>🎯 ' + escb(tipoDe(st.tipo).necesita) + '</p>' +
+        '<p class="onb-tipo-aviso" style="font-size:12.5px;opacity:.85">' + escb(!primera && typeof tipoFijo === 'function' && tipoFijo() ? '🔒 Tu tipo de negocio está fijo: si eliges otro, se le pide permiso al administrador de Vento.' : TIPO_AVISO) + '</p>'; };
       window.ventoTipoPicker($b('onbTipo'), st.tipo, (k, propio) => { st.tipo = k; st.tipoNombre = propio; st.espacios = ESPACIOS_DEF[k] || 3; st.funciones = defFunciones(k); if(primera && !st.modoElegido) st.modo = modoDe(k); guia(); }, { nombrePropio: st.tipoNombre });
       guia();
     } else if(n === 1){
@@ -30331,6 +30417,10 @@ window.mesoraCelebrar = function(emojis){
   const MODOS = [['restaurante', '🍽️', 'Con mesas', 'Cada uno tiene su cuenta'], ['tienda', '🏪', 'Caja rápida', 'Buscas, cobras y listo'], ['mixto', '🔀', 'Las dos', 'Caja arriba y cuentas abajo']];
   function modoDe(tipo){ try{ return window.ventoPOS.modoPorTipo(tipo); }catch(e){ const t = tipoDe(tipo); return t.fam !== 'tienda' ? 'restaurante' : (t.esp && t.esp[0] !== 'Cuenta' ? 'mixto' : 'tienda'); } }
   async function aplicar(){
+    // Tipo fijo: el asistente no lo cambia; se le pide permiso al administrador de Vento (y lo demás sí se guarda).
+    let tipoPedido = null;
+    if(!primera && data.businessType && data.businessType !== st.tipo && typeof tipoFijo === 'function' && tipoFijo()){ tipoPedido = { k: st.tipo, propio: st.tipoNombre }; st.tipo = data.businessType; st.tipoNombre = data.businessTypeName || ''; }
+    if(tipoPedido) setTimeout(() => { try{ tipoPedirCambio(tipoPedido.k, tipoPedido.propio); }catch(e){} }, 400);
     const cambioTipo = data.businessType !== st.tipo;
     data.businessType = st.tipo; data.businessName = st.nombre;
     if(st.tipo === 'otro' && st.tipoNombre) data.businessTypeName = st.tipoNombre; else if(st.tipo !== 'otro') delete data.businessTypeName; data.ciudad = st.ciudad; data.bizWhatsapp = st.wa;
@@ -30342,7 +30432,7 @@ window.mesoraCelebrar = function(emojis){
     for(let i = 1; i <= st.espacios; i++) if(!data.tables[i]) data.tables[i] = { items: [], people: [] };
     Object.keys(data.tables).map(Number).filter(id => id > st.espacios && !((data.tables[id].items || []).length)).forEach(id => { delete data.tables[id]; });
     data.tableCount = st.espacios;
-    data.onboarding = { t: Date.now(), tipo: st.tipo };
+    data.onboarding = { t: Date.now(), tipo: st.tipo }; data.tipoFijo = true;
     // El WhatsApp también queda como respaldo de los pedidos por QR.
     try{ if(st.wa && window.vitoMod){ const c = window.vitoMod.qCfg(); if(!c.wa){ c.wa = st.wa.replace(/\D/g, '').replace(/^3/, '573'); window.vitoMod.SS('vito_qr', c); } } }catch(e){}
     await saveData();

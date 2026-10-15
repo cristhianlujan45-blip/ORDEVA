@@ -185,6 +185,19 @@ async function soporteAvisar(req: Request, env: Env, b: Record<string, unknown>)
   return { ok: true, avisados: n };
 }
 
+// ---------- /tipo-pedir: cambiar el tipo de negocio necesita permiso del administrador de Vento ----------
+async function tipoPedir(req: Request, env: Env, b: Record<string, unknown>) {
+  const negocio = negocioDe(b);
+  const me = await usuario(req, env).rpc<{ id: string }>("sub_yo");
+  const db = servidor(env);
+  const p = { a: b.a, de: b.de, a_nombre: b.a_nombre, de_nombre: b.de_nombre, propio: b.propio, motivo: b.motivo };
+  const r = await db.rpc<Record<string, unknown>>("srv_tipo_pedir", { p_negocio: negocio, p_usuario: me.id, p });
+  await avisarAdmins(env, db, { titulo: "🏷️ Cambio de tipo de negocio", cuerpo: String(r.negocio || "Un negocio") + ": " + String(r.de_nombre || r.de || "—") + " → " + String(r.a_nombre || r.a),
+    tag: "tipo-" + negocio, url: urlAdmin(env, "soporte") });
+  log("info", "tipo_pedido", { negocio, a: String(r.a || "") });
+  return { ok: true, solicitud: r };
+}
+
 // ---------- /pago ----------
 async function pago(req: Request, env: Env, b: Record<string, unknown>) {
   const negocio = negocioDe(b);
@@ -275,6 +288,10 @@ async function admin(req: Request, env: Env, accion: string, b: Record<string, u
     }
     case "push_clave":
       return { ok: true, publica: (await vapid(db, env.VENTO_SITIO || SITIO)).publica };
+    case "tipos":
+      return { ok: true, solicitudes: await db.rpc("srv_tipo_lista", { p_estado: b.estado ? String(b.estado) : "pendiente" }) };
+    case "tipo_resolver":
+      return { ok: true, solicitud: await db.rpc("srv_tipo_resolver", { p_id: idDe(b.solicitud, "falta_solicitud", "Falta la solicitud"), p_aprobar: b.aprobar === true, p_respuesta: b.respuesta ? String(b.respuesta) : null, p_admin: a }) };
     case "soporte_imagen": {
       const id = Number(b.mensaje);
       if (!Number.isInteger(id) || id <= 0) throw new ErrorVento("falta_mensaje", "Falta el mensaje", 400);
@@ -323,6 +340,7 @@ export async function manejar(req: Request, env: Env): Promise<Response> {
     if (r0 === "licencia") return json(200, await licencia(req, env, b), cors);
     if (r0 === "soporte-adjunto") return json(200, await soporteAdjunto(req, env, b), cors);
     if (r0 === "soporte-avisar") return json(200, await soporteAvisar(req, env, b), cors);
+    if (r0 === "tipo-pedir") return json(200, await tipoPedir(req, env, b), cors);
     if (r0 === "admin") return json(200, await admin(req, env, ruta[1] || "yo", b), cors);
     return json(404, { ok: false, error: "ruta" }, cors);
   } catch (e) {
