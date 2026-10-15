@@ -1,7 +1,15 @@
 package co.vento.admin;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.content.pm.PackageManager;
+import android.os.PowerManager;
+import android.provider.Settings;
 import android.content.ActivityNotFoundException;
 import android.content.ContentValues;
 import android.content.Intent;
@@ -21,6 +29,7 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
 
+import java.lang.ref.WeakReference;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
@@ -94,6 +103,34 @@ public class AdminActivity extends Activity {
         setContentView(web);
         if (estado != null) web.restoreState(estado);
         else web.loadUrl(URL_ADMIN);
+        // Conectado siempre (pantalla bloqueada o app de fondo): servicio en primer plano + avisos del celular.
+        AdminServicio.pagina = new WeakReference<>(web);
+        if (getSharedPreferences("vento_admin", MODE_PRIVATE).getBoolean("fondo", true)) AdminServicio.arrancar(this);
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 41);
+        pedirSinAhorroBateria();
+    }
+
+    /** Sin el ahorro de batería, Android no duerme el panel (los avisos llegan con el celular bloqueado). Se pide una vez. */
+    private void pedirSinAhorroBateria() {
+        if (Build.VERSION.SDK_INT < 23) return;
+        try {
+            PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
+            if (pm == null || pm.isIgnoringBatteryOptimizations(getPackageName())) return;
+            if (getSharedPreferences("vento_admin", MODE_PRIVATE).getBoolean("pidio_bateria", false)) return;
+            getSharedPreferences("vento_admin", MODE_PRIVATE).edit().putBoolean("pidio_bateria", true).apply();
+            startActivity(new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:" + getPackageName())));
+        } catch (Exception ignorado) { }
+    }
+
+    // OJO: no se llama web.onPause() / pauseTimers(): con eso el panel dejaría de recibir avisos de fondo.
+    @Override
+    protected void onPause() { super.onPause(); }
+
+    @Override
+    protected void onDestroy() {
+        if (AdminServicio.pagina.get() == web) AdminServicio.pagina = new WeakReference<>(null);
+        super.onDestroy();
     }
 
     @Override
@@ -137,8 +174,35 @@ public class AdminActivity extends Activity {
         if (web.canGoBack()) web.goBack(); else super.onBackPressed();
     }
 
-    /** window.VentoAdmin: guardar respaldos y CSV en Descargas/Vento (el navegador de la app no descarga «blob:»). */
+    /** window.VentoAdmin: guardar respaldos y CSV en Descargas/Vento (el navegador de la app no descarga «blob:»)
+     *  y notificaciones del celular (soporte nuevo, pagos por revisar) aunque esté bloqueado. */
     class Puente {
+        @JavascriptInterface
+        public void notificar(final String titulo, final String cuerpo, final String tag) {
+            try {
+                NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+                if (nm == null) return;
+                String canal = "vento_admin_avisos";
+                if (Build.VERSION.SDK_INT >= 26 && nm.getNotificationChannel(canal) == null) {
+                    NotificationChannel ch = new NotificationChannel(canal, "Soporte y pagos", NotificationManager.IMPORTANCE_HIGH);
+                    ch.setDescription("Mensajes de soporte de los clientes y pagos por revisar.");
+                    ch.enableVibration(true);
+                    ch.setLockscreenVisibility(Notification.VISIBILITY_PRIVATE);
+                    nm.createNotificationChannel(ch);
+                }
+                int flagsPi = Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0;
+                Intent abrir = new Intent(AdminActivity.this, AdminActivity.class).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
+                PendingIntent pi = PendingIntent.getActivity(AdminActivity.this, 2, abrir, flagsPi);
+                Notification.Builder b = Build.VERSION.SDK_INT >= 26 ? new Notification.Builder(AdminActivity.this, canal) : new Notification.Builder(AdminActivity.this);
+                String t = titulo == null ? "Vento Admin" : (titulo.length() > 80 ? titulo.substring(0, 80) : titulo);
+                String c = cuerpo == null ? "" : (cuerpo.length() > 300 ? cuerpo.substring(0, 300) : cuerpo);
+                b.setSmallIcon(android.R.drawable.stat_notify_chat).setContentTitle(t).setContentText(c)
+                        .setStyle(new Notification.BigTextStyle().bigText(c)).setAutoCancel(true).setContentIntent(pi);
+                if (Build.VERSION.SDK_INT < 26) b.setPriority(Notification.PRIORITY_HIGH).setDefaults(Notification.DEFAULT_ALL);
+                nm.notify(tag == null || tag.isEmpty() ? "vento" : tag, 1, b.build());
+            } catch (Exception ignorado) { }
+        }
+
         @JavascriptInterface
         public void guardar(final String nombre, final String tipo, final String texto) {
             new Thread(() -> {

@@ -80,10 +80,24 @@ const ADMIN = 'cristhianwkh@gmail.com';
     chk('2. Ajustes → Guía y soporte: «🎧 Soporte de Vento»', await esperar(A.p, () => !!document.getElementById('vcSoporte') && document.getElementById('vcSoporte').offsetParent !== null));
     await A.p.click('#vcNuevo');
     await A.p.fill('#vcAsunto', 'No me imprime'); await A.p.fill('#vcMsg', 'Hola, no me imprime la cuenta de la mesa 3'); await A.p.fill('#vcTel', '3001112233');
+    // Pantallazo del error (PNG de verdad, 900×600): la app lo achica y lo manda con el mensaje
+    const zlib = require('zlib');
+    const png = (w, h) => { const T = []; for(let n = 0; n < 256; n++){ let c = n; for(let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; T[n] = c >>> 0; }
+      const crc = b => { let c = 0xffffffff; for(const x of b) c = T[(c ^ x) & 255] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+      const chunk = (t, d) => { const l = Buffer.alloc(4); l.writeUInt32BE(d.length); const td = Buffer.concat([Buffer.from(t), d]); const c = Buffer.alloc(4); c.writeUInt32BE(crc(td)); return Buffer.concat([l, td, c]); };
+      const ih = Buffer.alloc(13); ih.writeUInt32BE(w, 0); ih.writeUInt32BE(h, 4); ih[8] = 8; ih[9] = 2; const raw = Buffer.alloc((w * 3 + 1) * h);
+      for(let y = 0; y < h; y++) for(let x = 0; x < w; x++){ const i = y * (w * 3 + 1) + 1 + x * 3; raw[i] = x % 255; raw[i + 1] = y % 255; raw[i + 2] = 120; }
+      return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ih), chunk('IDAT', zlib.deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]); };
+    await A.p.setInputFiles('#vcFotos', { name: 'pantallazo.png', mimeType: 'image/png', buffer: png(900, 600) });
+    chk('2. Adjunta un pantallazo (se ve «1 imagen lista»)', await esperar(A.p, () => /1 imagen lista/.test(document.getElementById('vcFotosTxt').textContent)));
     await A.p.click('#vcEnviar');
-    chk('2. Mensaje enviado', await esperar(A.p, () => /Enviado/.test(document.getElementById('vcEstado').textContent)));
+    chk('2. Mensaje enviado', await esperar(A.p, () => /Enviado/.test(document.getElementById('vcEstado').textContent), null, 20000), await A.p.evaluate(() => document.getElementById('vcEstado').textContent));
     const caso = await uno("select c.* from soporte_casos c join auth.users u on u.id = c.usuario_id where u.email = 'dueno@soporte.co'");
     chk('2. El caso llega al servidor con su cuenta, negocio y celular', caso && caso.asunto === 'No me imprime' && caso.negocio_id === NEG && caso.telefono === '3001112233', caso);
+    const imgMsg = await uno('select id, adjunto, adjunto_tipo from soporte_mensajes where caso_id = $1 and adjunto is not null', [caso.id]);
+    chk('2. El pantallazo llega al servidor (JPEG achicado, almacenamiento privado)', imgMsg && imgMsg.adjunto_tipo === 'image/jpeg' && /^soporte\//.test(imgMsg.adjunto), imgMsg);
+    const fImg = await api('/admin/soporte_imagen', { mensaje: imgMsg && imgMsg.id }, adm.token);
+    chk('2. El administrador lo abre desde el panel (enlace firmado)', fImg.st === 200 && /object\/sign\/soporte/.test(fImg.j.url), fImg);
     await api('/admin/soporte_responder', { caso: caso.id, texto: 'Revisa que la impresora esté prendida y vuelve a intentar.' }, adm.token);
     await A.p.evaluate(() => window.ventoCuenta.soporte.revisar());
     chk('2. La respuesta llega con aviso y «1 nueva»', await esperar(A.p, () => /1 nueva/.test(document.getElementById('vcCasos').textContent) && !document.getElementById('vcBadge').hidden));
@@ -91,7 +105,7 @@ const ADMIN = 'cristhianwkh@gmail.com';
     chk('2. Al abrirla se ve la conversación', await esperar(A.p, () => document.getElementById('vcCasoOv').classList.contains('show') && /impresora esté prendida/.test(document.getElementById('vcHilo').textContent)));
     await A.p.fill('#vcResp', 'Ya funcionó, gracias'); await A.p.click('#vcResponder');
     chk('2. El cliente contesta (le llega al administrador)', await esperar(A.p, () => document.querySelectorAll('#vcHilo .vc-m.yo').length === 2) &&
-      (await api('/admin/soporte', {}, adm.token)).j.casos.some(c => c.id === caso.id && c.estado === 'abierto' && c.mensajes.length === 3));
+      (await api('/admin/soporte', {}, adm.token)).j.casos.some(c => c.id === caso.id && c.estado === 'abierto' && c.mensajes.length === 4));
     chk('2. Ya no sale como nueva', await esperar(A.p, () => !/nueva/.test(document.getElementById('vcCasos').textContent)));
     await cerrarTodo(A.p);
 

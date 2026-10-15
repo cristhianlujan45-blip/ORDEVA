@@ -116,6 +116,27 @@ const ADMIN = 'cristhianwkh@gmail.com', CLAVE_ADMIN = 'Clave-de-prueba-77';
     chk('4. Responder: queda en el hilo', await esperar(() => document.querySelectorAll('#spHilo .sp-m.adm').length === 1));
     const visto = (await rpc('soporte_mis_casos', { p_claves: [] }, (await entrar('dueno@bar.co', temp)).j.access_token)).j;
     chk('4. Al cliente le llega la respuesta en su app', visto[0].mensajes.some(m => m.autor === 'admin' && /Facturas anteriores/.test(m.texto)) && visto[0].sin_leer === 1, visto);
+    // El cliente manda un pantallazo: el panel se entera al instante (aviso «soporte» del tiempo real), avisa con una
+    // notificación del celular (app Android: VentoAdmin.notificar) y la imagen se abre en el caso.
+    await p.evaluate(() => { window.__avisos = []; window.VentoAdmin = Object.assign(window.VentoAdmin || {}, { notificar: (t, c, g) => window.__avisos.push([t, c, g]) }); });
+    const tokDueno = (await entrar('dueno@bar.co', temp)).j.access_token;
+    const zlib = require('zlib');
+    const png = (w, h) => { const T = []; for(let n = 0; n < 256; n++){ let c = n; for(let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; T[n] = c >>> 0; }
+      const crc = b => { let c = 0xffffffff; for(const x of b) c = T[(c ^ x) & 255] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+      const chunk = (t, d) => { const l = Buffer.alloc(4); l.writeUInt32BE(d.length); const td = Buffer.concat([Buffer.from(t), d]); const c = Buffer.alloc(4); c.writeUInt32BE(crc(td)); return Buffer.concat([l, td, c]); };
+      const ih = Buffer.alloc(13); ih.writeUInt32BE(w, 0); ih.writeUInt32BE(h, 4); ih[8] = 8; ih[9] = 2; const raw = Buffer.alloc((w * 3 + 1) * h);
+      for(let y = 0; y < h; y++) for(let x = 0; x < w; x++){ const i = y * (w * 3 + 1) + 1 + x * 3; raw[i] = 200; raw[i + 1] = x % 255; raw[i + 2] = y % 255; }
+      return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ih), chunk('IDAT', zlib.deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]); };
+    const subida = await api('/soporte-adjunto', { caso: caso.id, imagen: { base64: png(60, 40).toString('base64') }, texto: 'Mira el error' }, tokDueno);
+    chk('4. El cliente manda un pantallazo al caso', subida.st === 200, subida);
+    await p.evaluate(() => window.dispatchEvent(new CustomEvent('vento-admin-cambio', { detail: { k: 'soporte' } })));
+    chk('4. Llega la notificación del mensaje nuevo (con 📷) al celular del administrador', await esperar(() => (window.__avisos || []).some(a => /📷 Mira el error/.test(a[1]))), await p.evaluate(() => window.__avisos));
+    chk('4. …y el caso abierto se actualiza solo con la imagen', await esperar(() => !!document.querySelector('#spHilo [data-spimg]')));
+    await p.click('#spHilo [data-spimg]');
+    chk('4. «🖼 Ver imagen» la muestra en el caso', await esperar(() => { const i = document.querySelector('#spHilo img'); return !!i && i.complete && i.naturalWidth === 60; }));
+    await p.evaluate(() => window.dispatchEvent(new CustomEvent('vento-admin-cambio', { detail: { k: 'soporte' } })));
+    await p.waitForTimeout(800);
+    chk('4. El mismo mensaje no avisa dos veces', await p.evaluate(() => window.__avisos.filter(a => /Mira el error/.test(a[1])).length === 1));
     await p.click('#spCerrar');
     chk('4. Cerrar el caso', await esperar(() => /Abrir otra vez/.test(document.getElementById('spCerrar').textContent)));
     await p.click('#dlgSp [data-cerrar]');

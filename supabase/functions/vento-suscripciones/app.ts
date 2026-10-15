@@ -17,7 +17,9 @@
 import { crearDb, type Db } from "../vento-pagos/db.ts";
 import { type Env, ErrorVento, igualesSeguro, log } from "../vento-pagos/util.ts";
 import * as N from "./nucleo.ts";
-import { firmar } from "./almacen.ts";
+import { borrar, BUCKET_SOPORTE, firmar, subir } from "./almacen.ts";
+import { leerComprobante } from "./proveedores/manual.ts";
+import { enviarPush, vapid } from "../vento-pagos/push.ts";
 import { disponibles, elegir, googlePlay } from "./proveedores/index.ts";
 import type { EntradaPago } from "./proveedores/tipos.ts";
 import { accionAdmin } from "./cuentas.ts";
@@ -112,6 +114,77 @@ async function licencia(req: Request, env: Env, b: Record<string, unknown>) {
   return { ...r, ok: true, estado: await N.estado(db, negocio) };
 }
 
+// ---------- Soporte: fotos / pantallazos y avisos al administrador ----------
+const SITIO = "https://cristhianlujan45-blip.github.io/cuentas/";
+
+// Quién llama, si viene con su sesión (el soporte también se puede usar sin cuenta, con la clave del caso).
+async function quienOpcional(req: Request, env: Env): Promise<string | null> {
+  const jwt = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
+  const anon = req.headers.get("apikey") || env.SUPABASE_ANON_KEY || "";
+  if (!jwt || jwt === anon) return null;
+  const me = await usuario(req, env).rpc<{ id: string }>("sub_yo");
+  return me && me.id ? me.id : null;
+}
+const claveDe = (b: Record<string, unknown>) => { const c = String(b.clave || "").trim(); return /^[0-9a-f]{20,80}$/.test(c) ? c : null; };
+const casoDe = (b: Record<string, unknown>) => idDe(b.caso, "falta_caso", "Falta el caso de soporte");
+
+// Notificación push a los equipos del administrador (navegador / PWA). Nunca lanza.
+export async function avisarAdmins(env: Env, db: Db, mensaje: Record<string, unknown>): Promise<number> {
+  try {
+    const lista = await db.rpc<Array<{ endpoint: string; keys: { p256dh: string; auth: string } }>>("srv_admin_push_lista");
+    if (!lista || !lista.length) return 0;
+    const v = await vapid(db, env.VENTO_SITIO || SITIO);
+    let ok = 0;
+    await Promise.all(lista.map(async (sus) => {
+      try {
+        const st = await enviarPush(v, sus, mensaje);
+        if (st === 404 || st === 410) await db.rpc("srv_admin_push_borrar", { p_endpoint: sus.endpoint });
+        else if (st < 300) ok++;
+      } catch (e) { log("warn", "push_admin", { error: e instanceof Error ? e.message : String(e) }); }
+    }));
+    return ok;
+  } catch (e) {
+    log("warn", "push_admin_lista", { error: e instanceof Error ? e.message : String(e) });
+    return 0;
+  }
+}
+const urlAdmin = (env: Env, ancla: string) => (env.VENTO_SITIO || SITIO).replace(/\/?$/, "/") + "admin.html#" + ancla;
+
+async function avisarSoporte(env: Env, db: Db, caso: string, uid: string | null, clave: string | null) {
+  const d = await db.rpc<Record<string, unknown> | null>("srv_soporte_para_avisar", { p_caso: caso, p_uid: uid, p_clave: clave });
+  if (!d) return 0;
+  const quien = [d.nombre, d.negocio].filter(Boolean).join(" · ");
+  return await avisarAdmins(env, db, {
+    titulo: "🎧 Soporte" + (quien ? ": " + String(quien).slice(0, 60) : ""),
+    cuerpo: (d.imagen ? "📷 " : "") + String(d.texto || d.asunto || "").slice(0, 160),
+    tag: "soporte-" + caso, url: urlAdmin(env, "soporte"),
+  });
+}
+
+// POST /soporte-adjunto {caso, clave?, imagen:{base64}, texto?}: el SERVIDOR sube la imagen (bucket privado) y la guarda.
+async function soporteAdjunto(req: Request, env: Env, b: Record<string, unknown>) {
+  const caso = casoDe(b), clave = claveDe(b), uid = await quienOpcional(req, env);
+  const db = servidor(env);
+  if (!(await db.rpc<boolean>("srv_soporte_acceso", { p_caso: caso, p_uid: uid, p_clave: clave }))) throw new ErrorVento("sin_permiso", "No tienes permiso para ese caso de soporte.", 403);
+  let img;
+  try { img = leerComprobante(b.imagen); } catch { throw new ErrorVento("imagen_invalida", "La imagen debe ser una foto o pantallazo JPG, PNG o WebP de máximo 3 MB.", 400); }
+  const ruta = "soporte/" + caso + "/" + crypto.randomUUID() + "." + img.ext;
+  await subir(env, ruta, img.bytes, img.mime, BUCKET_SOPORTE);
+  let r: Record<string, unknown>;
+  try {
+    r = await db.rpc<Record<string, unknown>>("srv_soporte_adjuntar", { p_caso: caso, p_uid: uid, p_clave: clave, p_path: ruta, p_tipo: img.mime, p_texto: b.texto != null ? String(b.texto) : null });
+  } catch (e) { await borrar(env, ruta, BUCKET_SOPORTE); throw e; }
+  await avisarSoporte(env, db, caso, uid, clave);
+  log("info", "soporte_imagen", { caso, bytes: img.bytes.length });
+  return { ok: true, caso: r };
+}
+
+// POST /soporte-avisar {caso, clave?}: después de escribir un mensaje, avisa al administrador (con límite por caso).
+async function soporteAvisar(req: Request, env: Env, b: Record<string, unknown>) {
+  const n = await avisarSoporte(env, servidor(env), casoDe(b), await quienOpcional(req, env), claveDe(b));
+  return { ok: true, avisados: n };
+}
+
 // ---------- /pago ----------
 async function pago(req: Request, env: Env, b: Record<string, unknown>) {
   const negocio = negocioDe(b);
@@ -129,6 +202,8 @@ async function pago(req: Request, env: Env, b: Record<string, unknown>) {
   };
   const r = await prov.registrarPago({ env, db, negocio, usuario: me, rol, cfg: cat.config }, entrada);
   log("info", "sub_pago", { negocio, pago: r.payment.id, repetido: r.repetido, proveedor: prov.id, metodo: r.payment.method });
+  if (!r.repetido) await avisarAdmins(env, db, { titulo: "💳 Pago nuevo para revisar", cuerpo: String(r.payment.method || "") + " · $" + Number(r.payment.amount || 0).toLocaleString("es-CO"),
+    tag: "pago-sub-" + r.payment.id, url: urlAdmin(env, "subs") });
   return { ok: true, payment: r.payment, repetido: r.repetido, estado: await N.estado(db, negocio) };
 }
 
@@ -189,6 +264,21 @@ async function admin(req: Request, env: Env, accion: string, b: Record<string, u
       return { ok: true, ...(await db.rpc<Record<string, unknown>>("srv_sub_reactivar", { p_negocio: negocioDe(b), p_admin: a })) };
     case "planes":
       return { ok: true, ...(await db.rpc<Record<string, unknown>>("srv_admin_planes")) };
+    // Notificaciones push de ESTE equipo del administrador (soporte nuevo, pagos por revisar).
+    case "push_guardar": {
+      const sus = (b.sub && typeof b.sub === "object" ? b.sub : {}) as { endpoint?: string; keys?: { p256dh?: string; auth?: string } };
+      await db.rpc("srv_admin_push_guardar", { p_admin: a, p_endpoint: String(sus.endpoint || ""), p_p256dh: String(sus.keys && sus.keys.p256dh || ""), p_auth: String(sus.keys && sus.keys.auth || "") });
+      return { ok: true };
+    }
+    case "push_clave":
+      return { ok: true, publica: (await vapid(db, env.VENTO_SITIO || SITIO)).publica };
+    case "soporte_imagen": {
+      const id = Number(b.mensaje);
+      if (!Number.isInteger(id) || id <= 0) throw new ErrorVento("falta_mensaje", "Falta el mensaje", 400);
+      const x = await db.rpc<{ path: string; tipo: string } | null>("srv_soporte_adjunto_de", { p_mensaje: id });
+      if (!x || !x.path) throw new ErrorVento("no_existe", "Ese mensaje no tiene imagen.", 404);
+      return { ok: true, url: await firmar(env, x.path, 600, BUCKET_SOPORTE), tipo: x.tipo, vence_en: 600 };
+    }
     case "plan_guardar":
       if (!b.plan || typeof b.plan !== "object") throw N.errorSub("plan_invalido");
       return { ok: true, plan: await db.rpc("srv_admin_plan_guardar", { p_plan: b.plan, p_admin: a }) };
@@ -228,6 +318,8 @@ export async function manejar(req: Request, env: Env): Promise<Response> {
     if (r0 === "estado") return json(200, await estado(req, env, b), cors);
     if (r0 === "pago") return json(200, await pago(req, env, b), cors);
     if (r0 === "licencia") return json(200, await licencia(req, env, b), cors);
+    if (r0 === "soporte-adjunto") return json(200, await soporteAdjunto(req, env, b), cors);
+    if (r0 === "soporte-avisar") return json(200, await soporteAvisar(req, env, b), cors);
     if (r0 === "admin") return json(200, await admin(req, env, ruta[1] || "yo", b), cors);
     return json(404, { ok: false, error: "ruta" }, cors);
   } catch (e) {

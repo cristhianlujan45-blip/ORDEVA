@@ -320,6 +320,7 @@
       </select>
       <input id="spBuscar" type="search" placeholder="🔎 Correo, celular, negocio o texto">
       <button class="b" id="spRef" type="button" title="Actualizar">🔄</button>
+      <button class="b" id="spAvisos" type="button" title="Recibir notificaciones de soporte y pagos en este equipo">🔔</button>
     </div>
     <div class="list" id="spLista"><div class="empty">Cargando…</div></div>
   </section>
@@ -1401,19 +1402,32 @@
     try{
       const c = await sxCliente(); if(!c || !c.channel) return;
       let t = null;
-      const canal = c.channel('vs-admin').on('broadcast', { event: 'a' }, () => {
+      const canal = c.channel('vs-admin').on('broadcast', { event: 'a' }, msg => {
+        const k = msg && msg.payload && msg.payload.k;
+        try{ window.dispatchEvent(new CustomEvent('vento-admin-cambio', { detail: { k: k || '' } })); }catch(x){}
+        if(k === 'soporte') return;                      // lo atiende Soporte (más abajo)
         clearTimeout(t);
         t = setTimeout(() => {
           if(!sx.yo || sx.cargando) return;
           if(document.querySelector('dialog[open]')){ sxCargarPagos().catch(() => {}); sxCargarSubs().catch(() => {}); }   // sin mover lo que está abierto
           else sxRecargar();
         }, 300);
-      }).subscribe(st => { sx.rtVivo = st === 'SUBSCRIBED'; });
+      }).subscribe(st => {
+        sx.rtVivo = st === 'SUBSCRIBED';
+        // Se cayó el tiempo real (sin internet, el celular durmió…): se vuelve a conectar solo.
+        if((st === 'CHANNEL_ERROR' || st === 'TIMED_OUT' || st === 'CLOSED') && sx.rt && sx.rt.canal === canal){ sxDejarDeEscuchar(); setTimeout(sxEscuchar, 5000); }
+      });
       sx.rt = { canal, c };
     }catch(e){ sx.rt = null; }
     finally{ sx.rtAbriendo = false; }
   }
   function sxDejarDeEscuchar(){ const r = sx.rt; sx.rt = null; sx.rtVivo = false; if(r) try{ Promise.resolve(r.c.removeChannel(r.canal)).catch(() => {}); }catch(e){} }
+  // Conexión siempre viva: al volver internet o la pantalla, y cada 20 s, si el tiempo real no está conectado se reconecta.
+  const sxVigilar = () => { if(!sx.yo || !$('lock').hidden) return; if(!sx.rtVivo && !sx.rtAbriendo){ if(sx.rt) sxDejarDeEscuchar(); sxEscuchar(); } };
+  window.addEventListener('online', sxVigilar);
+  document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') sxVigilar(); });
+  setInterval(sxVigilar, 20000);
+  window.ventoAdminLatido = sxVigilar;   // la app Android lo llama cada pocos segundos con la pantalla bloqueada
   $('tabs').addEventListener('click', e => { if(e.target.closest('button[data-t="subs"]')) sxArrancar(); });
   // Si la pestaña ya estaba abierta, arranca apenas se desbloquee el panel con el código personal.
   new MutationObserver(() => { if($('lock').hidden && document.querySelector('#tabs button.on[data-t="subs"]')) sxArrancar(); }).observe($('lock'), { attributes: true, attributeFilter: ['hidden'] });
@@ -2132,7 +2146,9 @@
       kv('Negocio', c.negocio_nombre || '—') + kv('Cuenta en la nube', cuenta ? 'Sí' : 'No (equipo sin cuenta)') + kv('Estado', (SP_EST[c.estado] || [c.estado])[0]) + kv('Creado', fCoHora(c.creado_en)) + '</dl>' +
       (c.tipo === 'clave' && tel && c.telefono_de_la_cuenta && telWa(c.telefono_de_la_cuenta) !== telWa(c.telefono) ? '<p class="warn-t">⚠️ El celular que escribió (' + esc(c.telefono) + ') NO es el que tiene guardado la cuenta (' + esc(c.telefono_de_la_cuenta) + '). Verifica que sea el dueño antes de cambiar la contraseña.</p>' : '') +
       (c.tipo === 'clave' && tel && c.telefono_de_la_cuenta && telWa(c.telefono_de_la_cuenta) === telWa(c.telefono) ? '<p class="ok-t">✅ El celular coincide con el de la cuenta.</p>' : '');
-    $('spHilo').innerHTML = (c.mensajes || []).map(m => '<div class="sp-m' + (m.autor === 'admin' ? ' adm' : '') + '">' + esc(m.texto) + '<small>' + (m.autor === 'admin' ? 'Tú · ' : '') + esc(fCoHora(m.creado_en)) + '</small></div>').join('');
+    $('spHilo').innerHTML = (c.mensajes || []).map(m => '<div class="sp-m' + (m.autor === 'admin' ? ' adm' : '') + '">' + esc(m.texto) +
+      (m.adjunto ? '<div data-spimgbox="' + esc(m.id) + '"><button class="b" type="button" data-spimg="' + esc(m.id) + '" style="margin-top:6px">🖼 Ver imagen</button></div>' : '') +
+      '<small>' + (m.autor === 'admin' ? 'Tú · ' : '') + esc(fCoHora(m.creado_en)) + '</small></div>').join('');
     setTimeout(() => { $('spHilo').scrollTop = 1e6; }, 30);
     $('spRapidas').innerHTML = RAPIDAS.map((t, i) => '<button type="button" data-rap="' + i + '">' + esc(t.slice(0, 34)) + '…</button>').join('');
     $('spWa').hidden = !tel; if(tel) $('spWa').href = 'https://wa.me/' + telWa(tel);
@@ -2140,6 +2156,61 @@
     $('spCerrar').textContent = c.estado === 'cerrado' ? '↩️ Abrir otra vez' : '✅ Cerrar caso';
     $('spAcciones').innerHTML = cuenta ? '<button class="b" type="button" data-sp="cuenta">👤 Ver la cuenta</button><button class="b" type="button" data-sp="temp">🔑 Contraseña temporal</button><button class="b" type="button" data-sp="enlace">📧 Enlace de contraseña al correo</button>' : '';
   }
+  // Imagen (foto o pantallazo) que mandó el cliente: enlace firmado que vence en 10 minutos.
+  $('spHilo').addEventListener('click', async e => {
+    const b = e.target.closest('[data-spimg]'); if(!b) return;
+    b.disabled = true; b.textContent = '⏳ Abriendo…';
+    const j = await intentar(() => sxApi('soporte_imagen', { mensaje: +b.dataset.spimg }));
+    const box = b.parentNode; if(!j || !box){ b.disabled = false; b.textContent = '🖼 Ver imagen'; return; }
+    const a = document.createElement('a'); a.href = j.url; a.target = '_blank'; a.rel = 'noopener';
+    const img = document.createElement('img'); img.src = j.url; img.alt = 'Imagen del cliente'; img.style.cssText = 'display:block;max-width:100%;max-height:60vh;margin-top:6px;border-radius:10px;border:1px solid var(--line)';
+    a.appendChild(img); box.replaceChildren(a);
+  });
+  /* Mensajes nuevos de clientes: el panel se entera al instante (tiempo real «soporte») y avisa con una notificación
+     (app Android de Administrador, notificación del navegador o, con el panel cerrado, push del servidor). */
+  const SP_VISTO = 'vento-admin-sp-visto';
+  function adminNotificar(titulo, cuerpo, tag){
+    try{ if(window.VentoAdmin && typeof window.VentoAdmin.notificar === 'function'){ window.VentoAdmin.notificar(titulo, cuerpo, tag || ''); return; } }catch(e){}
+    try{
+      if('Notification' in window && Notification.permission === 'granted'){
+        const url = location.href.split('#')[0] + '#soporte';
+        const reg = navigator.serviceWorker ? navigator.serviceWorker.getRegistration() : Promise.resolve(null);
+        reg.then(r => r ? r.showNotification(titulo, { body: cuerpo, tag: tag || 'soporte', icon: 'icons/vento-192.png', renotify: true, data: { url } }) : new Notification(titulo, { body: cuerpo, tag: tag || 'soporte' })).catch(() => {});
+        return;
+      }
+    }catch(e){}
+    toast(titulo + ' — ' + cuerpo, 9000);
+  }
+  async function spRevisarNuevos(base){
+    let j; try{ j = await sxApi('soporte', { estado: 'abiertos' }); }catch(e){ return; }
+    const casos = j.casos || [];
+    let visto = {}; try{ visto = JSON.parse(localStorage.getItem(SP_VISTO) || '{}') || {}; }catch(e){}
+    const nuevos = [];
+    casos.forEach(c => { const m = (c.mensajes || []).filter(x => x.autor === 'cliente').slice(-1)[0]; if(m && +m.id > (+visto[c.id] || 0)){ if(!base && visto.__ok) nuevos.push({ c, m }); visto[c.id] = +m.id; } });
+    visto.__ok = 1; try{ localStorage.setItem(SP_VISTO, JSON.stringify(visto)); }catch(e){}
+    spBadge(casos.filter(c => c.estado === 'abierto').length);
+    nuevos.forEach(x => adminNotificar('🎧 ' + ([x.c.nombre, x.c.negocio_nombre].filter(Boolean).join(' · ') || 'Soporte'), (x.m.adjunto ? '📷 ' : '') + String(x.m.texto || '').slice(0, 140), 'soporte-' + x.c.id));
+    if(document.querySelector('#tabs button.on[data-t="soporte"]')) spCargar();
+    if($('dlgSp').open && ad.caso){ const n = casos.find(c => c.id === ad.caso.id); if(n){ Object.assign(ad.caso, n); spPintarCaso(); } }
+  }
+  window.addEventListener('vento-admin-cambio', e => { if(e.detail && e.detail.k === 'soporte' && sx.yo) spRevisarNuevos(false); });
+  // Notificaciones push en ESTE equipo (navegador o PWA): llegan aunque el panel esté cerrado. En la app Android las da la app.
+  function b64aBytes(s){ s = s.replace(/-/g, '+').replace(/_/g, '/'); while(s.length % 4) s += '='; return Uint8Array.from(atob(s), ch => ch.charCodeAt(0)); }
+  async function adminPushActivar(pedir){
+    try{
+      if(window.VentoAdmin || !('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return false;
+      if(Notification.permission === 'denied') { if(pedir) toast('Las notificaciones están bloqueadas en este navegador: actívalas en la configuración del sitio.', 8000); return false; }
+      if(Notification.permission !== 'granted'){ if(!pedir) return false; if(await Notification.requestPermission() !== 'granted') return false; }
+      const reg = await navigator.serviceWorker.register('sw.js');
+      const k = await sxApi('push_clave');
+      let sub = await reg.pushManager.getSubscription();
+      if(!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64aBytes(k.publica) });
+      await sxApi('push_guardar', { sub: sub.toJSON() });
+      if(pedir) toast('🔔 Listo: este equipo recibe los avisos de soporte y pagos, aunque el panel esté cerrado.', 7000);
+      return true;
+    }catch(e){ if(pedir) toast('⚠️ No se pudieron activar las notificaciones: ' + (e && e.message || e), 8000); return false; }
+  }
+  $('spAvisos').onclick = () => adminPushActivar(true);
   $('spRapidas').addEventListener('click', e => { const b = e.target.closest('[data-rap]'); if(b){ $('spTexto').value = RAPIDAS[+b.dataset.rap]; $('spTexto').focus(); } });
   async function spEnviar(texto, estado){
     const c = ad.caso; if(!c) return;
@@ -2259,6 +2330,9 @@
     const t = document.querySelector('#tabs button.on'); const tab = t ? t.dataset.t : 'resumen';
     if(tab === 'resumen') rsCargar(); else if(tab === 'usuarios') usCargar(); else if(tab === 'soporte') spCargar(); else if(tab === 'errores') erCargar(); else if(tab === 'licencias') lsCargar();
     if(tab !== 'resumen') rsCargar();
+    sxEscuchar(); spRevisarNuevos(true); adminPushActivar(false);
+    const ancla = (location.hash || '').replace('#', '');
+    if(['soporte', 'subs', 'licencias', 'usuarios'].includes(ancla)) irTab(ancla);
     return true;
   }
   const claveOk = c => String(c || '').length >= 8;

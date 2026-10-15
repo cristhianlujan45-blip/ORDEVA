@@ -3,6 +3,7 @@
 import { type Env, ErrorVento, esperar, log, pedir } from "../vento-pagos/util.ts";
 
 export const BUCKET = "comprobantes";
+export const BUCKET_SOPORTE = "soporte";   // fotos y pantallazos que mandan los clientes a soporte (también privado)
 
 function cfg(env: Env) {
   const url = (env.SUPABASE_URL || "").replace(/\/+$/, "");
@@ -13,12 +14,12 @@ function cfg(env: Env) {
 
 // Sube la foto. Reintenta una vez si Storage falla; la ruta es única (lleva el id del pago), así que un
 // «ya existe» después de una respuesta perdida cuenta como subida.
-export async function subir(env: Env, ruta: string, bytes: Uint8Array<ArrayBuffer>, mime: string): Promise<void> {
+export async function subir(env: Env, ruta: string, bytes: Uint8Array<ArrayBuffer>, mime: string, bucket = BUCKET): Promise<void> {
   const { base, h } = cfg(env);
   let ultimo = "";
   for (let i = 0; i < 2; i++) {
     try {
-      const r = await pedir(base + "/object/" + BUCKET + "/" + ruta, {
+      const r = await pedir(base + "/object/" + bucket + "/" + ruta, {
         method: "POST", headers: { ...h, "Content-Type": mime, "x-upsert": "false", "cache-control": "max-age=0" }, body: bytes, tiempo: 20000,
       });
       if (r.ok) return;
@@ -36,9 +37,9 @@ export async function subir(env: Env, ruta: string, bytes: Uint8Array<ArrayBuffe
 }
 
 // URL firmada para ver la foto (por defecto 10 minutos).
-export async function firmar(env: Env, ruta: string, segundos = 600): Promise<string> {
+export async function firmar(env: Env, ruta: string, segundos = 600, bucket = BUCKET): Promise<string> {
   const { base, h } = cfg(env);
-  const r = await pedir(base + "/object/sign/" + BUCKET + "/" + ruta, {
+  const r = await pedir(base + "/object/sign/" + bucket + "/" + ruta, {
     method: "POST", headers: { ...h, "Content-Type": "application/json" }, body: JSON.stringify({ expiresIn: segundos }), reintentos: 1,
   });
   const j = await r.json().catch(() => ({})) as { signedURL?: string; signedUrl?: string };
@@ -48,10 +49,10 @@ export async function firmar(env: Env, ruta: string, segundos = 600): Promise<st
 }
 
 // Borra una foto que sobró (pago repetido o rechazado por la base de datos). Nunca lanza.
-export async function borrar(env: Env, ruta: string): Promise<boolean> {
+export async function borrar(env: Env, ruta: string, bucket = BUCKET): Promise<boolean> {
   try {
     const { base, h } = cfg(env);
-    const r = await pedir(base + "/object/" + BUCKET, {
+    const r = await pedir(base + "/object/" + bucket, {
       method: "DELETE", headers: { ...h, "Content-Type": "application/json" }, body: JSON.stringify({ prefixes: [ruta] }), reintentos: 1,
     });
     return r.ok;

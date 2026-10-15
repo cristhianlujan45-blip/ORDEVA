@@ -22,6 +22,8 @@ export const MENSAJES_EXTRA: Record<string, [number, string]> = {
   licencia_ya_usada: [409, "Esa licencia ya se activó en esta cuenta."],
   licencia_otro_correo: [403, "Esa licencia es para otro correo. Entra con el correo al que te la enviaron."],
   licencia_un_correo: [400, "Una licencia es para un solo cliente: ponle máximo un correo."],
+  imagen_invalida: [400, "La imagen debe ser una foto o pantallazo JPG, PNG o WebP de máximo 3 MB."],
+  push_invalido: [400, "Este navegador no entregó una suscripción de notificaciones válida."],
   un_negocio_por_cuenta: [409, "Tu cuenta ya tiene su negocio. Para otra sede u otro negocio se necesita otra cuenta con su propia suscripción o licencia."],
   mensaje_invalido: [400, "Escribe el mensaje (máximo 2.000 letras)."],
   demasiados: [429, "Demasiados mensajes seguidos. Espera un rato."],

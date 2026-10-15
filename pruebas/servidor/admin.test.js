@@ -111,6 +111,45 @@ async function pruebas(sb) {
   r = await rpc('soporte_escribir', { p_caso: casoRosa.id, p_clave: casoRosa.clave, p_texto: 'Mi celular es el 3001234567' });
   chk('El cliente contesta en su caso (vuelve a «abierto»)', r.st === 200 && r.j.estado === 'abierto' && r.j.mensajes.length === 2, r);
 
+  // ===== Soporte con fotos y pantallazos (los sube el servidor a un almacenamiento privado) =====
+  const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAJ0lEQVR4nGP8z8Dwn4GBgYGBiYGBgYHh/38GBgYGRgYGBgYGBgYAAP//AwBQ6Af5dN4JiAAAAABJRU5ErkJggg==', 'base64');
+  const img = { base64: Buffer.concat([PNG, Buffer.alloc(80)]).toString('base64') };
+  r = await api('/soporte-adjunto', { caso: casoRosa.id, clave: casoRosa.clave, imagen: img, texto: 'Así me sale el error' });
+  chk('Sin cuenta, con la clave del caso: manda una foto/pantallazo', r.st === 200 && r.j.ok && r.j.caso.mensajes.slice(-1)[0].adjunto === true && r.j.caso.mensajes.slice(-1)[0].texto === 'Así me sale el error', r);
+  const conImg = await uno("select id, adjunto, adjunto_tipo from soporte_mensajes where caso_id = $1 and adjunto is not null", [casoRosa.id]);
+  chk('…queda en el almacenamiento PRIVADO «soporte» con una ruta que pone el servidor', /^soporte\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.png$/.test(conImg.adjunto) && conImg.adjunto_tipo === 'image/png' &&
+    (await uno("select public from storage.buckets where id = 'soporte'")).public === false, conImg);
+  r = await api('/soporte-adjunto', { caso: casoRosa.id, clave: 'f'.repeat(36), imagen: img });
+  chk('Con una clave falsa no se puede mandar imágenes a un caso ajeno', r.st === 403, r);
+  r = await api('/soporte-adjunto', { caso: casoDueno.id, imagen: img }, sinNeg.token);
+  chk('…ni con otra cuenta', r.st === 403, r);
+  r = await api('/soporte-adjunto', { caso: casoDueno.id, imagen: img }, dueno.token);
+  chk('Con su cuenta, en su caso: sí', r.st === 200 && r.j.caso.mensajes.some(m => m.adjunto), r);
+  r = await api('/soporte-adjunto', { caso: casoRosa.id, clave: casoRosa.clave, imagen: { base64: Buffer.from('<script>alert(1)</script>'.repeat(10)).toString('base64') } });
+  chk('Un archivo que no es imagen se rechaza (imagen_invalida)', r.st === 400 && r.j.error === 'imagen_invalida', r);
+  r = await api('/admin/soporte_imagen', { mensaje: conImg.id }, admin.token);
+  chk('El administrador abre la imagen con un enlace firmado que vence', r.st === 200 && /\/object\/sign\/soporte\//.test(r.j.url) && r.j.vence_en === 600, r);
+  r = await api('/admin/soporte_imagen', { mensaje: conImg.id }, dueno.token);
+  chk('Un cliente NO puede pedir imágenes por el panel', r.st === 403, r);
+  r = await rpc('srv_soporte_adjunto_de', { p_mensaje: conImg.id }, dueno.token);
+  chk('…ni leerlas desde la base directo', r.st >= 400, r);
+  r = await api('/admin/push_guardar', { sub: { endpoint: 'https://push.ejemplo.co/abc', keys: { p256dh: 'BOr5', auth: 'x1' } } }, admin.token);
+  chk('El administrador guarda las notificaciones push de su equipo', r.st === 200 && (await uno("select count(*)::int n from admin_push where endpoint = 'https://push.ejemplo.co/abc'")).n === 1, r);
+  r = await api('/admin/push_guardar', { sub: { endpoint: 'https://push.ejemplo.co/cliente', keys: { p256dh: 'BOr5', auth: 'x1' } } }, dueno.token);
+  chk('Un cliente no puede apuntarse a los avisos del administrador', r.st === 403, r);
+  r = await api('/admin/push_guardar', { sub: { endpoint: 'http://inseguro/x', keys: { p256dh: 'a', auth: 'b' } } }, admin.token);
+  chk('Solo direcciones https', r.st === 400, r);
+  await sb.sql('delete from admin_push');
+  await rpc('soporte_escribir', { p_caso: casoRosa.id, p_clave: casoRosa.clave, p_texto: 'Sigue pasando' });
+  await sb.sql('update soporte_casos set avisado_en = null where id = $1', [casoRosa.id]);
+  r = await api('/soporte-avisar', { caso: casoRosa.id, clave: casoRosa.clave });
+  const av1 = await uno('select avisado_en from soporte_casos where id = $1', [casoRosa.id]);
+  r = await api('/soporte-avisar', { caso: casoRosa.id, clave: casoRosa.clave });
+  const av2 = await uno('select avisado_en from soporte_casos where id = $1', [casoRosa.id]);
+  chk('Aviso al administrador por mensaje nuevo, y como mucho uno cada 20 s por caso (no lo pueden llenar de avisos)', r.st === 200 && !!av1.avisado_en && String(av1.avisado_en) === String(av2.avisado_en), { av1, av2 });
+  r = await api('/soporte-avisar', { caso: casoRosa.id, clave: 'f'.repeat(36) });
+  chk('Sin la clave no se avisa nada', r.st === 200 && r.j.avisados === 0, r);
+
   // ===== Recuperar contraseñas desde soporte =====
   r = await api('/admin/usuario_clave_temporal', { usuario: dueno.id }, admin.token);
   const temp = r.j.clave;
@@ -217,7 +256,7 @@ async function pruebas(sb) {
   r = await api('/admin/usuario', { usuario: dueno.id }, admin.token);
   chk('En la ficha del usuario se ven sus licencias', r.j.usuario.licencias.length === 1 && r.j.usuario.licencias[0].codigo === lic.codigo, r.j.usuario);
   r = await api('/admin/resumen', {}, admin.token);
-  chk('Resumen: licencias activas (3) y soporte abierto (1)', r.j.resumen.licencias_activas === 3 && r.j.resumen.soporte_abiertos === 1, r.j.resumen);
+  chk('Resumen: licencias activas (3) y soporte abierto (2: la foto reabrió el del dueño)', r.j.resumen.licencias_activas === 3 && r.j.resumen.soporte_abiertos === 2, r.j.resumen);
 
   // ===== La migración se puede volver a correr =====
   let errMig = null;
