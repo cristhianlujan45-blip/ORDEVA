@@ -1,4 +1,4 @@
-# Vento 1.38.0 — Comerciales y canciones «bloqueadas», canciones por QR sin límite y tu YouTube Premium
+# Vento 1.38.0 — Comerciales, canciones «bloqueadas», búsqueda sin el límite de Google y tu YouTube Premium en la app
 
 ## 1. Canciones que salían «bloqueadas por el sello» sin estarlo
 - **Qué pasaba:**
@@ -14,36 +14,44 @@
 - **La lista negra vieja**, con canciones buenas marcadas por error, **se limpia sola una vez**.
 - **El título ya no repite el artista** («Wiz Khalifa - Wiz Khalifa - Yiccen…» → «Wiz Khalifa - Yiccen…»).
 
-## 2. Canciones por QR sin límite
-- **Ajustes → Negocio → Música → «Canciones que puede pedir cada mesa por QR»:** Sin límite (así viene), 3, 5, 10, 15
-  o 20 cada 15 minutos.
-- **Sin límite:** las mesas piden las que quieran y suenan por turnos justos entre ellas. El QR dice «Pide las canciones
-  que quieras».
-- **El QR de las mesas se entera solo:** el límite viaja con la carta y con la cuenta en vivo de la mesa.
+## 2. Buscar música sin los límites de Google
+- **Cómo se busca:** las búsquedas (en el QR de las mesas y en la app) van por el **Servidor Vento**, que no usa el cupo
+  diario de Google.
+- **Ahora es más firme:**
+  - **Si YouTube bloquea un rato la página de resultados,** busca por un segundo camino: el mismo servicio interno con el
+    que youtube.com carga más resultados, que tampoco usa cupo de Google.
+  - **Si los dos fallan,** responde lo último encontrado para esa búsqueda en vez de dejar al cliente sin nada.
+- **QR → «Lo más pedido del artista»:** antes usaba primero la API de Google (con cupo). Ahora va primero por el
+  Servidor Vento, y la API solo queda de último respaldo.
+- **Las 10 canciones por mesa siguen igual** (así viene).
+  - Se puede cambiar en Ajustes → Negocio → Música → «Canciones que puede pedir cada mesa por QR».
+  - Opciones: 3, 5, 10, 15, 20 o sin límite.
 
-## 3. Comerciales con YouTube Premium
-- **Por qué salen:**
-  - El reproductor que va dentro de Vento (como en cualquier app o página) es el de YouTube para otras páginas.
-  - **Google no deja iniciar sesión con la cuenta dentro de apps**: lo bloquea por seguridad desde 2021, así que ese
-    reproductor no sabe que tienes Premium.
-  - No se puede saltar ese bloqueo sin ir contra las reglas de Google (podrían bloquear la cuenta).
-- **La solución que sí funciona: el YouTube de tu TV, vinculado con Vento.**
-  - En el TV entras a YouTube con tu cuenta Premium y lo vinculas con Vento una sola vez («📡 Buscar mi TV» o con el
-    código del TV).
-  - Desde ahí las canciones de las mesas y las tuyas suenan allá, **sin comerciales y sin límite**: no gasta el cupo de
-    Google.
-- **Guía «🚫 Sin comerciales con tu YouTube Premium»:**
-  - **Dónde está:**
-    - en el panel de YouTube, cuando suena en el reproductor de Vento: «¿Salen comerciales? Usa tu YouTube Premium en
-      el TV»;
-    - en Música;
-    - con el asistente, preguntando por «comerciales», «anuncios» o «Premium».
-  - **Qué tiene:** los pasos y los botones para buscar el TV, vincularlo con el código y conectar la cuenta de YouTube
-    (para las listas, «Me gusta» y suscripciones; queda vinculada para siempre).
-- **Sin TV:** se puede usar YouTube Music con Premium y un parlante Bluetooth. Esa forma tiene un tope diario de
-  Google; al llenarse, Vento sigue con su reproductor (con comerciales).
+## 3. Comerciales dentro de la app: entrar con tu YouTube Premium
+- **Por qué salen:** YouTube solo quita los comerciales cuando sabe que eres tú, con tu cuenta Premium iniciada en el
+  mismo reproductor. El de la app no tenía tu sesión.
+- **Nuevo en la app Android: «🔑 Entrar con mi YouTube Premium».**
+  - Abre la página de inicio de sesión de Google de verdad, **dentro de la app**, sin trucos.
+  - Entras con tu cuenta Premium (Vento no ve la contraseña) y la sesión queda guardada en la app.
+  - Es la misma sesión que usa el reproductor de Vento, así que desde la próxima canción YouTube sabe que tienes Premium.
+- **Dónde está:**
+  - en la guía «🚫 Sin comerciales con tu YouTube Premium», como primer paso;
+  - en el panel de YouTube: «¿Salen comerciales? Entra con tu YouTube Premium»;
+  - en Música;
+  - con el asistente.
+
+  Cuando ya entraste, dice «✅ Ya entraste».
+- **Si Google no deja entrar desde la app:** Google bloquea iniciar sesión dentro de apps en algunos celulares («Este
+  navegador o app no es seguro»). En ese caso Vento lo dice claro y ofrece el **YouTube del TV**, donde Premium siempre
+  funciona: sin comerciales y sin límite.
+- **En el computador:** basta con entrar a youtube.com con tu cuenta Premium en el mismo navegador.
+- **Hay que instalar la app de Android nueva** para tener el botón de entrar.
 
 ## Pruebas
-- **Nueva:** `musicaanuncios`, 17 comprobaciones: comercial que no se toma como bloqueo, video quieto de verdad, error
-  real de YouTube, limpieza de la lista negra, título, guía y asistente.
-- **Actualizada:** `cancionesmesa`, 17 comprobaciones; ahora también prueba el modo «Sin límite».
+- **Nuevas:**
+  - `musicaanuncios`, 22 comprobaciones: comercial que no se toma como bloqueo, video quieto de verdad, error real de
+    YouTube, lista negra, título, guía, asistente, y entrar con Premium en la app (bien y cuando Google no deja).
+- **Actualizadas:**
+  - `youtubesincupo`, 14 comprobaciones: la búsqueda sigue si YouTube bloquea la página de resultados, y con YouTube
+    caído responde lo último encontrado;
+  - `cancionesmesa`, 17 comprobaciones: 10 por defecto y la opción sin límite.
