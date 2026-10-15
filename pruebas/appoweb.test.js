@@ -42,6 +42,8 @@ const UA_APP = UA_CHROME.replace('Mobile Safari/537.36', 'Mobile Safari/537.36 V
     await p.waitForTimeout(300);
     let g = await p.evaluate(() => document.getElementById('pgGuiaOv').innerText);
     chk('1. Paso a paso: ya NO dice «Falta instalarla»; dice «Estás en Vento Web» y que solo la app lee los avisos', !/Falta instalarla/.test(g) && /Estás en Vento Web/.test(g) && /solo los puede leer la app Vento/.test(g), g.slice(0, 400));
+    const bajar = await p.evaluate(() => { const a = [...document.querySelectorAll('#pgGuiaOv a')].find(x => /Descargar la app \(vento\.apk\)/.test(x.textContent)); return a ? a.getAttribute('href') : null; });
+    chk('1. Botón directo «⬇️ Descargar la app (vento.apk)» con el enlace del APK (no la web) y cómo instalarlo', bajar === 'https://github.com/cristhianlujan45-blip/cuentas/releases/latest/download/vento.apk' && /Permitir de esta fuente/.test(g) && /Instalar/.test(g), bajar);
     await p.click('[data-gp="abrirapp"]');
     let ab = await p.evaluate(() => window.__abrir.slice());
     chk('1. «📲 Abrir la app Vento» abre la app (intent vento://abrir del paquete co.vento.app; si no está, la descarga)', ab.length === 1 && /^intent:\/\/abrir#Intent;scheme=vento;package=co\.vento\.app;S\.browser_fallback_url=https%3A%2F%2Fgithub\.com%2F.*vento\.apk;end$/.test(ab[0]), ab);
@@ -49,6 +51,7 @@ const UA_APP = UA_CHROME.replace('Mobile Safari/537.36', 'Mobile Safari/537.36 V
     await p.evaluate(() => { const i = document.getElementById('pgOn'); i.checked = true; i.dispatchEvent(new Event('change')); });
     const aj = await p.evaluate(() => { const a = document.getElementById('pgWebAviso'); return a ? { hidden: a.hidden, txt: a.innerText, est: document.getElementById('pgEstado').textContent } : null; });
     chk('1. Ajustes → Pagos: «📲 Estás en Vento Web, no en la app» con botón para abrirla', aj && !aj.hidden && /Estás en Vento Web/.test(aj.txt) && /Vento Web/.test(aj.est), aj);
+    chk('1. … y botón «⬇️ Descargar la app (vento.apk)» con el enlace del APK', await p.evaluate(() => { const a = document.getElementById('pgBajarApk'); return !!a && /releases\/latest\/download\/vento\.apk$/.test(a.href); }));
     // Al volver a abrir Vento Web (los pagos ya prendidos): aviso una vez
     await p.reload(); await p.waitForTimeout(1500);
     const t1 = await p.evaluate(() => new Promise(r => { const vistos = []; const st = window.showToast; window.showToast = (m, d) => { vistos.push(String(m)); try{ st(m, d); }catch(e){} }; setTimeout(() => r(vistos.join(' | ') + ' | ' + document.body.innerText), 5000); }));
