@@ -34,24 +34,42 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Llave de firma (desde los secretos, nunca desde el repositorio)
+      - name: Llave de firma
         id: firma
         env:
           KS_B64: ${{ secrets.VENTO_KEYSTORE_B64 }}
           KS_PASS: ${{ secrets.VENTO_KS_PASS }}
         run: |
+          # 1) Llave nueva desde los secretos (ver android/LEEME.md → Firma), si ya se configuraron.
           if [ -n "$KS_B64" ] && [ -n "$KS_PASS" ]; then
+            echo "::add-mask::$KS_PASS"
             echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/vento.jks"
             echo "VENTO_KS_FILE=$RUNNER_TEMP/vento.jks" >> "$GITHUB_ENV"
             echo "VENTO_KS_PASS=$KS_PASS" >> "$GITHUB_ENV"
             echo "publicar=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::warning title=Firma del APK::Faltan los secretos VENTO_KEYSTORE_B64 y VENTO_KS_PASS (ver android/LEEME.md → Firma). Se compila con una llave de prueba y NO se publica en Descargas."
-            mkdir -p ~/.android
-            [ -f ~/.android/debug.keystore ] || keytool -genkeypair -keystore ~/.android/debug.keystore -storepass android -keypass android \
-              -alias androiddebugkey -dname "CN=Android Debug,O=Android,C=US" -keyalg RSA -keysize 2048 -validity 10000 >/dev/null
-            echo "publicar=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+          # 2) Sin esos secretos (decisión del dueño, 15-oct): la MISMA llave de las versiones ya instaladas (1.0.1 a 1.0.15),
+          #    tal como quedó en el historial del repositorio (commit 7c6225d). Así la app nueva se instala ENCIMA de la del
+          #    cliente, sin desinstalar ni perder nada. Antes, sin los secretos, el APK se compilaba pero NO se publicaba: desde
+          #    el 4 de octubre la descarga seguía dando la 1.0.15 (sin avisos de pagos). Esa llave ya fue pública: para pasar a
+          #    una privada sin que los clientes reinstalen, ver android/LEEME.md → Firma (rotación).
+          LEGADO=7c6225df45eb14a809474b93ae921bf0ecdc91d7
+          git fetch --no-tags --depth=1 origin "$LEGADO" >/dev/null 2>&1 || git fetch --no-tags --unshallow origin >/dev/null 2>&1 || true
+          git show "$LEGADO:android/vento-apk.jks" > "$RUNNER_TEMP/vento.jks"
+          PASS=$(sed -n 's/.*contraseña `\([^`]*\)`.*/\1/p' android/LEEME.md | head -1)   # la de esa llave, ya publicada en android/LEEME.md
+          echo "::add-mask::$PASS"
+          # Tiene que ser exactamente la llave de las versiones instaladas (huella SHA-256 del certificado).
+          HUELLA=$(keytool -list -v -keystore "$RUNNER_TEMP/vento.jks" -storepass "$PASS" -alias vento 2>/dev/null | sed -n 's/.*SHA256: *//p' | head -1)
+          if [ "$HUELLA" != "3D:DC:CB:EE:94:2C:4E:0B:26:5D:A8:A0:52:E8:B4:F5:15:90:0D:E3:CC:80:91:A0:45:76:C4:86:E5:10:D4:0D" ]; then
+            echo "::error title=Firma del APK::No se pudo recuperar la llave de las versiones instaladas (huella: ${HUELLA:-ninguna}). No se publica."
+            exit 1
+          fi
+          echo "::warning title=Firma del APK::Firmado con la llave de las versiones ya instaladas (sin los secretos VENTO_KEYSTORE_B64 y VENTO_KS_PASS), para que la app se actualice encima."
+          echo "VENTO_KS_FILE=$RUNNER_TEMP/vento.jks" >> "$GITHUB_ENV"
+          echo "VENTO_KS_PASS=$PASS" >> "$GITHUB_ENV"
+          echo "FIRMA_LEGADO=1" >> "$GITHUB_ENV"
+          echo "publicar=true" >> "$GITHUB_OUTPUT"
       - name: Compilar el APK
         run: |
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null 2>&1 || true
@@ -59,6 +77,14 @@ jobs:
           cp android/app/build/outputs/apk/release/app-release.apk vento.apk
           cp android/admin/build/outputs/apk/release/admin-release.apk vento-admin.apk
           ls -la vento.apk vento-admin.apk
+          # Con la llave de las versiones instaladas, el APK TIENE que quedar firmado con ella (si no, el celular dice
+          # «No se instaló la app»): se comprueba antes de publicar.
+          AS="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner"
+          "$AS" verify --print-certs vento.apk | grep -i "SHA-256 digest" | tee firma.txt
+          if [ "$FIRMA_LEGADO" = "1" ] && ! grep -qi "3ddccbee942c4e0b265da8a052e8b4f515900de3cc8091a04576c486e510d40d" firma.txt; then
+            echo "::error title=Firma del APK::El APK no quedó firmado con la llave de las versiones instaladas. No se publica."
+            exit 1
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: vento-apk
