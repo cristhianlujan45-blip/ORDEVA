@@ -377,7 +377,7 @@
     if(s.status === 'payment_review') return '<div class="vs-estado esp"><b>⏳ Pago en revisión</b><small>Recibimos tu comprobante' + (s.pago ? ' de ' + plata(s.pago.amount) + ' por ' + esc((METODOS[s.pago.method] || {}).nombre || s.pago.method || '') : '') + '. Apenas lo aprobemos se activa tu plan. Mientras tanto sigues vendiendo con el plan gratis.</small></div>';
     if(s.status === 'rejected') return '<div class="vs-estado mal"><b>❌ Tu pago no fue aprobado</b><small>Motivo: ' + esc(s.rechazo || 'no se pudo comprobar el pago') + '</small></div>';
     if(s.status === 'expired') return '<div class="vs-estado mal"><b>⌛ Tu plan ' + P + ' venció' + (f ? ' el ' + f : '') + '</b><small>' +
-      (s.pago ? '⏳ Tu pago está en revisión: apenas lo aprobemos, Vento vuelve a funcionar.' : 'Paga tu plan para volver a usar Vento.') + '</small></div>';
+      (s.pago ? '⏳ Tu pago está en revisión: apenas lo aprobemos vuelve tu plan. Mientras tanto sigues vendiendo con el plan gratis.' : 'Sigues vendiendo con el plan gratis (funciones limitadas). Renueva para volver a usar la voz, la cámara con IA y lo demás.') + '</small></div>';
     if(s.status === 'canceled') return '<div class="vs-estado mal"><b>🚫 Suscripción cancelada</b><small>Paga tu plan para reactivar tu aplicación.</small></div>';
     return '<div class="vs-estado"><b>Elige tu plan</b><small>Estás en el plan gratis.</small></div>';
   }
@@ -687,15 +687,16 @@
        espera  → conectado, pero todavía no llegó el estado firmado del servidor;
        sinconexion → el último estado firmado ya caducó (72 h) y no se pudo renovar.
      Con internet caído se sigue con el último estado firmado hasta su vencimiento («h»: 72 h). */
-  var BLOQUEA = { canceled: 1, expired: 1, rejected: 1, pending_payment: 1, payment_review: 1 }, soloPagar = false;
+  var BLOQUEA = { canceled: 1 }, soloPagar = false;
   function puerta(){
     var n = negocio();
     if(!nube() || !nube().configurada || !nube().configurada()) return { ok: false, motivo: 'cuenta', sinServidor: true };
     if(!n) return { ok: false, motivo: 'cuenta' };
     if(E.neg !== n.id || !E.p) return { ok: false, motivo: 'espera', error: E.error || '', cargando: !!E.cargando };
     if(!vivo(E.p) && E.error) return { ok: false, motivo: 'sinconexion', error: E.error };
-    /* Sin plan pago vigente (cancelada por el administrador, vencida, pago rechazado o sin pagar): la app no se
-       usa; lo único que queda es pagar para reactivarla (o esperar la revisión del pago enviado). */
+    /* Cancelada por el administrador: la app no se usa; lo único que queda es pagar para reactivarla (o esperar la
+       revisión del pago enviado). Vencida, pago rechazado o sin pagar: sigue en el plan GRATIS con sus funciones
+       limitadas (las PRO piden el plan) y con la opción de pagar. */
     var st = estado();
     soloPagar = !!BLOQUEA[st.status];
     if(soloPagar) return { ok: false, motivo: 'pago', status: st.status, manda: st.manda, revision: st.revision, rechazo: st.rechazo || '',

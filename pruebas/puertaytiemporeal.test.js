@@ -112,27 +112,36 @@ const b64u = b => Buffer.from(b).toString('base64').replace(/\+/g, '-').replace(
     await p.evaluate(() => document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')));
     chk('Cerrar los planes NO abre la app: sigue bloqueada', !!(await puerta(p)) && (await puerta(p)).motivo === 'pago');
 
-    // Paga → pago en revisión: sigue bloqueada, sin botón de pagar otra vez
-    bd.sub = { status: 'payment_review', plan: 'pro', expiry: Date.now() + 30 * DIA }; bd.pendiente = { id: 'pay-1', status: 'review', plan_id: 'pro', method: 'NEQUI', amount: 59900 };
-    await aviso();
-    chk('Pago en revisión: «Tu pago está en revisión», sin botón de pagar', await listo(p, () => /Tu pago está en revisión/.test((document.getElementById('vpOv') || {}).innerText || '') && !document.querySelector('#vpOv [data-vp="pagar"]'), 4000), JSON.stringify(await puerta(p)));
-    // El administrador aprueba → se abre sola
-    bd.sub = { status: 'active', plan: 'pro', expiry: Date.now() + 30 * DIA }; bd.pendiente = null;
-    await aviso();
-    chk('Aprobado / activado: la app se abre sola al instante con PRO', await listo(p, () => !document.getElementById('vpOv') && ventoSuscripcion.estado().plan === 'pro', 4000), JSON.stringify(await puerta(p)));
-
-    // Vencida y pago rechazado: también bloquean
-    bd.sub = { status: 'expired', plan: 'pro', expiry: Date.now() - DIA };
-    await aviso();
-    chk('Vencida: bloqueada con «Tu suscripción venció» y solo pagar', await listo(p, () => /Tu suscripción venció/.test((document.getElementById('vpOv') || {}).innerText || '') && document.querySelectorAll('#vpOv button').length === 1, 4000), JSON.stringify(await puerta(p)));
-    bd.sub = { status: 'rejected', plan: 'pro', expiry: 0 }; bd.ultimo = { id: 'pay-2', status: 'rejected', plan_id: 'pro', method: 'NEQUI', amount: 59900, reject_reason: 'No llegó el dinero' };
-    await aviso();
-    chk('Pago rechazado: bloqueada con el motivo y solo pagar', await listo(p, () => /Tu pago no fue aprobado/.test((document.getElementById('vpOv') || {}).innerText || '') && /No llegó el dinero/.test(document.getElementById('vpOv').innerText) && !!document.querySelector('#vpOv [data-vp="pagar"]'), 4000), JSON.stringify(await puerta(p)));
-    // Un cajero (no puede pagar): bloqueado y sin botón
+    // Cancelada y un cajero (no puede pagar): bloqueado y sin botón
     bd.rol = 'caja';
     await aviso();
-    chk('Cajero con la suscripción sin pagar: bloqueado, sin botón (le toca al dueño)', await listo(p, () => /el dueño o el administrador del negocio debe pagar/.test((document.getElementById('vpOv') || {}).innerText || '') && !document.querySelector('#vpOv button'), 4000), JSON.stringify(await puerta(p)));
-    bd.rol = 'dueno'; bd.ultimo = null;
+    chk('Cajero con la suscripción cancelada: bloqueado, sin botón (le toca al dueño)', await listo(p, () => /el dueño o el administrador del negocio debe pagar/.test((document.getElementById('vpOv') || {}).innerText || '') && !document.querySelector('#vpOv button'), 4000), JSON.stringify(await puerta(p)));
+    bd.rol = 'dueno';
+
+    // Paga → pago en revisión: la app se abre en el plan gratis mientras lo revisan
+    bd.sub = { status: 'payment_review', plan: 'pro', expiry: Date.now() + 30 * DIA }; bd.pendiente = { id: 'pay-1', status: 'review', plan_id: 'pro', method: 'NEQUI', amount: 59900 };
+    await aviso();
+    chk('Pago en revisión: la app abre en el plan gratis (vende) mientras lo revisan', await listo(p, () => !document.getElementById('vpOv') && ventoSuscripcion.estado().plan === 'free' && ventoSuscripcion.tiene('pos_basic') && !ventoSuscripcion.tiene('voice'), 4000), JSON.stringify(await puerta(p)));
+    // El administrador aprueba → PRO al instante
+    bd.sub = { status: 'active', plan: 'pro', expiry: Date.now() + 30 * DIA }; bd.pendiente = null;
+    await aviso();
+    chk('Aprobado / activado: PRO al instante', await listo(p, () => !document.getElementById('vpOv') && ventoSuscripcion.estado().plan === 'pro', 4000), JSON.stringify(await puerta(p)));
+
+    // Vencida, pago rechazado o sin pagar: NO se bloquea, sigue en el plan gratis con funciones limitadas
+    const gratis = () => p.evaluate(() => !document.getElementById('vpOv') && ventoSuscripcion.estado().plan === 'free' && ventoSuscripcion.tiene('pos_basic') && ventoSuscripcion.tiene('tables') &&
+      !ventoSuscripcion.tiene('voice') && !ventoSuscripcion.tiene('ai_camera') && !ventoSuscripcion.tiene('advanced_reports'));
+    bd.sub = { status: 'expired', plan: 'pro', expiry: Date.now() - DIA };
+    await aviso();
+    chk('Vencida: la app sigue abierta en el plan GRATIS (vende, mesas) sin funciones PRO', await listo(p, () => ventoSuscripcion.estado().status === 'expired', 4000) && await gratis(), JSON.stringify(await puerta(p)));
+    await p.evaluate(() => ventoSuscripcion.abrirPlanes(''));
+    chk('…y puede pagar: los planes muestran el pago y el plan gratis', await listo(p, () => !!document.querySelector('#vsOv [data-pagar="pro"]') && !!document.querySelector('#vsOv .vs-plan[data-plan="free"]') && /Sigues vendiendo con el plan gratis/.test(document.getElementById('vsOv').innerText), 5000));
+    await p.evaluate(() => document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')));
+    bd.sub = { status: 'rejected', plan: 'pro', expiry: 0 }; bd.ultimo = { id: 'pay-2', status: 'rejected', plan_id: 'pro', method: 'NEQUI', amount: 59900, reject_reason: 'No llegó el dinero' };
+    await aviso();
+    chk('Pago rechazado: sigue en el plan gratis', await listo(p, () => ventoSuscripcion.estado().status === 'rejected', 4000) && await gratis(), JSON.stringify(await puerta(p)));
+    bd.sub = { status: 'pending_payment', plan: 'pro', expiry: 0 }; bd.ultimo = null;
+    await aviso();
+    chk('Sin pagar todavía: sigue en el plan gratis', await listo(p, () => ventoSuscripcion.estado().status === 'pending_payment', 4000) && await gratis(), JSON.stringify(await puerta(p)));
 
     // El administrador vuelve a activar → se abre sola
     bd.sub = { status: 'active', plan: 'pro', expiry: Date.now() + 30 * DIA };

@@ -13,7 +13,13 @@
   - Las cuentas que ya tenían varios negocios los conservan.
 - **Panel → 🔑 Licencias:** «Correo del cliente (uno solo)», sin «Usos»; «✅ Activada / ⏳ Sin activar».
 
-## 2. Vento Admin se actualiza solo
+## 2. Plan vencido → modo gratis (cancelada → solo pagar)
+- **Vencida, pago rechazado, sin pagar o pago en revisión:** la app NO se bloquea. Sigue en el plan **Gratis** con sus
+  funciones limitadas (vender, mesas, inventario y gastos, según el plan Gratis del panel). Las funciones PRO (voz,
+  cámara con IA, estadísticas avanzadas…) piden el plan, y desde «Mi plan» se puede pagar.
+- **Cancelada por el administrador:** sigue bloqueada con un solo botón, «💳 Pagar para reactivar» (1.39.2).
+
+## 3. Vento Admin se actualiza solo
 - Revisa `version.txt` al abrir, cada 2 minutos y al volver a la app.
 - Con una versión nueva: si recién abre, está bloqueado o vuelve después de un rato, se **recarga solo sin caché**. Si
   estás escribiendo o tienes una ventana abierta, muestra «🔄 Actualizar ahora» para no cortarte. Sin bucles.
