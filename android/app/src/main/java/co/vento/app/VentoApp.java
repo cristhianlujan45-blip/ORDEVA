@@ -152,6 +152,15 @@ public class VentoApp extends Application {
         } catch (Exception ignorado) { }
     }
 
+    /** Aviso del celular de un pago confirmado (sin la voz, que ya se dijo). */
+    static void anunciarPagoAviso(String banco, long monto) {
+        if (app == null || monto <= 0) return;
+        try {
+            app.new Puente().notificar("💜 Pagaron " + AvisoPago.plata(monto) + " por " + AvisoPago.nombreApp(banco),
+                    "Pago confirmado por SMS de " + AvisoPago.nombreApp(banco) + ".", "pedidos", false);
+        } catch (Exception ignorado) { }
+    }
+
     // ---------------------------------------------------------------- Voz de los pagos
     // Su propia voz: la de la página se calla cada vez que la página va a decir otra cosa (y cortaba el «Pago confirmado»).
     // Los pagos que llegan mientras la voz se prepara quedan en fila (antes el segundo se perdía) y, mientras habla, la
@@ -1028,6 +1037,13 @@ public class VentoApp extends Application {
 
         @JavascriptInterface
         public int pagosVolumenActual() { return volPagos(); }
+
+        /** Confirmar también los SMS del banco (desde su código corto). Apagado = «revísalo». */
+        @JavascriptInterface
+        public void pagosSmsConfiar(boolean si) { getSharedPreferences("vento", MODE_PRIVATE).edit().putBoolean(VentoEscucha.PREF_SMS_OK, si).apply(); }
+
+        @JavascriptInterface
+        public boolean pagosSmsConfiarActual() { return getSharedPreferences("vento", MODE_PRIVATE).getBoolean(VentoEscucha.PREF_SMS_OK, false); }
 
         /** Un aviso de pago que llega por otro camino (otro celular, el Servidor Vento, MacroDroid): con la voz de los pagos. */
         @JavascriptInterface

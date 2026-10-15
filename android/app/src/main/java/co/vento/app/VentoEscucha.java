@@ -27,7 +27,7 @@ public class VentoEscucha extends NotificationListenerService {
     static final String PREF_ON = "pagosAvisos", PREF_COLA = "pagosAvisosCola";
     // Las reglas (qué es plata recibida, el valor y la frase) están en AvisoPago (se prueban sin Android).
     private static final long VIGENCIA = 6 * 3600_000L;   // un aviso que la página no alcanzó a tomar en 6 h ya no sirve
-    static final String PREF_VISTOS = "pagosAvisosVistos", PREF_NOTIF = "pagosNotif";
+    static final String PREF_VISTOS = "pagosAvisosVistos", PREF_NOTIF = "pagosNotif", PREF_SMS_OK = "pagosSmsConfiar", PREF_RECIENTES = "pagosRecientes";
 
     @Override
     public void onListenerConnected() {
@@ -78,7 +78,10 @@ public class VentoEscucha extends NotificationListenerService {
         android.content.pm.ApplicationInfo info;
         try { info = pm.getApplicationInfo(pkg, 0); app = String.valueOf(pm.getApplicationLabel(info)); }
         catch (Exception e) { return false; }
-        if (!AvisoPago.esBanco(app) && !AvisoPago.paqueteOficial(pkg)) return false;
+        String smsDefecto = null;
+        try { smsDefecto = android.provider.Telephony.Sms.getDefaultSmsPackage(this); } catch (Throwable ignorado) { }
+        boolean sms = AvisoPago.esAppSms(pkg, smsDefecto);
+        if (!sms && !AvisoPago.esBanco(app) && !AvisoPago.paqueteOficial(pkg)) return false;
         // ¿Es la app de verdad del banco? (la oficial, o instalada desde la tienda, o del celular). Una app con nombre de
         // banco instalada por fuera podría mostrar pagos falsos: ese aviso queda «⚠️ Revisar», nunca «Pago confirmado».
         // Si Android no deja saber de dónde se instaló (algunos celulares lo esconden), se confía como antes: solo se marca
@@ -114,6 +117,12 @@ public class VentoEscucha extends NotificationListenerService {
         if (atrasada && edad > 30 * 60_000L) return false;
         boolean callado = atrasada && edad > 3 * 60_000L;
         boolean alguno = false;
+        if (sms) {
+            // Mensaje de texto: el título es quien lo manda (número o nombre); cada mensaje de la conversación es un aviso.
+            if (procesarSms(sp, titulo, principal, sbn.getKey() + ":" + cuando + ":", callado)) alguno = true;
+            for (String l : otros) if (!l.isEmpty() && !l.equals(principal) && procesarSms(sp, titulo, l, "S:", callado)) alguno = true;
+            return alguno;
+        }
         if (procesar(sp, app, titulo, principal, sbn.getKey() + ":" + cuando + ":", confiable, callado)) alguno = true;
         for (String l : otros) if (!l.isEmpty() && !l.equals(principal) && procesar(sp, app, titulo, l, "L:", confiable, callado)) alguno = true;
         return alguno;
@@ -131,10 +140,55 @@ public class VentoEscucha extends NotificationListenerService {
         // Sin valor que se entienda: no se dice nada; la página lo reporta para aprender ese formato.
         boolean voz = false;
         if (monto <= 0) callado = true;
+        // ¿Ya llegó este mismo pago por SMS (el banco avisa por los dos lados)? Entonces este aviso de la app lo confirma
+        // y reemplaza al del SMS (no son dos pagos).
+        String reemplaza = monto > 0 && confiable ? parear(sp, monto, false, id) : null;
         if (confiable && !callado) { VentoApp.anunciarPago(app, monto, sp.getBoolean(PREF_NOTIF, true)); voz = true; }
         else if (!confiable && !callado) { VentoApp.decirPago("Ojo. Llegó un aviso de " + monto + " pesos de una aplicación que no es la oficial de " + AvisoPago.nombreApp(app) + ". Revísalo en la aplicación del banco antes de entregar."); voz = true; }
-        guardar(sp, id, txt, voz, confiable ? null : "La app «" + app + "» de este celular no es la oficial (no se instaló desde la tienda): míralo en la app del banco");
+        guardar(sp, id, txt, voz, confiable ? null : "La app «" + app + "» de este celular no es la oficial (no se instaló desde la tienda): míralo en la app del banco", false, reemplaza);
         return true;
+    }
+
+    /** SMS del banco: solo plata recibida que nombra un banco. Desde un celular común = falso; desde el código corto del
+     *  banco = «revísalo» (o «Pago confirmado» si el dueño eligió confirmar los SMS del banco). */
+    private boolean procesarSms(SharedPreferences sp, String remitente, String cuerpo, String prefijo, boolean callado) throws Exception {
+        if (!AvisoPago.esSmsDePago(remitente, cuerpo)) return false;
+        long monto = AvisoPago.monto(remitente + " " + cuerpo);
+        String txt = "SMS | " + remitente + " | " + cuerpo;
+        String id = prefijo + txt.hashCode();
+        if (!marcarVisto(sp, id)) return false;
+        String tipo = AvisoPago.tipoRemitente(remitente);
+        // El mismo pago ya llegó por la app del banco (confirmado): el SMS no se cuenta otra vez.
+        if (!"celular".equals(tipo) && parear(sp, monto, true, id) != null) return false;
+        boolean confiar = !"celular".equals(tipo) && sp.getBoolean(PREF_SMS_OK, false);
+        boolean voz = false;
+        if (!callado) { VentoApp.decirPago(AvisoPago.fraseSms(cuerpo, monto, tipo, confiar)); voz = true; }
+        if (!callado && confiar && sp.getBoolean(PREF_NOTIF, true)) try { VentoApp.anunciarPagoAviso(AvisoPago.bancoDe(cuerpo), monto); } catch (Throwable ignorado) { }
+        guardar(sp, id, txt, voz, null, confiar, null);
+        return true;
+    }
+
+    /** El mismo pago por los dos lados (app del banco y SMS, mismo valor, en 3 min): devuelve el ID del otro aviso si
+     *  todavía no estaba emparejado (y los empareja); si no, guarda este para emparejarlo después. */
+    private static synchronized String parear(SharedPreferences sp, long monto, boolean esSms, String id) {
+        try {
+            JSONArray l = new JSONArray(sp.getString(PREF_RECIENTES, "[]")), out = new JSONArray();
+            long ahora = System.currentTimeMillis();
+            String par = null;
+            for (int i = 0; i < l.length(); i++) {
+                JSONObject o = l.getJSONObject(i);
+                if (ahora - o.optLong("t") > 5 * 60_000L) continue;
+                if (par == null && !o.optBoolean("par") && o.optLong("m") == monto && o.optBoolean("sms") != esSms && ahora - o.optLong("t") <= 3 * 60_000L) {
+                    o.put("par", true);
+                    par = o.optString("id");
+                }
+                out.put(o);
+            }
+            if (par == null) out.put(new JSONObject().put("id", id).put("m", monto).put("sms", esSms).put("t", ahora));
+            while (out.length() > 40) out.remove(0);
+            sp.edit().putString(PREF_RECIENTES, out.toString()).apply();
+            return par;
+        } catch (Exception e) { return null; }
     }
 
     /** Avisos ya vistos (12 h): el mismo aviso no se dice dos veces aunque la app del banco lo vuelva a publicar. */
@@ -152,7 +206,7 @@ public class VentoEscucha extends NotificationListenerService {
     private static String texto(CharSequence c) { return c == null ? "" : c.toString().replaceAll("\\s+", " ").trim(); }
 
     /** Cola de avisos para la página (sobrevive si la página todavía no ha cargado). */
-    private static synchronized void guardar(SharedPreferences sp, String id, String txt, boolean voz, String revisar) throws Exception {
+    private static synchronized void guardar(SharedPreferences sp, String id, String txt, boolean voz, String revisar, boolean smsOk, String reemplaza) throws Exception {
         JSONArray l = new JSONArray(sp.getString(PREF_COLA, "[]")), out = new JSONArray();
         long ahora = System.currentTimeMillis();
         for (int i = 0; i < l.length(); i++) {
@@ -162,6 +216,8 @@ public class VentoEscucha extends NotificationListenerService {
         }
         JSONObject o = new JSONObject().put("id", id).put("txt", txt).put("t", ahora).put("voz", voz);   // voz: ya se dijo en voz alta aquí
         if (revisar != null) o.put("revisar", revisar);                  // no es la app oficial: «⚠️ Revisar», no «confirmado»
+        if (smsOk) o.put("smsOk", true);                                  // SMS del banco y el dueño eligió confirmarlos
+        if (reemplaza != null) o.put("reemplaza", reemplaza);             // confirma el SMS de este mismo pago
         out.put(o);
         while (out.length() > 30) out.remove(0);
         sp.edit().putString(PREF_COLA, out.toString()).apply();

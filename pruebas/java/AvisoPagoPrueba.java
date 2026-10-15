@@ -41,6 +41,19 @@ public class AvisoPagoPrueba {
         chk("Volumen 100 % y 150 % → nivel máximo", AvisoPago.nivel(100, 7) == 7 && AvisoPago.nivel(150, 7) == 7, AvisoPago.nivel(150, 7));
         chk("Volumen 10 % → al menos nivel 1 (nunca mudo)", AvisoPago.nivel(10, 7) == 1, AvisoPago.nivel(10, 7));
         chk("Refuerzo: 100 % = nada; 150 % = +12 dB (más fuerte de lo normal)", AvisoPago.refuerzo(100) == 0 && AvisoPago.refuerzo(150) == 1200 && AvisoPago.refuerzo(120) == 480, AvisoPago.refuerzo(150));
+        // SMS del banco
+        chk("App de SMS: Mensajes de Google", AvisoPago.esAppSms("com.google.android.apps.messaging", null), "");
+        chk("App de SMS: la de SMS por defecto del celular", AvisoPago.esAppSms("com.xiaomi.otra", "com.xiaomi.otra"), "");
+        chk("WhatsApp no es app de SMS", !AvisoPago.esAppSms("com.whatsapp", "com.google.android.apps.messaging"), "");
+        chk("SMS de pago: «DaviPlata: Le llegó plata. Recibió $200 de JUAN»", AvisoPago.esSmsDePago("85888", "DaviPlata: Le llegó plata. Recibió $200 de JUAN"), "");
+        chk("SMS de pago desde «Nequi» (contacto guardado): «Te llegó plata $15.000»", AvisoPago.esSmsDePago("Nequi", "¡Te llegó plata! ANA te envió $15.000"), "");
+        chk("SMS personal (sin banco) NO se toma: «Te envié $20.000 de lo del almuerzo»", !AvisoPago.esSmsDePago("Mamá", "Te llegaron los $20.000 de lo del almuerzo?"), "");
+        chk("SMS de código NO se toma", !AvisoPago.esSmsDePago("85888", "DaviPlata: su clave para recibir $5.000 es 4455"), "");
+        chk("Remitente celular (3001234567) → «celular» (falso)", AvisoPago.tipoRemitente("+57 300 123 4567").equals("celular"), AvisoPago.tipoRemitente("+57 300 123 4567"));
+        chk("Remitente código corto (85888) → «corto»", AvisoPago.tipoRemitente("85888").equals("corto"), "");
+        chk("Frase SMS sin confiar: «Llegó un mensaje de texto de 200 pesos desde DaviPlata. Revísalo…»", AvisoPago.fraseSms("DaviPlata: Recibió $200", 200, "corto", false).startsWith("Llegó un mensaje de texto de 200 pesos desde DaviPlata. Revísalo"), AvisoPago.fraseSms("DaviPlata: Recibió $200", 200, "corto", false));
+        chk("Frase SMS confiando: «Pago confirmado. 200 pesos desde DaviPlata, por mensaje de texto.»", AvisoPago.fraseSms("DaviPlata: Recibió $200", 200, "corto", true).equals("Pago confirmado. 200 pesos desde DaviPlata, por mensaje de texto."), AvisoPago.fraseSms("DaviPlata: Recibió $200", 200, "corto", true));
+        chk("Frase SMS desde celular: «Ojo… parece falso» aunque se confíe", AvisoPago.fraseSms("Nequi: te llegó $50.000", 50000, "celular", true).startsWith("Ojo."), "");
         chk("Banco: DaviPlata", AvisoPago.esBanco("DaviPlata"), "");
         chk("Banco: Nequi", AvisoPago.esBanco("Nequi"), "");
         chk("No es banco: WhatsApp", !AvisoPago.esBanco("WhatsApp"), "");

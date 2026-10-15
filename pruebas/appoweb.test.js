@@ -26,7 +26,7 @@ const UA_APP = UA_CHROME.replace('Mobile Safari/537.36', 'Mobile Safari/537.36 V
         window.VentoAndroid = { pagosAvisos: v => { A.on = !!v; }, pagosAvisosEstado: () => JSON.stringify({ on: A.on, permiso: A.permiso }), pagosAvisosTomar: () => '[]', mediosPermiso: () => {}, notificar: () => true, pagosNotif: () => {}, pagosVolumen: () => {} }; }
     }, [app]);
     const p = await ctx.newPage(); p.on('pageerror', e => errs.push(e.message));
-    await p.goto(url || BASE + '/index.html'); await p.waitForTimeout(1200);
+    await p.goto(url || BASE + '/index.html', { waitUntil: 'domcontentloaded' }); await p.waitForTimeout(1500);
     return { ctx, p };
   };
   const entrar = async (p, biz) => {

@@ -28543,7 +28543,12 @@ let fotosListas = false;
     try{ window.ventoPagosReenviarAviso && window.ventoPagosReenviarAviso(txt, id); }catch(e){}   // también al Servidor Vento
     // op.revisar: la app Android vio que la app de ese banco NO es la oficial (instalada por fuera de la tienda): podría
     // mostrar pagos falsos, así que queda «⚠️ Revisar» y nunca «Pago confirmado».
-    const f = op.revisar ? { nivel: 'revisar', txt: String(op.revisar) } : pgFuente(txt);
+    const f0 = pgFuente(txt);
+    // op.smsOk: SMS del código corto del banco y el dueño eligió confirmarlos (Ajustes → Pagos). Nunca uno «falso».
+    const f = op.revisar ? { nivel: 'revisar', txt: String(op.revisar) }
+      : op.smsOk && f0.nivel === 'revisar' ? { nivel: 'app', txt: 'Confirmado por SMS del banco (elegiste confirmar los SMS del banco)' } : f0;
+    // op.reemplaza: este aviso de la app del banco es el MISMO pago que ya había llegado por SMS → se queda uno (confirmado).
+    if(op.reemplaza){ const i = g.lista.findIndex(x => x.id === 'and-' + op.reemplaza); if(i >= 0) g.lista.splice(i, 1); }
     const mesa = f.nivel === 'falso' ? null : pgMesaPara(p.monto);
     const reg = { id: id || Date.now().toString(36), via, t: Date.now(), monto: p.monto, app: p.app, de: p.de, mesa: mesa ? Number(mesa) : null, estado: f.nivel, fuente: f.txt, txt: String(txt).slice(0, 200) };
     g.lista.unshift(reg); g.lista = g.lista.slice(0, 200);
@@ -28585,7 +28590,7 @@ let fotosListas = false;
   window.ventoAvisosNativos = function(){
     if(!AND() || typeof authUser === 'undefined' || !authUser || typeof data === 'undefined' || !data) return;
     let l = []; try{ l = JSON.parse(AND().pagosAvisosTomar() || '[]'); }catch(e){}
-    l.forEach(a => { try{ if(a && a.txt) pgRecibir(a.txt, 'and-' + a.id, { voz: !!a.voz, revisar: a.revisar || '' }); }catch(e){} });
+    l.forEach(a => { try{ if(a && a.txt) pgRecibir(a.txt, 'and-' + a.id, { voz: !!a.voz, revisar: a.revisar || '', smsOk: !!a.smsOk, reemplaza: a.reemplaza || '' }); }catch(e){} });
     if(l.length) try{ pgPintar(); }catch(e){}
   };
   setInterval(() => window.ventoAvisosNativos(), 5000);
@@ -28640,6 +28645,15 @@ let fotosListas = false;
   // Para recibir los avisos NO hace falta convenio con Davivienda ni la API: la app Vento para Android lee el aviso
   // que DaviPlata ya muestra en el celular («¡Le llegó plata!…») y lo convierte en «Pago confirmado» + el aviso del celular.
   const APK = 'https://github.com/cristhianlujan45-blip/cuentas/releases/latest/download/vento.apk';
+  // «🔎 Este equipo: …»: con un pantallazo se sabe si es la app o Vento Web (y cuál navegador).
+  function pgDondeEstoy(){
+    const ua = navigator.userAgent || '';
+    if(AND()) return 'App Vento para Android' + ((ua.match(/VentoAndroid\/([\w.]+)/) || [])[1] ? ' ' + ua.match(/VentoAndroid\/([\w.]+)/)[1] : '') + (AND().pagosSmsConfiar ? '' : ' (versión vieja: instala la nueva)');
+    if(window.ventoAppSinPuente && window.ventoAppSinPuente()) return 'App Vento sin conexión con Android (ciérrala y ábrela otra vez)';
+    let nav = navigator.brave ? 'Brave' : /SamsungBrowser/.test(ua) ? 'Samsung Internet' : /EdgA?\//.test(ua) ? 'Edge' : /Firefox\//.test(ua) ? 'Firefox' : /MiuiBrowser|XiaoMi/.test(ua) ? 'navegador de Xiaomi' : /OPR\//.test(ua) ? 'Opera' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'navegador';
+    let inst = false; try{ inst = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; }catch(e){}
+    return 'Vento Web' + (inst ? ' instalada (acceso directo de ' + nav + ')' : ' en ' + nav) + (/Android/i.test(ua) ? ' · Android' : '');
+  }
   function pgGuia(){
     let ov = $p('pgGuiaOv');
     if(!ov){ ov = document.createElement('div'); ov.className = 'overlay'; ov.id = 'pgGuiaOv'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-label', 'Paso a paso: avisos de DaviPlata y Nequi'); document.body.appendChild(ov);
@@ -28672,11 +28686,12 @@ let fotosListas = false;
           ok(!!A, A ? 'Listo' : window.ventoAppSinPuente && window.ventoAppSinPuente() ? 'Ábrela de nuevo' : android ? 'Estás en Vento Web' : 'Hazlo en el Android')) +
         paso(2, 'Prende «Recibir avisos de pagos»', 'Vento empieza a escuchar los avisos de plata que te llegan.' + (g.on && (!A || e.on) ? '' : '<br><button type="button" class="btn-primary gp-btn" data-gp="prender">Prender ahora</button>'), ok(g.on && (!A || e.on), g.on && (!A || e.on) ? 'Prendido' : 'Apagado')) +
         paso(3, 'Dale a Vento el permiso «Acceso a notificaciones»', 'Se abre una pantalla del celular: busca <b>Vento</b> en la lista, actívalo y toca <b>Permitir</b>. Luego vuelve con el botón de atrás. Vento solo toma los avisos de <b>plata recibida</b>: nunca códigos, claves ni compras.' + (A && !e.permiso ? '<br><button type="button" class="btn-primary gp-btn" data-gp="permiso">Abrir el permiso</button>' : ''), A ? ok(!!e.permiso, e.permiso ? 'Permiso dado' : 'Falta el permiso') : '') +
-        paso(4, 'Deja prendidas las notificaciones de DaviPlata', 'En el celular: <b>Ajustes → Aplicaciones → DaviPlata → Notificaciones → Permitir</b> (todas). Abre DaviPlata una vez y entra con tu clave para que quede activa. Haz lo mismo con <b>Nequi</b> si también la usas.', '') +
+        paso(4, 'Deja prendidas las notificaciones de DaviPlata', 'En el celular: <b>Ajustes → Aplicaciones → DaviPlata → Notificaciones → Permitir</b> (todas). Abre DaviPlata una vez y entra con tu clave para que quede activa. Haz lo mismo con <b>Nequi</b> si también la usas. <b>¿Tu banco te avisa por SMS?</b> La app también lee esos mensajes de texto (con el mismo permiso): mira «📩 Confirmar también los SMS del banco» en Ajustes → 💜 Pagos.', '') +
         paso(5, 'Que el celular no duerma a Vento', 'Así el aviso llega aunque Vento esté cerrada o la pantalla apagada.' + (A && perm.bateria === false ? '<br><button type="button" class="btn-ghost gp-btn" data-gp="bateria">⚡ Quitar el ahorro de batería</button>' : ''), A && perm.bateria !== undefined ? ok(!!perm.bateria, perm.bateria ? 'Listo' : 'Falta') : '') +
         paso(6, 'Prueba', 'Pídele a alguien que te pase <b>$1.000</b> a tu DaviPlata. Vento dirá <i>«Pago confirmado. 1000 pesos desde DaviPlata»</i> y en el celular sale <b>«💜 Pagaron $1.000 por DaviPlata»</b>.<br><button type="button" class="btn-ghost gp-btn" data-gp="probar">▶️ Ver cómo se ve (simulado)</button>', ok(!!llego, llego ? 'Ya llegó un pago real de DaviPlata (' + plata(llego.monto) + ')' : 'Esperando el primer pago')) +
         '</ol>' +
         '<div class="settings-desc" style="margin-top:8px"><b>¿Y los demás celulares del negocio?</b> Con tu misma cuenta (Vento Nube) también ven el pago al instante. <b>¿No usas la app Vento en ese celular?</b> <button type="button" class="btn-ghost gp-btn" data-gp="macro">Usar MacroDroid</button><br><small>«Conectar DaviPlata» (API oficial) es otra cosa: sirve para <b>cobrar con código</b> y necesita convenio con Davivienda. Para que Vento te avise los pagos <b>no lo necesitas</b>.</small></div>' +
+        '<div class="settings-desc" style="margin-top:6px;opacity:.75"><small>🔎 Este equipo: ' + escp(pgDondeEstoy()) + '</small></div>' +
         '<div class="modal-actions"><button type="button" class="btn-close" data-gp="cerrar">Listo</button></div></div>';
     }
     pintar(); ov.classList.add('show');
@@ -28702,6 +28717,7 @@ let fotosListas = false;
       '<div id="pgCaja" hidden>' +
       '<div class="settings-row" id="pgVolFila" style="flex-direction:column;align-items:stretch"><div class="settings-row-text"><strong>🔊 Volumen de la voz de los pagos: <span id="pgVolTxt"></span></strong><span>Qué tan alto dice «Pago confirmado. 200 pesos desde DaviPlata». ' + (enApp ? 'Suena a este volumen aunque la música o el celular estén bajitos, y luego deja el volumen como estaba. <b>Más de 100 % = más fuerte de lo normal.</b>' : 'En el navegador llega hasta 100 %; en la app Android se puede subir hasta 150 % (más fuerte de lo normal).') + '</span></div>' +
       '<input type="range" id="pgVol" min="10" max="' + (enApp ? 150 : 100) + '" step="10" style="width:100%;margin:6px 0" aria-label="Volumen de la voz de los pagos"><div class="mz-actions"><button class="btn-ghost" id="pgVolMenos" type="button">🔉 Más bajo</button><button class="btn-ghost" id="pgVolMas" type="button">🔊 Más alto</button><button class="btn-primary" id="pgVolProbar" type="button">▶ Probar la voz</button></div></div>' +
+      (enApp ? '<div class="settings-row" id="pgSmsFila"><div class="settings-row-text"><strong>📩 Confirmar también los SMS del banco</strong><span>Si tu banco te avisa por <b>mensaje de texto</b>, la app también lo lee (con el mismo permiso). <b>Apagado:</b> dice «Llegó un mensaje de texto de $X… revísalo en la app del banco». <b>Prendido:</b> dice «Pago confirmado» con los SMS que vienen del <b>número corto</b> del banco. Ojo: un SMS se puede falsificar; los que vienen de un número de celular siempre salen como 🚨 FALSO.</span></div><label class="switch"><input type="checkbox" id="pgSmsOk"><span class="switch-slider"></span></label></div>' : '') +
       (enApp ? '<div class="settings-row" id="pgAndFila"><div class="settings-row-text"><strong>📲 Leer los avisos de ESTE celular</strong><span id="pgAndTxt">Vento toma directo los avisos de plata recibida de DaviPlata, Nequi y tu banco que llegan a este celular. Nunca toma códigos, claves ni compras.</span></div><label class="switch"><input type="checkbox" id="pgAndOn"><span class="switch-slider"></span></label></div>' : '') +
       '<details class="settings-desc"' + (enApp ? '' : ' open') + '><summary><b>' + (enApp ? 'Otro método, solo si en ese celular NO usas la app Vento' : 'Sin la app Vento: con MacroDroid') + '</b></summary>' +
       '<div class="settings-row" style="flex-direction:column;align-items:stretch"><div class="settings-row-text"><strong>Tu dirección privada de avisos</strong><span>No la compartas: quien la tenga podría mandarte avisos falsos.</span></div>' +
@@ -28719,6 +28735,15 @@ let fotosListas = false;
     grupo.insertAdjacentElement('afterend', g);
     $p('pgGuiaBtn').onclick = pgGuia;
     $p('pgAbrirApp').onclick = () => { try{ window.ventoAbrirApp(); }catch(e){} };
+    const smsOk = $p('pgSmsOk');
+    if(smsOk){
+      try{ smsOk.checked = !!(AND().pagosSmsConfiarActual && AND().pagosSmsConfiarActual()); }catch(e){}
+      if(!(AND() && AND().pagosSmsConfiar)){ smsOk.disabled = true; smsOk.closest('.settings-row').querySelector('span').insertAdjacentHTML('beforeend', ' <b>Para leer los SMS instala la app nueva (Ajustes → Descargar la app).</b>'); }
+      smsOk.onchange = () => {
+        try{ AND().pagosSmsConfiar(smsOk.checked); }catch(e){}
+        showToast(smsOk.checked ? '📩 Listo: los SMS del número corto del banco dicen «Pago confirmado». Los de un celular siguen saliendo como FALSO.' : '📩 Los SMS del banco dicen «revísalo en la app del banco».', 8000);
+      };
+    }
     const vol = $p('pgVol'), volMax = Number(vol.max);
     const volTxt = v => v + ' %' + (v > 100 ? ' · más fuerte de lo normal' : v === 100 ? ' · lo más alto del celular' : v <= 30 ? ' · bajito' : '');
     const volPoner = v => {

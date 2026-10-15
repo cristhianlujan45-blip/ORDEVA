@@ -47,6 +47,7 @@ public final class AvisoPago {
         if (b.contains("nequi")) return "Nequi";
         if (b.contains("bancolombia")) return "Bancolombia";
         if (b.contains("davivienda")) return "Davivienda";
+        if (b.equals("banco")) return "el banco";
         return a.isEmpty() ? "el banco" : a;
     }
 
@@ -86,6 +87,50 @@ public final class AvisoPago {
 
     /** Nivel del volumen del celular para ese porcentaje (1 a máx). */
     static int nivel(int v, int max) { v = volumen(v); return Math.max(1, Math.min(max, Math.round(max * Math.min(100, v) / 100f))); }
+
+    // ---------- SMS del banco ----------
+    // Hay bancos que avisan la plata recibida por mensaje de texto (SMS) y no por su app. Vento lee el aviso que la app
+    // de mensajes muestra (con el mismo permiso «Acceso a notificaciones»; no lee la bandeja de SMS) y SOLO si es de
+    // plata recibida y nombra un banco. Un SMS lo puede mandar cualquiera: desde un celular común es FALSO; desde el código
+    // corto del banco se dice «revísalo», salvo que el dueño elija confirmarlos (Ajustes → Pagos).
+    static final String[] APPS_SMS = {"com.google.android.apps.messaging", "com.samsung.android.messaging", "com.android.mms",
+            "com.android.messaging", "com.miui.mms", "com.xiaomi.mms", "com.oneplus.mms", "com.motorola.messaging", "com.textra",
+            "com.coloros.mms", "com.oplus.mms", "com.huawei.message", "com.hihonor.mms", "com.sonyericsson.conversations",
+            "com.lge.message", "com.asus.message", "com.transsion.message", "com.android.mms.service"};
+
+    static boolean esAppSms(String pkg, String smsPorDefecto) {
+        if (pkg == null) return false;
+        if (pkg.equals(smsPorDefecto)) return true;
+        for (String a : APPS_SMS) if (a.equals(pkg)) return true;
+        return false;
+    }
+
+    /** ¿El SMS habla de plata que llegó y nombra un banco o billetera? */
+    static boolean esSmsDePago(String remitente, String cuerpo) {
+        String todo = (remitente == null ? "" : remitente) + " " + (cuerpo == null ? "" : cuerpo);
+        return esRecibido(todo) && BANCO.matcher(todo).find() && monto(todo) > 0;
+    }
+
+    /** Remitente: «celular» (7 o más dígitos: los bancos no escriben desde celulares → falso), «corto» (código del banco). */
+    static String tipoRemitente(String remitente) {
+        String d = remitente == null ? "" : remitente.replaceAll("\\D", "");
+        if (d.length() >= 7) return "celular";
+        return "corto";
+    }
+
+    static String fraseSms(String cuerpo, long monto, String tipo, boolean confiar) {
+        String banco = nombreApp(bancoDe(cuerpo));
+        if ("celular".equals(tipo)) return "Ojo. Llegó un mensaje de pago sospechoso por " + monto + " pesos desde un número de celular. Parece falso. No entregues nada.";
+        if (confiar) return "Pago confirmado. " + monto + " pesos desde " + banco + ", por mensaje de texto.";
+        return "Llegó un mensaje de texto de " + monto + " pesos desde " + banco + ". Revísalo en la aplicación del banco antes de entregar.";
+    }
+
+    /** El banco que nombra el texto («DaviPlata», «Nequi»…) o «el banco». */
+    static String bancoDe(String txt) {
+        if (txt == null) return "";
+        Matcher m = BANCO.matcher(txt);
+        return m.find() ? m.group() : "";
+    }
 
     /** «Pago confirmado. 200 pesos desde DaviPlata.» */
     static String frase(String app, long monto) {

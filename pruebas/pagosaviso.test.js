@@ -12,6 +12,9 @@
 //  9. Volumen de la voz de los pagos (Ajustes → Pagos): se guarda, llega a Android y «▶ Probar» la dice; hasta 150 % en la app.
 // 10. En la app, los pagos que llegan por otro camino (otro celular / servidor) también usan la voz de pagos de Android.
 // 11. En el navegador, la voz de los pagos sale con el volumen elegido.
+// 12. SMS del banco (los lee la app): del código corto → «⚠️ Revisar»; si el dueño eligió confirmarlos → confirmado; desde un
+//     celular → FALSO. El mismo pago por SMS y por la app → uno solo (confirmado). Interruptor «📩 Confirmar los SMS».
+// 13. «🔎 Este equipo: App Vento para Android» al final del paso a paso.
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 
@@ -30,6 +33,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
         mediosPermiso: () => {}, notificar: (t, x, c) => { A.notifs.push({ t, x, c }); return true; },
         pagosNotif: v => { A.notifPagos.push(!!v); },
         pagosVolumen: v => { A.vol = v; }, pagosProbarVoz: () => { A.probo = (A.probo || 0) + 1; },
+        pagosSmsConfiar: v => { A.smsOk = !!v; }, pagosSmsConfiarActual: () => !!A.smsOk,
       };
     });
     const p = await ctx.newPage(); p.on('pageerror', e => errs.push(e.message));
@@ -132,6 +136,31 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     const d10 = await p.evaluate(() => window.__and.decir.slice());
     chk('10. En la app, «Pago confirmado» sale por la voz de pagos de Android (con su volumen), no por la de la página', d10.some(t => /^Pago confirmado\. 12000 pesos desde Nequi/.test(t)) && d10.some(t => /^Pago confirmado\. 7000 pesos desde DaviPlata/.test(t)) && (await estado()).voz.length === v10, d10);
 
+    // 12. SMS del banco
+    await llega('S:1', true, 'SMS | 85888 | DaviPlata: Le llegó plata. Recibió $21.000 de JUAN PEREZ');
+    let x12 = await p.evaluate(() => (data.pagos.lista || []).find(x => x.monto === 21000));
+    chk('12. SMS del código corto del banco → registrado «⚠️ Revisar» (por SMS)', x12 && x12.estado === 'revisar' && /SMS/.test(x12.fuente), x12);
+    await llega('S:2', true, 'SMS | 85888 | DaviPlata: Le llegó plata. Recibió $22.000 de ANA');
+    await p.evaluate(() => { window.__and.cola.push({ id: 'S:3', txt: 'SMS | 85888 | DaviPlata: Le llegó plata. Recibió $23.000 de ANA', t: Date.now(), voz: true, smsOk: true }); window.ventoAvisosNativos(); });
+    x12 = await p.evaluate(() => (data.pagos.lista || []).find(x => x.monto === 23000));
+    chk('12. Con «Confirmar los SMS del banco» → el SMS del código corto queda ✅ confirmado', x12 && x12.estado === 'app' && /SMS del banco/.test(x12.fuente), x12);
+    await p.evaluate(() => { window.__and.cola.push({ id: 'S:4', txt: 'SMS | +57 300 123 4567 | Nequi: te llegó plata $90.000', t: Date.now(), voz: true, smsOk: true }); window.ventoAvisosNativos(); });
+    x12 = await p.evaluate(() => (data.pagos.lista || []).find(x => x.monto === 90000));
+    chk('12. SMS desde un número de celular → 🚨 FALSO aunque se confíe en los SMS', x12 && x12.estado === 'falso', x12);
+    // El mismo pago: primero el SMS (revisar), luego la app del banco (confirma y reemplaza)
+    await llega('S:5', true, 'SMS | 85888 | DaviPlata: Le llegó plata. Recibió $24.000 de LUIS');
+    await p.evaluate(() => { window.__and.cola.push({ id: 'k24:1:-1', txt: 'DaviPlata | ¡Le llegó plata! | LUIS le pasó $24.000 a su DaviPlata', t: Date.now(), voz: true, reemplaza: 'S:5' }); window.ventoAvisosNativos(); });
+    const l24 = await p.evaluate(() => (data.pagos.lista || []).filter(x => x.monto === 24000).map(x => x.estado));
+    chk('12. El mismo pago por SMS y por la app del banco → queda UNO, confirmado', l24.length === 1 && l24[0] === 'app', l24);
+    const sw = await p.evaluate(() => { const i = document.getElementById('pgSmsOk'); if(!i) return null; const antes = i.checked; i.checked = true; i.dispatchEvent(new Event('change')); return { antes, ahora: window.__and.smsOk, dis: i.disabled }; });
+    chk('12. Ajustes → Pagos: «📩 Confirmar también los SMS del banco» (apagado por defecto) le llega a Android', sw && sw.antes === false && sw.ahora === true && !sw.dis, sw);
+
+    // 13. Diagnóstico en el paso a paso
+    await p.evaluate(() => window.ventoPagosGuia()); await p.waitForTimeout(300);
+    const g13 = await p.evaluate(() => document.getElementById('pgGuiaOv').innerText);
+    chk('13. Paso a paso: «🔎 Este equipo: App Vento para Android» y el paso de los SMS', /Este equipo: App Vento para Android/.test(g13) && /te avisa por SMS/.test(g13), g13.slice(-400));
+    await p.evaluate(() => document.getElementById('pgGuiaOv').classList.remove('show'));
+
     // 11. Navegador (sin la app): la voz sale con el volumen elegido (hasta 100 %)
     const ctx2 = await b.newContext({ viewport: { width: 1200, height: 900 } });
     await ctx2.route('**/*', r => new URL(r.request().url()).hostname === 'localhost' ? r.continue() : r.abort());
@@ -148,6 +177,8 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     });
     chk('11. En el navegador: «Pago confirmado. 5000 pesos desde Nequi» al 50 %', r11.voces.some(x => /^Pago confirmado\. 5000 pesos desde Nequi/.test(x.t) && x.vol === 0.5), r11);
     chk('11. En el navegador el volumen llega hasta 100 % (más de eso es en la app Android)', r11.max === '100', r11.max);
+    await p2.evaluate(() => window.ventoPagosGuia()); await p2.waitForTimeout(300);
+    chk('13. En el computador: «🔎 Este equipo: Vento Web en …»', /Este equipo: Vento Web en (Chrome|navegador)/.test(await p2.evaluate(() => document.getElementById('pgGuiaOv').innerText)));
     await ctx2.close();
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.stack || e)); }
   chk('Sin errores de página', !errs.length, errs);
