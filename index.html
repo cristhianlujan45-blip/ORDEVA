@@ -3716,6 +3716,8 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
     <div class="settings-group">
       <h2>🔊 Reproductor en la app</h2>
       <div class="settings-desc">La app reproduce sola las canciones en orden justo, una tras otra, y las que piden los clientes entran solas a la cola. Deja esta pantalla abierta con el celular encendido y con volumen.<br><br>🔈 Suena en este celular (o en el parlante Bluetooth conectado a él).</div>
+      <div class="settings-row" id="mqFila" style="flex-direction:column;align-items:stretch;gap:8px"><div class="settings-row-text"><strong>🎶 Equipo que pone la música</strong><span id="mqTxt"></span></div>
+        <div class="mz-actions" style="flex-wrap:wrap"><button class="btn-primary" type="button" id="mqYo" style="flex:1 1 100%">🎶 Este equipo pone la música</button><button class="btn-ghost" type="button" id="mqLibre" hidden style="flex:1 1 100%">Cada equipo por su cuenta</button></div></div>
       <div class="settings-row"><div class="settings-row-text"><strong>Reproducir automáticamente</strong><span id="autoEstado"></span></div><label class="switch"><input type="checkbox" id="autoPlay"><span class="switch-slider"></span></label></div>
       <div id="ytBox" hidden><div id="ytPlayer"></div></div>
     </div>
@@ -21049,7 +21051,7 @@ function procesar(txt){
     if(o&&o.t==='pedido'){pedidoEntrante(o,'qr');return;}
     if(o&&o.t==='cancion'){const id=parseInt(o.mesa,10);if(!id)return;const r=agregarCancion(id,String(o.s||'').slice(0,120),String(o.id||'').slice(0,40));
       // Mesa sin cupo: se le avisa al celular que la pidió (por el canal de estados) en vez de dejarla esperando.
-      if(r.limite){try{const cn=qCanalOk(window.__canalTopic)?window.__canalTopic:qCfg().topic;fetch('https://canal.vento.local/'+cn+'e',{method:'POST',body:JSON.stringify({t:'estado',id:String(o.id||'').slice(0,40),e:'limite',m:id,min:r.min,max:MAX,n:r.msg,at:Date.now()})}).catch(()=>{});}catch(e){}return;}if(r.nuevo!==false&&notifMusica()){showToast(r.msg+(mzSinReproductor()?' · Para que suene: Música → «🎶 Activar música automática».':''),mzSinReproductor()?8000:0);ventoAvisoCel('🎵 Canción · '+tableLabel(id),String(o.s||'').slice(0,120),'musica');}renderMusica();return;}
+      if(r.limite&&!mqOtro()){try{const cn=qCanalOk(window.__canalTopic)?window.__canalTopic:qCfg().topic;fetch('https://canal.vento.local/'+cn+'e',{method:'POST',body:JSON.stringify({t:'estado',id:String(o.id||'').slice(0,40),e:'limite',m:id,min:r.min,max:MAX,n:r.msg,at:Date.now()})}).catch(()=>{});}catch(e){}return;}if(r.nuevo!==false&&notifMusica()){showToast(r.msg+(mzSinReproductor()?' · Para que suene: Música → «🎶 Activar música automática».':''),mzSinReproductor()?8000:0);ventoAvisoCel('🎵 Canción · '+tableLabel(id),String(o.s||'').slice(0,120),'musica');}renderMusica();return;}
     if(o&&o.t==='estado')return;                                   // eco de nuestros propios avisos
     if(o&&o.t==='prueba'){if(o.id&&window.__qPrueba&&window.__qPrueba[o.id])window.__qPrueba[o.id](window.__canalTopic);return;}
   }
@@ -21339,7 +21341,7 @@ function agregarCancion(mesa,song,reqId){
 }
 window.vitoAddSong=(mesa,song)=>{const r=agregarCancion(mesa,song);try{renderMusica();}catch(e){}return r.msg;};
 // Para Vento (y la campana): leer y manejar la cola sin duplicar su lógica.
-window.vitoMusica={cola:()=>cola(),hist:()=>mzHist(),actual:()=>mzActual(),saltar:()=>mzSaltar(),cancelar:id=>{mzTermino(id,'cancelled');try{tvPublicar(true);renderMusica();}catch(e){}},auto:()=>AUTO(),tv:()=>tvOn()};
+window.vitoMusica={cola:()=>cola(),hist:()=>mzHist(),actual:()=>mzActual(),saltar:()=>mzSaltar(),cancelar:id=>{if(mqOtro())mqPub({t:'cmd',a:'quitar',id});mzTermino(id,'cancelled');try{tvPublicar(true);renderMusica();}catch(e){}},auto:()=>AUTO(),tv:()=>tvOn()};
 // Rotación justa: cada mesa tiene «turnos». Su 1.ª canción va en la ronda 1, la 2.ª en la ronda 2…
 // y lo que ya le sonó en la última hora cuenta: una mesa que ya escuchó 3 no se adelanta a una
 // que no ha escuchado ninguna. Dentro de la misma ronda manda el orden de llegada.
@@ -21392,6 +21394,7 @@ function mzGuardarLista(id,nombre,n){
   saveData();
 }
 async function mzPonerLista(id,nombre,boton){
+  if(mqOtro()){mzGuardarLista(id,nombre||'Mi playlist',null);mqPub({t:'cmd',a:'lista',id,nombre:nombre||''});showToast('🎶 La lista va a sonar de fondo en «'+mqNombre()+'».',6000);return true;}
   if(boton){boton.disabled=true;boton.dataset.t=boton.textContent;boton.textContent='⏳';}
   try{
     const L=await mzLeerLista(id);
@@ -21409,6 +21412,7 @@ async function mzPonerLista(id,nombre,boton){
   }finally{if(boton){boton.disabled=false;boton.textContent=boton.dataset.t||'▶ Poner';}}
 }
 function mzFondoQuitar(silencio){
+  if(mqOtro()&&!silencio){mqPub({t:'cmd',a:'fondo-quitar'});showToast('⏹ Quitando la música de fondo en «'+mqNombre()+'».');return;}
   const f=mzF();f.on=false;SS(MZF_KEY,f);
   cola().filter(x=>x.fondo&&!x.done&&x.status!=='playing').forEach(x=>mzTermino(x.id,'cancelled'));
   try{tvPublicar(true);}catch(e){}
@@ -21517,6 +21521,7 @@ function ytOpenMusic(vid, song){
   ytOpenMusicPath(vid ? ('watch?v=' + encodeURIComponent(vid)) : ('search?q=' + encodeURIComponent(song || '')));
 }
 function reproducir(x){
+  if(mqOtro()){mqPub({t:'cmd',a:'poner',id:x.id});showToast('▶ «'+(x.title||x.song)+'» → suena ya en «'+mqNombre()+'».');return;}
   // Con el TV conectado, «▶» manda la música al TV (antes abría YouTube Music afuera, en el celular).
   if(window.tvConectado&&window.tvConectado()){try{window.tvMandarYa();}catch(e){}showToast('📺 Mandando la música al TV…');return;}
   const it=mzEmpezo(x.id,'ytmusic');
@@ -21597,12 +21602,13 @@ function renderMusica(){
   o.forEach((x,i)=>{
     const d=document.createElement('div');d.className='mz-song';
     d.innerHTML='<span>'+(i+1)+'. '+esc(x.song)+' · '+esc(mzEtq(x))+' <small class="mz-est mz-'+(x.status||'pending')+'">'+(x.status==='approved'||x.ok?'En cola':'Pendiente')+' · '+new Date(x.ts).toLocaleTimeString('es-CO',{hour:'numeric',minute:'2-digit'})+'</small></span>';
-    d.append(btn('▶',()=>reproducir(x)),btn('🗑',()=>{mzTermino(x.id,'cancelled');tvPublicar(true);renderMusica();}));
+    d.append(btn('▶',()=>reproducir(x)),btn('🗑',()=>{if(mqOtro())mqPub({t:'cmd',a:'quitar',id:x.id});mzTermino(x.id,'cancelled');tvPublicar(true);renderMusica();}));
     L.appendChild(d);
   });
 }
 // Saltar la que suena (en el TV, en el reproductor de la app o en YouTube Music) y pasar a la siguiente.
 function mzSaltar(){
+  if(mqOtro()){mqPub({t:'cmd',a:'sig'});showToast('⏭ Siguiente → «'+mqNombre()+'».');return;}
   const x=mzActual();
   if(!x){const o=ordenJusto(cola());if(!o.length)return showToast('No hay canciones en cola.');return reproducir(o[0]);}
   mzTermino(x.id,'skipped');
@@ -21812,6 +21818,7 @@ async function ySearch(q,excluir){
   return cands.length?cands[0].v:null;
 }
 async function ytUno(id){
+  if(mqOtro())return;                                  // la busca y la pone el equipo de la música
   try{
     let l=cola(),it=l.find(x=>x.id===id);if(!it||it.done)return;
     if(!it.vid&&!it.novid){
@@ -22105,8 +22112,112 @@ function yAvisoReconectar(){
   b.querySelector('span').textContent=txt;const k=b.querySelector('button');k.textContent=btn;k.onclick=fn;
 }
 
+/* ---------- 🎶 Un solo equipo pone la música ----------
+   Con la misma cuenta en varios equipos (celular y computador), se elige UNO que pone la música: así nunca suenan dos a
+   la vez. Los demás muestran lo que suena y la cola, y lo que se haga en ellos (panel de YouTube, ⏭, ⏯, 🗑, poner una
+   lista) se manda a ese equipo por un canal PRIVADO del negocio (data.musicaCanal: no es el de los QR, que conocen los
+   clientes). El equipo de la música publica lo que suena y la cola (sin el segundo a segundo: los demás lo calculan).
+   Sin elegir ninguno, cada equipo funciona por su cuenta, como antes. */
+function mqEq(){try{return codigoEquipo();}catch(e){return '';}}
+function mqCfg(){return (typeof data!=='undefined'&&data&&data.musicaEquipo&&data.musicaEquipo.id)?data.musicaEquipo:null;}
+function mqOtro(){const c=mqCfg();return !!c&&c.id!==mqEq();}
+function mqSoy(){const c=mqCfg();return !!c&&c.id===mqEq();}
+function mqNombre(){const c=mqCfg();return c?(c.nombre||'el equipo de la música'):'';}
+function mqNombreEquipo(){const u=navigator.userAgent||'';return (window.VentoAndroid?'App Android':/iPhone|iPad/.test(u)?'iPhone':/Android/.test(u)?'Celular':'Computador')+(typeof authUser!=='undefined'&&authUser?' de '+String(authUser).split('@')[0].slice(0,30):'')+(mqEq()?' · '+mqEq().replace(/[^A-Za-z0-9]/g,'').slice(0,4):'');}   // con el código del equipo: dos computadores no se confunden
+function mqCanal(){if(typeof data==='undefined'||!data)return '';if(!/^vmus[a-z0-9]{20,}$/.test(data.musicaCanal||'')){data.musicaCanal='vmus'+Array.from(crypto.getRandomValues(new Uint8Array(20)),b=>(b%36).toString(36)).join('');saveData();}return data.musicaCanal;}
+function mqPub(o){const c=mqCanal();if(!c)return;try{fetch('https://canal.vento.local/'+c,{method:'POST',body:JSON.stringify(Object.assign({de:mqEq(),n:mqNombreEquipo(),at:Date.now()},o))}).catch(()=>{});}catch(e){}}
+let mqES=null,mqESCanal='',mqVisto=0,mqHash='',mqHashT=0,mqEra=null;
+const mqHechos=new Set(),mqDesde=Date.now();
+function mqEscuchar(){
+  const c=mqCfg()?mqCanal():'';
+  if(c===mqESCanal&&(mqES||!c))return;
+  try{mqES&&mqES.close();}catch(e){}mqES=null;mqESCanal=c;if(!c)return;
+  try{mqES=new EventSource('https://canal.vento.local/'+c+'/sse?since=2m');}catch(e){return;}
+  mqES.onmessage=ev=>{let m;try{const r=JSON.parse(ev.data);if(r.event&&r.event!=='message')return;m=JSON.parse(r.message);}catch(e){return;}
+    if(!m||m.de===mqEq())return;
+    if(m.t==='estado'&&mqOtro()&&m.de===(mqCfg()||{}).id)mqAplicar(m);
+    else if(m.t==='cmd'&&mqSoy())mqComando(m);};
+}
+// Equipo de la música → los demás: lo que suena y la cola.
+function mqPublicarEstado(forzar){
+  if(!mqSoy())return;
+  const a=mzActual(),F=mzF();let pausa=false;try{pausa=!!(a&&a.fuente==='app'&&yPl&&yPl.getPlayerState&&yPl.getPlayerState()===2);}catch(e){}
+  const it=x=>({i:x.id,v:x.vid||'',s:String(x.title||x.song||'').slice(0,80),a:String(x.artist||'').slice(0,50),g:String(x.song||'').slice(0,100),m:x.mesa,mn:String(x.mesaNombre||tableLabel(x.mesa)).slice(0,30),d:x.dur||null,ts:x.ts||0,pr:x.primero||0,fo:x.fondo?1:0});
+  const est={t:'estado',ahora:a?Object.assign(it(a),{f:a.fuente||'',p:pausa?1:0}):null,q:ordenJusto(cola()).slice(0,40).map(it),fondo:F&&F.on?String(F.nombre||'').slice(0,60):''};
+  const h=JSON.stringify(est);
+  if(!forzar&&h===mqHash&&Date.now()-mqHashT<60e3)return;                // sin cambios: un «sigo aquí» por minuto
+  mqHash=h;mqHashT=Date.now();
+  let e=0;if(a){e=a.playedSeconds||0;if(a.progresoAt)e+=(Date.now()-a.progresoAt)/1000;else if(a.startedAt&&!a.playedSeconds)e=(Date.now()-a.startedAt)/1000;}
+  if(est.ahora)est.ahora.e=Math.round(e);
+  mqPub(est);
+}
+// Los demás equipos: muestran la cola y lo que suena en el equipo de la música.
+function mqAplicar(m){
+  mqVisto=Date.now();
+  const prev=mzActual(),l=[];
+  if(prev&&(!m.ahora||m.ahora.i!==prev.id)){prev.status='played';prev.endedAt=Date.now();try{mzAlHistorial(prev);}catch(e){}}
+  const de=x=>({id:String(x.i),vid:x.v||null,title:x.s,artist:x.a,song:x.g||x.s,mesa:x.m,mesaNombre:x.mn,dur:x.d,ts:x.ts||Date.now(),primero:x.pr||0,fondo:!!x.fo});
+  if(m.ahora)l.push(Object.assign(de(m.ahora),{status:'playing',done:true,fuente:'remoto',pausa:!!m.ahora.p,playedSeconds:m.ahora.p?m.ahora.e||0:m.ahora.e||0,progresoAt:m.ahora.p?null:Date.now(),startedAt:Date.now()-(m.ahora.e||0)*1000}));
+  (m.q||[]).forEach(x=>l.push(Object.assign(de(x),{status:'approved',ok:true,done:false})));
+  const ids=new Set(l.map(x=>x.id));
+  cola().filter(x=>!x.done&&!ids.has(x.id)&&Date.now()-(x.ts||0)<20000).forEach(x=>l.push(x));   // lo que se acaba de mandar y todavía no vuelve
+  SS('vito_cola',l);
+  try{renderMusica();}catch(e){}try{ypSigueK='';ypPintar();if(ypAbierto&&!ypVer&&ypTab==='cola')ypCuerpo();}catch(e){}
+}
+// El equipo de la música recibe lo que mandan los demás.
+function mqComando(m){
+  const k=(m.de||'')+'|'+(m.at||0)+'|'+(m.a||'')+'|'+(m.id||'');
+  if(mqHechos.has(k)||(m.at&&m.at<mqDesde-90e3))return;mqHechos.add(k);
+  const quien=String(m.n||'otro equipo').slice(0,40);
+  try{
+    if(m.a==='add'&&m.v&&/^[\w-]{6,20}$/.test(m.v.vid||'')){
+      if(ypAgregar({vid:m.v.vid,title:String(m.v.title||'').slice(0,80),artist:String(m.v.artist||'').slice(0,60),dur:+m.v.dur||null},!!m.pr,true,m.id&&/^[\w-]{4,40}$/.test(m.id)?m.id:null))
+        showToast('🎵 «'+String(m.v.title||'').slice(0,60)+'» (desde '+quien+')'+(m.pr?' suena después de la actual.':' a la cola.'));
+    }
+    else if(m.a==='sig')mzSaltar();
+    else if(m.a==='pausa')ypPausa();
+    else if(m.a==='quitar'&&m.id){mzTermino(String(m.id),'cancelled');try{tvPublicar(true);}catch(e){}renderMusica();}
+    else if((m.a==='primero'||m.a==='poner')&&m.id){const l=cola(),it=l.find(z=>z.id===String(m.id));if(it){it.primero=Date.now();SS('vito_cola',l);try{tvPublicar(true);}catch(e){}if(m.a==='poner'&&mzActual())mzSaltar();else{try{siguienteAuto();}catch(e){}}renderMusica();}}
+    else if(m.a==='lista'&&m.id&&mzListaId(String(m.id)))mzPonerLista(mzListaId(String(m.id)),String(m.nombre||'').slice(0,80),null);
+    else if(m.a==='fondo-quitar')mzFondoQuitar();
+  }catch(e){}
+  setTimeout(()=>mqPublicarEstado(true),400);
+}
+// Un equipo que deja de ser el de la música se calla (la música sigue en el otro).
+function mqRevisar(){
+  try{
+    mqEscuchar();
+    const otro=mqOtro();
+    if(otro&&mqEra!==true){try{if(yPl&&yPl.stopVideo)yPl.stopVideo();}catch(e){}sonando=false;cargadoEn=0;try{ytMostrar(false);}catch(e){}
+      const l=cola();l.filter(x=>x.status==='playing'&&x.fuente==='app').forEach(x=>{x.status='skipped';x.endedAt=Date.now();});SS('vito_cola',l);}
+    if(mqEra===true&&!otro){mqVisto=0;try{siguienteAuto();}catch(e){}}
+    mqEra=otro;
+    mqPublicarEstado(false);
+    mqPintar();
+  }catch(e){}
+}
+setInterval(mqRevisar,3000);setTimeout(mqRevisar,1500);
+function mqElegir(si){
+  if(typeof data==='undefined'||!data)return;
+  if(si){data.musicaEquipo={id:mqEq(),nombre:mqNombreEquipo(),at:Date.now()};mqCanal();saveData();
+    mqEra=false;try{mzAsegurarReproductor(true);}catch(e){}
+    showToast('🎶 Listo: la música suena SOLO en este equipo. En tus otros equipos ves la cola y lo que pongas allá suena aquí.',8000);}
+  else{data.musicaEquipo=null;saveData();showToast('🎶 Listo: cada equipo pone su música por su cuenta (como antes).',6000);}
+  mqRevisar();mqPublicarEstado(true);try{mzAutoPintar();renderMusica();}catch(e){}
+}
+function mqPintar(){
+  const t=$('mqTxt'),b1=$('mqYo'),b2=$('mqLibre');if(!t)return;
+  const c=mqCfg();
+  t.textContent=!c?'Ahora cada equipo con tu cuenta puede poner música por su lado. Elige uno para que nunca suenen dos a la vez.':
+    mqSoy()?'🟢 Este equipo pone la música. En tus otros equipos se ve la cola y lo que pongan suena aquí.':
+    '🔊 La música suena en «'+mqNombre()+'». Aquí ves la cola y lo que pongas suena allá.'+(mqVisto&&Date.now()-mqVisto>3*6e4?' ⚠️ No responde hace rato (¿está cerrado o sin internet?).':!mqVisto?' (conectando…)':'');
+  b1.hidden=mqSoy();b1.textContent=c?'🎶 Que suene en este equipo':'🎶 Este equipo pone la música';
+  b2.hidden=!c;
+  if(!b1.onclick){b1.onclick=()=>mqElegir(true);b2.onclick=()=>mqElegir(false);}
+}
 /* ---------- Reproductor automático dentro de la app ---------- */
-const AUTO=()=>!!LS('vito_auto_play',{}).on;
+// Si otro equipo es el de la música, este no suena (aunque tenga el reproductor prendido).
+const AUTO=()=>!!LS('vito_auto_play',{}).on&&!mqOtro();
 let yPl=null,yListo=false,sonando=false,cargadoEn=0;
 function cargarAPI(){
   if(window.YT&&YT.Player){if(AUTO())crearPlayer();crearTest();return;}
@@ -22207,10 +22318,10 @@ function ytMostrar(si){
    reproducir (ni el TV, ni YouTube Music sonando), se prende el reproductor de Vento, igual que «Activar música automática». */
 const mzHayTV=()=>tvOn()||(typeof lngOn==='function'&&lngOn());
 const mzConYTMusic=()=>{const a=mzActual();return !!(yTok()&&!ySinCupo()&&a&&a.fuente==='ytmusic');};
-const mzSinReproductor=()=>!AUTO()&&!mzHayTV()&&!(yTok()&&!ySinCupo());
+const mzSinReproductor=()=>!mqOtro()&&!AUTO()&&!mzHayTV()&&!(yTok()&&!ySinCupo());
 function mzAsegurarReproductor(callado){
   gestoUsuario=true;
-  if(mzHayTV()||mzConYTMusic())return false;
+  if(mqOtro()||mzHayTV()||mzConYTMusic())return false;
   let prendi=false;
   if(!AUTO()){prendi=true;
     const a=$('autoPlay');
@@ -22234,6 +22345,8 @@ function mzVigilar(){
     const marca=(k,si,ms,fn)=>{if(!si){delete mzVigia[k];return;}if(!mzVigia[k])mzVigia[k]=Date.now();else if(Date.now()-mzVigia[k]>ms&&!mzVigia[k+'!']){mzVigia[k+'!']=1;fn();}};
     // 1) Piden canciones y en este equipo nadie las pone (ni el reproductor de Vento, ni el TV, ni YouTube Music).
     marca('sinrep',typeof mqOtro==='function'?!mqOtro()&&mzSinReproductor()&&viejo>0:mzSinReproductor()&&viejo>0,3*6e4,()=>window.ventoError&&window.ventoError('musica','Canciones esperando y ningún reproductor prendido',{esperando:esperan.length,minutos:Math.round(viejo/6e4)},'musica|sin-reproductor'));
+    // 1b) El equipo de la música no responde (otro equipo de la cuenta lo eligió y está cerrado o sin internet).
+    marca('mqmudo',typeof mqOtro==='function'&&mqOtro()&&Date.now()-mqVisto>3*6e4&&viejo>0,6e4,()=>window.ventoError&&window.ventoError('musica','El equipo que pone la música no responde',{equipo:mqNombre(),esperando:esperan.length},'musica|equipo-no-responde'));
     // 2) El reproductor está prendido, hay canciones listas y no suena nada.
     const a=mzActual(),listas=o.filter(y=>y.vid&&(y.ok||!yTestListo));
     const quieto=AUTO()&&!mzHayTV()&&listas.length>0&&!a&&!sonando;
@@ -22300,6 +22413,7 @@ window.vitoMusicaLatido=()=>{
 ['pointerdown','keydown','touchstart'].forEach(ev=>document.addEventListener(ev,()=>{if(gestoUsuario)return;gestoUsuario=true;try{if(AUTO())siguienteAuto();}catch(e){}mzAutoPintar();},{capture:true,passive:true}));
 function mzAutoPintar(){
   const t=$('mzAutoTxt'),b=$('mzAutoGo');if(!t||!b)return;
+  if(mqOtro()){b.hidden=true;t.textContent='🔊 La música suena en «'+mqNombre()+'». Lo que pongas aquí suena allá (cámbialo en «🎶 Equipo que pone la música»).';return;}
   if(tvOn()){b.hidden=true;t.textContent=(Date.now()-tvVisto<75000)?'📺 Automática en el TV: las canciones que piden las mesas suenan solas, una tras otra.':'📺 Modo TV: abre el link del TV y toca «Empezar música» una vez; después todo es automático.';return;}
   b.hidden=false;
   if(!AUTO()){b.textContent='🎶 Activar música automática';t.textContent='Toca «Activar música automática»: este celular reproduce la cola sola, una canción tras otra, y las nuevas entran solas.';return;}
@@ -22342,7 +22456,7 @@ function tvUrl(){
 }
 let tvHash='',tvHashT=0,tvES=null,tvVisto=0,tvSonando='',tvReintT=null;
 function tvPublicar(force){
-  if(!tvOn())return;
+  if(!tvOn()||mqOtro())return;
   const q=ordenJusto(cola()).filter(x=>x.vid&&!x.sinVersion&&(x.ok||!yTestListo)).slice(0,15)
     .map(x=>({i:x.id,v:x.vid,s:String(x.title||x.song).slice(0,60),a:String(x.artist||'').slice(0,40),m:String(tableLabel(x.mesa)).slice(0,20)}));
   const msg={q,b:String(data&&data.businessName||'').slice(0,40)};
@@ -22519,7 +22633,7 @@ function ypUbicar(){
   const s=$('ytSitio');if(s)s.hidden=b.hidden;
 }
 const ypFuente=()=>{const x=mzActual();return x?(x.fuente||''):(sonando?'app':'');};
-const ypDonde=f=>f==='app'?'🔊 En este equipo':(f==='tv'||f==='tvyt'||f==='cc')?'📺 En el TV':f==='ytmusic'?'🎧 En YouTube Music':'';
+const ypDonde=f=>f==='remoto'?'🔊 En «'+mqNombre()+'»':f==='app'?'🔊 En este equipo':(f==='tv'||f==='tvyt'||f==='cc')?'📺 En el TV':f==='ytmusic'?'🎧 En YouTube Music':'';
 /* ---------- Ventana de YouTube (como YouTube normal) ----------
    Ocupa toda la pantalla, como una ventana nueva. Arriba el buscador; a un lado (o arriba en el celular) las secciones:
    Inicio · Buscar · En cola · Mis canciones (❤️ guardadas, las que más suenan, historial) · Mis listas · Mi YouTube
@@ -22573,6 +22687,7 @@ function ypCrear(){
   ov.addEventListener('scroll',ypUbicar,{passive:true,capture:true});
 }
 function ypPausa(){
+  if(mqOtro()){mqPub({t:'cmd',a:'pausa'});showToast('⏯ Enviado a «'+mqNombre()+'».');return;}
   const f=ypFuente();
   if(f==='app'&&yPl&&yPl.getPlayerState){try{if(yPl.getPlayerState()===1){yPl.pauseVideo();showToast('⏸ En pausa.');}else{yPl.playVideo();showToast('▶ Sigue sonando.');}}catch(e){}return;}
   if((f==='tvyt'||f==='cc')&&$('tvvPausa')){$('tvvPausa').click();return;}
@@ -22599,7 +22714,7 @@ function ypPintar(){
   if(f==='app'&&yPl&&yPl.getCurrentTime){try{t=yPl.getCurrentTime();}catch(e){}}
   $('ypBar').style.width=(x&&x.dur?Math.min(100,t/x.dur*100):0).toFixed(1)+'%';
   $('ypTiempo').textContent=x?mmss(t)+' / '+(x.dur?mmss(x.dur):'--:--'):'';
-  $('ypPausa').hidden=!(f==='app'||f==='tvyt'||f==='cc');
+  $('ypPausa').hidden=!(f==='app'||f==='tvyt'||f==='cc'||f==='remoto');
   const cor=$('ypCor');cor.hidden=!(x&&x.vid);if(x&&x.vid){const si=ypEsFav(x.vid);cor.textContent=si?'❤️':'🤍';cor.title=si?'Quitar de Mis canciones':'Guardar en Mis canciones';cor.setAttribute('aria-label',cor.title);}
   const o=ordenJusto(cola());$('ypNCola').textContent=o.length?String(o.length):'';
   // «A continuación» (solo se vuelve a pintar si cambió)
@@ -22646,13 +22761,16 @@ function ypCard(v,extra){
 const ypGrid=(c,id)=>{const g=document.createElement('div');g.className='yp-grid';if(id)g.id=id;c.appendChild(g);return g;};
 // Canción elegida en el panel → a la cola (con «primero», va de primera). Suena por el camino de siempre
 // (reproductor de la app, el TV o YouTube Music).
-function ypAgregar(v,primero,callado){
+function ypAgregar(v,primero,callado,idFijo){
   const now=Date.now(),l=cola();
   if(l.some(x=>!x.done&&x.vid===v.vid)){if(!callado)showToast('🎵 «'+v.title+'» ya está en la cola.');return false;}
-  const it={id:now+'-'+Math.random().toString(36).slice(2,6),reqId:null,mesa:0,mesaNombre:tableLabel(0),song:(v.artist?v.artist+' - ':'')+v.title,pedido:v.title,
+  const it={id:idFijo||(now+'-'+Math.random().toString(36).slice(2,6)),reqId:null,mesa:0,mesaNombre:tableLabel(0),song:(v.artist?v.artist+' - ':'')+v.title,pedido:v.title,
     title:String(v.title||'').slice(0,80),artist:String(v.artist||'').slice(0,60),vid:v.vid,dur:v.dur||ytDurCache[v.vid]||null,ts:now,done:false,status:'pending',panel:true};
   if(primero)it.primero=now;
   l.push(it);SS('vito_cola',l);mzRespaldo();
+  // Otro equipo pone la música: se le manda allá (aquí queda en la cola mientras llega la respuesta).
+  if(mqOtro()){mqPub({t:'cmd',a:'add',id:it.id,pr:primero?1:0,v:{vid:it.vid,title:it.title,artist:it.artist,dur:it.dur}});
+    if(!callado)showToast((primero?'⏭ «':'➕ «')+it.title+'» → suena en «'+mqNombre()+'»'+(primero?' después de la actual.':'.'));try{renderMusica();}catch(e){}ypPintar();return true;}
   try{mzAsegurarReproductor();}catch(e){}                  // que suene de verdad (antes quedaba en la cola sin sonar)
   try{ytAgregar(it.id);}catch(e){}try{tvPublicar();}catch(e){}try{verificarCola();}catch(e){}try{siguienteAuto();}catch(e){}
   try{renderMusica();}catch(e){}
@@ -22817,8 +22935,8 @@ function ypColaUI(c){
   if(!o.length){ypNota(c,'No hay canciones en cola. Busca arriba o pon una de tus listas; las mesas piden con el QR.');return;}
   const L=document.createElement('div');L.className='yp-lista';c.appendChild(L);
   o.slice(0,60).forEach((y,i)=>L.appendChild(ypFila(ypMini_(y.vid),(i+1)+'. '+(y.title||y.song),mzEtq(y)+(y.primero?' · ⏭ va primero':''),[
-    ypBtn('⏭',()=>{const l=cola(),it=l.find(z=>z.id===y.id);if(it){it.primero=Date.now();SS('vito_cola',l);try{tvPublicar(true);}catch(e){}renderMusica();ypCuerpo();showToast('⏭ «'+(y.title||y.song)+'» suena después de la actual.');}}),
-    ypBtn('🗑',()=>{mzTermino(y.id,'cancelled');try{tvPublicar(true);}catch(e){}renderMusica();ypCuerpo();})].concat(y.vid?[ypCorBtn({vid:y.vid,title:y.title||y.song,artist:y.artist,dur:y.dur})]:[]))));
+    ypBtn('⏭',()=>{if(mqOtro())mqPub({t:'cmd',a:'primero',id:y.id});const l=cola(),it=l.find(z=>z.id===y.id);if(it){it.primero=Date.now();SS('vito_cola',l);try{tvPublicar(true);}catch(e){}renderMusica();ypCuerpo();showToast('⏭ «'+(y.title||y.song)+'» suena después de la actual.');}}),
+    ypBtn('🗑',()=>{if(mqOtro())mqPub({t:'cmd',a:'quitar',id:y.id});mzTermino(y.id,'cancelled');try{tvPublicar(true);}catch(e){}renderMusica();ypCuerpo();})].concat(y.vid?[ypCorBtn({vid:y.vid,title:y.title||y.song,artist:y.artist,dur:y.dur})]:[]))));
 }
 // ---------- Barrita «🎵 Sonando…» en toda la app ----------
 function ypMiniPintar(){
