@@ -4137,6 +4137,7 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
       <div class="settings-desc">Prende o apaga cada aviso. Cada uno sale en la pantalla con sonido y, en la <b>app Vento para Android</b>, también como notificación del celular aunque Vento esté cerrada.</div>
       <div class="settings-row"><div class="settings-row-text"><strong>🍺 Pedidos de las mesas</strong><span>Cuando una mesa pide algo por el QR o un mesero manda un pedido.</span></div><label class="switch"><input type="checkbox" id="notifPedidosOn" data-notif="pedidos" checked><span class="switch-slider"></span></label></div>
       <div class="settings-row"><div class="settings-row-text"><strong>🧾 Piden la cuenta o avisan que pagaron</strong><span>Cuando una mesa pide la cuenta o dice que ya pagó.</span></div><label class="switch"><input type="checkbox" id="notifCuentaOn" data-notif="cuenta" checked><span class="switch-slider"></span></label></div>
+      <div class="settings-row"><div class="settings-row-text"><strong>💜 Pagos que te llegan (DaviPlata, Nequi…)</strong><span>«Pagaron $20.000 por DaviPlata»: una sola vez por cada pago.</span></div><label class="switch"><input type="checkbox" id="notifPagosOn" data-notif="pagos" checked><span class="switch-slider"></span></label></div>
       <div class="settings-row"><div class="settings-row-text"><strong>🛵 Domicilios</strong><span>Cuando llega un pedido para entregar.</span></div><label class="switch"><input type="checkbox" id="notifDomOn" data-notif="domicilios" checked><span class="switch-slider"></span></label></div>
       <div class="settings-row"><div class="settings-row-text"><strong>🎵 Canciones pedidas</strong><span>Cuando piden una canción por el QR, o hay canciones nuevas para el TV.</span></div><label class="switch"><input type="checkbox" id="notifMusicaOn" data-notif="musica" checked><span class="switch-slider"></span></label></div>
       <div class="settings-row"><div class="settings-row-text"><strong>🎧 Respuestas del soporte de Vento</strong><span>Cuando el soporte te responde.</span></div><label class="switch"><input type="checkbox" id="notifSoporteOn" data-notif="soporte" checked><span class="switch-slider"></span></label></div>
@@ -21093,7 +21094,7 @@ setTimeout(()=>{try{
 // para no confundirlos con las alertas del canal de Vento (esas sí avisan con la pantalla
 // bloqueada; estas son mientras Vento está abierta).
 const NOTIF_KEY='vito_notif';
-const notifCfg=()=>Object.assign({pedidos:true,musica:true,cuenta:true,domicilios:true,soporte:true,ia:true},LS(NOTIF_KEY,{}));
+const notifCfg=()=>Object.assign({pedidos:true,musica:true,cuenta:true,pagos:true,domicilios:true,soporte:true,ia:true},LS(NOTIF_KEY,{}));
 const notifPedidos=()=>notifCfg().pedidos;
 const notifMusica=()=>notifCfg().musica;
 window.notifPedidos=notifPedidos;window.notifMusica=notifMusica;   // para el módulo de la campana, que corre en otro cierre
@@ -27739,9 +27740,11 @@ let fotosListas = false;
   function pgLeer(txt){
     const t = String(txt || '').replace(/\s+/g, ' ').trim();
     if(!t) return null;
-    const recibido = /(recibiste|te lleg(?:[oó]|aron)|te pas(?:[oó]|aron)|pasaron plata|te envi(?:[oó]|aron)|te transfiri(?:[oó]|eron)|te pag(?:[oó]|aron)|te consign|te abon|consignaron|abonaron|entr[oó] plata|ingres[oó]|recibi[oó]|recepci[oó]n|pago recibido|dinero recibido|transferencia recibida|abono a tu cuenta)/i.test(t);
-    const salida = /(enviaste|pagaste|transferiste|retiraste|compraste|sacaste|c[oó]digo|clave din|otp|contrase)/i.test(t);
-    if(!recibido || salida && !/(recibiste|te lleg)/i.test(t)) return null;
+    // Nequi habla de «tú» («Te llegó plata»); DaviPlata y varios bancos de «usted» («Le llegó plata», «Le pasaron»,
+    // «Recibió», «Ha recibido»). Antes solo se entendía la forma de «tú» y los avisos de DaviPlata no salían.
+    const recibido = /(recibiste|has recibido|ha recibido|(?:te|le) lleg(?:[oó]|aron)|(?:te|le) pas(?:[oó]|aron)|pasaron plata|(?:te|le) envi(?:[oó]|aron)|(?:te|le) transfiri(?:[oó]|eron)|(?:te|le) pag(?:[oó]|aron)|(?:te|le) consign|(?:te|le) abon|consignaron|abonaron|entr[oó] plata|lleg[oó] plata|ingres[oó]|recibi[oó]|recepci[oó]n|pago recibido|dinero recibido|transferencia recibida|abono a (?:tu|su) cuenta)/i.test(t);
+    const salida = /(enviaste|pagaste|transferiste|retiraste|compraste|sacaste|usted (?:envi|pag|transfiri|pas)|c[oó]digo|clave din|otp|contrase)/i.test(t);
+    if(!recibido || salida && !/(recibiste|recibi[oó]|ha recibido|(?:te|le) lleg)/i.test(t)) return null;
     // Con signo ($20.000) o sin él («Recibiste 25.000 pesos», «transferencia por 30.000»)
     const m = t.match(/\$\s?(\d{1,3}(?:[.,]\d{3})+|\d+)/) || t.match(/(\d{1,3}(?:[.,]\d{3})+|\d{4,})\s*(?:pesos|cop)\b/i) || t.match(/\b(?:recibiste|por|de)\s+(\d{1,3}(?:[.,]\d{3})+)\b/i);
     if(!m) return null;
@@ -27749,9 +27752,9 @@ let fotosListas = false;
     if(!(monto > 0)) return null;
     const app = (APPS.find(([re]) => re.test(t)) || [0, 'Transferencia'])[1];
     const NOM = "[A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ'.]+(?:\\s+[A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ'.]+){0,3}";
-    let de = (t.match(new RegExp('(' + NOM + ')\\s+te\\s+(?:envi|transfiri|pag|pas|consign|abon)')) || [])[1]
+    let de = (t.match(new RegExp('(' + NOM + ')\\s+(?:te|le)\\s+(?:envi|transfiri|pag|pas|consign|abon)')) || [])[1]
           || (t.match(new RegExp('\\bde\\s+(' + NOM + ')')) || [])[1] || '';
-    if(/^(nequi|daviplata|bancolombia|tu|su|la|el|dinero|plata|recibiste|te)$/i.test(de.split(' ')[0])) de = '';
+    if(/^(nequi|daviplata|bancolombia|tu|su|la|el|le|dinero|plata|recibiste|te|usted)$/i.test(de.split(' ')[0])) de = '';
     de = de.split(' ').map(x => x.charAt(0).toUpperCase() + x.slice(1).toLowerCase()).join(' ');
     return { monto, app, de };
   }
@@ -27792,13 +27795,17 @@ let fotosListas = false;
     if(id){ if(g.vistos.includes(id)) return; g.vistos.push(id); g.vistos = g.vistos.slice(-300); }
     const p = pgLeer(txt);
     if(!p) return;
+    // Una sola vez: el MISMO aviso que llega por dos caminos (la app Vento de este celular y MacroDroid) no se cuenta dos veces.
+    // Por el mismo camino cada aviso ya trae su propio ID (dos clientes que pagan lo mismo sí son dos pagos).
+    const via = String(id || '').startsWith('and-') ? 'and' : 'canal', mismo = String(txt).slice(0, 200).replace(/^\s*[^|]*\|/, '');
+    if((g.lista || []).some(x => x.via && x.via !== via && Date.now() - (x.t || 0) < 3 * 60e3 && x.monto === p.monto && String(x.txt || '').replace(/^\s*[^|]*\|/, '') === mismo)){ saveData(); return; }
     // ¿Ya llegó este mismo pago por el Servidor Vento (otro celular lo reenvió)? Entonces no se repite.
     const yaSrv = (g.lista || []).find(x => x.srv && Number(x.monto) === p.monto && Math.abs((x.t || 0) - Date.now()) < 3 * 60e3 && String(x.app).toLowerCase() === String(p.app).toLowerCase());
     if(yaSrv){ saveData(); return; }
     try{ window.ventoPagosReenviarAviso && window.ventoPagosReenviarAviso(txt); }catch(e){}   // también al Servidor Vento
     const f = pgFuente(txt);
     const mesa = f.nivel === 'falso' ? null : pgMesaPara(p.monto);
-    const reg = { id: id || Date.now().toString(36), t: Date.now(), monto: p.monto, app: p.app, de: p.de, mesa: mesa ? Number(mesa) : null, estado: f.nivel, fuente: f.txt, txt: String(txt).slice(0, 200) };
+    const reg = { id: id || Date.now().toString(36), via, t: Date.now(), monto: p.monto, app: p.app, de: p.de, mesa: mesa ? Number(mesa) : null, estado: f.nivel, fuente: f.txt, txt: String(txt).slice(0, 200) };
     g.lista.unshift(reg); g.lista = g.lista.slice(0, 200);
     if(mesa && f.nivel === 'app') delete g.espera[mesa];
     saveData();
@@ -27817,6 +27824,8 @@ let fotosListas = false;
     // Como el parlante de Bold: sonido de éxito y «Pago confirmado» en voz alta, con el valor y quién pagó.
     const msg = '✅ Pago confirmado · ' + plata(p.monto) + ' por ' + p.app + (p.de ? ' de ' + p.de : '') + (mesa ? ' · ' + tableLabel(mesa) : '');
     try{ showToast(msg, 9000); }catch(e){}
+    // Aviso del celular (con Vento minimizada o la pantalla apagada): «💜 Pagaron $20.000 por DaviPlata».
+    try{ if(!window.ventoAvisoOn || window.ventoAvisoOn('pagos')) window.ventoAvisoCel && window.ventoAvisoCel('💜 Pagaron ' + plata(p.monto) + ' por ' + p.app, (p.de ? 'De ' + p.de + '. ' : '') + (mesa ? tableLabel(mesa) + '. ' : '') + 'Confirmado por la app de ' + p.app + '.', 'pedidos'); }catch(e){}
     try{ window.ventoSonidos && window.ventoSonidos.success(); }catch(e){}
     try{ speakVoice('Pago confirmado. ' + p.monto + ' pesos por ' + p.app + (p.de ? ', de ' + p.de : '') + (mesa ? ', de la ' + tableLabel(mesa) : '')); }catch(e){}
     if(navigator.vibrate) try{ navigator.vibrate([150, 80, 150]); }catch(e){}
@@ -27886,6 +27895,49 @@ let fotosListas = false;
   setInterval(() => { if(document.visibilityState === 'visible') pgSondear(); }, 30000);
   document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible'){ pgConectar(); pgSondear(); } });
 
+  // ---------- 📘 Paso a paso: agregar DaviPlata (o Nequi) para que Vento avise «Pagaron $X» ----------
+  // Para recibir los avisos NO hace falta convenio con Davivienda ni la API: la app Vento para Android lee el aviso
+  // que DaviPlata ya muestra en el celular («¡Le llegó plata!…») y lo convierte en «Pago confirmado» + el aviso del celular.
+  const APK = 'https://github.com/cristhianlujan45-blip/cuentas/releases/latest/download/vento.apk';
+  function pgGuia(){
+    let ov = $p('pgGuiaOv');
+    if(!ov){ ov = document.createElement('div'); ov.className = 'overlay'; ov.id = 'pgGuiaOv'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-label', 'Paso a paso: avisos de DaviPlata y Nequi'); document.body.appendChild(ov);
+      ov.addEventListener('click', e => {
+        if(e.target === ov || e.target.closest('[data-gp="cerrar"]')){ ov.classList.remove('show'); clearInterval(ov.__t); return; }
+        const a = e.target.closest('[data-gp]'); if(!a) return;
+        const k = a.dataset.gp, A = AND();
+        if(k === 'prender'){ PG().on = true; saveData(); try{ pgConectar(); }catch(x){} if(A && !andEstado().on){ A.pagosAvisos(true); if(!andEstado().permiso) try{ A.mediosPermiso(); }catch(x){} } try{ pgPintar(); }catch(x){} }
+        if(k === 'permiso' && A) try{ A.mediosPermiso(); }catch(x){}
+        if(k === 'bateria' && A) try{ A.ajustesBateria(); }catch(x){}
+        if(k === 'probar'){ pgRecibir('DaviPlata | ¡Le llegó plata! | PRUEBA VENTO le pasó $1.000 a su DaviPlata', 'prueba-' + Date.now()); }
+        if(k === 'macro'){ ov.classList.remove('show'); clearInterval(ov.__t); try{ pgPintar(); const d = $p('pgGrupo') && $p('pgGrupo').querySelector('details'); if(d){ d.open = true; d.scrollIntoView({ behavior: 'smooth', block: 'start' }); } }catch(x){} }
+        setTimeout(pintar, 400);
+      }); }
+    const ua = navigator.userAgent || '', A = AND(), iphone = /iPhone|iPad/.test(ua), android = /Android/.test(ua);
+    function pintar(){
+      const g = PG(), e = A ? andEstado() : {}, perm = (() => { try{ return A && A.permisos ? JSON.parse(A.permisos() || '{}') : {}; }catch(x){ return {}; } })();
+      const llego = (g.lista || []).find(x => /davi/i.test(x.app) && !/PRUEBA VENTO/.test(x.txt || ''));
+      const ok = (b, t) => '<span class="gp-e ' + (b ? 'gp-si' : 'gp-no') + '">' + (b ? '✅ ' : '⏳ ') + t + '</span>';
+      const paso = (n, tit, cuerpo, estado) => '<li class="gp-paso"><div class="gp-n">' + n + '</div><div><b>' + tit + '</b>' + (estado || '') + '<div class="gp-c">' + cuerpo + '</div></div></li>';
+      ov.innerHTML = '<div class="modal gp-modal"><h2>📘 Agregar DaviPlata (y Nequi) a Vento</h2>' +
+        '<div class="modal-sub">Así, cada vez que te pasen plata a tu DaviPlata o Nequi, Vento te avisa <b>una sola vez</b>: «💜 Pagaron $20.000 por DaviPlata», lo dice en voz alta y te muestra de qué mesa es. <b>No necesitas convenio con Davivienda</b> ni ninguna clave del banco.</div>' +
+        (iphone ? '<div class="gp-alerta">📱 En iPhone no se pueden leer los avisos de otras apps. Haz estos pasos en un <b>celular Android</b> que tenga DaviPlata (puede ser el del negocio). Este iPhone igual recibe los avisos.</div>' : '') +
+        '<ol class="gp-lista">' +
+        paso(1, 'Instala la app Vento en el celular donde tienes DaviPlata', A ? 'Ya estás en la app Vento para Android. 👍' : '<a class="btn-primary gp-btn" href="' + APK + '" target="_blank" rel="noopener">📲 Descargar la app Vento (Android)</a><br><small>Ábrela, entra con tu misma cuenta y vuelve a este paso a paso (Ajustes → 💜 Pagos).</small>', ok(!!A, A ? 'Listo' : android ? 'Falta instalarla' : 'Hazlo en el Android')) +
+        paso(2, 'Prende «Recibir avisos de pagos»', 'Vento empieza a escuchar los avisos de plata que te llegan.' + (g.on && (!A || e.on) ? '' : '<br><button type="button" class="btn-primary gp-btn" data-gp="prender">Prender ahora</button>'), ok(g.on && (!A || e.on), g.on && (!A || e.on) ? 'Prendido' : 'Apagado')) +
+        paso(3, 'Dale a Vento el permiso «Acceso a notificaciones»', 'Se abre una pantalla del celular: busca <b>Vento</b> en la lista, actívalo y toca <b>Permitir</b>. Luego vuelve con el botón de atrás. Vento solo toma los avisos de <b>plata recibida</b>: nunca códigos, claves ni compras.' + (A && !e.permiso ? '<br><button type="button" class="btn-primary gp-btn" data-gp="permiso">Abrir el permiso</button>' : ''), A ? ok(!!e.permiso, e.permiso ? 'Permiso dado' : 'Falta el permiso') : '') +
+        paso(4, 'Deja prendidas las notificaciones de DaviPlata', 'En el celular: <b>Ajustes → Aplicaciones → DaviPlata → Notificaciones → Permitir</b> (todas). Abre DaviPlata una vez y entra con tu clave para que quede activa. Haz lo mismo con <b>Nequi</b> si también la usas.', '') +
+        paso(5, 'Que el celular no duerma a Vento', 'Así el aviso llega aunque Vento esté cerrada o la pantalla apagada.' + (A && perm.bateria === false ? '<br><button type="button" class="btn-ghost gp-btn" data-gp="bateria">⚡ Quitar el ahorro de batería</button>' : ''), A && perm.bateria !== undefined ? ok(!!perm.bateria, perm.bateria ? 'Listo' : 'Falta') : '') +
+        paso(6, 'Prueba', 'Pídele a alguien que te pase <b>$1.000</b> a tu DaviPlata. Vento dirá <i>«Pago confirmado, mil pesos por DaviPlata»</i> y en el celular sale <b>«💜 Pagaron $1.000 por DaviPlata»</b>.<br><button type="button" class="btn-ghost gp-btn" data-gp="probar">▶️ Ver cómo se ve (simulado)</button>', ok(!!llego, llego ? 'Ya llegó un pago real de DaviPlata (' + plata(llego.monto) + ')' : 'Esperando el primer pago')) +
+        '</ol>' +
+        '<div class="settings-desc" style="margin-top:8px"><b>¿Y los demás celulares del negocio?</b> Con tu misma cuenta (Vento Nube) también ven el pago al instante. <b>¿No usas la app Vento en ese celular?</b> <button type="button" class="btn-ghost gp-btn" data-gp="macro">Usar MacroDroid</button><br><small>«Conectar DaviPlata» (API oficial) es otra cosa: sirve para <b>cobrar con código</b> y necesita convenio con Davivienda. Para que Vento te avise los pagos <b>no lo necesitas</b>.</small></div>' +
+        '<div class="modal-actions"><button type="button" class="btn-close" data-gp="cerrar">Listo</button></div></div>';
+    }
+    pintar(); ov.classList.add('show');
+    clearInterval(ov.__t); ov.__t = setInterval(() => { if(!ov.classList.contains('show')) return clearInterval(ov.__t); if(!ov.contains(document.activeElement) || document.activeElement === document.body) pintar(); }, 3000);
+  }
+  window.ventoPagosGuia = pgGuia;
+
   // ---------- Ajustes ----------
   function pgCrearUI(){
     if($p('pgGrupo')) return true;
@@ -27895,6 +27947,7 @@ let fotosListas = false;
     g.className = 'settings-group'; g.id = 'pgGrupo'; g.hidden = true; g.dataset.cat = 'pagos';
     const enApp = !!AND();
     g.innerHTML = '<h2>🔔 Pagos de Nequi y DaviPlata al instante <span class="tvp-badge">Nuevo</span></h2>' +
+      '<button type="button" class="btn-primary" id="pgGuiaBtn" style="width:100%;margin:2px 0 10px">📘 Paso a paso: agregar DaviPlata o Nequi</button>' +
       (enApp
         ? '<div class="settings-desc">Cuando te llega plata a <b>DaviPlata</b>, <b>Nequi</b> o tu banco, <b>la app de Vento lee directamente el aviso del banco en este celular</b> y te dice en voz alta <b>«Pago confirmado»</b> con el valor, quién pagó y de qué mesa es (como el parlante de Bold). No necesitas instalar nada más.</div>'
         : '<div class="settings-desc">Para que Vento te diga <b>«Pago confirmado»</b> apenas te llegue la plata, instala la <b>app Vento para Android</b> en el celular donde tienes DaviPlata o Nequi y prende esta opción allí: la app lee directamente el aviso del banco. Desde el navegador no se pueden leer los avisos de otras apps. Los demás celulares del negocio reciben el aviso por Vento Nube.</div>') +
@@ -27915,6 +27968,7 @@ let fotosListas = false;
       '<p style="margin:8px 0 0">Si igual quieres reenviar los SMS, crea otra macro con el disparador <b>SMS recibido</b> y en el cuerpo pon: <b>SMS | [número que envía] | [texto del SMS]</b>. Vento debe estar abierta en algún celular o computador para oír los avisos (en el negocio normalmente lo está).</p></details>' +
       '<div class="settings-row" style="flex-direction:column;align-items:stretch"><div class="settings-row-text"><strong>Últimos pagos que llegaron</strong></div><div id="pgLista"></div></div></div>';
     grupo.insertAdjacentElement('afterend', g);
+    $p('pgGuiaBtn').onclick = pgGuia;
     const on = $p('pgOn');
     on.onchange = () => {
       PG().on = on.checked; saveData();
@@ -29749,6 +29803,10 @@ window.mesoraCelebrar = function(emojis){
     if(/\b(busca|buscar|conecta|conectar|muestrame|transmite|transmitir|manda)\b.*\b(tv|tele|televisor|televisores|chromecast)\b/.test(t) && typeof tvTransmitirToque === 'function'){
       return { text: '📺 Busco los TV de tu wifi.', run: () => { try{ asisClose(); }catch(e){} const nb = document.querySelector('nav button[data-view="musica"]'); if(nb) nb.click(); setTimeout(() => { try{ tvTransmitirToque(); }catch(e){} }, 400); } };
     }
+    // «¿Cómo agrego DaviPlata?», «vincular Nequi», «que me avise cuando me paguen» → el paso a paso.
+    if(/\b(agrega|agregar|agrego|anadir|anado|conecta|conectar|conecto|vincula|vincular|vinculo|configura|configurar|activa|activar|poner|pongo|instalo|tutorial|paso a paso)\b.*\b(nequi|daviplata|davi plata|david plata)\b|\b(avise|avisa|avisar|aviso)\b.*\b(paguen|pagan|pagaron|pasen plata|llegue (la )?plata)\b/.test(t) && window.ventoPagosGuia){
+      return { text: '📘 Te muestro el paso a paso para agregar DaviPlata (y Nequi): así Vento te avisa una sola vez «Pagaron $X» cada vez que te pasan plata.', run: () => { try{ asisClose(); }catch(e){} setTimeout(() => window.ventoPagosGuia(), 200); } };
+    }
     if(/\b(nequi|daviplata|bre b|transferencias?|pagos? (digitales|de hoy|recibidos|que llegaron)|me (ha |han )?llegado|cuanto (me )?llego|llego (el )?pago|llegaron pagos)\b/.test(t) && window.pagosResumen){
       const mesaP = (t.match(/\bmesa (\d+)\b/) || [])[1]; return { text: window.pagosResumen(periodo(t), mesaP ? +mesaP : null), actions: [{ tipo: 'laya', op: 'pagosPanel', label: '💜 Ver los pagos' }] };
     }
@@ -29999,7 +30057,7 @@ window.mesoraCelebrar = function(emojis){
   // ---------- Resumen (lo usa Vento) ----------
   window.pagosResumen = function(pe, mesa){
     const ini = pe && pe.ini || new Date().setHours(0, 0, 0, 0), fin = pe && pe.fin || Date.now() + 1, txt = pe && pe.txt || 'hoy';
-    if(!(data.pagos && data.pagos.on)) return '💜 Los avisos de Nequi y Daviplata no están activados. Actívalos en Ajustes → Negocio → «Verificar pagos de Nequi y Daviplata» (te explico los pasos ahí).';
+    if(!(data.pagos && data.pagos.on)) return '💜 Los avisos de Nequi y Daviplata no están activados. Actívalos en Ajustes → 💜 Pagos → «📘 Paso a paso: agregar DaviPlata o Nequi».';
     if(mesa){ const l = lista().filter(x => x.mesa === mesa && Date.now() - x.t < 6 * 36e5 && x.estado !== 'falso');
       return l.length ? '💜 ' + tableLabel(mesa) + ': ' + l.map(x => plata(x.monto) + ' por ' + x.app + (x.de ? ' de ' + x.de : '') + (confirmado(x) ? ' ✅' : ' ⚠️ revisar') + (x.aplicado ? ' (registrado)' : '')).join('; ') + '.' : '⏳ No ha llegado ningún pago de ' + tableLabel(mesa) + ' en las últimas horas.'; }
     const l = lista().filter(x => x.t >= ini && x.t < fin);
@@ -30018,7 +30076,8 @@ window.mesoraCelebrar = function(emojis){
     if(!ov){ ov = document.createElement('div'); ov.id = 'pagosPanelOv'; ov.className = 'overlay'; document.body.appendChild(ov);
       ov.addEventListener('click', e => {
         if(e.target === ov || e.target.closest('[data-pp="cerrar"]')) return ov.classList.remove('show');
-        if(e.target.closest('[data-pp="config"]')){ ov.classList.remove('show'); const b = document.querySelector('nav button[data-view="ajustes"]') ; try{ asisGoView('ajustes'); }catch(x){ b && b.click(); } setTimeout(() => { const c = document.querySelector('.ajustes-cat[data-cat="negocio"]'); c && c.click(); setTimeout(() => { const g = document.getElementById('pgGrupo'); g && g.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 300); }, 300); return; }
+        if(e.target.closest('[data-pp="guia"]')){ ov.classList.remove('show'); try{ window.ventoPagosGuia(); }catch(x){} return; }
+        if(e.target.closest('[data-pp="config"]')){ ov.classList.remove('show'); const b = document.querySelector('nav button[data-view="ajustes"]') ; try{ asisGoView('ajustes'); }catch(x){ b && b.click(); } setTimeout(() => { const c = document.querySelector('.ajustes-cat[data-cat="pagos"]'); c && c.click(); setTimeout(() => { const g = document.getElementById('pgGrupo'); g && g.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 300); }, 300); return; }
         const r = e.target.closest('[data-reg]'); if(r){ const x = lista().find(y => y.id === r.dataset.reg); if(x){ x.ignorado = false; window.pagoLlego(x, true); } return; }
         const v = e.target.closest('[data-vi]'); if(v){ const x = lista().find(y => y.id === v.dataset.vi); if(x){ x.estado = 'ok'; saveData(); pintar(); window.pagoLlego(x, true); } }
       }); }
@@ -30028,7 +30087,7 @@ window.mesoraCelebrar = function(emojis){
       const sello = x => x.estado === 'falso' ? '<span class="pp-s pp-f">🚨 Falso</span>' : x.estado === 'revisar' ? '<span class="pp-s pp-r">⚠️ Revisar</span>' : '<span class="pp-s pp-ok">✅</span>';
       ov.innerHTML = '<div class="modal" style="max-width:520px"><h2>💜 Pagos Nequi / Daviplata</h2>' +
         (on ? '<div class="pp-total"><small>Hoy, confirmados</small><b>' + plata(ok.reduce((a, x) => a + x.monto, 0)) + '</b><span>' + (Object.entries(porApp).map(([a, v]) => a + ' ' + plata(v)).join(' · ') || 'Todavía nada hoy') + '</span></div>'
-          : '<div class="pp-off"><b>Los avisos de pago no están activados.</b><br>' + (window.VentoAndroid && window.VentoAndroid.pagosAvisosTomar ? 'Prende «Recibir avisos de pagos»: la app de Vento lee directo el aviso de DaviPlata o Nequi de este celular y te dice «Pago confirmado» con el valor y quién te pagó.' : 'Con la app Vento para Android en el celular donde tienes DaviPlata o Nequi, cada pago que te llega sale aquí en un segundo y Vento dice «Pago confirmado».') + '<br><button type="button" class="btn-primary" data-pp="config" style="margin-top:10px">⚙️ Activar y ver los pasos</button></div>') +
+          : '<div class="pp-off"><b>Los avisos de pago no están activados.</b><br>' + (window.VentoAndroid && window.VentoAndroid.pagosAvisosTomar ? 'Prende «Recibir avisos de pagos»: la app de Vento lee directo el aviso de DaviPlata o Nequi de este celular y te dice «Pago confirmado» con el valor y quién te pagó.' : 'Con la app Vento para Android en el celular donde tienes DaviPlata o Nequi, cada pago que te llega sale aquí en un segundo y Vento dice «Pago confirmado».') + '<br><button type="button" class="btn-primary" data-pp="guia" style="margin-top:10px">📘 Paso a paso: agregar DaviPlata o Nequi</button> <button type="button" class="btn-ghost" data-pp="config" style="margin-top:10px">⚙️ Ajustes de pagos</button></div>') +
         (l.length ? '<div class="pp-lista">' + l.map(x => '<div class="pp-fila' + (x.estado === 'falso' ? ' pp-tach' : '') + '"><span><b>' + plata(x.monto) + '</b> ' + esc(x.app) + (x.de ? ' · ' + esc(x.de) : '') + '<small>' + new Date(x.t).toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) + (x.aplicado ? ' · registrado en ' + esc(tableLabel(x.aplicado)) : x.mesa ? ' · coincide con ' + esc(tableLabel(x.mesa)) : '') + '</small></span>' + sello(x) +
           (x.estado === 'revisar' ? '<button type="button" class="btn-ghost" data-vi="' + esc(x.id) + '">Lo vi en la app</button>' : (confirmado(x) && !x.aplicado ? '<button type="button" class="btn-ghost" data-reg="' + esc(x.id) + '">Registrar</button>' : '')) + '</div>').join('') + '</div>' : (on ? '<div class="modal-sub">Aún no ha llegado ningún pago.</div>' : '')) +
         '<div class="modal-actions" style="flex-wrap:wrap;gap:8px">' + (on ? '<button type="button" class="btn-ghost" data-pp="config">⚙️ Configuración</button>' : '') + '<button type="button" class="btn-close" data-pp="cerrar">Cerrar</button></div></div>';
@@ -30106,6 +30165,9 @@ window.mesoraCelebrar = function(emojis){
     '.pp-total{display:flex;flex-direction:column;align-items:center;border:1px solid var(--line);border-radius:14px;padding:12px;margin:8px 0;background:var(--surface-2,transparent)}.pp-total b{font-size:30px}.pp-total small,.pp-total span{color:var(--ink-soft);font-size:13px}' +
     '.pp-off{border:1px dashed var(--line);border-radius:14px;padding:12px;margin:8px 0;font-size:14px;line-height:1.5}.pp-lista{display:flex;flex-direction:column;max-height:46vh;overflow:auto;margin:6px 0}' +
     '.pp-fila{display:flex;gap:8px;align-items:center;padding:8px 2px;border-top:1px solid var(--line);font-size:14px}.pp-fila>span{flex:1;min-width:0;overflow-wrap:anywhere}.pp-fila small{display:block;color:var(--ink-soft);font-size:12px}.pp-tach{opacity:.7;text-decoration:line-through}' +
+    '.gp-modal{max-width:560px;width:100%;max-height:92vh;overflow:auto}.gp-lista{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:10px}.gp-paso{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:14px;padding:10px 12px}' +
+    '.gp-n{flex:0 0 28px;height:28px;border-radius:50%;display:grid;place-items:center;font-weight:800;background:color-mix(in srgb,var(--amber,#8b5cf6) 25%,transparent)}.gp-c{font-size:14px;line-height:1.5;margin-top:4px;color:var(--ink-soft)}.gp-c b{color:var(--ink)}' +
+    '.gp-e{display:inline-block;margin-left:6px;font-size:12px;font-weight:800;white-space:nowrap}.gp-si{color:#22c55e}.gp-no{color:#f5a524}.gp-btn{margin-top:8px;display:inline-block;text-decoration:none;padding:9px 14px}.gp-alerta{border:1px dashed #f5a524;border-radius:12px;padding:10px;margin:8px 0;font-size:14px}' +
     '.pp-s{font-weight:800;font-size:12px;white-space:nowrap}.pp-f{color:#e5484d}.pp-r{color:#f5a524}.pp-ok{color:#22c55e}' +
     '.calc-modal{max-width:400px;width:100%}.calc-h{display:flex;justify-content:space-between;align-items:center}.calc-h h2{margin:0}' +
     '.calc-cinta{max-height:120px;overflow:auto;margin:8px 0 4px;font-size:14px;color:var(--ink-soft)}.calc-cinta div{display:flex;justify-content:space-between;gap:8px;padding:2px 0}.calc-cinta b{color:var(--ink)}' +

@@ -266,6 +266,7 @@
     '.vp-form label{display:block;font-size:13px;color:var(--ink-soft);margin:10px 0 4px}.vp-form input,.vp-form select{width:100%;box-sizing:border-box}' +
     '.vp-hist{font-size:14px}.vp-hist div{display:flex;gap:8px;justify-content:space-between;padding:7px 0;border-top:1px solid var(--line)}.vp-hist small{display:block;color:var(--ink-soft)}' +
     '.vp-url{width:100%;box-sizing:border-box;font-size:12px}' +
+    '.vp-guia{border:1px solid color-mix(in srgb,#8b5cf6 55%,transparent);border-radius:14px;padding:10px 12px;margin:10px 0;font-size:14px;line-height:1.5}.vp-guia button{display:block;width:100%;margin-top:8px}' +
     '.vp-modal{max-width:440px;width:100%}.vp-opc{display:grid;gap:8px;margin:10px 0}.vp-opc button{text-align:left;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:var(--surface-2,transparent);color:inherit;font:600 15px var(--font-main);cursor:pointer}.vp-opc button small{display:block;font-weight:400;color:var(--ink-soft);margin-top:2px}' +
     '.vp-qr{display:grid;place-items:center;margin:12px auto;background:#fff;padding:12px;border-radius:16px;width:max-content;max-width:100%}' +
     '.vp-monto{font:800 34px/1.2 var(--font-main);text-align:center;margin:6px 0}.vp-estado{text-align:center;font-weight:800;font-size:17px;margin:10px 0}' +
@@ -527,9 +528,12 @@
   function asistente(cual){
     var n = negocio(), ov = ventana('vpAsisOv');
     var r = est.resumen || {}, wompiYa = (est.info && est.info.proveedores || []).some(function(p){ return p.proveedor === 'wompi' && p.estado === 'conectado'; });
-    var intro = cual === 'daviplata'
-      ? '<div class="modal-sub">Hay dos vías oficiales. Puedes usar una o las dos: la <b>API Pago con DaviPlata</b> de Davivienda (cobro con código al celular del cliente) o <b>Wompi</b> (link o QR que se paga con DaviPlata, Nequi o tarjeta).</div>'
-      : '<div class="modal-sub">Hay dos vías oficiales. Puedes usar una o las dos:</div>';
+    // ¿Solo quiere que Vento le avise cuando le pagan? Eso NO necesita la API ni convenio: el paso a paso de los avisos.
+    var soloAvisos = '<div class="vp-guia"><b>¿Solo quieres que Vento te avise «Pagaron $20.000 por ' + (cual === 'daviplata' ? 'DaviPlata' : 'Nequi') + '» cuando te pasan plata?</b> No necesitas esto (ni convenio con el banco).' +
+      ' <button type="button" class="btn-primary" data-vp-guia>📘 Paso a paso: agregar ' + (cual === 'daviplata' ? 'DaviPlata' : 'Nequi') + '</button></div>';
+    var intro = soloAvisos + (cual === 'daviplata'
+      ? '<div class="modal-sub">Para <b>cobrar</b> con la integración oficial hay dos vías. Puedes usar una o las dos: la <b>API Pago con DaviPlata</b> de Davivienda (cobro con código al celular del cliente) o <b>Wompi</b> (link o QR que se paga con DaviPlata, Nequi o tarjeta).</div>'
+      : '<div class="modal-sub">Para <b>cobrar</b> con la integración oficial hay dos vías. Puedes usar una o las dos:</div>');
     var provD = (est.info && est.info.proveedores || []).find(function(p){ return p.proveedor === 'daviplata'; }) || null, pubD = provD && provD.publico || {};
     var formD = '<div class="vp-form" id="vpFormD"><h3 style="margin:14px 0 0">Conectar DaviPlata (API oficial de Davivienda)' + (provD && provD.estado === 'conectado' ? ' <span class="vp-ok">· conectada</span>' : provD && provD.estado === 'error' ? ' <span class="vp-mal">· con error</span>' : '') + '</h3>' +
       '<div class="modal-sub">Cobras con el <b>documento</b> del cliente: a su celular le llega un código y tú lo escribes en Vento; DaviPlata responde «Aprobado» en ese momento (no manda aviso aparte). Necesitas: <b>convenio con Davivienda</b>, tu aplicación en el <a href="https://conectesunegocio.daviplata.com" target="_blank" rel="noopener">Developer Portal</a> (Client ID y Secret), su <b>certificado</b> (.cer + llave .pem) y los códigos de <b>comercio y terminal</b> que asigna Redeban.</div>' +
@@ -566,6 +570,7 @@
     var q = function(id){ return ov.querySelector('#' + id); };
     var msg = function(t, mal){ q('vpAsisMsg').innerHTML = t; q('vpAsisMsg').className = 'vp-estado ' + (mal ? 'vp-mal' : 'vp-ok'); };
     q('vpAsisX').onclick = function(){ cerrarVentana(ov); pintarAjustes(); };
+    var bg = ov.querySelector('[data-vp-guia]'); if(bg) bg.onclick = function(){ cerrarVentana(ov); try{ window.ventoPagosGuia && window.ventoPagosGuia(); }catch(e){} };
     var enviar = function(btn, cuerpo){
       if(!n) return msg('Primero entra a Vento Nube.', true);
       btn.disabled = true; msg('<span class="vp-gira">⏳</span> Comprobando con la entidad…');

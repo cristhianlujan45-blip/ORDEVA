@@ -1,6 +1,6 @@
 // Ajustes ordenados, sin repetidos y fáciles de buscar; cada notificación se prende o apaga.
 //  1. Pagos (pasarela Nequi y avisos de pagos) juntos en «💜 Pagos»; domicilios por web y WhatsApp en «Pedidos».
-//  2. «🔔 Notificaciones del celular» tiene un interruptor por cada aviso (pedidos, cuenta, domicilios, música, soporte, IA).
+//  2. «🔔 Notificaciones del celular» tiene un interruptor por cada aviso (pedidos, cuenta, pagos, domicilios, música, soporte, IA).
 //     Ya no hay avisos sueltos en «Pedidos» ni la sección de la app ntfy.
 //  3. Apagar un aviso: ya no sale ni suena; prenderlo: vuelve. «Probar canción» manda la notificación de música al celular.
 //  4. Ningún ajuste repetido (mismo título dos veces) y el buscador lleva a la categoría correcta.
@@ -31,7 +31,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     chk('1. Domicilios por la página web y WhatsApp están en Pedidos', await cat('#domGrupoWeb') === 'pedidos' && await p.evaluate(() => !document.getElementById('waGrupo') || document.getElementById('waGrupo').dataset.cat === 'pedidos'));
     // 2.
     const tipos = await p.evaluate(() => [...document.querySelectorAll('#avTipos input[data-notif]')].map(i => i.dataset.notif));
-    chk('2. Un interruptor por aviso en Notificaciones', JSON.stringify(tipos) === JSON.stringify(['pedidos', 'cuenta', 'domicilios', 'musica', 'soporte', 'ia']) && await cat('#avTipos') === 'avisos', tipos);
+    chk('2. Un interruptor por aviso en Notificaciones', JSON.stringify(tipos) === JSON.stringify(['pedidos', 'cuenta', 'pagos', 'domicilios', 'musica', 'soporte', 'ia']) && await cat('#avTipos') === 'avisos', tipos);
     chk('2. Ya no hay avisos sueltos en Pedidos ni la sección de ntfy', await p.evaluate(() => !/Avisos dentro de la app/.test(document.getElementById('view-ajustes').textContent) && !/ntfy/i.test(document.getElementById('view-ajustes').innerHTML)));
     // 3.
     const toasts = () => p.evaluate(() => [...document.querySelectorAll('.toast, #toast, .vito-toast')].map(t => t.textContent).join(' | '));

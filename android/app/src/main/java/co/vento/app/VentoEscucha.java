@@ -28,10 +28,10 @@ public class VentoEscucha extends NotificationListenerService {
     static final String PREF_ON = "pagosAvisos", PREF_COLA = "pagosAvisosCola";
     // Apps de bancos y billeteras (por el nombre que muestra el celular).
     private static final Pattern BANCO = Pattern.compile("daviplata|nequi|bancolombia|davivienda|movii|\\bdale\\b|bre-?b|banco|\\bnu\\b|lulo|rappipay|powwi|ual[aá]|bbva|scotiabank|av villas|colpatria|occidente|caja social", Pattern.CASE_INSENSITIVE);
-    // Plata que ENTRA (igual que pgLeer en la página).
-    private static final Pattern RECIBIDO = Pattern.compile("recibiste|te lleg[oó]|te llegaron|te pas[oó]|te pasaron|pasaron plata|te envi[oó]|te enviaron|te transfiri|te pag[oó]|te pagaron|te consign|te abon|consignaron|abonaron|entr[oó] plata|ingres[oó]|recibi[oó]|recepci[oó]n|pago recibido|dinero recibido|transferencia recibida|abono a tu cuenta", Pattern.CASE_INSENSITIVE);
+    // Plata que ENTRA (igual que pgLeer en la página). DaviPlata escribe de «usted»: «Le llegó plata», «Le pasaron».
+    private static final Pattern RECIBIDO = Pattern.compile("recibiste|has recibido|ha recibido|(te|le) lleg[oó]|(te|le) llegaron|(te|le) pas[oó]|(te|le) pasaron|pasaron plata|(te|le) envi[oó]|(te|le) enviaron|(te|le) transfiri|(te|le) pag[oó]|(te|le) pagaron|(te|le) consign|(te|le) abon|consignaron|abonaron|entr[oó] plata|lleg[oó] plata|ingres[oó]|recibi[oó]|recepci[oó]n|pago recibido|dinero recibido|transferencia recibida|abono a (tu|su) cuenta", Pattern.CASE_INSENSITIVE);
     // Nunca se toman códigos, claves ni avisos de plata que SALE.
-    private static final Pattern PRIVADO = Pattern.compile("c[oó]digo|clave|otp|contrase|token|enviaste|pagaste|transferiste|retiraste|compraste|sacaste", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PRIVADO = Pattern.compile("c[oó]digo|clave|otp|contrase|token|enviaste|pagaste|transferiste|retiraste|compraste|sacaste|usted (envi|pag|transfiri|pas)", Pattern.CASE_INSENSITIVE);
     private static final long VIGENCIA = 6 * 3600_000L;   // un aviso que la página no alcanzó a tomar en 6 h ya no sirve
 
     @Override public void onListenerConnected() { activa = this; }
@@ -59,7 +59,7 @@ public class VentoEscucha extends NotificationListenerService {
             String todo = titulo + " " + cuerpo;
             if (!RECIBIDO.matcher(todo).find()) return;
             // «Recibiste $20.000» siempre pasa; si además habla de códigos o plata que sale, no se toma.
-            if (PRIVADO.matcher(todo).find() && !Pattern.compile("recibiste|te lleg", Pattern.CASE_INSENSITIVE).matcher(todo).find()) return;
+            if (PRIVADO.matcher(todo).find() && !Pattern.compile("recibiste|recibi[oó]|ha recibido|(te|le) lleg", Pattern.CASE_INSENSITIVE).matcher(todo).find()) return;
             String txt = app + " | " + titulo + " | " + cuerpo;
             guardar(sp, sbn.getKey() + ":" + txt.hashCode(), txt);
             // La página (aunque la ventana esté cerrada, la mantiene viva VentoServicio) lo toma ya.
