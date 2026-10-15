@@ -484,7 +484,7 @@
   <section data-tab="licencias">
     <div class="card">
       <h2>🔑 Nueva licencia</h2>
-      <p class="soft">Solo tú puedes crear licencias. Cada licencia es <b>única</b>: un solo cliente, un solo uso y <b>un solo equipo</b> (si cambia de celular, él mismo la pasa al nuevo, una vez cada 30 días). Para otra sede, crea otra licencia. Si escribes el correo del cliente, <b>solo esa cuenta</b> la puede usar (se le activa sola al entrar a Vento).</p>
+      <p class="soft">Solo tú puedes crear licencias. Cada licencia es <b>única</b>: un solo cliente y <b>un solo negocio</b> (sirve en todos sus equipos: computador, tablet, celular). Para otra sede u otro negocio, el cliente necesita otra cuenta y otra licencia. Si escribes el correo del cliente, <b>solo esa cuenta</b> la puede usar (se le activa sola al entrar a Vento).</p>
       <div class="f2">
         <div><label for="lsPlan">Plan</label><select id="lsPlan"><option value="pro">PRO</option></select></div>
         <div><label for="lsTipo">Duración</label><select id="lsTipo">
@@ -2190,8 +2190,7 @@
       (x.nota ? '<div class="soft">📝 ' + esc(x.nota) + '</div>' : '') +
       '<div class="soft">' + (x.usos ? '✅ Activada' : '⏳ Sin activar') + ' · creada ' + fCo(x.creada_en) + '</div>' +
       '<div class="chips">' + (x.correos.length ? x.correos.map(c => '<span class="chip' + (c.usada ? ' ok' : '') + (x.estado === 'activa' ? ' x' : '') + '" data-quitar="' + esc(c.email) + '" title="' + (c.usada ? 'Ya la activó' : c.registrado ? 'Tiene cuenta; se activa al entrar' : 'Todavía no tiene cuenta') + '">' + (c.usada ? '✅ ' : c.registrado ? '👤 ' : '✉️ ') + esc(c.email) + (x.estado === 'activa' ? ' ✕' : '') + '</span>').join('') : '<span class="soft">Por código (cualquier cuenta)</span>') + '</div>' +
-      (x.activaciones.length ? '<div class="soft">🏪 ' + x.activaciones.map(a => esc((a.negocio || '¿?') + ' (' + (a.email || '') + ') hasta ' + fCo(a.hasta)) +
-        ' · 📲 ' + esc(a.equipo ? 'equipo ' + a.equipo : 'sin equipo todavía') + (a.cambios ? esc(' · cambió de equipo ' + a.cambios + ' vez' + (a.cambios === 1 ? '' : 'es') + (a.movida_en ? ' (último ' + fCo(a.movida_en) + ')' : '')) : '')).join(' · ') + '</div>' : '') +
+      (x.activaciones.length ? '<div class="soft">🏪 ' + x.activaciones.map(a => esc((a.negocio || '¿?') + ' (' + (a.email || '') + ') hasta ' + fCo(a.hasta))).join(' · ') + '</div>' : '') +
       (x.estado === 'activa' ? '<div class="row" style="margin-top:4px">' + (x.correos.length ? '' : '<button class="b" type="button" data-la="correo">➕ Correo</button>') + '<button class="b" type="button" data-la="enviar">📤 Enviar</button><button class="b" type="button" data-la="anular">⛔ Anular</button></div>' : '') +
       '</div>').join('') : '<div class="empty">' + (ad.lics.length ? 'Nada coincide.' : 'Todavía no has creado licencias.') + '</div>';
   }

@@ -68,6 +68,7 @@
       [/email not confirmed/i, 'Falta confirmar el correo: abre el mensaje que te llegó y vuelve a entrar.'],
       [/already registered|already exists/i, 'Ese correo ya tiene cuenta: usa «Entrar».'],
       [/password should be at least|weak password/i, 'La contraseña debe tener al menos 6 caracteres.'],
+      [/un_negocio_por_cuenta/, 'Tu cuenta ya tiene su negocio. Para otra sede u otro negocio se necesita otra cuenta con su propia suscripción o licencia.'],
       [/sin_permiso/, 'Tu rol no permite hacer eso.'], [/sin_sesion/, 'Primero entra con tu cuenta.'],
       [/codigo_invalido/, 'Ese código no existe. Revísalo.'], [/codigo_usado/, 'Ese código ya se usó. Pide uno nuevo.'],
       [/codigo_vencido/, 'Ese código venció (duran 7 días). Pide uno nuevo.'], [/dueno_no_sale/, 'El dueño no puede salirse de su propio negocio.'],

@@ -70,15 +70,19 @@ const hoy = () => new Date(Date.now() - 5 * 3600e3).toISOString().slice(0, 10);
       history: [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }], purchases: [{ id: 'f1' }], contab: [{ id: 'g1', tipo: 'gasto', monto: 5000 }, { id: 'i1', tipo: 'ingreso', monto: 1000 }] };
     const NEG1 = (await rpc('crear_negocio', { p_nombre: 'Bar Real', p_datos: datos, p_nombre_usuario: 'Carlos' }, dueno.token)).j;
     const MALO = '<img src=x onerror="window.__xss=1">Tienda Real';
-    const NEG2 = (await rpc('crear_negocio', { p_nombre: MALO, p_datos: {}, p_nombre_usuario: 'Carlos' }, dueno.token)).j;
-    chk('Dos negocios creados en la nube', /^[0-9a-f-]{36}$/.test(String(NEG1)) && /^[0-9a-f-]{36}$/.test(String(NEG2)), [NEG1, NEG2]);
+    r = await rpc('crear_negocio', { p_nombre: 'Segunda sede', p_datos: {} }, dueno.token);
+    chk('Un negocio por cuenta: el mismo dueño no puede crear un segundo negocio', r.st >= 400 && /un_negocio_por_cuenta/.test(JSON.stringify(r.j)), r);
+    // El segundo negocio es de OTRA cuenta (otra sede = otra cuenta con su propia suscripción)
+    const dueno2 = await sb.usuario('dueno2@barreal.co');
+    const NEG2 = (await rpc('crear_negocio', { p_nombre: MALO, p_datos: {}, p_nombre_usuario: 'Carlos' }, dueno2.token)).j;
+    chk('Dos negocios creados en la nube (cada uno con su cuenta)', /^[0-9a-f-]{36}$/.test(String(NEG1)) && /^[0-9a-f-]{36}$/.test(String(NEG2)), [NEG1, NEG2]);
     // La app pide el estado al abrir: el primer negocio arranca su prueba gratis
     r = await api('/estado', { negocio: NEG1 }, dueno.token);
     chk('El negocio 1 está en prueba gratis', r.st === 200 && r.j.subscription && r.j.subscription.source === 'trial', r.j);
-    const pagar = (neg, n, metodo, ref, color) => api('/pago', { negocio: neg, plan: 'pro', metodo, monto: 59900, referencia: ref, fecha: hoy(), nombre: 'Carlos Pérez', telefono: '3001234567',
-      idem: 'idem-real-' + n, comprobante: { base64: png(120, 80, color).toString('base64'), tipo: 'image/png' } }, dueno.token);
+    const pagar = (neg, n, metodo, ref, color, tok) => api('/pago', { negocio: neg, plan: 'pro', metodo, monto: 59900, referencia: ref, fecha: hoy(), nombre: 'Carlos Pérez', telefono: '3001234567',
+      idem: 'idem-real-' + n, comprobante: { base64: png(120, 80, color).toString('base64'), tipo: 'image/png' } }, tok || dueno.token);
     const r1 = await pagar(NEG1, 1, 'NEQUI', 'M-REAL-001', [218, 0, 129]);
-    const r2 = await pagar(NEG2, 2, 'DAVIPLATA', 'D-REAL-002', [239, 51, 64]);
+    const r2 = await pagar(NEG2, 2, 'DAVIPLATA', 'D-REAL-002', [239, 51, 64], dueno2.token);
     const PAY1 = r1.j.payment && r1.j.payment.id, PAY2 = r2.j.payment && r2.j.payment.id;
     chk('Pagos enviados con comprobante (POST /pago) y en revisión', r1.st === 200 && r2.st === 200 && r1.j.payment.status === 'review' && r2.j.payment.status === 'review', [r1.j, r2.j]);
 
@@ -163,7 +167,7 @@ const hoy = () => new Date(Date.now() - 5 * 3600e3).toISOString().slice(0, 10);
     chk('Base de datos: pago rechazado con el motivo y quién lo rechazó', pg2 && pg2.status === 'rejected' && pg2.reject_reason === MOTIVO && pg2.rejected_by === jefe.id, pg2);
     const sub2 = await uno('select status from subscriptions where business_id = $1', [NEG2]);
     chk('Base de datos: la suscripción del negocio 2 queda «rejected» (sin premium)', sub2 && sub2.status === 'rejected', sub2);
-    r = await api('/estado', { negocio: NEG2 }, dueno.token);
+    r = await api('/estado', { negocio: NEG2 }, dueno2.token);
     chk('La app del negocio 2 ve el motivo del rechazo', r.st === 200 && r.j.last_payment && r.j.last_payment.reject_reason === MOTIVO && r.j.plan_efectivo === 'free', r.j);
     await p.selectOption('#sxPagosEstado', 'all');
     chk('Filtro «Todos»: el aprobado con su período y el rechazado con su motivo', await esperar((m) => { const t = document.getElementById('sxPagos').textContent; return document.querySelectorAll('#sxPagos .sxc').length === 2 && /Aprobado/.test(t) && /Rechazado/.test(t) && t.includes(m); }, MOTIVO));

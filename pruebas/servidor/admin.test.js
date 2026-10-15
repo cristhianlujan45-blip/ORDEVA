@@ -165,7 +165,7 @@ async function pruebas(sb) {
   chk('Un cliente NO puede crear licencias (solo el proveedor)', r.st === 403, r);
   r = await rpc('srv_lic_crear', { p: { plan: 'pro', dias: 30 }, p_admin: dueno.id }, dueno.token);
   chk('Tampoco llamando la base directo', r.st >= 400, r);
-  r = await api('/estado', { negocio: neg, equipo: 'AAAA-1111' }, dueno.token);
+  r = await api('/estado', { negocio: neg }, dueno.token);
   chk('Al entrar el dueño (correo de la lista) la licencia se activa sola', r.st === 200 && r.j.licencias_activadas && r.j.licencias_activadas.length === 1 && r.j.plan_efectivo === 'pro', r.j);
   const vence = Date.parse(r.j.subscription.expiry_date);
   chk('…por 90 días', Math.abs(vence - (Date.now() + 90 * DIA)) < 2 * DIA, r.j.subscription);
@@ -196,43 +196,20 @@ async function pruebas(sb) {
   r = await api('/admin/licencia_correos', { licencia: licSin.id, agregar: ['tercero@bar.co'] }, admin.token);
   chk('A una sin correo sí se le puede poner el correo del cliente', r.st === 200 && r.j.licencia.correos.map(c => c.email).join() === 'tercero@bar.co', r.j);
 
-  // ===== Un solo equipo; el cliente la pasa a otro =====
-  r = await api('/estado', { negocio: neg, equipo: 'AAAA-1111' }, dueno.token);
-  chk('En el equipo donde se activó: PRO', r.st === 200 && r.j.plan_efectivo === 'pro' && !r.j.licencia_equipo, r.j);
-  r = await api('/estado', { negocio: neg, equipo: 'BBBB-2222' }, dueno.token);
-  chk('En OTRO equipo del mismo negocio: «otro_equipo», sin funciones y con el código', r.st === 200 && r.j.subscription.status === 'otro_equipo' && r.j.plan_efectivo === 'free' &&
-    r.j.entitlements.voice === false && r.j.licencia_equipo && r.j.licencia_equipo.codigo === lic.codigo, r.j);
-  const tokOtro = JSON.parse(Buffer.from(r.j.token.split('.')[0].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString());
-  chk('…el token FIRMADO dice «otro_equipo» y plan gratis (no se puede falsear en el celular)', tokOtro.s === 'otro_equipo' && tokOtro.p === 'free' && tokOtro.e.length === 0, tokOtro);
-  r = await api('/estado', { negocio: neg }, dueno.token);
-  chk('Sin decir el equipo tampoco funciona', r.j.subscription.status === 'otro_equipo', r.j.subscription);
-  r = await api('/licencia-mover', { negocio: neg, equipo: 'BBBB-2222' }, cliAdmin.token);
-  chk('Alguien de otro negocio no puede pasarla', r.st === 403, r);
-  r = await api('/licencia-mover', { negocio: neg, equipo: 'x' }, dueno.token);
-  chk('Equipo inválido → equipo_invalido', r.st === 400 && r.j.error === 'equipo_invalido', r);
-  r = await api('/licencia-mover', { negocio: neg, equipo: 'BBBB-2222' }, dueno.token);
-  chk('El dueño la pasa a su equipo nuevo', r.st === 200 && r.j.ok && r.j.repetido === false && r.j.codigo === lic.codigo, r);
-  r = await api('/estado', { negocio: neg, equipo: 'BBBB-2222' }, dueno.token);
-  chk('…el nuevo queda con PRO', r.j.plan_efectivo === 'pro' && r.j.subscription.status === 'active', r.j);
-  r = await api('/estado', { negocio: neg, equipo: 'AAAA-1111' }, dueno.token);
-  chk('…y el anterior queda bloqueado («otro_equipo»)', r.j.subscription.status === 'otro_equipo' && r.j.plan_efectivo === 'free', r.j.subscription);
-  r = await api('/licencia-mover', { negocio: neg, equipo: 'BBBB-2222' }, dueno.token);
-  chk('Pasarla al mismo equipo otra vez = repetido', r.st === 200 && r.j.repetido === true, r);
-  r = await api('/licencia-mover', { negocio: neg, equipo: 'AAAA-1111' }, dueno.token);
-  chk('Otro cambio antes de 30 días → licencia_cambio_reciente', r.st === 409 && r.j.error === 'licencia_cambio_reciente', r);
-  r = await api('/estado', { negocio: neg, equipo: 'AAAA-1111' }, dueno.token);
-  chk('…y le dice desde cuándo podrá pasarla', Math.abs(Date.parse(r.j.licencia_equipo.mover_desde) - (Date.now() + 30 * DIA)) < DIA, r.j.licencia_equipo);
-  await sb.sql("update licencia_usos set movida_en = now() - interval '31 days' where licencia_id = $1", [lic.id]);
-  r = await api('/licencia-mover', { negocio: neg, equipo: 'AAAA-1111' }, dueno.token);
-  chk('Pasados 30 días sí se puede volver a cambiar', r.st === 200 && r.j.repetido === false, r);
-  const nPlano = (await rpc('crear_negocio', { p_nombre: 'Sede Norte', p_datos: {} }, sinNeg.token)).j;
-  await api('/admin/dar', { negocio: nPlano, plan: 'pro', meses: 1 }, admin.token);
-  const ea = (await api('/estado', { negocio: nPlano, equipo: 'CCCC-3333' }, sinNeg.token)).j, eb = (await api('/estado', { negocio: nPlano, equipo: 'DDDD-4444' }, sinNeg.token)).j;
-  chk('Un plan que NO es de licencia (activado por el administrador / pagado) sirve en todos los equipos', ea.plan_efectivo === 'pro' && eb.plan_efectivo === 'pro' && !eb.licencia_equipo, { ea: ea.subscription, eb: eb.subscription });
+  // ===== Un negocio por cuenta (la suscripción sirve en todos sus equipos, pero no en otro negocio) =====
+  r = await rpc('crear_negocio', { p_nombre: 'Segunda sede', p_datos: {} }, dueno.token);
+  chk('El dueño NO puede crear otro negocio u otra sede con la misma cuenta', r.st >= 400 && /un_negocio_por_cuenta/.test(JSON.stringify(r.j)), r);
+  r = await rpc('crear_negocio', { p_nombre: 'Sede Norte', p_datos: {} }, sinNeg.token);
+  chk('…tampoco otra cuenta que ya tiene su negocio', r.st >= 400 && /un_negocio_por_cuenta/.test(JSON.stringify(r.j)), r);
+  r = await rpc('mi_negocio_propio', {}, dueno.token);
+  chk('La app puede preguntar cuál es el negocio de la cuenta', r.st === 200 && r.j === neg, r);
+  r = await rpc('pasar_negocio_a', { p_negocio: neg, p_email: 'sin.negocio@x.co' }, dueno.token);
+  chk('No se puede pasar el negocio a una cuenta que ya es dueña de otro', r.st >= 400 && /un_negocio_por_cuenta/.test(JSON.stringify(r.j)), r);
+  const e1 = (await api('/estado', { negocio: neg }, dueno.token)).j, e2 = (await api('/estado', { negocio: neg }, dueno.token)).j;
+  chk('La licencia del negocio sirve en varios equipos a la vez (computador, tablet, celular)', e1.plan_efectivo === 'pro' && e2.plan_efectivo === 'pro', { e1: e1.subscription, e2: e2.subscription });
   r = await api('/admin/licencias', {}, admin.token);
   const l1 = (r.j.licencias || []).find(x => x.id === lic.id) || {};
-  chk('Lista de licencias con quién la usó, en qué equipo y cuántos cambios', r.st === 200 && r.j.licencias.length === 4 && l1.usos === 1 && l1.activaciones[0].negocio === 'Bar Las Palmas' && l1.correos.find(c => c.email === 'dueno@bar.co').usada &&
-    l1.activaciones[0].equipo === 'AAAA-1111' && l1.activaciones[0].cambios === 2, l1);
+  chk('Lista de licencias con quién la usó', r.st === 200 && r.j.licencias.length === 4 && l1.usos === 1 && l1.activaciones[0].negocio === 'Bar Las Palmas' && l1.correos.find(c => c.email === 'dueno@bar.co').usada, l1);
   r = await api('/admin/licencia_revocar', { licencia: licFecha.id, quitar_acceso: true }, admin.token);
   chk('Anular una licencia y quitar el acceso', r.st === 200 && r.j.licencia.estado === 'revocada', r);
   r = await api('/estado', { negocio: n2 }, sinNeg.token);
@@ -245,9 +222,9 @@ async function pruebas(sb) {
   // ===== La migración se puede volver a correr =====
   let errMig = null;
   try { await sb.sql(fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', '20261015000000_admin_soporte_licencias.sql'), 'utf8')); } catch (x) { errMig = x.message; }
-  try { if(!errMig) await sb.sql(fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', '20261020000000_licencias_un_equipo.sql'), 'utf8')); } catch (x) { errMig = x.message; }
-  const eqDespues = await uno("select equipo, cambios from licencia_usos where licencia_id = $1", [lic.id]);
-  chk('Las migraciones se vuelven a correr sin errores ni perder datos (ni el equipo de la licencia)', !errMig && (await uno('select count(*) n from licencias')).n === 4 && eqDespues.equipo === 'AAAA-1111' && eqDespues.cambios === 2, errMig || eqDespues);
+  try { if(!errMig) await sb.sql(fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', '20261020000000_licencias_un_negocio.sql'), 'utf8')); } catch (x) { errMig = x.message; }
+  r = await rpc('crear_negocio', { p_nombre: 'Otra más', p_datos: {} }, dueno.token);
+  chk('Las migraciones se vuelven a correr sin errores ni perder datos (y la regla sigue)', !errMig && (await uno('select count(*) n from licencias')).n === 4 && r.st >= 400, errMig || r);
 }
 
 (async () => {

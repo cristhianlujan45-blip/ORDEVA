@@ -26,15 +26,8 @@ const b64u = b => Buffer.from(b).toString('base64').replace(/\+/g, '-').replace(
   const firmar = async pl => { const a = b64u(JSON.stringify(pl)); const sig = await S.sign({ name: 'ECDSA', hash: 'SHA-256' }, llave.privateKey, Buffer.from(a)); return a + '.' + b64u(Buffer.from(sig)); };
 
   // «Base de datos» simulada: la suscripción del negocio. Cambiarla aquí = que el administrador la cambie.
-  const bd = { sub: { status: 'active', plan: 'free', expiry: 0 }, offline: false, vidaToken: 72 * H, pedidos: 0, rol: 'dueno', ultimo: null, pendiente: null, lic: null, movidas: [], equipos: [] };
-  async function respEstado(eq){
-    bd.equipos.push(eq);
-    // Licencia con código en otro equipo: «otro_equipo», sin funciones (como el servidor de verdad)
-    if(bd.lic && bd.lic.equipo !== eq){
-      const now = Date.now(), token = await firmar({ t: 'vento-sub', n: NEG, p: 'free', s: 'otro_equipo', e: [], v: 0, i: now, h: now + bd.vidaToken });
-      return { ok: true, subscription: { id: 'sub-1', status: 'otro_equipo', plan_id: 'pro', source: 'admin', expiry_date: new Date(now + 30 * DIA).toISOString() }, plan_efectivo: 'free',
-        pending_payment: null, last_payment: null, renew_notice: false, rol: bd.rol, token, licencia_equipo: { codigo: bd.lic.codigo, desde: new Date(now - DIA).toISOString(), mover_desde: new Date(bd.lic.moverDesde || now).toISOString() } };
-    }
+  const bd = { sub: { status: 'active', plan: 'free', expiry: 0 }, offline: false, vidaToken: 72 * H, pedidos: 0, rol: 'dueno', ultimo: null, pendiente: null };
+  async function respEstado(){
     const now = Date.now(), s = bd.sub, activo = s.status === 'active' && (!s.expiry || s.expiry > now), pe = activo ? s.plan : 'free';
     const token = await firmar({ t: 'vento-sub', n: NEG, p: pe, s: s.status, e: ENTS[pe], v: s.expiry || 0, i: now, h: now + bd.vidaToken });
     return { ok: true, subscription: { id: 'sub-1', status: s.status, plan_id: s.plan, source: 'admin', expiry_date: s.expiry ? new Date(s.expiry).toISOString() : null, updated_at: new Date(now).toISOString() },
@@ -52,9 +45,7 @@ const b64u = b => Buffer.from(b).toString('base64').replace(/\+/g, '-').replace(
       const json = (status, j) => r.fulfill({ status, headers: CORS, contentType: 'application/json', body: JSON.stringify(j) });
       if(m[1] === 'clave') return json(200, { ok: true, jwk: PUB });
       if(m[1] === 'planes') return json(200, { ok: true, planes: PLANES, config: {}, proveedores: ['manual'] });
-      let cuerpo = {}; try{ cuerpo = JSON.parse(req.postData() || '{}'); }catch(e){}
-      if(m[1] === 'estado'){ bd.pedidos++; return json(200, await respEstado(cuerpo.equipo)); }
-      if(m[1] === 'licencia-mover'){ bd.movidas.push(cuerpo); bd.lic.equipo = cuerpo.equipo; return json(200, { ok: true, codigo: bd.lic.codigo, repetido: false }); }
+      if(m[1] === 'estado'){ bd.pedidos++; return json(200, await respEstado()); }
       return json(404, { ok: false });
     });
     await ctx.addInitScript(({ neg, nube }) => {
@@ -142,24 +133,6 @@ const b64u = b => Buffer.from(b).toString('base64').replace(/\+/g, '-').replace(
     await aviso();
     chk('Cajero con la suscripción sin pagar: bloqueado, sin botón (le toca al dueño)', await listo(p, () => /el dueño o el administrador del negocio debe pagar/.test((document.getElementById('vpOv') || {}).innerText || '') && !document.querySelector('#vpOv button'), 4000), JSON.stringify(await puerta(p)));
     bd.rol = 'dueno'; bd.ultimo = null;
-
-    // ---------- Licencia con código en OTRO equipo ----------
-    bd.sub = { status: 'active', plan: 'pro', expiry: Date.now() + 30 * DIA };
-    const miEquipo = await p.evaluate(() => ventoSuscripcion.equipo());
-    chk('La app manda el código de este equipo al servidor', /^[A-Za-z0-9_-]{6,64}$/.test(miEquipo) && bd.equipos.includes(miEquipo), miEquipo);
-    bd.lic = { codigo: 'VENTO-ABCD-EFGH-JKLM', equipo: 'OTRO-9999', moverDesde: 0 };
-    await aviso();
-    chk('Licencia en otro equipo: bloqueada con «Tu licencia está en otro equipo» y el código', await listo(p, () => /Tu licencia está en otro equipo/.test((document.getElementById('vpOv') || {}).innerText || '') && /VENTO-ABCD-EFGH-JKLM/.test(document.getElementById('vpOv').innerText), 4000), JSON.stringify(await puerta(p)));
-    chk('…con el botón «📲 Pasar mi licencia a este equipo» (y dice que otra sede = otra licencia)', await p.evaluate(() => !!document.querySelector('#vpOv [data-vp="mover"]') && /otra sede, compra otra licencia/.test(document.getElementById('vpOv').innerText)));
-    p.once('dialog', d => d.accept());
-    await p.evaluate(() => document.querySelector('#vpOv [data-vp="mover"]').click());
-    chk('Pasarla: le pide al servidor moverla a ESTE equipo', await listo(p, () => true, 100) && await (async () => { for(let i = 0; i < 40 && !bd.movidas.length; i++) await p.waitForTimeout(100); return bd.movidas.length === 1 && bd.movidas[0].equipo === miEquipo && bd.movidas[0].negocio === NEG; })(), JSON.stringify(bd.movidas));
-    chk('…y la app se abre en este equipo con PRO', await listo(p, () => !document.getElementById('vpOv') && ventoSuscripcion.estado().plan === 'pro', 5000), JSON.stringify(await puerta(p)));
-    // Si ya se cambió hace poco: no hay botón, dice desde cuándo
-    bd.lic = { codigo: 'VENTO-ABCD-EFGH-JKLM', equipo: 'OTRO-9999', moverDesde: Date.now() + 20 * DIA };
-    await aviso();
-    chk('Cambiada hace poco: sin botón y con la fecha desde la que podrá pasarla', await listo(p, () => /podrás pasarla desde el/.test((document.getElementById('vpOv') || {}).innerText || '') && !document.querySelector('#vpOv [data-vp="mover"]'), 4000), JSON.stringify(await puerta(p)));
-    bd.lic = null;
 
     // El administrador vuelve a activar → se abre sola
     bd.sub = { status: 'active', plan: 'pro', expiry: Date.now() + 30 * DIA };

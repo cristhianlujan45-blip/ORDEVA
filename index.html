@@ -5702,6 +5702,9 @@ function wireSedesUI(){
   if(addBtn && input) addBtn.addEventListener('click', async () => {
     const name = input.value.trim();
     if(!name){ showToast('Escribe el nombre de la sede o negocio.'); return; }
+    // Un negocio por cuenta: con la cuenta de Vento, otra sede u otro negocio necesita OTRA cuenta con su propia
+    // suscripción o licencia (el servidor tampoco deja crear un segundo negocio con la misma cuenta).
+    if(sedeUnaPorCuenta()){ showToast('🏢 Tu cuenta es de un solo negocio. Para otra sede u otro negocio crea otra cuenta de Vento con su propia suscripción o licencia.', 9000); return; }
     // Sedes adicionales: se pagan. Sin un código de activación válido, se muestra cómo pagar.
     if(typeof licPuedeAgregarSede === 'function' && !licPuedeAgregarSede()){ licPaywall(name); return; }
     const sede = await addSede(name);
@@ -26094,13 +26097,15 @@ async function licCargar(){
   licPintar();
   try{ subAplicar(); }catch(e){}
 }
+// Con cuenta de Vento Nube (y sin ser el proveedor) la cuenta es de un solo negocio: no se agregan sedes en ella.
+function sedeUnaPorCuenta(){ try{ return !!(window.ventoNube && window.ventoNube.negocio && window.ventoNube.negocio()) && !(typeof subEsProv === 'function' && subEsProv()); }catch(e){ return false; } }
 function licPuedeAgregarSede(){ return sedesList().length < SEDES_INCLUIDAS + licExtra; }
 function licPintar(){
   const box = document.getElementById('licPlan'); if(!box) return;
   const usadas = sedesList().length, total = SEDES_INCLUIDAS + licExtra;
   box.innerHTML = '<b>Tu plan:</b> ' + total + (total === 1 ? ' sede' : ' sedes') + ' (' + SEDES_INCLUIDAS + ' incluida' + (licExtra ? ' + ' + licExtra + ' pagada' + (licExtra > 1 ? 's' : '') : '') + ') · usas ' + usadas + '.' +
     (licInfo && licInfo.v ? ' Vence el ' + new Date(licInfo.v).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' }) + '.' : '') +
-    '<br>Código de tu negocio: <b>' + codigoNegocio() + '</b> · <a href="#" id="licOpen" style="color:var(--cream);font-weight:700">Activar más sedes</a>';
+    '<br>Código de tu negocio: <b>' + codigoNegocio() + '</b>' + (sedeUnaPorCuenta() ? '<br>Tu cuenta es de un solo negocio: para otra sede, crea otra cuenta con su propia suscripción.' : ' · <a href="#" id="licOpen" style="color:var(--cream);font-weight:700">Activar más sedes</a>');
   const a = document.getElementById('licOpen'); if(a) a.onclick = e => { e.preventDefault(); licPaywall(''); };
 }
 async function licActivar(texto, silencioso){
