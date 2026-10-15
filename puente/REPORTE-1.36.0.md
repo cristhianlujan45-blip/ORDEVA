@@ -1,4 +1,26 @@
-# Vento 1.36.0 — Ventana de YouTube grande, DaviPlata que avisa «Pagaron $X», 10 canciones por mesa y sonido de la mesa a tu gusto
+# Vento 1.36.0 — El panel de YouTube sí pone las canciones, ventana de YouTube grande, DaviPlata que avisa «Pagaron $X», 10 canciones por mesa y sonido de la mesa a tu gusto
+
+## 0. Arreglo: el panel de YouTube no ponía las canciones
+- **El problema:** con el reproductor de Vento apagado (así viene el celular), «⏭ Que siga», «➕ Cola» o «▶ Poner» una
+  lista **solo dejaban la canción en la cola**. No sonaba nada.
+- **Ahora:** si en ese equipo nadie la va a poner (ni el TV ni YouTube Music sonando), **se prende solo el reproductor
+  de Vento y suena**. Avisa: «Encendí el reproductor de Vento…». Con el modo TV, la canción sigue yendo al TV.
+- **Canciones por QR:**
+  - después de la que pusiste suenan solas, una tras otra;
+  - si llega una por QR y no hay ningún reproductor prendido, el aviso dice cómo hacer que suene (Música → «🎶 Activar
+    música automática»).
+- **Arreglo: se perdían canciones de las mesas.**
+  - **Qué pasaba:** salía «No encontré una versión de … que se pueda reproducir» aunque la búsqueda sí la encontraba.
+  - **Por qué:** el chequeo extra de YouTube respondía vacío (cupo, clave sin permiso…) y Vento lo tomaba como «no se
+    puede».
+  - **Ahora:** solo se descarta lo que YouTube dice que está bloqueado. El probador de la app igual revisa cada video
+    antes de que suene.
+- **Sin límite de YouTube para las mesas:**
+  - **La búsqueda** va por el Servidor Vento, que no gasta cupo de Google.
+  - **El cupo de la lista de YouTube Music:** si se acaba, Vento sigue con su propio reproductor.
+  - **El canal de pedidos:** recibe hasta 240 mensajes por minuto por negocio. Si alguna vez se llena, el celular del
+    cliente reintenta solo.
+  - **Lo único que limita es la regla de 10 canciones por mesa cada 15 minutos** (punto 3).
 
 ## 1. Ventana de YouTube grande, como YouTube normal
 - **Se abre como una ventana nueva y ocupa toda la pantalla.** En el computador deja un margen pequeño.
@@ -70,6 +92,7 @@
 
 ## Pruebas
 - **Nuevas:**
+  - `panelsuena`: 15 comprobaciones, con el celular como viene (reproductor apagado, sin Google ni TV);
   - `ventanayoutube`: 30 comprobaciones, en computador y celular;
   - `pagosguia`: 29 comprobaciones;
   - `cancionesmesa`: 14 comprobaciones, contra el servidor local real;

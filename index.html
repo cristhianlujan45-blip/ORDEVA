@@ -21048,7 +21048,7 @@ function procesar(txt){
     if(o&&o.t==='pedido'){pedidoEntrante(o,'qr');return;}
     if(o&&o.t==='cancion'){const id=parseInt(o.mesa,10);if(!id)return;const r=agregarCancion(id,String(o.s||'').slice(0,120),String(o.id||'').slice(0,40));
       // Mesa sin cupo: se le avisa al celular que la pidió (por el canal de estados) en vez de dejarla esperando.
-      if(r.limite){try{const cn=qCanalOk(window.__canalTopic)?window.__canalTopic:qCfg().topic;fetch('https://canal.vento.local/'+cn+'e',{method:'POST',body:JSON.stringify({t:'estado',id:String(o.id||'').slice(0,40),e:'limite',m:id,min:r.min,max:MAX,n:r.msg,at:Date.now()})}).catch(()=>{});}catch(e){}return;}if(r.nuevo!==false&&notifMusica()){showToast(r.msg);ventoAvisoCel('🎵 Canción · '+tableLabel(id),String(o.s||'').slice(0,120),'musica');}renderMusica();return;}
+      if(r.limite){try{const cn=qCanalOk(window.__canalTopic)?window.__canalTopic:qCfg().topic;fetch('https://canal.vento.local/'+cn+'e',{method:'POST',body:JSON.stringify({t:'estado',id:String(o.id||'').slice(0,40),e:'limite',m:id,min:r.min,max:MAX,n:r.msg,at:Date.now()})}).catch(()=>{});}catch(e){}return;}if(r.nuevo!==false&&notifMusica()){showToast(r.msg+(mzSinReproductor()?' · Para que suene: Música → «🎶 Activar música automática».':''),mzSinReproductor()?8000:0);ventoAvisoCel('🎵 Canción · '+tableLabel(id),String(o.s||'').slice(0,120),'musica');}renderMusica();return;}
     if(o&&o.t==='estado')return;                                   // eco de nuestros propios avisos
     if(o&&o.t==='prueba'){if(o.id&&window.__qPrueba&&window.__qPrueba[o.id])window.__qPrueba[o.id](window.__canalTopic);return;}
   }
@@ -21060,7 +21060,7 @@ function procesar(txt){
   // Antes, si la mesa del QR no existía en la app (ej. se bajó el número de mesas), el pedido se
   // botaba en silencio. Ahora la mesa se crea sola para no perder nada.
   if(!data.tables[id])asegurarMesa(id);
-  if(tp==='CANCION'){const r=agregarCancion(id,cuerpo,window.__canalMsgId?'t'+window.__canalMsgId:null);if(r.nuevo!==false&&notifMusica()){showToast(r.msg);ventoAvisoCel('🎵 Canción · '+tableLabel(id),cuerpo,'musica');}renderMusica();}
+  if(tp==='CANCION'){const r=agregarCancion(id,cuerpo,window.__canalMsgId?'t'+window.__canalMsgId:null);if(r.nuevo!==false&&notifMusica()){showToast(r.msg+(mzSinReproductor()?' · Para que suene: Música → «🎶 Activar música automática».':''),mzSinReproductor()?8000:0);ventoAvisoCel('🎵 Canción · '+tableLabel(id),cuerpo,'musica');}renderMusica();}
   else if(tp==='CUENTA'){
     /* Si el cliente avisó que ya pagó (botón "Ya pagué" del QR o de Nequi en pedido.html), el
        aviso trae el MONTO y la APP (Nequi, Bancolombia, Daviplata, Bre-B…) en el cuerpo — se
@@ -21400,8 +21400,9 @@ async function mzPonerLista(id,nombre,boton){
     mzFondoQuitar(true);
     const mezclar=!!($('mzPlMezclar')&&$('mzPlMezclar').checked),repetir=!($('mzPlRepetir')&&!$('mzPlRepetir').checked);
     SS(MZF_KEY,{on:true,id,nombre:nom,vids:mezclar?mzMezclar(L.vids):L.vids,pos:0,mezclar,repetir});
+    const pr=mzAsegurarReproductor(true);                     // que suene de verdad en este equipo si nadie más la pone
     mzFondoRellenar();
-    showToast('🎶 Sonando de fondo: «'+nom+'» ('+L.vids.length+' canciones). Lo que pidan las mesas va primero.',7000);
+    showToast('🎶 Sonando de fondo: «'+nom+'» ('+L.vids.length+' canciones). Lo que pidan las mesas va primero.'+(pr==='prendido'?' Encendí el reproductor de Vento: suena en este equipo.':''),7000);
     try{renderMusica();}catch(e){}
     return true;
   }finally{if(boton){boton.disabled=false;boton.textContent=boton.dataset.t||'▶ Poner';}}
@@ -21801,7 +21802,9 @@ async function ySearch(q,excluir){
       ok[v.id]=st.embeddable!==false&&st.privacyStatus==='public'&&!bloqReg&&!edad;
       const dur=ytDur(cd.duration);if(dur)ytDurCache[v.id]=dur;
     });
-    if(d&&d.items)cands=cands.filter(x=>ok[x.v]);
+    // Solo se descartan las que YouTube dice que NO se pueden poner. Una respuesta vacía (cupo, clave sin permiso…) no es
+    // un «no»: antes así se perdía la canción de la mesa («No encontré una versión…»); el probador de la app igual la revisa.
+    if(d&&d.items&&d.items.length)cands=cands.filter(x=>ok[x.v]!==false&&(x.v in ok));
   }catch(e){}
   cands.sort((a,b)=>SELLO_RE.test(a.canal)-SELLO_RE.test(b.canal));
   if(cands.length)window.ytFallo=null;   // la canción sí se encontró (aunque el chequeo extra haya fallado)
@@ -22196,6 +22199,28 @@ async function verificarCola(){
 function ytMostrar(si){
   const b=$('ytBox');if(!b)return;
   b.classList.toggle('yt-espera',!si);
+}
+/* Poner música desde el panel de YouTube (o «▶ Poner» una lista) es querer que suene YA. Antes, con el reproductor de
+   Vento apagado (así viene) la canción solo quedaba en la cola y no sonaba nada. Ahora, si en este equipo nadie la va a
+   reproducir (ni el TV, ni YouTube Music sonando), se prende el reproductor de Vento, igual que «Activar música automática». */
+const mzHayTV=()=>tvOn()||(typeof lngOn==='function'&&lngOn());
+const mzConYTMusic=()=>{const a=mzActual();return !!(yTok()&&!ySinCupo()&&a&&a.fuente==='ytmusic');};
+const mzSinReproductor=()=>!AUTO()&&!mzHayTV()&&!(yTok()&&!ySinCupo());
+function mzAsegurarReproductor(callado){
+  gestoUsuario=true;
+  if(mzHayTV()||mzConYTMusic())return false;
+  let prendi=false;
+  if(!AUTO()){prendi=true;
+    const a=$('autoPlay');
+    if(a&&a.onchange){a.checked=true;a.dispatchEvent(new Event('change'));}
+    else{SS('vito_auto_play',{on:true});const b=$('ytBox');if(b)b.hidden=false;}
+    SS('vito_auto_por_cupo',0);
+    if(!callado)showToast('🎶 Encendí el reproductor de Vento: lo que pongas aquí y lo que pidan las mesas por QR suena en este equipo, una tras otra.',7000);
+  }
+  try{cargarAPI();}catch(e){}
+  try{if(yPl&&yPl.getPlayerState&&yPl.getPlayerState()===2&&!pausaManual)yPl.playVideo();}catch(e){}
+  try{mzAutoPintar();}catch(e){}
+  return prendi?'prendido':true;
 }
 function siguienteAuto(){
   if(!AUTO()||!yListo||sonando)return;
@@ -22604,6 +22629,7 @@ function ypAgregar(v,primero,callado){
     title:String(v.title||'').slice(0,80),artist:String(v.artist||'').slice(0,60),vid:v.vid,dur:v.dur||ytDurCache[v.vid]||null,ts:now,done:false,status:'pending',panel:true};
   if(primero)it.primero=now;
   l.push(it);SS('vito_cola',l);mzRespaldo();
+  try{mzAsegurarReproductor();}catch(e){}                  // que suene de verdad (antes quedaba en la cola sin sonar)
   try{ytAgregar(it.id);}catch(e){}try{tvPublicar();}catch(e){}try{verificarCola();}catch(e){}try{siguienteAuto();}catch(e){}
   try{renderMusica();}catch(e){}
   if(!callado)showToast(primero?'⏭ «'+it.title+'» suena después de la actual.':'➕ «'+it.title+'» a la cola.');
