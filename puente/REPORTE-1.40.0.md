@@ -1,0 +1,67 @@
+# Vento 1.40.0 — Licencias únicas y un negocio por cuenta, plan gratis al vencer, soporte con fotos, conexión siempre viva y revisión de seguridad
+
+## 1. Licencias y suscripciones: varios equipos sí, otro negocio no
+- **La suscripción o licencia sirve en TODOS los equipos del negocio a la vez** (computador, tablet, celular…).
+- **Una licencia = un cliente y un negocio:** un solo uso y máximo un correo. Las licencias viejas con varios usos
+  quedaron con los usos que ya tuvieron.
+- **No se puede tener otro negocio u otra sede con la misma cuenta:**
+  - el servidor no deja crear un segundo negocio a una cuenta que ya es dueña de uno;
+  - no deja pasar un negocio a una cuenta que ya tiene el suyo;
+  - la licencia vigente de un correo no se activa en otro negocio;
+  - en la app, «Agregar sede» con cuenta de Vento dice que otra sede necesita otra cuenta con su propia suscripción.
+  Las cuentas que ya tenían varios negocios los conservan.
+
+## 2. Plan vencido → modo gratis; cancelada → solo pagar
+- **Vencida, pago rechazado, sin pagar o pago en revisión:** la app sigue en el plan **Gratis** con sus funciones
+  limitadas (vender, mesas, inventario y gastos, según el plan Gratis del panel). Las PRO piden el plan.
+- **Cancelada por el administrador:** bloqueada con un solo botón, «💳 Pagar para reactivar».
+
+## 3. Soporte con fotos y pantallazos, y avisos al administrador
+- **En la app** (Ajustes → Guía y soporte): «📎 Agregar fotos o pantallazos» (hasta 3) al escribir y «📎 Foto» al
+  responder. Se achican en el celular (JPEG, máx. 1600 px) y las sube el servidor a un almacenamiento **privado**.
+- **En el panel (🎧 Soporte):** «🖼 Ver imagen» en cada mensaje, con un enlace firmado que vence en 10 minutos.
+- **Avisos al instante:** cada mensaje o foto nueva llega al panel en tiempo real, con notificación:
+  - en la **app Android de Administrador**, como notificación del celular, también bloqueado;
+  - en el **navegador**, con 🔔 («Recibir notificaciones en este equipo»), por push aunque el panel esté cerrado.
+  También avisa cada **pago nuevo para revisar**. Como mucho un aviso cada 20 s por caso.
+
+## 4. Conexión siempre viva
+- **Vento Admin (Android):** servicio en primer plano («Vento Admin conectado») con el procesador y el wifi
+  despiertos. Despierta el panel cada 10 s, pide quitar el ahorro de batería y el tiempo real se reconecta solo.
+- **Vento (Android):** ya tenía su servicio de fondo (pedidos, música y pagos con la pantalla bloqueada).
+- **Mesero, pantalla de preparación y TV (navegador):** la pantalla no se apaga mientras están abiertas y, si el
+  sistema las congela, al despertar se ponen al día al instante. Los mensajes se guardan 8 días, no se pierde nada.
+- Un navegador web normal no puede seguir trabajando con el celular bloqueado. Para eso está la app Android:
+  meseros y caja pueden usar Vento (APK) con su cuenta.
+
+## 5. Vento Admin se actualiza solo
+- Revisa `version.txt` al abrir, cada 2 minutos y al volver. Con versión nueva: si está libre se recarga sin caché;
+  si estás escribiendo, muestra «🔄 Actualizar ahora». Sin bucles.
+
+## 6. Revisión de seguridad
+- **Base de datos:**
+  - las tablas del negocio no aceptan escrituras directas de nadie de afuera, y sin cuenta no se pueden ni leer;
+  - `admin_correos` con RLS;
+  - las funciones del servidor no se pueden llamar desde la app, y todas las privilegiadas fijan su `search_path`.
+- **Administrador amarrado a su cuenta:** como las cuentas se confirman solas (sin correo SMTP), cualquiera podía crear
+  una cuenta con un correo de administrador no registrado y entrar al panel. Ahora la primera vez que el administrador
+  entra, su cuenta queda amarrada; otra cuenta con ese correo, aunque la borren y la vuelvan a crear, no entra.
+- **Topes globales contra abuso sin cuenta:**
+  - canales en vivo: 6.000 mensajes por minuto en todo Vento;
+  - soporte sin cuenta: 300 casos y 300 imágenes por hora;
+  - equipos nuevos sin cuenta: 500 por hora.
+- **CORS de producción:** solo el sitio de Vento; se quitó `localhost`.
+- **Ataque real por el QR:** HTML/JS malicioso en pedidos, canciones, domicilios y «pide la cuenta» no se ejecuta ni en
+  la app del negocio ni en la pantalla de preparación (prueba `seguridadqr`).
+- **Pendiente (recomendado):** el puente de la app Android (`VentoAndroid`) también lo pueden usar los iframes de la
+  página, como el reproductor de YouTube. Cerrarlo bien requiere pasar a `WebViewCompat.addWebMessageListener`
+  restringido al sitio de Vento. Es un cambio grande, no se hizo a la carrera.
+
+## Servidor y migraciones
+- `20261018000000_suscripciones_tiempo_real` (ya aplicada), `20261019000000_suscripciones_reactivar` (ya aplicada),
+  `20261020000000_licencias_un_negocio`, `20261021000000_soporte_fotos_avisos`, `20261022000000_seguridad`.
+- Rutas nuevas: `/soporte-adjunto`, `/soporte-avisar`, `/admin/soporte_imagen`, `/admin/push_guardar`, `/admin/push_clave`.
+
+## Pruebas
+- `servidor/admin` 95, `servidor/suscripciones` 154, `adminsubreal` 35, `adminreal` 44, `cuentacliente` 35,
+  `puertaytiemporeal` 29, `adminversion` 7, `seguridadqr` 6 (nueva) y el resto de la suite.
