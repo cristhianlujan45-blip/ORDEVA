@@ -14,7 +14,7 @@
   navegador**, no a la app, y de ahí en adelante se seguía usando la web.
 
 ## Qué cambió
-- **El acceso directo de la web ahora se llama «Vento Web".** La app sigue siendo «Vento». El nombre del acceso directo
+- **El acceso directo de la web ahora se llama «Vento Web».** La app sigue siendo «Vento». El nombre del acceso directo
   se actualiza solo en unos días; también se puede borrar el de «Vento Web» y dejar solo la app.
 - **En Vento Web en un Android, Vento lo dice claro:**
   - el paso a paso dice **«Estás en Vento Web»** y tiene el botón **«📲 Abrir la app Vento»** (si la app no está
@@ -33,7 +33,7 @@
 
 ## Qué hacer en el celular
 1. Instala la app nueva (vento.apk) encima de la que tienes.
-2. Abre **la app «Vento»**, no «Vento Web". Si no sabes cuál es, entra a Vento Web → Ajustes → 💜 Pagos → «📲 Abrir la
+2. Abre **la app «Vento»**, no «Vento Web». Si no sabes cuál es, entra a Vento Web → Ajustes → 💜 Pagos → «📲 Abrir la
    app Vento».
 3. En la app: Ajustes → 💜 Pagos → «Recibir avisos de pagos». Si pide el permiso «Acceso a notificaciones», actívalo
    para Vento.
