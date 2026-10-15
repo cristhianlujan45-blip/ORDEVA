@@ -48,6 +48,18 @@
 - Un navegador web normal no puede seguir trabajando con el celular bloqueado. Para eso está la app Android:
   meseros y caja pueden usar Vento (APK) con su cuenta.
 
+## 4b. Voz de los pagos con volumen parejo (app Android)
+- **Qué pasaba:** al llegar un pago, la voz empezaba bajito y después subía. El refuerzo de volumen era un compresor
+  (LoudnessEnhancer) que sube la ganancia de a poco, y la salida de audio (parlante o Bluetooth) tardaba en despertar.
+- **Ahora:** la frase se graba y se toca con el volumen **parejo de principio a fin** (`AvisoPago.vozPareja`):
+  - 0,4 s de silencio antes de hablar, para que la salida ya esté despierta en la primera palabra;
+  - todas las frases al mismo nivel;
+  - por encima de 100 %, una ganancia fija con tope suave (sin chasquidos), sin compresor.
+  Así «Pago confirmado. 1.200 pesos…» suena igual de fuerte de la primera a la última palabra. Si el celular no
+  puede grabar la frase, se dice normal con el mismo silencio de arranque.
+- Prueba `pruebas/java/AvisoPagoPrueba` (90): misma ganancia en toda la frase, silencio inicial, 100 % al mismo
+  nivel, 150 % más fuerte sin pasarse del tope.
+
 ## 5. Vento Admin se actualiza solo
 - Revisa `version.txt` al abrir, cada 2 minutos y al volver. Con versión nueva: si está libre se recarga sin caché;
   si estás escribiendo, muestra «🔄 Actualizar ahora». Sin bucles.

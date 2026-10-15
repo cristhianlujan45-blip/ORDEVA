@@ -257,8 +257,9 @@ public class VentoApp extends Application {
             pagosHablando++;
             // Por si el motor de voz nunca avisa que terminó: la música y el volumen vuelven solos.
             ui.postDelayed(() -> { if (pagosHablando > 0) { pagosHablando = 0; subirMusica(); } }, 25000);
-            if (AvisoPago.refuerzo(volPagos()) > 0) {
-                // Más fuerte de lo normal: se graba la frase y se toca reforzada.
+            {
+                // Se graba la frase y se toca con el volumen PAREJO de principio a fin (AvisoPago.vozPareja): silencio
+                // corto para que la salida despierte, mismo nivel siempre y, arriba de 100 %, ganancia fija con tope suave.
                 java.io.File f = new java.io.File(app.getCacheDir(), "pago" + System.nanoTime() + ".wav");
                 String id = "arch" + System.nanoTime();
                 archivosPago.put(id, new Object[]{f, frase});
@@ -273,10 +274,25 @@ public class VentoApp extends Application {
     }
 
     private static void decirDirecto(String frase) {
+        // Silencio corto antes: la salida de audio ya está despierta en la primera palabra (no empieza bajito).
+        try { if (ttsPago != null && Build.VERSION.SDK_INT >= 21) ttsPago.playSilentUtterance(400, TextToSpeech.QUEUE_ADD, "sil" + System.nanoTime()); } catch (Exception ignorado) { }
         if (ttsPago == null || ttsPago.speak(frase, TextToSpeech.QUEUE_ADD, null, "pago" + System.nanoTime()) != TextToSpeech.SUCCESS) pagoTermino();
     }
 
+    /** Lee el WAV grabado y lo deja con el volumen parejo (null si no se pudo: se toca tal cual). */
+    private static boolean emparejar(java.io.File f) {
+        try {
+            byte[] b = new byte[(int) f.length()];
+            try (java.io.FileInputStream in = new java.io.FileInputStream(f)) { int n = 0; while (n < b.length) { int r = in.read(b, n, b.length - n); if (r < 0) break; n += r; } }
+            byte[] p = AvisoPago.vozPareja(b, volPagos(), 400);
+            if (p == null) return false;
+            try (java.io.FileOutputStream o = new java.io.FileOutputStream(f)) { o.write(p); }
+            return true;
+        } catch (Throwable e) { return false; }
+    }
+
     private static void terminoVoz(String u, boolean bien) {
+        if (u != null && u.startsWith("sil")) return;              // el silencio de antes de hablar no es el final del pago
         if (u != null && u.startsWith("arch")) {
             Object[] o = archivosPago.remove(u);
             if (o == null) return;
@@ -295,16 +311,22 @@ public class VentoApp extends Application {
         final String frase = (String) o[1];
         android.media.MediaPlayer mp = null;
         try {
+            boolean parejo = emparejar(f);
             mp = new android.media.MediaPlayer();
             mp.setAudioAttributes(atributosPago());
             mp.setDataSource(f.getPath());
             mp.prepare();
+            mp.setVolume(1f, 1f);
+            // Sin compresor (subía la ganancia de a poco): el refuerzo ya va fijo en el audio. Solo si no se pudo
+            // emparejar el archivo y se pidió más de 100 %, se usa el refuerzo del sistema como antes.
             android.media.audiofx.LoudnessEnhancer le = null;
-            try {
-                le = new android.media.audiofx.LoudnessEnhancer(mp.getAudioSessionId());
-                le.setTargetGain(AvisoPago.refuerzo(volPagos()));
-                le.setEnabled(true);
-            } catch (Throwable ignorado) { }
+            if (!parejo && AvisoPago.refuerzo(volPagos()) > 0) {
+                try {
+                    le = new android.media.audiofx.LoudnessEnhancer(mp.getAudioSessionId());
+                    le.setTargetGain(AvisoPago.refuerzo(volPagos()));
+                    le.setEnabled(true);
+                } catch (Throwable ignorado) { }
+            }
             final android.media.audiofx.LoudnessEnhancer refuerzo = le;
             final android.media.MediaPlayer jugador = mp;
             Runnable fin = () -> {

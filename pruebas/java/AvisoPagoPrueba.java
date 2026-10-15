@@ -5,6 +5,7 @@ package co.vento.app;
 public class AvisoPagoPrueba {
     static int ok = 0, mal = 0;
     static void chk(String n, boolean c, Object x) { if (c) { ok++; System.out.println("✅ " + n); } else { mal++; System.out.println("❌ " + n + " → " + x); } }
+    static int maxAbs(byte[] b, int ini, int muestras) { int m = 0; for (int k = 0; k < muestras; k++) m = Math.max(m, Math.abs((short) ((b[ini + k * 2] & 0xff) | ((b[ini + k * 2 + 1] & 0xff) << 8)))); return m; }
     public static void main(String[] a) {
         String[][] recibidos = {
             {"¡Le llegó plata! MARIA LOPEZ le pasó $200 a su DaviPlata", "200"},
@@ -84,6 +85,24 @@ public class AvisoPagoPrueba {
         chk("Frase Nequi: «Pago confirmado. 25000 pesos desde Nequi.»", AvisoPago.frase("Nequi", 25000).equals("Pago confirmado. 25000 pesos desde Nequi."), AvisoPago.frase("Nequi", 25000));
         chk("Plata: $1.500.000", AvisoPago.plata(1500000).equals("$1.500.000"), AvisoPago.plata(1500000));
         chk("Plata: $200", AvisoPago.plata(200).equals("$200"), AvisoPago.plata(200));
+        // Voz de los pagos con volumen PAREJO (antes empezaba bajito y subía)
+        int fr = 22050, n = fr;                                         // 1 s de voz: la primera mitad bajita, la segunda alta
+        byte[] wav = new byte[44 + n * 2];
+        for (int k = 0; k < n; k++) { double amp = k < n / 2 ? 3000 : 12000; int v = (int) (amp * Math.sin(2 * Math.PI * 440 * k / fr));
+            wav[44 + k * 2] = (byte) v; wav[45 + k * 2] = (byte) (v >> 8); }
+        System.arraycopy("RIFF".getBytes(), 0, wav, 0, 4); System.arraycopy("WAVE".getBytes(), 0, wav, 8, 4); System.arraycopy("fmt ".getBytes(), 0, wav, 12, 4);
+        wav[16] = 16; wav[20] = 1; wav[22] = 1; wav[24] = (byte) fr; wav[25] = (byte) (fr >> 8); wav[34] = 16; System.arraycopy("data".getBytes(), 0, wav, 36, 4);
+        int dl = n * 2; wav[40] = (byte) dl; wav[41] = (byte) (dl >> 8); wav[42] = (byte) (dl >> 16);
+        byte[] p100 = AvisoPago.vozPareja(wav, 100, 400), p150 = AvisoPago.vozPareja(wav, 150, 400);
+        int sil = 400 * fr / 1000;
+        chk("Voz pareja: sale un WAV válido con 0,4 s de silencio al principio (la salida despierta antes de hablar)", p100 != null && p100.length == 44 + (sil + n) * 2 &&
+            new String(p100, 0, 4).equals("RIFF") && new String(p100, 36, 4).equals("data") && maxAbs(p100, 44, sil) == 0, p100 == null ? "null" : p100.length);
+        int pico = maxAbs(p100, 44 + sil * 2, n);
+        chk("Voz pareja: misma ganancia en TODA la frase (la parte bajita no se sube sola: sin compresor)", Math.abs((double) maxAbs(p100, 44 + sil * 2, n / 2) / maxAbs(p100, 44 + (sil + n / 2) * 2, n / 2) - 0.25) < 0.01,
+            maxAbs(p100, 44 + sil * 2, n / 2) + " / " + maxAbs(p100, 44 + (sil + n / 2) * 2, n / 2));
+        chk("Voz pareja: 100 % queda al 92 % del máximo (todas las frases al mismo nivel)", Math.abs(pico - 30145) < 60, pico);
+        chk("Voz pareja: 150 % suena más fuerte, sin pasarse del tope (sin chasquidos)", p150 != null && maxAbs(p150, 44 + (sil + n / 2) * 2, n / 2) <= 32767 && maxAbs(p150, 44 + sil * 2, n / 2) > maxAbs(p100, 44 + sil * 2, n / 2) * 2, p150 == null ? "null" : maxAbs(p150, 44 + sil * 2, n / 2));
+        chk("Voz pareja: si no es un WAV de 16 bits, no se toca (se reproduce como siempre)", AvisoPago.vozPareja("hola".getBytes(), 100, 400) == null && AvisoPago.vozPareja(new byte[60], 100, 400) == null, "");
         System.out.println("RESULTADO " + ok + " bien " + mal + " mal");
         System.exit(mal > 0 ? 1 : 0);
     }

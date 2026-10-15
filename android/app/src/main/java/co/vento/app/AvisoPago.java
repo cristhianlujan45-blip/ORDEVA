@@ -102,6 +102,62 @@ public final class AvisoPago {
     /** Refuerzo en milibelios por encima del 100 % (150 % → +12 dB). */
     static int refuerzo(int v) { v = volumen(v); return v <= 100 ? 0 : (v - 100) * 24; }
 
+    /**
+     * Voz de los pagos con volumen PAREJO de principio a fin (antes empezaba bajito y subía: el refuerzo era un
+     * compresor que sube la ganancia de a poco, y la salida de audio tardaba en despertar):
+     *  • un silencio corto al principio, para que el parlante o el Bluetooth ya estén despiertos en la primera palabra;
+     *  • la frase se lleva siempre al mismo nivel (normalizada al pico) y, por encima de 100 %, con una ganancia FIJA
+     *    a todo el audio y un tope suave (sin chasquidos).
+     * Entra y sale un WAV PCM de 16 bits (lo que graba el motor de voz). Si no es ese formato devuelve null.
+     */
+    static byte[] vozPareja(byte[] wav, int volumenPct, int silencioMs) {
+        if (wav == null || wav.length < 44 || !"RIFF".equals(ascii(wav, 0, 4)) || !"WAVE".equals(ascii(wav, 8, 4))) return null;
+        int canales = 0, frecuencia = 0, bits = 0, formato = 0, ini = -1, largo = 0;
+        for (int i = 12; i + 8 <= wav.length; ) {
+            String id = ascii(wav, i, 4);
+            int tam = le32(wav, i + 4);
+            if (tam < 0) return null;
+            if ("fmt ".equals(id) && i + 24 <= wav.length) {
+                formato = le16(wav, i + 8); canales = le16(wav, i + 10); frecuencia = le32(wav, i + 12); bits = le16(wav, i + 22);
+            } else if ("data".equals(id)) {
+                ini = i + 8; largo = Math.min(tam, wav.length - ini); break;
+            }
+            i += 8 + tam + (tam & 1);
+        }
+        if (formato != 1 || bits != 16 || canales < 1 || canales > 2 || frecuencia < 8000 || frecuencia > 96000 || ini < 0) return null;
+        int muestras = largo / 2;
+        int pico = 1;
+        for (int k = 0; k < muestras; k++) pico = Math.max(pico, Math.abs((short) le16(wav, ini + k * 2)));
+        // Al mismo nivel siempre (92 % del máximo); arriba de 100 % se refuerza con ganancia fija y tope suave.
+        double g = (32767.0 * 0.92 / pico) * Math.pow(10, refuerzo(volumenPct) / 2000.0);
+        int sil = Math.max(0, Math.min(2000, silencioMs)) * frecuencia / 1000 * canales;
+        byte[] out = new byte[44 + (sil + muestras) * 2];
+        cabecera(out, canales, frecuencia, (sil + muestras) * 2);
+        for (int k = 0; k < muestras; k++) {
+            double x = (short) le16(wav, ini + k * 2) * g / 32767.0;
+            double ax = Math.abs(x), y = ax <= 0.9 ? ax : 0.9 + 0.1 * Math.tanh((ax - 0.9) / 0.1);
+            int v = (int) Math.round(Math.signum(x) * Math.min(1.0, y) * 32767.0);
+            int o = 44 + (sil + k) * 2;
+            out[o] = (byte) v; out[o + 1] = (byte) (v >> 8);
+        }
+        return out;
+    }
+
+    private static String ascii(byte[] b, int i, int n) { return i + n <= b.length ? new String(b, i, n, java.nio.charset.StandardCharsets.US_ASCII) : ""; }
+    private static int le16(byte[] b, int i) { return (b[i] & 0xff) | ((b[i + 1] & 0xff) << 8); }
+    private static int le32(byte[] b, int i) { return (b[i] & 0xff) | ((b[i + 1] & 0xff) << 8) | ((b[i + 2] & 0xff) << 16) | ((b[i + 3] & 0xff) << 24); }
+    private static void pon32(byte[] b, int i, int v) { b[i] = (byte) v; b[i + 1] = (byte) (v >> 8); b[i + 2] = (byte) (v >> 16); b[i + 3] = (byte) (v >> 24); }
+    private static void cabecera(byte[] b, int canales, int frecuencia, int datos) {
+        byte[] t = "RIFF....WAVEfmt ".getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+        System.arraycopy(t, 0, b, 0, 16);
+        pon32(b, 4, 36 + datos); pon32(b, 16, 16);
+        b[20] = 1; b[21] = 0; b[22] = (byte) canales; b[23] = 0;
+        pon32(b, 24, frecuencia); pon32(b, 28, frecuencia * canales * 2);
+        b[32] = (byte) (canales * 2); b[33] = 0; b[34] = 16; b[35] = 0;
+        System.arraycopy("data".getBytes(java.nio.charset.StandardCharsets.US_ASCII), 0, b, 36, 4);
+        pon32(b, 40, datos);
+    }
+
     /** Nivel del volumen del celular para ese porcentaje (1 a máx). */
     static int nivel(int v, int max) { v = volumen(v); return Math.max(1, Math.min(max, Math.round(max * Math.min(100, v) / 100f))); }
 
