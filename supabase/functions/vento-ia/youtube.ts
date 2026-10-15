@@ -146,6 +146,7 @@ export async function buscar(q: string, tipo: "video" | "canal" | "lista", traer
     const r = await traer("https://www.youtube.com/results?hl=es&gl=CO&search_query=" + encodeURIComponent(q) + "&sp=" + FILTRO[tipo], { headers: h });
     if (r.ok) items = leerResultados(await r.text(), tipo, 10); else error = "YouTube respondió " + r.status;
   } catch (e) { error = e instanceof Error ? e.message : String(e); }
+  const primeraBien = !error;                               // la página respondió (aunque sin resultados)
   if (!items.length) {
     try {
       const r = await traer("https://www.youtube.com/youtubei/v1/search?prettyPrint=false", { method: "POST", headers: { ...h, "Content-Type": "application/json" },
@@ -154,7 +155,7 @@ export async function buscar(q: string, tipo: "video" | "canal" | "lista", traer
     } catch (e) { error = error || (e instanceof Error ? e.message : String(e)); }
   }
   if (!items.length && c) return c.r;                       // lo último que se encontró (aunque sea viejo)
-  if (!items.length && error) throw new Error(error);
+  if (!items.length && error && !primeraBien) throw new Error(error);   // si la página respondió sin resultados: lista vacía
   const res: Resultado = { items, fuente: "youtube.com" };
   if (items.length) { cache.set(clave, { t: Date.now(), r: res }); if (cache.size > 3000) cache.clear(); }
   return res;
