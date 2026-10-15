@@ -42,6 +42,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     await A.p.evaluate(base => {
       document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show'));
       for(let i = 1; i <= 3; i++) data.tables[i] = data.tables[i] || { items: [], people: [] };
+      data.cancionesMesa = 10;                                       // Ajustes → Música: 10 por mesa (así viene: sin límite)
       saveData();
       const M = window.vitoMod, c = M.qCfg(); c.url = base + '/pedido.html'; c.live = true; M.SS('vito_qr', c);
       M.reconectarPedidos();
@@ -86,5 +87,12 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     await pedir(C4, 'Cancion de la mesa dos');
     chk('4. Otra mesa pide sin problema', await esperar(A.p, () => window.vitoMod.cola().some(x => x.mesa === 2), null, 20000));
     chk('4. … y su cupo es el suyo (1 de 10)', await C4.p.evaluate(() => usadas() === 1), await C4.p.evaluate(() => usadas()));
+
+    // ===== 5. «Sin límite» (Ajustes → Música) =====
+    await A.p.evaluate(() => { const sel = document.getElementById('cancionesMesaSel'); sel.value = '0'; sel.dispatchEvent(new Event('change')); });
+    chk('5. El QR se entera de que ya no hay límite', await esperar(C1.p, () => MAXC() === 0, null, 25000), await C1.p.evaluate(() => [MAXC(), cat && cat.cl, snap && snap.cm]));
+    await pedir(C1, 'Cancion once sin limite');
+    chk('5. Sin límite: la mesa que ya tenía 10 pide la 11.ª y entra', await esperar(A.p, () => window.vitoMod.cola().some(x => /once sin limite/i.test(x.song)), null, 20000), await enCola(1));
+    chk('5. … y el QR ya no muestra cupos («Pide las canciones que quieras»)', await C1.p.evaluate(() => { info(); return document.getElementById('cupos').hidden && /(quieras|as you like)/.test(document.getElementById('m').textContent); }));
   }
 })();

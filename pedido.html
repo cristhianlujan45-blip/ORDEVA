@@ -505,7 +505,10 @@ const P=new URLSearchParams(location.search),
    le llega a la app como un domicilio, no como una mesa. */
 const dom=P.get('dom')==='1';
 const SUF=dom?'dom':mesa;
-const MAX=10,V=15*6e4,K='canc_'+SUF,KR='rondas_'+SUF,KH='hist_'+SUF,VIDA_RONDA=12*36e5;
+// Canciones por mesa cada 15 min: lo decide el negocio (Ajustes → Música) y llega con la carta (cat.cl) o con la cuenta
+// en vivo de la mesa (snap.cm). 0 = sin límite.
+const MAXC=()=>{try{if(snap&&+snap.cm>0)return +snap.cm;}catch(e){}try{if(cat&&cat.cl!=null)return +cat.cl>0?+cat.cl:0;}catch(e){}return 0;};
+const V=15*6e4,K='canc_'+SUF,KR='rondas_'+SUF,KH='hist_'+SUF,VIDA_RONDA=12*36e5;
 const $=i=>document.getElementById(i);
 const jget=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))||d}catch(e){return d}};
 const jset=(k,x)=>{try{localStorage.setItem(k,JSON.stringify(x))}catch(e){}};
@@ -514,7 +517,7 @@ const jset=(k,x)=>{try{localStorage.setItem(k,JSON.stringify(x))}catch(e){}};
 let snapEn=0;
 const recLocal=()=>jget(K,[]).filter(x=>Date.now()-x<V);
 const recMesa=()=>{if(!snap||!Array.isArray(snap.cs))return[];const d=Date.now()-snapEn;return snap.cs.map(x=>Date.now()-((+snap.t||0)-x)-d).filter(x=>Date.now()-x<V)};
-const recientes=()=>{const a=recLocal(),b=recMesa();return b.length>a.length?b:a},usadas=()=>Math.min(MAX,recientes().length);
+const recientes=()=>{const a=recLocal(),b=recMesa();return b.length>a.length?b:a},usadas=()=>{const m=MAXC();return m?Math.min(m,recientes().length):recientes().length};
 let modo='p',ultimo='',es=null,snap=null,lineas=[];
 
 function h(tag,cls,txt){const e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e}
@@ -588,6 +591,7 @@ const DICT_SRC={
   pideCancion:["Pide tu canción","Request your song","Peça sua música","Demandez votre chanson","点一首歌","अपना गाना चुनें"],
   hintCancion:["Escribe artista y canción; así suena más rápido. Puedes pedir hasta 10; cada cupo se libera a los 15 minutos. Suenan por turnos entre todas las mesas.","Type the artist and song; it plays faster that way. You can request up to 10; each slot frees up after 15 minutes. Songs play in turns between all tables.","Escreva o artista e a música; assim toca mais rápido. Você pode pedir até 10; cada vaga libera após 15 minutos. Tocam por turnos entre todas as mesas.","Écrivez l’artiste et la chanson ; elle passera plus vite. Vous pouvez en demander jusqu’à 10 ; chaque créneau se libère après 15 minutes. Elles passent à tour de rôle entre toutes les tables.","请输入艺人和歌曲名，这样播放更快。最多可点10首；每个名额15分钟后释放。各桌轮流播放。","कलाकार और गाना लिखें; इससे जल्दी बजेगा। आप 10 तक माँग सकते हैं; हर स्लॉट 15 मिनट बाद खाली होता है। सभी मेज़ों के बीच बारी-बारी बजते हैं।"],
   ejemploCancion:["Ej: Bad Bunny - Titi Me Preguntó","E.g. Bad Bunny - Titi Me Preguntó","Ex.: Bad Bunny - Titi Me Preguntó","Ex. : Bad Bunny - Titi Me Preguntó","例如：Bad Bunny - Titi Me Preguntó","जैसे: Bad Bunny - Titi Me Preguntó"],
+  cancionesLibre:["🎵 Pide las canciones que quieras: suenan por turnos entre las mesas.","🎵 Request as many songs as you like: tables take turns.","🎵 Peça as músicas que quiser: as mesas tocam por turnos.","🎵 Demandez autant de chansons que vous voulez : les tables passent à tour de rôle.","🎵 想点多少首都可以：各桌轮流播放。","🎵 जितने चाहें गाने माँगें: टेबलें बारी-बारी से बजती हैं।"],
   cancionesEstado:["Llevas {u} de {max} canciones. Cada cupo se libera a los 15 minutos.","You’ve used {u} of {max} songs. Each slot frees up after 15 minutes.","Você já pediu {u} de {max} músicas. Cada vaga libera após 15 minutos.","Vous avez utilisé {u} chansons sur {max}. Chaque créneau se libère après 15 minutes.","您已点{u}/{max}首歌。每个名额15分钟后释放。","आपने {max} में से {u} गाने माँगे हैं। हर स्लॉट 15 मिनट बाद खाली होता है।"],
   tuCuenta:["Tu cuenta","Your bill","Sua conta","Votre addition","您的账单","आपका बिल"],
   cargandoCuenta:["Cargando tu cuenta…","Loading your bill…","Carregando sua conta…","Chargement de l’addition…","正在加载账单…","आपका बिल लोड हो रहा है…"],
@@ -1085,12 +1089,13 @@ $('ronda').onclick=()=>{
 
 /* ---------- Pestañas ---------- */
 function info(){
-  if(modo=='c'){pintarCupos();setMsg(()=>t('cancionesEstado',{u:usadas(),max:MAX}),'')}
+  if(modo=='c'){pintarCupos();const m=MAXC();setMsg(()=>m?t('cancionesEstado',{u:usadas(),max:m}):t('cancionesLibre'),'')}
 }
 function pintarCupos(){
   const b=$('cupos');b.textContent='';
   const u=usadas();
-  for(let i=0;i<MAX;i++)b.appendChild(h('i',i<u?'on':''));
+  const m=MAXC();b.hidden=!m;
+  for(let i=0;i<m;i++)b.appendChild(h('i',i<u?'on':''));
 }
 function set(x){
   modo=x;colocarEnvio();
@@ -1203,7 +1208,7 @@ function escucharEstados(forzar){
     // La app del local rechazó una canción porque la MESA ya llegó a su cupo (la pidieron desde otros celulares).
     if(o.e==='limite'){const mc=jget(MISC,[]);if(!mc.includes(o.id))return;jset(MISC,mc.filter(x=>x!==o.id));
       const a=jget(K,[]);a.pop();jset(K,a);if(modo=='c')pintarCupos();
-      setMsg(()=>t('cancionLimiteMesa',{max:o.max||MAX,min:o.min||1}),'err');return}
+      setMsg(()=>t('cancionLimiteMesa',{max:o.max||MAXC()||10,min:o.min||1}),'err');return}
     const l=jget(MISK,[]),x=l.find(y=>y.id===o.id);if(!x)return;x.e=o.e;x.n=o.n||'';delete x.body;jset(MISK,l);pintarEstados();
     if(['recibido','preparacion','listo'].includes(o.e)&&$('m').className!=='err')setMsg(()=>t('enviadoOk'),'ok');}catch(e){}};
 }
@@ -1257,7 +1262,7 @@ $('b').onclick=async()=>{
   }else if(modo=='c')txt=$('s').value.replace(/\s+/g,' ').trim();
   else txt=$('n').value.replace(/\s+/g,' ').trim();
   if(!txt&&modo!='q')return setMsg(()=>t('escribeAlgo'),'err');
-  if(modo=='c'&&usadas()>=MAX)return setMsg(()=>t(recMesa().length>recLocal().length?'cancionLimiteMesa':'cancionLimite',{max:MAX,min:Math.max(1,Math.ceil((Math.min(...recientes())+V-Date.now())/6e4))}),'err');
+  if(modo=='c'&&MAXC()&&usadas()>=MAXC())return setMsg(()=>t(recMesa().length>recLocal().length?'cancionLimiteMesa':'cancionLimite',{max:MAXC(),min:Math.max(1,Math.ceil((Math.min(...recientes())+V-Date.now())/6e4))}),'err');
   const tipo={p:'PEDIDO',c:'CANCION',q:'CUENTA'}[modo];
   if(dom){
     // DOMICILIO: nombre | teléfono | dirección | productos
@@ -1291,7 +1296,7 @@ $('b').onclick=async()=>{
         $('s').value=$('n').value='';
         $('b').disabled=false;
         if(modo=='c')pintarCupos();
-        setMsg(()=>(modo=='p'?t('pedEsperando'):t('enviadoOk'))+(modo=='c'?t('cancionesLlevas',{u:usadas(),max:MAX}):''),'ok');
+        setMsg(()=>(modo=='p'?t('pedEsperando'):t('enviadoOk'))+(modo=='c'&&MAXC()?t('cancionesLlevas',{u:usadas(),max:MAXC()}):''),'ok');
         if(modo=='p')escucharEstados();
         try{ mesoraCelebrar(modo=='c'?['🎵','🎶','✨']:dom?['🛵','🎉','✨']:['🎉','✨','🍻']); }catch(e){}
         return;

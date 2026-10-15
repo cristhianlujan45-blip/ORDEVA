@@ -2316,6 +2316,8 @@ body.mod-v #quickSaleBtn{ order:-1; background:var(--amber); color:#fff; border-
   .yp-ctrl .yp-cor{ flex:0 0 48px; }
   .yp-cor{ border:1px solid var(--line); background:transparent; color:inherit; border-radius:999px; min-width:38px; height:36px; font-size:16px; cursor:pointer; padding:0 8px; }
   .yp-sigue{ border-top:1px solid var(--line); padding-top:4px; }
+  .yp-sc{ border:1px dashed color-mix(in srgb,#ff0033 60%,transparent); background:rgba(255,0,51,.08); color:var(--ink); border-radius:12px; padding:9px 12px; font:600 13.5px var(--font-main); text-align:left; cursor:pointer; }
+  .yp-sc[hidden]{ display:none; }
   .yp-mfila{ display:flex; gap:10px; align-items:center; padding:6px 0; }
   .yp-mfila img, .yp-mfila .yp-sinimg{ width:96px; aspect-ratio:16/9; height:auto; object-fit:cover; border-radius:8px; flex:0 0 auto; background:var(--surface-2); display:grid; place-items:center; }
   .yp-vermas{ border:0; background:transparent; color:#3ea6ff; font-weight:700; padding:6px 0; cursor:pointer; font-size:13.5px; }
@@ -3724,6 +3726,7 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
     <div class="settings-group tv-hub">
       <h2>📺 Música en el TV</h2>
       <button class="btn-primary cast-big" id="tvTransmitir" type="button">📡 Transmitir al TV</button>
+      <button class="btn-ghost" id="mzScBtn" type="button" style="width:100%;margin:6px 0" onclick="window.vitoSinComerciales&&window.vitoSinComerciales()">🚫 Sin comerciales con tu YouTube Premium</button>
       <div class="cast-devs" id="castDevs" hidden><span class="cast-dot"></span><span id="castDevsTxt"></span></div>
       <div class="tv-vivo" id="tvDispos" hidden>
         <div class="tvv-h"><b>📺 Dispositivos</b><small id="tvdAct"></small></div>
@@ -4081,6 +4084,10 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
       <div class="settings-row">
         <div class="settings-row-text"><strong>Activar Música / YouTube en TV</strong><span>Apagado: se esconde todo lo de música (clientes, cola y TV). Prendido: aparece la sección Música.</span></div>
         <label class="switch"><input type="checkbox" id="musicOnToggle"><span class="switch-slider"></span></label>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-text"><strong>🎵 Canciones que puede pedir cada mesa por QR</strong><span>Cuántas puede pedir una mesa (sumando todos sus celulares) cada 15 minutos. «Sin límite»: piden las que quieran; igual suenan por turnos justos entre las mesas.</span></div>
+        <select id="cancionesMesaSel" class="mz-in" style="max-width:150px"><option value="0">Sin límite</option><option value="3">3</option><option value="5">5</option><option value="10">10</option><option value="15">15</option><option value="20">20</option></select>
       </div>
     </div>
 
@@ -19552,6 +19559,16 @@ function wireAccountUI(){
       showToast(data.musicOn ? '🎵 Música activada: tus clientes ya pueden pedir canciones.' : '🔇 Música apagada: tus clientes ya no verán «Pedir canción».');
     };
   }
+  const cmSel = document.getElementById('cancionesMesaSel');
+  if(cmSel){
+    const v = Number(data.cancionesMesa) || 0; cmSel.value = String([0, 3, 5, 10, 15, 20].includes(v) ? v : 0);
+    cmSel.onchange = () => {
+      data.cancionesMesa = Number(cmSel.value) || 0; saveData();
+      try{ if(window.vitoPublicarCatalogo) window.vitoPublicarCatalogo(true); }catch(e){}            // el QR de las mesas lo sabe de una vez
+      try{ window.vitoMod && window.vitoMod.republicarMesas && window.vitoMod.republicarMesas(); }catch(e){}
+      showToast(data.cancionesMesa ? '🎵 Cada mesa puede pedir ' + data.cancionesMesa + ' canciones cada 15 minutos.' : '🎵 Sin límite: las mesas piden las canciones que quieran (suenan por turnos justos).');
+    };
+  }
   const domToggle = document.getElementById('domiciliosOnToggle');
   if(domToggle){
     domToggle.checked = !!data.domiciliosOn;
@@ -21051,7 +21068,7 @@ function procesar(txt){
     if(o&&o.t==='pedido'){pedidoEntrante(o,'qr');return;}
     if(o&&o.t==='cancion'){const id=parseInt(o.mesa,10);if(!id)return;const r=agregarCancion(id,String(o.s||'').slice(0,120),String(o.id||'').slice(0,40));
       // Mesa sin cupo: se le avisa al celular que la pidió (por el canal de estados) en vez de dejarla esperando.
-      if(r.limite&&!mqOtro()){try{const cn=qCanalOk(window.__canalTopic)?window.__canalTopic:qCfg().topic;fetch('https://canal.vento.local/'+cn+'e',{method:'POST',body:JSON.stringify({t:'estado',id:String(o.id||'').slice(0,40),e:'limite',m:id,min:r.min,max:MAX,n:r.msg,at:Date.now()})}).catch(()=>{});}catch(e){}return;}if(r.nuevo!==false&&notifMusica()){showToast(r.msg+(mzSinReproductor()?' · Para que suene: Música → «🎶 Activar música automática».':''),mzSinReproductor()?8000:0);ventoAvisoCel('🎵 Canción · '+tableLabel(id),String(o.s||'').slice(0,120),'musica');}renderMusica();return;}
+      if(r.limite&&!mqOtro()){try{const cn=qCanalOk(window.__canalTopic)?window.__canalTopic:qCfg().topic;fetch('https://canal.vento.local/'+cn+'e',{method:'POST',body:JSON.stringify({t:'estado',id:String(o.id||'').slice(0,40),e:'limite',m:id,min:r.min,max:mzMax(),n:r.msg,at:Date.now()})}).catch(()=>{});}catch(e){}return;}if(r.nuevo!==false&&notifMusica()){showToast(r.msg+(mzSinReproductor()?' · Para que suene: Música → «🎶 Activar música automática».':''),mzSinReproductor()?8000:0);ventoAvisoCel('🎵 Canción · '+tableLabel(id),String(o.s||'').slice(0,120),'musica');}renderMusica();return;}
     if(o&&o.t==='estado')return;                                   // eco de nuestros propios avisos
     if(o&&o.t==='prueba'){if(o.id&&window.__qPrueba&&window.__qPrueba[o.id])window.__qPrueba[o.id](window.__canalTopic);return;}
   }
@@ -21235,7 +21252,8 @@ function iniQR(){
 }
 
 /* ---------- Música: máximo 5 por mesa y turnos equitativos ---------- */
-const MAX=10;
+// Canciones por mesa cada 15 min (Ajustes → Negocio → Música). 0 = sin límite (así viene).
+const mzMax=()=>{const n=Number(typeof data!=='undefined'&&data?data.cancionesMesa:0);return n>0?n:0;};
 const cola=()=>LS('vito_cola',[]);
 const VENT=15*6e4;
 /* ---------- Una sola cola con estados (vito_cola) ----------
@@ -21327,7 +21345,8 @@ function agregarCancion(mesa,song,reqId){
   if(dup)return{msg:'🎵 Esa canción ya está en la cola.',nuevo:false};
   const rec=l.filter(x=>x.mesa===mesa&&now-x.ts<VENT).sort((x,y)=>x.ts-y.ts);
   // El límite es POR MESA (sumando todos los celulares de esa mesa), no por dispositivo.
-  if(mesa!==0&&rec.length>=MAX)return{msg:'🎵 '+tableLabel(mesa)+' ya pidió '+MAX+' canciones; podrá pedir otra en '+Math.ceil((rec[0].ts+VENT-now)/6e4)+' min.',limite:true,min:Math.ceil((rec[0].ts+VENT-now)/6e4)};
+  const MAX=mzMax();
+  if(mesa!==0&&MAX&&rec.length>=MAX)return{msg:'🎵 '+tableLabel(mesa)+' ya pidió '+MAX+' canciones; podrá pedir otra en '+Math.ceil((rec[0].ts+VENT-now)/6e4)+' min.',limite:true,min:Math.ceil((rec[0].ts+VENT-now)/6e4)};
   const it={id:now+'-'+Math.random().toString(36).slice(2,6),reqId:reqId||null,mesa,mesaNombre:tableLabel(mesa),song:song.slice(0,120),pedido:pedidoOriginal,title:lim.title.slice(0,80),artist:lim.artist.slice(0,60),ts:now,done:false,status:'pending'};
   l.push(it);SS('vito_cola',l);mzRespaldo();
   // Busca el video y la agrega sola a la lista/reproductor apenas llega el pedido,
@@ -21691,6 +21710,8 @@ function ytAgregar(id){cadena=cadena.then(()=>ytUno(id)).catch(()=>{});}
 //    vuelven a elegir. excluir: ids ya probados para esta canción.
 const YT_BAD_KEY='vito_yt_bad', YT_REGION=((navigator.language||'').split('-')[1]||'CO').toUpperCase();
 const ytBad=()=>LS(YT_BAD_KEY,[]);
+// La lista negra vieja tenía canciones buenas marcadas por error (cuando YouTube pasaba comerciales): se limpia una vez.
+try{if(!LS('vito_yt_bad_v2',0)){SS(YT_BAD_KEY,[]);SS('vito_yt_bad_v2',1);}}catch(e){}
 function ytMarcarBad(v){ if(!v)return; const b=ytBad(); if(!b.includes(v)){ b.push(v); SS(YT_BAD_KEY,b.slice(-400)); } }
 const SELLO_RE=/vevo|\s-\stopic$|warner|wmg|atlantic|elektra|parlophone|reprise|rhino|asylum|nonesuch|sire records/i;
 /* Buscar en YouTube, con respaldos. Antes, si la clave compartida se quedaba sin cupo del día
@@ -22230,19 +22251,22 @@ function crearPlayer(){
   yPl=new YT.Player('ytPlayer',{width:'100%',height:'200',playerVars:{playsinline:1,rel:0},events:{
     onReady:()=>{yListo=true;crearTest();siguienteAuto();},
     onStateChange:e=>{if(e.data===1){cargadoEn=0;pausaManual=false;}if(e.data===2)pausaManual=window.__ventoAlFrente!==false&&!document.hidden;if(e.data===0){sonando=false;const a=mzActual();if(a&&a.fuente==='app')mzTermino(a.id,'played',a.dur||null);if(!ordenJusto(cola()).some(y=>y.vid))ytMostrar(false);siguienteAuto();}},
-    onError:()=>{reemplazarBloqueada();}}});
+    onError:e=>{reemplazarBloqueada('error',e&&e.data);}}});
 }
 // El video que sonaba está bloqueado para reproductores fuera de YouTube: se busca otra versión
 // de la MISMA canción (hasta 3 intentos) antes de pasar a la siguiente; si ya no queda ninguna,
 // se tapa el aviso de error de YouTube con un «esperando la próxima canción».
 let reemplazando=false;
-async function reemplazarBloqueada(){
+// motivo: 'error' = YouTube dijo que esa versión no se deja poner aquí (100/101/150…): queda en la lista negra.
+//         'atascada' = no arrancó en mucho rato sin decir nada: se prueba otra versión, pero NO se marca como mala
+//         (antes un comercial largo de YouTube hacía creer que la canción estaba «bloqueada por el sello»).
+async function reemplazarBloqueada(motivo,codigo){
   if(reemplazando)return;
   reemplazando=true;sonando=false;cargadoEn=0;
   try{
     const now=LS('vito_now',null);
     if(now&&now.song){
-      ytMarcarBad(now.vid);
+      if(motivo==='error')ytMarcarBad(now.vid);
       const probados=(now.probados||[]).concat(now.vid?[now.vid]:[]);
       if(probados.length<=3){
         const qs=[now.song,now.song+' audio',now.song+' letra'];
@@ -22252,7 +22276,7 @@ async function reemplazarBloqueada(){
           const nx=Object.assign({},now,{vid:v,probados,dur:ytDurCache[v]||null});
           SS('vito_now',nx);
           const l=cola(),it=l.find(y=>y.id===now.id);if(it){it.vid=v;it.dur=ytDurCache[v]||it.dur;SS('vito_cola',l);}
-          showToast('🔁 Esa versión de «'+now.song+'» está bloqueada por el sello; pongo otra versión.');
+          showToast(motivo==='error'?'🔁 Esa versión de «'+now.song+'» no se deja poner fuera de YouTube; pongo otra versión.':'🔁 «'+now.song+'» no arrancó; pruebo otra versión.');
           ytMostrar(true);sonando=true;cargadoEn=Date.now();yPl.loadVideoById(v);
           return;
         }
@@ -22378,15 +22402,22 @@ setInterval(()=>{try{const a=mzActual();if(a&&a.fuente==='app'&&yPl&&yPl.getCurr
 // una canción "cargada" no arranca a sonar en 7 segundos, se da por
 // trabada/bloqueada y se pasa sola a la siguiente, en vez de quedarse
 // pegada mostrando el aviso de YouTube para siempre.
+let atascoPlay=0;
+window.__ytVigilar=()=>vigilarAtascado();window.__ytAdelantar=ms=>{if(cargadoEn)cargadoEn-=ms;};   // para las pruebas
 function vigilarAtascado(){
   if(!sonando||!cargadoEn||!yPl||!yPl.getPlayerState)return;
-  if(Date.now()-cargadoEn<7000)return;
   const st=yPl.getPlayerState();
-  if(st===1||st===3)return; // 1=reproduciendo, 3=cargando/buffering: va bien, solo tarda
+  if(st===1||st===3){atascoPlay=0;return;} // 1=reproduciendo, 3=cargando/buffering: va bien, solo tarda
+  // Antes se daba por bloqueada a los 7 s, pero mientras YouTube pasa sus comerciales (hasta 30 s o más, a veces dos)
+  // el video no arranca: la canción se marcaba «bloqueada» sin estarlo. Ahora: a los 12 s se le da play una vez, y solo
+  // si a los 60 s sigue quieta se prueba otra versión (sin marcarla como mala para siempre).
+  const t=Date.now()-cargadoEn;
+  if(t>=12000&&atascoPlay!==cargadoEn&&!pausaManual){atascoPlay=cargadoEn;try{yPl.playVideo();}catch(e){}return;}
+  if(t<60000)return;
   // Con la app minimizada el celular puede frenar el video un momento: se le da play otra vez en vez de
   // marcar la canción como mala (antes se descartaban canciones buenas por estar en segundo plano).
   if(fondoMusica()){try{yPl.playVideo();}catch(e){}cargadoEn=Date.now();return;}
-  reemplazarBloqueada();
+  reemplazarBloqueada('atascada');
 }
 /* Música automática: RECIBIR → ENCOLAR → REPRODUCIR → DETECTAR EL FINAL → SIGUIENTE, sin tocar Play.
    Los navegadores no dejan sonar con audio hasta que la persona toca la pantalla una vez (es una
@@ -22549,7 +22580,7 @@ function snapMesa(id){
   const its=(data.tables[id]&&data.tables[id].items)||[],consumo=tableTotal(id),saldo=tableBalance(id);
   const sn={t:Date.now(),c:consumo,s:saldo,p:Math.max(0,consumo-saldo),i:its.slice(0,40).map(it=>[String(it.name).slice(0,40),it.qty,it.price])};
   // Canciones que la mesa pidió en la ventana del límite (hora de cada una): el cupo es de la mesa, no del celular.
-  try{const now=Date.now(),cs=cola().filter(x=>x.mesa===id&&!x.fondo&&now-x.ts<VENT).map(x=>x.ts).sort((a,b)=>a-b);if(cs.length){sn.cs=cs.slice(-MAX);sn.cm=MAX;}}catch(e){}
+  try{const now=Date.now(),cs=cola().filter(x=>x.mesa===id&&!x.fondo&&now-x.ts<VENT).map(x=>x.ts).sort((a,b)=>a-b);const lim=mzMax();if(lim&&cs.length){sn.cs=cs.slice(-lim);sn.cm=lim;}}catch(e){}
   return sn;
 }
 /* ---------- Menú (restaurante/cafetería) o catálogo (cervecería/tienda) para el QR ---------- */
@@ -22593,6 +22624,7 @@ async function publicarCatalogo(force){
     info: (data.orderExtraInfo || '').slice(0, 200),
     oh: data.orderOpenTime || '', ch: data.orderCloseTime || '', hn: (data.orderHoursNote || '').slice(0, 100),
     mz: musicaOn() ? 1 : 0,
+    cl: mzMax(),                                                         // canciones por mesa cada 15 min (0 = sin límite)
     mo: (data.motivo || '')
   };
   while(list.length && new Blob([JSON.stringify(m)]).size > 3800) list.pop();   // tope del canal de Vento (~4 KB)
@@ -22658,6 +22690,39 @@ function ypCorBtn(v){
   const p=()=>{const si=ypEsFav(v.vid);b.textContent=si?'❤️':'🤍';b.title=si?'Quitar de Mis canciones':'Guardar en Mis canciones';b.setAttribute('aria-label',b.title);b.setAttribute('aria-pressed',si?'true':'false');};
   p();b.onclick=()=>{ypFav(v);p();if(ypTab==='canciones')ypCuerpo();ypPintar();};return b;
 }
+/* ---------- 🚫 Música sin comerciales con YouTube Premium ----------
+   Por qué salen: el reproductor que va DENTRO de Vento (como en cualquier app o página) es el de YouTube para otras
+   páginas, y Google no deja iniciar sesión con la cuenta dentro de apps (lo bloquea por seguridad): ese reproductor no
+   sabe que tienes Premium. Donde Premium SÍ se nota es en las apps de YouTube: el TV (vinculado a Vento por código, sin
+   límites) o YouTube Music en el celular. Esta guía lleva a eso con un toque. */
+function mzSinComerciales(){
+  let ov=$('mzScOv');
+  if(!ov){ov=document.createElement('div');ov.id='mzScOv';ov.className='overlay';document.body.appendChild(ov);
+    ov.addEventListener('click',e=>{
+      if(e.target===ov||e.target.closest('[data-sc="x"]')){ov.classList.remove('show');return;}
+      const a=e.target.closest('[data-sc]');if(!a)return;ov.classList.remove('show');
+      const ir=()=>{try{ypCerrar();}catch(x){}const b=document.querySelector('nav button[data-view="musica"]')||document.querySelector('.more-tile[data-go="musica"]');if(b)b.click();};
+      if(a.dataset.sc==='tv'){ir();setTimeout(()=>{try{tvTransmitirToque();}catch(x){const t=$('tvTransmitir');t&&t.click();}},350);}
+      if(a.dataset.sc==='codigo'){ir();setTimeout(()=>{try{tvSinLista('En el TV: abre YouTube con tu cuenta Premium → Configuración → «Vincular con código de TV» y escribe aquí los 12 números.');}catch(x){}},350);}
+      if(a.dataset.sc==='cuenta'){try{yConectar(false,()=>{try{ypMiasCache=null;ypMioCache={};}catch(x){}showToast('✅ Tu cuenta de YouTube quedó vinculada.');});}catch(x){showToast('No pude abrir Google. Revisa el internet.');}}
+    });}
+  const app=!!window.VentoAndroid,tv=mzHayTV(),con=!!yTok();
+  ov.innerHTML='<div class="modal gp-modal"><h2>🚫 Música sin comerciales con tu YouTube Premium</h2>'+
+    '<div class="modal-sub"><b>Por qué salen comerciales:</b> el reproductor que va dentro de Vento es el de YouTube para otras páginas y apps. Google no deja iniciar sesión con tu cuenta dentro de apps (lo bloquea por seguridad), así que ese reproductor <b>no sabe que tienes Premium</b>. Tu Premium sí funciona en las apps de YouTube: por eso la solución es que suene en el <b>YouTube de tu TV</b>.</div>'+
+    (tv?'<div class="gp-alerta" style="border-color:#22c55e">✅ Ya tienes un TV vinculado: la música suena allá. Si el TV tiene tu cuenta Premium, no salen comerciales.</div>':'')+
+    '<ol class="gp-lista">'+
+    '<li class="gp-paso"><div class="gp-n">1</div><div><b>En el TV, entra a YouTube con tu cuenta Premium</b><div class="gp-c">Abre la app de <b>YouTube</b> del TV → tu foto (arriba a la izquierda) → elige o agrega <b>tu cuenta con Premium</b>.</div></div></li>'+
+    '<li class="gp-paso"><div class="gp-n">2</div><div><b>Vincula el TV con Vento</b><div class="gp-c">Una sola vez: queda vinculado. Las canciones que pidan las mesas por QR y las que pongas tú suenan allá solas, una tras otra, <b>sin comerciales y sin límite</b> (no gasta el cupo de Google).'+
+      '<br><button type="button" class="btn-primary gp-btn" data-sc="tv">📡 Buscar mi TV</button> <button type="button" class="btn-ghost gp-btn" data-sc="codigo">🔢 Con el código del TV</button></div></div></li>'+
+    '<li class="gp-paso"><div class="gp-n">3</div><div><b>Tu cuenta de YouTube en Vento (para tus listas)</b><div class="gp-c">Con tu cuenta conectada ves y pones tus listas, tus «Me gusta» y tus suscripciones (👤 Mi YouTube). Queda vinculada para siempre.'+
+      (con?'<br>✅ <b>Ya está conectada.</b>':'<br><button type="button" class="btn-ghost gp-btn" data-sc="cuenta">🔗 Conectar mi cuenta de YouTube</button>')+'</div></div></li>'+
+    '</ol>'+
+    '<div class="settings-desc" style="margin-top:8px"><b>¿Sin TV?</b> Conecta el celular o el computador a un parlante Bluetooth y usa <b>YouTube Music</b> con tu Premium: Vento pasa las canciones a tu lista «Música '+esc((typeof data!=='undefined'&&data&&data.businessName)||'del local')+'» (Música → «Lista de YouTube Music»). Ojo: Google pone un tope diario a esa forma; cuando se llena, Vento sigue con su reproductor (con comerciales) hasta el otro día.'+
+      (app?'<br><small>En la app Android el reproductor de Vento seguirá mostrando comerciales: Google no permite usar tu Premium ahí.</small>':'')+'</div>'+
+    '<div class="modal-actions"><button type="button" class="btn-close" data-sc="x">Listo</button></div></div>';
+  ov.classList.add('show');
+}
+window.vitoSinComerciales=mzSinComerciales;
 function ypCrear(){
   if($('ypOv'))return;
   const ov=document.createElement('div');ov.id='ypOv';ov.className='overlay yp-ov';
@@ -22671,6 +22736,7 @@ function ypCrear(){
         '<div class="yp-video" id="ypVideo"><img id="ypPortada" alt=""><div class="yp-nada" id="ypNada">🎵 No está sonando nada.<br><small>Busca una canción o pon una de tus listas.</small></div></div>'+
         '<div class="yp-ahora"><div class="yp-info"><div class="yp-titulo" id="ypTitulo"></div><div class="yp-quien" id="ypQuien"></div><div class="yp-donde" id="ypDonde"></div><div class="yp-bar"><i id="ypBar"></i></div><div class="yp-tiempo" id="ypTiempo"></div></div>'+
         '<div class="yp-ctrl"><button type="button" class="yp-cor" id="ypCor" hidden>🤍</button><button type="button" class="btn-ghost" id="ypPausa">⏯<span class="yp-bt-txt"> Pausa</span></button><button type="button" class="btn-primary" id="ypSig">⏭<span class="yp-bt-txt"> Siguiente</span></button></div></div>'+
+        '<button type="button" class="yp-sc" id="ypSc" hidden>🚫 ¿Salen comerciales? Usa tu YouTube Premium en el TV <b>›</b></button>'+
         '<div class="yp-sigue" id="ypSigue"></div>'+
       '</section>'+
       '<div class="yp-cuerpo" id="ypCuerpo"></div>'+
@@ -22680,6 +22746,7 @@ function ypCrear(){
   ov._fin=()=>ypCerrar();
   $('ypSig').onclick=()=>{if(!mzActual()&&!ordenJusto(cola()).length)return showToast('No hay más canciones en la cola.');mzSaltar();setTimeout(ypPintar,300);};
   $('ypPausa').onclick=ypPausa;
+  $('ypSc').onclick=mzSinComerciales;
   $('ypCor').onclick=()=>{const x=mzActual();if(x&&x.vid){ypFav(x);ypPintar();if(ypTab==='canciones')ypCuerpo();}};
   $('ypBuscarF').onsubmit=e=>{e.preventDefault();ypBuscar($('ypQ').value);};
   ov.querySelectorAll('[data-yp-tab]').forEach(b=>b.onclick=()=>{ypTab=b.dataset.ypTab;ypVer=null;ypCuerpo();if(ypTab==='buscar'&&!ypRes)setTimeout(()=>{try{$('ypQ').focus();}catch(e){}},30);});
@@ -22715,6 +22782,7 @@ function ypPintar(){
   $('ypBar').style.width=(x&&x.dur?Math.min(100,t/x.dur*100):0).toFixed(1)+'%';
   $('ypTiempo').textContent=x?mmss(t)+' / '+(x.dur?mmss(x.dur):'--:--'):'';
   $('ypPausa').hidden=!(f==='app'||f==='tvyt'||f==='cc'||f==='remoto');
+  $('ypSc').hidden=!(f==='app'||(!x&&!mzHayTV()));
   const cor=$('ypCor');cor.hidden=!(x&&x.vid);if(x&&x.vid){const si=ypEsFav(x.vid);cor.textContent=si?'❤️':'🤍';cor.title=si?'Quitar de Mis canciones':'Guardar en Mis canciones';cor.setAttribute('aria-label',cor.title);}
   const o=ordenJusto(cola());$('ypNCola').textContent=o.length?String(o.length):'';
   // «A continuación» (solo se vuelve a pintar si cambió)
@@ -22764,7 +22832,9 @@ const ypGrid=(c,id)=>{const g=document.createElement('div');g.className='yp-grid
 function ypAgregar(v,primero,callado,idFijo){
   const now=Date.now(),l=cola();
   if(l.some(x=>!x.done&&x.vid===v.vid)){if(!callado)showToast('🎵 «'+v.title+'» ya está en la cola.');return false;}
-  const it={id:idFijo||(now+'-'+Math.random().toString(36).slice(2,6)),reqId:null,mesa:0,mesaNombre:tableLabel(0),song:(v.artist?v.artist+' - ':'')+v.title,pedido:v.title,
+  // «Wiz Khalifa - Yiccen» con canal «Wiz Khalifa»: no se repite el artista («Wiz Khalifa - Wiz Khalifa - …»).
+  const conArt=v.artist&&!fiAscii(String(v.title||'')).toLowerCase().includes(fiAscii(String(v.artist).replace(/\s*-\s*topic$/i,'').replace(/vevo$/i,'')).toLowerCase().trim());
+  const it={id:idFijo||(now+'-'+Math.random().toString(36).slice(2,6)),reqId:null,mesa:0,mesaNombre:tableLabel(0),song:(conArt?v.artist+' - ':'')+v.title,pedido:v.title,
     title:String(v.title||'').slice(0,80),artist:String(v.artist||'').slice(0,60),vid:v.vid,dur:v.dur||ytDurCache[v.vid]||null,ts:now,done:false,status:'pending',panel:true};
   if(primero)it.primero=now;
   l.push(it);SS('vito_cola',l);mzRespaldo();
@@ -22953,7 +23023,7 @@ function ypMiniPintar(){
 }
 document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-yp-abrir]');if(b){e.preventDefault();ypAbrir();}});
 window.vitoPanel={abrir:ypAbrir,cerrar:ypCerrar,agregar:ypAgregar,abierto:()=>ypAbierto};
-window.vitoMod = { yRenovarServidor, linkMesa, mCfg, mUrl, prepUrl: () => { try{ return prepUrl(); }catch(e){ return ''; } }, prepPublicar: f => { try{ prepPublicar(f); }catch(e){} }, mVistos, mPublicar, reconectarPedidos: () => { try{conectar();}catch(e){} }, qCanales, qProbarPedidos, tvOn, tvUrl, LS, SS, qCfg, yCfg, yTok, yConectar, cola, ordenJusto, mzEmpezo, mzTermino, mzProgreso, yLista, ytAgregar, ySearch, yGet, AUTO, renderMusica, esperarYT: () => cadena, yFuente: () => yFuente, ytDur, ytPosicionSiguiente, ytTanda: () => ytTanda, procesar, notifPedidos, notifMusica };
+window.vitoMod = { republicarMesas: () => { Object.keys(pubHash).forEach(k => { if(pubHash[k] !== undefined) pubHash[k] = '-'; }); try{ publicarCuentas(); }catch(e){} }, mzMax, yRenovarServidor, linkMesa, mCfg, mUrl, prepUrl: () => { try{ return prepUrl(); }catch(e){ return ''; } }, prepPublicar: f => { try{ prepPublicar(f); }catch(e){} }, mVistos, mPublicar, reconectarPedidos: () => { try{conectar();}catch(e){} }, qCanales, qProbarPedidos, tvOn, tvUrl, LS, SS, qCfg, yCfg, yTok, yConectar, cola, ordenJusto, mzEmpezo, mzTermino, mzProgreso, yLista, ytAgregar, ySearch, yGet, AUTO, renderMusica, esperarYT: () => cadena, yFuente: () => yFuente, ytDur, ytPosicionSiguiente, ytTanda: () => ytTanda, procesar, notifPedidos, notifMusica };
 function publicarCuentas(){
   if(typeof data==='undefined'||!data)return;
   try{publicarCatalogo();}catch(e){}             // la carta se publica siempre (aunque "en vivo" esté apagado)
@@ -30215,6 +30285,10 @@ window.mesoraCelebrar = function(emojis){
     }
     if(/\b(busca|buscar|conecta|conectar|muestrame|transmite|transmitir|manda)\b.*\b(tv|tele|televisor|televisores|chromecast)\b/.test(t) && typeof tvTransmitirToque === 'function'){
       return { text: '📺 Busco los TV de tu wifi.', run: () => { try{ asisClose(); }catch(e){} const nb = document.querySelector('nav button[data-view="musica"]'); if(nb) nb.click(); setTimeout(() => { try{ tvTransmitirToque(); }catch(e){} }, 400); } };
+    }
+    // «salen comerciales», «quitar anuncios», «tengo YouTube Premium» → cómo poner la música sin comerciales.
+    if(/\b(comerciales?|anuncios?|propagandas?|publicidad|premium)\b/.test(t)&&/\b(musica|youtube|cancion|canciones|salen|sale|quitar|quita|premium|video)\b/.test(t)&&window.vitoSinComerciales){
+      return { text: '🚫 Te muestro cómo poner la música SIN comerciales con tu YouTube Premium (en el YouTube de tu TV, sin límites).', run: () => { try{ asisClose(); }catch(e){} setTimeout(() => window.vitoSinComerciales(), 200); } };
     }
     // «¿Cómo agrego DaviPlata?», «vincular Nequi», «que me avise cuando me paguen» → el paso a paso.
     if(/\b(agrega|agregar|agrego|anadir|anado|conecta|conectar|conecto|vincula|vincular|vinculo|configura|configurar|activa|activar|poner|pongo|instalo|tutorial|paso a paso)\b.*\b(nequi|daviplata|davi plata|david plata)\b|\b(avise|avisa|avisar|aviso)\b.*\b(paguen|pagan|pagaron|pasen plata|llegue (la )?plata)\b/.test(t) && window.ventoPagosGuia){
