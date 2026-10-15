@@ -43,8 +43,13 @@ y hay que darla por comprometida.** Ya no está en el repositorio ni en los `bui
 | `VENTO_KEYSTORE_B64` | La llave nueva en base64: `base64 -w0 vento-nueva.jks` |
 | `VENTO_KS_PASS` | Su contraseña (larga y que no esté en ningún archivo) |
 
-Sin esos secretos el flujo compila con una llave de prueba y **no publica** el APK (para que nunca salga
-una versión que no se pueda instalar encima de la anterior).
+Sin esos secretos el flujo firma con **la misma llave de las versiones ya instaladas** (1.0.1 a 1.0.15), sacada
+del historial del repositorio (commit `7c6225d`). Lo decidió el dueño el 15 de octubre, porque antes el flujo **no
+publicaba** sin los secretos: desde el 4 de octubre la descarga seguía dando la 1.0.15, sin los avisos de pagos.
+- Antes de publicar se comprueba la huella del certificado (`3D:DC:CB:…:D4:0D`), así la app nueva siempre se instala
+  encima de la del cliente.
+- Si la huella no coincide, no se publica.
+- Esa llave ya fue pública: lo que protege de verdad es pasar a una llave privada con rotación (abajo).
 
 **Cambiar a la llave nueva sin que los clientes reinstalen** (rotación de firma APK v3, Android 9+):
 
