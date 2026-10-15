@@ -20958,7 +20958,9 @@ function procesar(txt){
   if(/^\s*\{/.test(txt)){
     let o=null;try{o=JSON.parse(txt);}catch(e){}
     if(o&&o.t==='pedido'){pedidoEntrante(o,'qr');return;}
-    if(o&&o.t==='cancion'){const id=parseInt(o.mesa,10);if(!id)return;const r=agregarCancion(id,String(o.s||'').slice(0,120),String(o.id||'').slice(0,40));if(r.nuevo!==false&&notifMusica()){showToast(r.msg);ventoAvisoCel('🎵 Canción · '+tableLabel(id),String(o.s||'').slice(0,120),'musica');}renderMusica();return;}
+    if(o&&o.t==='cancion'){const id=parseInt(o.mesa,10);if(!id)return;const r=agregarCancion(id,String(o.s||'').slice(0,120),String(o.id||'').slice(0,40));
+      // Mesa sin cupo: se le avisa al celular que la pidió (por el canal de estados) en vez de dejarla esperando.
+      if(r.limite){try{const cn=qCanalOk(window.__canalTopic)?window.__canalTopic:qCfg().topic;fetch('https://canal.vento.local/'+cn+'e',{method:'POST',body:JSON.stringify({t:'estado',id:String(o.id||'').slice(0,40),e:'limite',m:id,min:r.min,max:MAX,n:r.msg,at:Date.now()})}).catch(()=>{});}catch(e){}return;}if(r.nuevo!==false&&notifMusica()){showToast(r.msg);ventoAvisoCel('🎵 Canción · '+tableLabel(id),String(o.s||'').slice(0,120),'musica');}renderMusica();return;}
     if(o&&o.t==='estado')return;                                   // eco de nuestros propios avisos
     if(o&&o.t==='prueba'){if(o.id&&window.__qPrueba&&window.__qPrueba[o.id])window.__qPrueba[o.id](window.__canalTopic);return;}
   }
@@ -21233,7 +21235,8 @@ function agregarCancion(mesa,song,reqId){
   const dup=l.concat(mzHist()).find(x=>(reqId&&x.reqId===reqId)||(x.mesa===mesa&&normVoiceText(x.song||'')===nk&&now-(x.ts||x.requestedAt||0)<3*6e4&&x.status!=='cancelled'));
   if(dup)return{msg:'🎵 Esa canción ya está en la cola.',nuevo:false};
   const rec=l.filter(x=>x.mesa===mesa&&now-x.ts<VENT).sort((x,y)=>x.ts-y.ts);
-  if(mesa!==0&&rec.length>=MAX)return{msg:'🎵 '+tableLabel(mesa)+' ya pidió '+MAX+' canciones; podrá pedir otra en '+Math.ceil((rec[0].ts+VENT-now)/6e4)+' min.'};
+  // El límite es POR MESA (sumando todos los celulares de esa mesa), no por dispositivo.
+  if(mesa!==0&&rec.length>=MAX)return{msg:'🎵 '+tableLabel(mesa)+' ya pidió '+MAX+' canciones; podrá pedir otra en '+Math.ceil((rec[0].ts+VENT-now)/6e4)+' min.',limite:true,min:Math.ceil((rec[0].ts+VENT-now)/6e4)};
   const it={id:now+'-'+Math.random().toString(36).slice(2,6),reqId:reqId||null,mesa,mesaNombre:tableLabel(mesa),song:song.slice(0,120),pedido:pedidoOriginal,title:lim.title.slice(0,80),artist:lim.artist.slice(0,60),ts:now,done:false,status:'pending'};
   l.push(it);SS('vito_cola',l);mzRespaldo();
   // Busca el video y la agrega sola a la lista/reproductor apenas llega el pedido,
@@ -21241,6 +21244,8 @@ function agregarCancion(mesa,song,reqId){
   // ese botón, así que las canciones nuevas se quedaban esperando en silencio).
   try{ if(typeof ytAgregar === 'function') ytAgregar(it.id); }catch(e){}
   try{ tvPublicar(); }catch(e){}
+  // La cuenta en vivo de la mesa lleva cuántas canciones ya pidió la mesa: así cada celular ve el cupo real.
+  try{ clearTimeout(pubT); pubT=setTimeout(publicarCuentas,1200); }catch(e){}
   return{msg:'🎵 '+tableLabel(mesa)+': '+song,nuevo:true};
 }
 window.vitoAddSong=(mesa,song)=>{const r=agregarCancion(mesa,song);try{renderMusica();}catch(e){}return r.msg;};
@@ -22291,7 +22296,10 @@ function vTopic(id){
 const pubHash={};let pubT=null;
 function snapMesa(id){
   const its=(data.tables[id]&&data.tables[id].items)||[],consumo=tableTotal(id),saldo=tableBalance(id);
-  return {t:Date.now(),c:consumo,s:saldo,p:Math.max(0,consumo-saldo),i:its.slice(0,40).map(it=>[String(it.name).slice(0,40),it.qty,it.price])};
+  const sn={t:Date.now(),c:consumo,s:saldo,p:Math.max(0,consumo-saldo),i:its.slice(0,40).map(it=>[String(it.name).slice(0,40),it.qty,it.price])};
+  // Canciones que la mesa pidió en la ventana del límite (hora de cada una): el cupo es de la mesa, no del celular.
+  try{const now=Date.now(),cs=cola().filter(x=>x.mesa===id&&!x.fondo&&now-x.ts<VENT).map(x=>x.ts).sort((a,b)=>a-b);if(cs.length){sn.cs=cs.slice(-MAX);sn.cm=MAX;}}catch(e){}
+  return sn;
 }
 /* ---------- Menú (restaurante/cafetería) o catálogo (cervecería/tienda) para el QR ---------- */
 let catHash = '', catT = 0;
@@ -22547,7 +22555,7 @@ function publicarCuentas(){
     if(pubHash[id]===h)return;
     if(pubHash[id]===undefined&&!mesaQRActiva(id))return;      // nadie la está viendo por QR
     const primera=pubHash[id]===undefined;pubHash[id]=h;
-    if(primera&&!sn.i.length)return;
+    if(primera&&!sn.i.length&&!sn.cs)return;
     fetch('https://canal.vento.local/'+vTopic(id),{method:'POST',body:JSON.stringify(sn)}).catch(()=>{delete pubHash[id];});
   });
 }

@@ -508,7 +508,12 @@ const MAX=10,V=15*6e4,K='canc_'+SUF,KR='rondas_'+SUF,KH='hist_'+SUF,VIDA_RONDA=1
 const $=i=>document.getElementById(i);
 const jget=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))||d}catch(e){return d}};
 const jset=(k,x)=>{try{localStorage.setItem(k,JSON.stringify(x))}catch(e){}};
-const recientes=()=>jget(K,[]).filter(x=>Date.now()-x<V),usadas=()=>recientes().length;
+// El cupo de canciones es POR MESA: la app del local publica en la cuenta en vivo (snap.cs) la hora de cada
+// canción que pidió la mesa (desde cualquier celular). Se usa la cuenta más alta entre la mesa y este celular.
+let snapEn=0;
+const recLocal=()=>jget(K,[]).filter(x=>Date.now()-x<V);
+const recMesa=()=>{if(!snap||!Array.isArray(snap.cs))return[];const d=Date.now()-snapEn;return snap.cs.map(x=>Date.now()-((+snap.t||0)-x)-d).filter(x=>Date.now()-x<V)};
+const recientes=()=>{const a=recLocal(),b=recMesa();return b.length>a.length?b:a},usadas=()=>Math.min(MAX,recientes().length);
 let modo='p',ultimo='',es=null,snap=null,lineas=[];
 
 function h(tag,cls,txt){const e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e}
@@ -561,6 +566,7 @@ const DICT_SRC={
   modoFacil:["Letra grande","Large text","Letra grande","Grand texte","大字体","बड़ा टेक्स्ट"],
   qrIncompleto:["Este QR está incompleto.","This QR is incomplete.","Este QR está incompleto.","Ce QR est incomplet.","此二维码不完整。","यह QR अधूरा है।"],
   escribeAlgo:["Escribe algo primero.","Write something first.","Escreva algo primeiro.","Écrivez quelque chose d’abord.","请先输入内容。","पहले कुछ लिखें।"],
+  cancionLimiteMesa:["Esta mesa ya pidió {max} canciones. Podrán pedir otra en {min} min.","This table has already requested {max} songs. You can request another in {min} min.","Esta mesa já pediu {max} músicas. Poderão pedir outra em {min} min.","Cette table a déjà demandé {max} chansons. Vous pourrez en redemander une dans {min} min.","本桌已点了{max}首歌。{min}分钟后可再点一首。","इस टेबल ने पहले ही {max} गाने माँगे हैं। {min} मिनट में और माँग सकते हैं।"],
   cancionLimite:["Ya pediste {max} canciones. Podrás pedir otra en {min} min.","You’ve already requested {max} songs. You can request another in {min} min.","Você já pediu {max} músicas. Poderá pedir outra em {min} min.","Vous avez déjà demandé {max} chansons. Vous pourrez en redemander une dans {min} min.","您已点了{max}首歌。{min}分钟后可再点一首。","आपने पहले ही {max} गाने माँगे हैं। {min} मिनट में और माँग सकते हैं।"],
   pedidoLargo:["Tu pedido es muy largo. Envíalo en dos rondas.","Your order is too long. Send it in two rounds.","Seu pedido é muito longo. Envie em duas rodadas.","Votre commande est trop longue. Envoyez-la en deux fois.","您的订单太长，请分两次发送。","आपका ऑर्डर बहुत लंबा है। इसे दो राउंड में भेजें।"],
   enviadoOk:["✅ Enviado, ya lo recibió el local.","✅ Sent, the place received it.","✅ Enviado, o local já recebeu.","✅ Envoyé, l’établissement l’a reçu.","✅ 已发送，商家已收到。","✅ भेजा गया, दुकान को मिल गया।"],
@@ -1143,7 +1149,7 @@ function conectar(){
   try{es=new EventSource('https://canal.vento.local/'+v+'/sse?since=12h')}catch(e){return}
   es.onmessage=ev=>{try{
     const m=JSON.parse(ev.data);
-    if(m.event==='message'){snap=JSON.parse(m.message);pintar(snap);pintarChips();pintarSug()}
+    if(m.event==='message'){snap=JSON.parse(m.message);snapEn=Date.now();pintar(snap);pintarChips();pintarSug();if(modo=='c')info()}
   }catch(e){}};
   es.onopen=()=>{if($('cs').textContent==t('cargandoCuenta'))$('cs').textContent=t('cuentaSinConsumo')};
 }
@@ -1161,7 +1167,7 @@ async function canalPost(body){
   }
   return false;
 }
-const OUTK='outbox_'+c,MISK='mis_'+c+'_'+SUF;
+const OUTK='outbox_'+c,MISK='mis_'+c+'_'+SUF,MISC='misc_'+c+'_'+SUF;
 function outboxAgregar(body){const l=jget(OUTK,[]);if(!l.some(x=>x.body===body))l.push({body,at:Date.now()});jset(OUTK,l.slice(-20));}
 let vaciando=false;
 async function vaciarOutbox(){
@@ -1189,10 +1195,14 @@ function pintarEstados(){
   l.slice().reverse().slice(0,5).forEach(x=>{const r=h('div');r.appendChild(h('span',null,x.txt));r.appendChild(h('em',null,EST_TXT[x.e]+' '+(x.n||(x.e==='enviado'?'…':''))));box.appendChild(r)});
 }
 let esEst=null;
-function escucharEstados(){
-  if(esEst||!c||!misPedidos().length)return;
+function escucharEstados(forzar){
+  if(esEst||!c||(!forzar&&!misPedidos().length))return;
   try{esEst=new EventSource('https://canal.vento.local/'+c+'e/sse?since=12h')}catch(e){return}
   esEst.onmessage=ev=>{try{const m=JSON.parse(ev.data);if(m.event!=='message')return;const o=JSON.parse(m.message);if(!o||o.t!=='estado')return;
+    // La app del local rechazó una canción porque la MESA ya llegó a su cupo (la pidieron desde otros celulares).
+    if(o.e==='limite'){const mc=jget(MISC,[]);if(!mc.includes(o.id))return;jset(MISC,mc.filter(x=>x!==o.id));
+      const a=jget(K,[]);a.pop();jset(K,a);if(modo=='c')pintarCupos();
+      setMsg(()=>t('cancionLimiteMesa',{max:o.max||MAX,min:o.min||1}),'err');return}
     const l=jget(MISK,[]),x=l.find(y=>y.id===o.id);if(!x)return;x.e=o.e;x.n=o.n||'';delete x.body;jset(MISK,l);pintarEstados();
     if(['recibido','preparacion','listo'].includes(o.e)&&$('m').className!=='err')setMsg(()=>t('enviadoOk'),'ok');}catch(e){}};
 }
@@ -1244,7 +1254,7 @@ $('b').onclick=async()=>{
   }else if(modo=='c')txt=$('s').value.replace(/\s+/g,' ').trim();
   else txt=$('n').value.replace(/\s+/g,' ').trim();
   if(!txt&&modo!='q')return setMsg(()=>t('escribeAlgo'),'err');
-  if(modo=='c'&&usadas()>=MAX)return setMsg(()=>t('cancionLimite',{max:MAX,min:Math.ceil((Math.min(...recientes())+V-Date.now())/6e4)}),'err');
+  if(modo=='c'&&usadas()>=MAX)return setMsg(()=>t(recMesa().length>recLocal().length?'cancionLimiteMesa':'cancionLimite',{max:MAX,min:Math.max(1,Math.ceil((Math.min(...recientes())+V-Date.now())/6e4))}),'err');
   const tipo={p:'PEDIDO',c:'CANCION',q:'CUENTA'}[modo];
   if(dom){
     // DOMICILIO: nombre | teléfono | dirección | productos
@@ -1265,7 +1275,7 @@ $('b').onclick=async()=>{
       const items=env.map(l=>({n:l.n,q:l.q,p:precioDe(l.n)}));
       cuerpo=JSON.stringify({t:'pedido',v:2,id,mesa:+mesa,items,total:items.reduce((a,x)=>a+x.q*x.p,0),at:Date.now(),txt:ultimo.slice(0,300)});
       misPedidosAgregar({id,txt:txt.slice(0,120),at:Date.now(),e:'enviado',body:cuerpo});
-    } else cuerpo=JSON.stringify({t:'cancion',v:2,id,mesa:+mesa,s:txt.slice(0,120),at:Date.now()});
+    } else{cuerpo=JSON.stringify({t:'cancion',v:2,id,mesa:+mesa,s:txt.slice(0,120),at:Date.now()});jset(MISC,jget(MISC,[]).concat(id).slice(-12));escucharEstados(true)}
   }
   if(c){
     if(cuerpo.length>3800||ultimo.length>(dom?500:2000))return setMsg(()=>t('pedidoLargo'),'err');
