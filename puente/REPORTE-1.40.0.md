@@ -18,11 +18,12 @@
   **solicitud** al administrador, que le llega con notificación. En **🎧 Soporte → 🏷️ Cambios de tipo de negocio**
   se aprueba o se rechaza (con motivo). Aprobada, la app del negocio cambia sola en todos sus equipos; rechazada, le
   avisa el motivo. Los negocios que ya tenían su tipo también quedaron fijos. El equipo del proveedor lo cambia siempre.
-- **Tipos nuevos, con barra de tragos** (mesas, rondas y música por QR, como un bar):
-  - **🧥 Segunda Vuelta · Ropa de segunda y tragos:** ropa usada, paca, americana o vintage. Cada prenda con talla,
-    estado y marca.
-  - **🛍️ Estreno & Brindis · Ropa nueva y tragos:** ropa nueva con tallas, colores y marca.
-  Cada uno trae su carta de ejemplo (prendas y tragos). La «Tienda de ropa / Boutique» de siempre sigue igual.
+- **Ropa, sin tipos repetidos y con barra opcional** (hay tiendas que venden tragos o hacen eventos):
+  - **👕 Tienda de ropa / Boutique** (ropa nueva): tallas, colores y marca. Ahora trae la música de los clientes
+    prendida, y en el asistente se puede elegir «Las dos» (caja y mesas) para tener barra.
+  - **🧥 Segunda Vuelta · Ropa de segunda** (nuevo): paca, americana o vintage, cada prenda con talla, estado y
+    marca. Arranca con caja y mesas (barra) y música; su carta de ejemplo trae prendas y tragos.
+  Si algún negocio quedó con el tipo duplicado de una prueba anterior, pasa solo a la Boutique.
 - Migración `20261023000000_cambio_tipo_negocio` y rutas `/tipo-pedir`, `/admin/tipos`, `/admin/tipo_resolver`.
 
 ## 2. Plan vencido → modo gratis; cancelada → solo pagar
