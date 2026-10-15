@@ -5,6 +5,46 @@
 <meta charset="UTF-8">
 <script src="lib/vento-errores.js"></script><!-- errores de este equipo → Vento Admin (🐞 Errores) -->
 <script>
+/* ==================== Menús que no saltan arriba solos ====================
+   Muchas partes de Vento se refrescan solas (estado de los pagos, cola de canciones, pedidos de cocina…) rehaciendo su
+   contenido. Al rehacerlo, la lista que uno estaba bajando volvía arriba sola. Ahora, al refrescar un bloque, se guarda
+   dónde iba la lista (el bloque y sus listas internas, hasta 2 niveles) y se deja ahí mismo. Si el código manda arriba a
+   propósito después (cambiar de pestaña o de paso), eso sigue funcionando. */
+(function(){
+  try{
+    var d = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML');
+    if(!d || !d.set || !d.get) return;
+    var guardar = function(raiz){
+      var l = [];
+      if(raiz.scrollTop > 0 || raiz.scrollLeft > 0) l.push({ c: [], t: raiz.scrollTop, x: raiz.scrollLeft });
+      var hijos = raiz.children, n = 0;
+      for(var i = 0; i < hijos.length && n < 300; i++){
+        var h = hijos[i]; n++;
+        if(h.scrollTop > 0 || h.scrollLeft > 0) l.push({ c: [i], t: h.scrollTop, x: h.scrollLeft, k: h.className, g: h.tagName });
+        for(var j = 0; j < h.children.length && n < 300; j++){ var nn = h.children[j]; n++; if(nn.scrollTop > 0 || nn.scrollLeft > 0) l.push({ c: [i, j], t: nn.scrollTop, x: nn.scrollLeft, k: nn.className, g: nn.tagName }); }
+      }
+      return l;
+    };
+    var poner = function(raiz, l){
+      l.forEach(function(r){
+        var el = raiz;
+        for(var i = 0; i < r.c.length && el; i++) el = el.children[r.c[i]];
+        if(!el || (r.g && (el.tagName !== r.g || el.className !== r.k))) return;
+        if(r.t) el.scrollTop = r.t; if(r.x) el.scrollLeft = r.x;
+      });
+    };
+    Object.defineProperty(Element.prototype, 'innerHTML', {
+      configurable: true, enumerable: d.enumerable,
+      get: function(){ return d.get.call(this); },
+      set: function(v){
+        var l = null;
+        try{ if(this.isConnected && this.firstElementChild) l = guardar(this); }catch(e){ l = null; }
+        d.set.call(this, v);
+        if(l && l.length) try{ poner(this, l); }catch(e){}
+      }
+    });
+  }catch(e){}
+})();
 /* ==================== App Android o Vento Web ====================
    En Android hay dos «Vento»: la APP (lee los avisos de DaviPlata/Nequi, dice «Pago confirmado» aunque esté minimizada)
    y VENTO WEB (la página en el navegador o su acceso directo instalado desde el navegador), que NO puede leer los avisos
@@ -22374,7 +22414,7 @@ function mqAplicar(m){
   const ids=new Set(l.map(x=>x.id));
   cola().filter(x=>!x.done&&!ids.has(x.id)&&Date.now()-(x.ts||0)<20000).forEach(x=>l.push(x));   // lo que se acaba de mandar y todavía no vuelve
   SS('vito_cola',l);
-  try{renderMusica();}catch(e){}try{ypSigueK='';ypPintar();if(ypAbierto&&!ypVer&&ypTab==='cola')ypCuerpo();}catch(e){}
+  try{renderMusica();}catch(e){}try{ypSigueK='';ypPintar();if(ypAbierto&&!ypVer&&ypTab==='cola')ypCuerpo(true);}catch(e){}
 }
 // El equipo de la música recibe lo que mandan los demás.
 function mqComando(m){
@@ -22885,7 +22925,7 @@ function ypFav(v){
 function ypCorBtn(v){
   const b=document.createElement('button');b.type='button';b.className='yp-cor';
   const p=()=>{const si=ypEsFav(v.vid);b.textContent=si?'❤️':'🤍';b.title=si?'Quitar de Mis canciones':'Guardar en Mis canciones';b.setAttribute('aria-label',b.title);b.setAttribute('aria-pressed',si?'true':'false');};
-  p();b.onclick=()=>{ypFav(v);p();if(ypTab==='canciones')ypCuerpo();ypPintar();};return b;
+  p();b.onclick=()=>{ypFav(v);p();if(ypTab==='canciones')ypCuerpo(true);ypPintar();};return b;
 }
 /* ---------- 🚫 Música sin comerciales con YouTube Premium ----------
    Por qué salen: el reproductor que va DENTRO de Vento (como en cualquier app o página) es el de YouTube para otras
@@ -22964,7 +23004,7 @@ function ypCrear(){
   $('ypSc').onclick=mzSinComerciales;
   $('ypTocar').onclick=ypTocarSonar;
   $('ypMqYo').onclick=()=>{mqElegir(true);ypSigueK='';ypPintar();};
-  $('ypCor').onclick=()=>{const x=mzActual();if(x&&x.vid){ypFav(x);ypPintar();if(ypTab==='canciones')ypCuerpo();}};
+  $('ypCor').onclick=()=>{const x=mzActual();if(x&&x.vid){ypFav(x);ypPintar();if(ypTab==='canciones')ypCuerpo(true);}};
   $('ypBuscarF').onsubmit=e=>{e.preventDefault();ypBuscar($('ypQ').value);};
   ov.querySelectorAll('[data-yp-tab]').forEach(b=>b.onclick=()=>{ypTab=b.dataset.ypTab;ypVer=null;ypCuerpo();if(ypTab==='buscar'&&!ypRes)setTimeout(()=>{try{$('ypQ').focus();}catch(e){}},30);});
   // El video sigue al recuadro aunque se mueva cualquier parte de la ventana (scroll no burbujea: se escucha en captura).
@@ -23033,13 +23073,17 @@ function ypPintar(){
 setInterval(()=>{try{ypPintar();ypMiniPintar();}catch(e){}},1000);
 window.addEventListener('resize',()=>{try{ypUbicar();}catch(e){}});
 // ---------- Secciones ----------
-function ypCuerpo(){
+// mantener=true: se rehace la lista (llegó una canción, se agregaron varias, ❤️) SIN volver arriba. Antes cada canción que
+// pedía una mesa mandaba la cola al principio mientras uno bajaba.
+function ypCuerpo(mantener){
   const c=$('ypCuerpo');if(!c)return;
+  const antes=mantener?c.scrollTop:0;
   document.querySelectorAll('#ypOv [data-yp-tab]').forEach(b=>{const on=b.dataset.ypTab===ypTab;b.classList.toggle('on',on);b.setAttribute('aria-selected',on?'true':'false');});
-  c.innerHTML='';c.scrollTop=0;
+  c.innerHTML='';c.scrollTop=0;c.__vScroll=null;
   if(ypVer)ypVerUI(c);
   else if(ypTab==='inicio')ypInicioUI(c);else if(ypTab==='buscar')ypBuscarUI(c);else if(ypTab==='listas')ypListasUI(c);
   else if(ypTab==='canciones')ypCancionesUI(c);else if(ypTab==='mio')ypMioUI(c);else ypColaUI(c);
+  if(antes){c.scrollTop=antes;requestAnimationFrame(()=>{c.scrollTop=antes;});}
   setTimeout(ypUbicar,30);
 }
 const ypBtn=(t,fn,cls)=>{const b=document.createElement('button');b.type='button';b.className=cls||'btn-ghost';b.textContent=t;b.onclick=()=>fn(b);return b;};
@@ -23092,7 +23136,7 @@ function ypAgregar(v,primero,callado,idFijo){
 function ypPonerVarias(l,nombre){
   const ya=mzActual();let n=0;l.forEach(v=>{if(v&&v.vid&&!(ya&&ya.vid===v.vid)&&ypAgregar(v,false,true))n++;});   // la que suena no se repite
   showToast(n?'➕ '+n+' canci'+(n===1?'ón':'ones')+(nombre?' de «'+nombre+'»':'')+' a la cola.':'🎵 Esas canciones ya están en la cola.');
-  if(ypTab==='cola')ypCuerpo();
+  if(ypTab==='cola')ypCuerpo(true);
 }
 const ypChips=(c,lista)=>{const r=document.createElement('div');r.className='yp-chips';lista.forEach(([t,q])=>r.appendChild(ypBtn(t,()=>ypBuscar(q),'yp-chip')));c.appendChild(r);return r;};
 async function ypBuscar(q){
@@ -23247,8 +23291,8 @@ function ypColaUI(c){
   if(!o.length){ypNota(c,'No hay canciones en cola. Busca arriba o pon una de tus listas; las mesas piden con el QR.');return;}
   const L=document.createElement('div');L.className='yp-lista';c.appendChild(L);
   o.slice(0,60).forEach((y,i)=>L.appendChild(ypFila(ypMini_(y.vid),(i+1)+'. '+(y.title||y.song),mzEtq(y)+(y.primero?' · ⏭ va primero':''),[
-    ypBtn('⏭',()=>{if(mqOtro())mqPub({t:'cmd',a:'primero',id:y.id});const l=cola(),it=l.find(z=>z.id===y.id);if(it){it.primero=Date.now();SS('vito_cola',l);try{tvPublicar(true);}catch(e){}renderMusica();ypCuerpo();showToast('⏭ «'+(y.title||y.song)+'» suena después de la actual.');}}),
-    ypBtn('🗑',()=>{if(mqOtro())mqPub({t:'cmd',a:'quitar',id:y.id});mzTermino(y.id,'cancelled');try{tvPublicar(true);}catch(e){}renderMusica();ypCuerpo();})].concat(y.vid?[ypCorBtn({vid:y.vid,title:y.title||y.song,artist:y.artist,dur:y.dur})]:[]))));
+    ypBtn('⏭',()=>{if(mqOtro())mqPub({t:'cmd',a:'primero',id:y.id});const l=cola(),it=l.find(z=>z.id===y.id);if(it){it.primero=Date.now();SS('vito_cola',l);try{tvPublicar(true);}catch(e){}renderMusica();ypCuerpo(true);showToast('⏭ «'+(y.title||y.song)+'» suena después de la actual.');}}),
+    ypBtn('🗑',()=>{if(mqOtro())mqPub({t:'cmd',a:'quitar',id:y.id});mzTermino(y.id,'cancelled');try{tvPublicar(true);}catch(e){}renderMusica();ypCuerpo(true);})].concat(y.vid?[ypCorBtn({vid:y.vid,title:y.title||y.song,artist:y.artist,dur:y.dur})]:[]))));
 }
 // ---------- Barrita «🎵 Sonando…» en toda la app ----------
 function ypMiniPintar(){
@@ -28701,7 +28745,7 @@ let fotosListas = false;
       const llego = (g.lista || []).find(x => /davi/i.test(x.app) && !/PRUEBA VENTO/.test(x.txt || ''));
       const ok = (b, t) => '<span class="gp-e ' + (b ? 'gp-si' : 'gp-no') + '">' + (b ? '✅ ' : '⏳ ') + t + '</span>';
       const paso = (n, tit, cuerpo, estado) => '<li class="gp-paso"><div class="gp-n">' + n + '</div><div><b>' + tit + '</b>' + (estado || '') + '<div class="gp-c">' + cuerpo + '</div></div></li>';
-      ov.innerHTML = '<div class="modal gp-modal"><h2>📘 Agregar DaviPlata (y Nequi) a Vento</h2>' +
+      const html = '<div class="modal gp-modal"><h2>📘 Agregar DaviPlata (y Nequi) a Vento</h2>' +
         '<div class="modal-sub">Así, cada vez que te pasen plata a tu DaviPlata o Nequi, Vento te avisa <b>una sola vez</b>: «💜 Pagaron $20.000 por DaviPlata», lo dice en voz alta y te muestra de qué mesa es. <b>No necesitas convenio con Davivienda</b> ni ninguna clave del banco.</div>' +
         (iphone ? '<div class="gp-alerta">📱 En iPhone no se pueden leer los avisos de otras apps. Haz estos pasos en un <b>celular Android</b> que tenga DaviPlata (puede ser el del negocio). Este iPhone igual recibe los avisos.</div>' : '') +
         '<ol class="gp-lista">' +
@@ -28729,6 +28773,12 @@ let fotosListas = false;
         '<div class="settings-desc" style="margin-top:8px"><b>¿Y los demás celulares del negocio?</b> Con tu misma cuenta (Vento Nube) también ven el pago al instante. <b>¿No usas la app Vento en ese celular?</b> <button type="button" class="btn-ghost gp-btn" data-gp="macro">Usar MacroDroid</button><br><small>«Conectar DaviPlata» (API oficial) es otra cosa: sirve para <b>cobrar con código</b> y necesita convenio con Davivienda. Para que Vento te avise los pagos <b>no lo necesitas</b>.</small></div>' +
         '<div class="settings-desc" style="margin-top:6px;opacity:.75"><small>🔎 Este equipo: ' + escp(pgDondeEstoy()) + '</small></div>' +
         '<div class="modal-actions"><button type="button" class="btn-close" data-gp="cerrar">Listo</button></div></div>';
+      // Solo si algo cambió (el estado se revisa cada 3 s) y sin volver arriba: antes el paso a paso se rehacía cada 3 s y
+      // mandaba al principio mientras uno bajaba.
+      if(ov.__html === html) return;
+      const sc = [ov, ov.firstElementChild].map(x => x ? x.scrollTop : 0);
+      ov.__html = html; ov.innerHTML = html;
+      [ov, ov.firstElementChild].forEach((x, n) => { if(x && sc[n]) x.scrollTop = sc[n]; });
     }
     pintar(); ov.classList.add('show');
     clearInterval(ov.__t); ov.__t = setInterval(() => { if(!ov.classList.contains('show')) return clearInterval(ov.__t); if(!ov.contains(document.activeElement) || document.activeElement === document.body) pintar(); }, 3000);

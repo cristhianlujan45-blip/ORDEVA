@@ -1,4 +1,4 @@
-# Vento 1.38.6 — Suena siempre (pantalla bloqueada o Vento cerrada), Bre-B de otros bancos y Nequi
+# Vento 1.38.6 — Suena siempre (pantalla bloqueada o Vento cerrada), Bre-B de otros bancos, Nequi y menús que ya no saltan arriba
 
 ## 1. Que suene con la pantalla bloqueada o Vento cerrada
 - **Qué pasaba:** con la pantalla bloqueada, Android congelaba la app apenas leía el aviso del banco, antes de que la
@@ -29,6 +29,16 @@
   aplicación.»**, con su aviso en el celular.
 - **Nunca cuentan como pago:** las **solicitudes** («JUAN te pidió $20.000», «Recibiste una solicitud»), los cobros y
   las transferencias rechazadas, fallidas, reversadas o programadas.
+
+## 4. Los menús ya no se suben solos al bajar
+- **El paso a paso de DaviPlata/Nequi** se rehacía cada 3 s (para revisar el permiso, la batería…) y mandaba al
+  principio mientras uno bajaba. Ahora solo se rehace si algo cambió, y se queda donde ibas.
+- **Panel de YouTube «🎵 En cola»:** cada canción que llegaba (o que ponía el equipo de la música) y cada 🗑 / ⏭
+  mandaban la lista arriba. Ahora se queda donde ibas. Cambiar de pestaña sí empieza arriba, a propósito.
+- **Para todos los menús:** cualquier parte de Vento que se refresca sola (pagos, cocina, música, avisos…) guarda dónde
+  iba la lista y la deja ahí mismo. Lo que manda arriba a propósito (cambiar de pestaña o de paso) sigue igual.
+- **Prueba nueva `desplazamiento`** (10 comprobaciones): con el código anterior falla en 5 de ellas (la lista volvía a
+  0) y con el arreglo pasan todas.
 
 ## Pruebas
 - **Java `AvisoPagoPrueba`:** 85 comprobaciones (Bre-B, Nequi con «¿», solicitudes y avisos sin valor).
