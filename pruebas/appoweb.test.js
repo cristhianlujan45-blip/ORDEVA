@@ -76,6 +76,27 @@ const UA_APP = UA_CHROME.replace('Mobile Safari/537.36', 'Mobile Safari/537.36 V
     chk('2. … el paso a paso dice que la cierre del todo y la abra otra vez', /no cargó bien/.test(g) && /Ábrela de nuevo/.test(g), g.slice(0, 300));
     await ctx.close();
 
+    // ---------- 2b. App VIEJA (antes del 13 de octubre): tiene puente pero no lee avisos ----------
+    {
+      const c = await b.newContext({ viewport: { width: 390, height: 844 }, userAgent: UA_APP.replace('1.0.25', '1.0.9') });
+      await c.route('**/*', r => new URL(r.request().url()).hostname === 'localhost' ? r.continue() : r.abort());
+      await c.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '' })); }catch(e){} window.VentoAndroid = { notificar: () => true, hablar: () => {}, callar: () => {} }; window.__abrir = []; window.__errores = []; });
+      const pv = await c.newPage(); pv.on('pageerror', e => errs.push(e.message));
+      await pv.goto(BASE + '/index.html', { waitUntil: 'domcontentloaded' }); await pv.waitForTimeout(1500);
+      await entrar(pv, 'Bar Vieja');
+      chk('2b. La app vieja se reconoce como app (no como Vento Web)', await pv.evaluate(() => window.ventoAppVieja() && !window.ventoAndroidWeb() && !window.ventoAppSinPuente()));
+      await pv.evaluate(() => { data.pagos = data.pagos || {}; data.pagos.on = true; saveData(); window.ventoPagosGuia(); });
+      await pv.waitForTimeout(300);
+      const gv = await pv.evaluate(() => document.getElementById('pgGuiaOv').innerText);
+      chk('2b. Paso a paso: «Estás en la app Vento, pero es una versión VIEJA (1.0.9)» + «⬇️ Descargar la app nueva (vento.apk)», NO «Vento Web»', /versión VIEJA \(1\.0\.9\)/.test(gv) && /Descargar la app nueva \(vento\.apk\)/.test(gv) && /App vieja: actualízala/.test(gv) && !/Estás en Vento Web/.test(gv), gv.slice(0, 600));
+      chk('2b. … con qué hacer si dice «No se instaló la app»', /No se instaló la app/.test(gv));
+      chk('2b. «🔎 Este equipo: App Vento para Android 1.0.9 — VIEJA…»', /Este equipo: App Vento para Android 1\.0\.9 — VIEJA/.test(gv), gv.slice(-300));
+      await pv.evaluate(() => { document.getElementById('pgGuiaOv').classList.remove('show'); const i = document.getElementById('pgOn'); i.checked = true; i.dispatchEvent(new Event('change')); });
+      const av = await pv.evaluate(() => ({ h: document.getElementById('pgWebAviso').hidden, t: document.getElementById('pgWebAviso').innerText, e: document.getElementById('pgEstado').textContent }));
+      chk('2b. Ajustes → Pagos: «Tu app Vento es una versión vieja… actualízala» con el botón del APK', !av.h && /versión vieja/.test(av.t) && /Descargar la app \(vento\.apk\)/.test(av.t) && /app Vento es vieja/.test(av.e), av);
+      await c.close();
+    }
+
     // ---------- 3. Conectar YouTube empezado en la app ----------
     ({ ctx, p } = await nuevo(UA_APP, true));
     await p.evaluate(() => { try{ window.ytConectarHora(); }catch(e){ window.__e = e.message; } });

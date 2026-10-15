@@ -17,6 +17,12 @@
   // La app sin su puente (no cargó bien): el navegador de la app dice «VentoAndroid/…» pero falta window.VentoAndroid.
   window.ventoAppSinPuente = function(){ return /VentoAndroid\//.test(ua) && !window.VentoAndroid; };
   window.ventoAndroidWeb = function(){ return /Android/i.test(ua) && !window.VentoAndroid && !/VentoAndroid\//.test(ua); };
+  // La app Vento instalada es VIEJA (de antes del 13 de octubre): tiene conexión con Android pero no lee los avisos de
+  // pagos. Antes el paso a paso la tomaba por Vento Web.
+  window.ventoAppVieja = function(){ var A = window.VentoAndroid; return !!A && !A.pagosAvisosTomar; };
+  // La app lee los avisos de pagos pero no los SMS (antes de la 1.38.3).
+  window.ventoAppSinSms = function(){ var A = window.VentoAndroid; return !!A && !!A.pagosAvisosTomar && !A.pagosSmsConfiar; };
+  window.ventoAppVersion = function(){ var m = ua.match(/VentoAndroid\/([\w.]+)/); return m ? m[1] : ''; };
   window.ventoIntentApp = function(consulta){
     return 'intent://abrir' + (consulta ? '?' + consulta : '') + '#Intent;scheme=vento;package=co.vento.app;S.browser_fallback_url=' + encodeURIComponent(APK) + ';end';
   };
@@ -25253,7 +25259,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-15 · v1.38.4';
+const MESORA_VERSION = '2026-10-15 · v1.38.5';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'Vento · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 // Si el navegador (o el celular, con la app agregada a la pantalla de inicio) se quedó con
@@ -28648,7 +28654,9 @@ let fotosListas = false;
   // «🔎 Este equipo: …»: con un pantallazo se sabe si es la app o Vento Web (y cuál navegador).
   function pgDondeEstoy(){
     const ua = navigator.userAgent || '';
-    if(AND()) return 'App Vento para Android' + ((ua.match(/VentoAndroid\/([\w.]+)/) || [])[1] ? ' ' + ua.match(/VentoAndroid\/([\w.]+)/)[1] : '') + (AND().pagosSmsConfiar ? '' : ' (versión vieja: instala la nueva)');
+    const ver = window.ventoAppVersion ? window.ventoAppVersion() : '';
+    if(AND()) return 'App Vento para Android' + (ver ? ' ' + ver : '') + (AND().pagosSmsConfiar ? '' : ' (no lee SMS: actualízala)');
+    if(window.VentoAndroid) return 'App Vento para Android' + (ver ? ' ' + ver : '') + ' — VIEJA: no lee los avisos de pagos, actualízala';
     if(window.ventoAppSinPuente && window.ventoAppSinPuente()) return 'App Vento sin conexión con Android (ciérrala y ábrela otra vez)';
     let nav = navigator.brave ? 'Brave' : /SamsungBrowser/.test(ua) ? 'Samsung Internet' : /EdgA?\//.test(ua) ? 'Edge' : /Firefox\//.test(ua) ? 'Firefox' : /MiuiBrowser|XiaoMi/.test(ua) ? 'navegador de Xiaomi' : /OPR\//.test(ua) ? 'Opera' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'navegador';
     let inst = false; try{ inst = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; }catch(e){}
@@ -28679,14 +28687,17 @@ let fotosListas = false;
         '<div class="modal-sub">Así, cada vez que te pasen plata a tu DaviPlata o Nequi, Vento te avisa <b>una sola vez</b>: «💜 Pagaron $20.000 por DaviPlata», lo dice en voz alta y te muestra de qué mesa es. <b>No necesitas convenio con Davivienda</b> ni ninguna clave del banco.</div>' +
         (iphone ? '<div class="gp-alerta">📱 En iPhone no se pueden leer los avisos de otras apps. Haz estos pasos en un <b>celular Android</b> que tenga DaviPlata (puede ser el del negocio). Este iPhone igual recibe los avisos.</div>' : '') +
         '<ol class="gp-lista">' +
-        paso(1, 'Usa la app Vento en el celular donde tienes DaviPlata', A ? 'Ya estás en la app Vento para Android. 👍'
+        paso(1, 'Usa la app Vento en el celular donde tienes DaviPlata', A ? 'Ya estás en la app Vento para Android. 👍' + (window.ventoAppSinSms && window.ventoAppSinSms() ? '<br><small>Para que también lea los <b>SMS</b> del banco, actualízala: <a href="' + APK + '" download="vento.apk" rel="noopener">⬇️ vento.apk</a> (se instala encima, no se borra nada).</small>' : '')
+          : window.ventoAppVieja && window.ventoAppVieja() ? '<b>Estás en la app Vento, pero es una versión VIEJA' + (window.ventoAppVersion() ? ' (' + escp(window.ventoAppVersion()) + ')' : '') + '</b> que todavía no lee los avisos de pagos. Actualízala:' +
+            '<br><a class="btn-primary gp-btn" href="' + APK + '" download="vento.apk" rel="noopener">⬇️ Descargar la app nueva (vento.apk)</a>' +
+            '<ol style="margin:6px 0 0;padding-left:20px;line-height:1.5;font-size:14px"><li>Ábrela desde la notificación de la descarga o en <b>Archivos → Descargas</b>.</li><li>Si pregunta, <b>Configuración → Permitir de esta fuente</b>.</li><li>Toca <b>Actualizar</b> (no se borra nada) y luego <b>Abrir</b>.</li><li>Si dice <b>«No se instaló la app»</b> o <b>«conflicto con un paquete»</b>: revisa que tu cuenta esté en Vento Nube (Ajustes), desinstala la Vento vieja e instala la nueva; al entrar con tu correo vuelven tus datos.</li></ol>'
           : window.ventoAppSinPuente && window.ventoAppSinPuente() ? '⚠️ La app Vento no cargó bien. Ciérrala del todo (quítala de las apps recientes) y ábrela otra vez.'
           : android ? '<b>Estás en Vento Web</b> (el navegador o su acceso directo «Vento Web»), no en la app. Los avisos de DaviPlata y Nequi <b>solo los puede leer la app Vento</b> (el archivo <b>vento.apk</b>).' +
             '<br><b>¿Todavía no tienes la app?</b><br><a class="btn-primary gp-btn" href="' + APK + '" download="vento.apk" rel="noopener">⬇️ Descargar la app (vento.apk)</a>' +
             '<ol style="margin:6px 0 0;padding-left:20px;line-height:1.5;font-size:14px"><li>Toca el botón: se baja el archivo <b>vento.apk</b> (3,5 MB).</li><li>Ábrelo desde la notificación de la descarga o en <b>Archivos → Descargas</b>.</li><li>Si el celular pregunta, toca <b>Configuración → Permitir de esta fuente</b> y vuelve.</li><li>Toca <b>Instalar</b> (si ya la tenías, <b>Actualizar</b>: no se borra nada) y luego <b>Abrir</b>.</li><li>Entra con tu misma cuenta y vuelve a este paso a paso en la app (Ajustes → 💜 Pagos).</li></ol>' +
             '<b>¿Ya la tienes instalada?</b><br><button type="button" class="btn-ghost gp-btn" data-gp="abrirapp">📲 Abrir la app Vento</button><br><small>De ahí en adelante abre siempre <b>la app</b> (ícono «Vento»), no «Vento Web».</small>'
           : '<a class="btn-primary gp-btn" href="' + APK + '" target="_blank" rel="noopener">📲 Descargar la app Vento (Android)</a><br><small>Ábrela, entra con tu misma cuenta y vuelve a este paso a paso (Ajustes → 💜 Pagos).</small>',
-          ok(!!A, A ? 'Listo' : window.ventoAppSinPuente && window.ventoAppSinPuente() ? 'Ábrela de nuevo' : android ? 'Estás en Vento Web' : 'Hazlo en el Android')) +
+          ok(!!A, A ? 'Listo' : window.ventoAppVieja && window.ventoAppVieja() ? 'App vieja: actualízala' : window.ventoAppSinPuente && window.ventoAppSinPuente() ? 'Ábrela de nuevo' : android ? 'Estás en Vento Web' : 'Hazlo en el Android')) +
         paso(2, 'Prende «Recibir avisos de pagos»', 'Vento empieza a escuchar los avisos de plata que te llegan.' + (g.on && (!A || e.on) ? '' : '<br><button type="button" class="btn-primary gp-btn" data-gp="prender">Prender ahora</button>'), ok(g.on && (!A || e.on), g.on && (!A || e.on) ? 'Prendido' : 'Apagado')) +
         paso(3, 'Dale a Vento el permiso «Acceso a notificaciones»', 'Se abre una pantalla del celular: busca <b>Vento</b> en la lista, actívalo y toca <b>Permitir</b>. Luego vuelve con el botón de atrás. Vento solo toma los avisos de <b>plata recibida</b>: nunca códigos, claves ni compras.' + (A && !e.permiso ? '<br><button type="button" class="btn-primary gp-btn" data-gp="permiso">Abrir el permiso</button>' : ''), A ? ok(!!e.permiso, e.permiso ? 'Permiso dado' : 'Falta el permiso') : '') +
         paso(4, 'Deja prendidas las notificaciones de DaviPlata', 'En el celular: <b>Ajustes → Aplicaciones → DaviPlata → Notificaciones → Permitir</b> (todas). Abre DaviPlata una vez y entra con tu clave para que quede activa. Haz lo mismo con <b>Nequi</b> si también la usas. <b>¿Tu banco te avisa por SMS?</b> La app también lee esos mensajes de texto (con el mismo permiso): mira «📩 Confirmar también los SMS del banco» en Ajustes → 💜 Pagos.', '') +
@@ -28715,7 +28726,7 @@ let fotosListas = false;
       (enApp
         ? '<div class="settings-desc">Cuando te llega plata a <b>DaviPlata</b>, <b>Nequi</b> o tu banco, <b>la app de Vento lee directamente el aviso del banco en este celular</b> y te dice en voz alta <b>«Pago confirmado»</b> con el valor, quién pagó y de qué mesa es (como el parlante de Bold). No necesitas instalar nada más.</div>'
         : '<div class="settings-desc">Para que Vento te diga <b>«Pago confirmado»</b> apenas te llegue la plata, instala la <b>app Vento para Android</b> en el celular donde tienes DaviPlata o Nequi y prende esta opción allí: la app lee directamente el aviso del banco. Desde el navegador no se pueden leer los avisos de otras apps. Los demás celulares del negocio reciben el aviso por Vento Nube.</div>') +
-      '<div class="settings-desc" id="pgWebAviso" hidden style="border:1px solid #f5a524;border-radius:12px;padding:10px"><b>📲 Estás en Vento Web, no en la app.</b> Para que Vento lea los avisos de DaviPlata y Nequi y diga «Pago confirmado» (también con el celular bloqueado), usa <b>la app Vento</b> (archivo vento.apk) en este celular. <a class="btn-primary" id="pgBajarApk" href="https://github.com/cristhianlujan45-blip/cuentas/releases/latest/download/vento.apk" download="vento.apk" rel="noopener" style="margin-top:8px;width:100%;display:block;text-align:center;box-sizing:border-box">⬇️ Descargar la app (vento.apk)</a><button type="button" class="btn-ghost" id="pgAbrirApp" style="margin-top:8px;width:100%">📲 Ya la tengo: abrir la app Vento</button></div>' +
+      '<div class="settings-desc" id="pgWebAviso" hidden style="border:1px solid #f5a524;border-radius:12px;padding:10px"><b id="pgWebAvisoTit">📲 Estás en Vento Web, no en la app.</b> Para que Vento lea los avisos de DaviPlata y Nequi y diga «Pago confirmado» (también con el celular bloqueado), usa <b>la app Vento</b> (archivo vento.apk) en este celular. <a class="btn-primary" id="pgBajarApk" href="https://github.com/cristhianlujan45-blip/cuentas/releases/latest/download/vento.apk" download="vento.apk" rel="noopener" style="margin-top:8px;width:100%;display:block;text-align:center;box-sizing:border-box">⬇️ Descargar la app (vento.apk)</a><button type="button" class="btn-ghost" id="pgAbrirApp" style="margin-top:8px;width:100%">📲 Ya la tengo: abrir la app Vento</button></div>' +
       '<div class="settings-row"><div class="settings-row-text"><strong>Recibir avisos de pagos</strong><span id="pgEstado"></span></div><label class="switch"><input type="checkbox" id="pgOn"><span class="switch-slider"></span></label></div>' +
       '<div id="pgCaja" hidden>' +
       '<div class="settings-row" id="pgVolFila" style="flex-direction:column;align-items:stretch"><div class="settings-row-text"><strong>🔊 Volumen de la voz de los pagos: <span id="pgVolTxt"></span></strong><span>Qué tan alto dice «Pago confirmado. 200 pesos desde DaviPlata». ' + (enApp ? 'Suena a este volumen aunque la música o el celular estén bajitos, y luego deja el volumen como estaba. <b>Más de 100 % = más fuerte de lo normal.</b>' : 'En el navegador llega hasta 100 %; en la app Android se puede subir hasta 150 % (más fuerte de lo normal).') + '</span></div>' +
@@ -28796,9 +28807,10 @@ let fotosListas = false;
     $p('pgOn').checked = !!g.on; $p('pgCaja').hidden = !g.on; $p('pgUrl').value = urlExterna();
     if(document.activeElement !== $p('pgVol')){ const v = Math.min(pgVol(), Number($p('pgVol').max)); $p('pgVol').value = v; $p('pgVolTxt').textContent = v + ' %' + (v > 100 ? ' · más fuerte de lo normal' : v === 100 ? ' · lo más alto del celular' : v <= 30 ? ' · bajito' : ''); }
     const ea = AND() ? andEstado() : null;
-    const web = !ea && window.ventoAndroidWeb && window.ventoAndroidWeb();
-    if($p('pgWebAviso')) $p('pgWebAviso').hidden = !web;
-    $p('pgEstado').textContent = !g.on ? 'Apagado.' : web ? '🟠 Estás en Vento Web: aquí no se leen los avisos del banco. Abre la app Vento en este celular.' : ea && ea.on ? (ea.permiso ? '🟢 La app lee directo los avisos de pagos de este celular.' : '🟠 Falta el permiso «Acceso a notificaciones» para Vento.') : (es && es.readyState === 1 ? '🟢 Escuchando los avisos de pagos.' : '🟠 Conectando…');
+    const vieja = !ea && window.ventoAppVieja && window.ventoAppVieja();
+    const web = !ea && (vieja || (window.ventoAndroidWeb && window.ventoAndroidWeb()));
+    if($p('pgWebAviso')){ $p('pgWebAviso').hidden = !web; const t = $p('pgWebAvisoTit'); if(t) t.textContent = vieja ? '📲 Tu app Vento es una versión vieja: todavía no lee los avisos de pagos. Actualízala (se instala encima, no se borra nada).' : '📲 Estás en Vento Web, no en la app.'; }
+    $p('pgEstado').textContent = !g.on ? 'Apagado.' : vieja ? '🟠 Tu app Vento es vieja: actualízala para que lea los avisos del banco.' : web ? '🟠 Estás en Vento Web: aquí no se leen los avisos del banco. Abre la app Vento en este celular.' : ea && ea.on ? (ea.permiso ? '🟢 La app lee directo los avisos de pagos de este celular.' : '🟠 Falta el permiso «Acceso a notificaciones» para Vento.') : (es && es.readyState === 1 ? '🟢 Escuchando los avisos de pagos.' : '🟠 Conectando…');
     if($p('pgAndOn')){
       const e = andEstado();
       $p('pgAndOn').checked = !!e.on;
