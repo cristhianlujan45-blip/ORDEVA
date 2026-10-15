@@ -26,12 +26,12 @@ const b64u = b => Buffer.from(b).toString('base64').replace(/\+/g, '-').replace(
   const firmar = async pl => { const a = b64u(JSON.stringify(pl)); const sig = await S.sign({ name: 'ECDSA', hash: 'SHA-256' }, llave.privateKey, Buffer.from(a)); return a + '.' + b64u(Buffer.from(sig)); };
 
   // «Base de datos» simulada: la suscripción del negocio. Cambiarla aquí = que el administrador la cambie.
-  const bd = { sub: { status: 'active', plan: 'free', expiry: 0 }, offline: false, vidaToken: 72 * H, pedidos: 0 };
+  const bd = { sub: { status: 'active', plan: 'free', expiry: 0 }, offline: false, vidaToken: 72 * H, pedidos: 0, rol: 'dueno', ultimo: null, pendiente: null };
   async function respEstado(){
     const now = Date.now(), s = bd.sub, activo = s.status === 'active' && (!s.expiry || s.expiry > now), pe = activo ? s.plan : 'free';
     const token = await firmar({ t: 'vento-sub', n: NEG, p: pe, s: s.status, e: ENTS[pe], v: s.expiry || 0, i: now, h: now + bd.vidaToken });
     return { ok: true, subscription: { id: 'sub-1', status: s.status, plan_id: s.plan, source: 'admin', expiry_date: s.expiry ? new Date(s.expiry).toISOString() : null, updated_at: new Date(now).toISOString() },
-      plan_efectivo: pe, pending_payment: null, last_payment: null, renew_notice: false, rol: 'dueno', token };
+      plan_efectivo: pe, pending_payment: bd.pendiente, last_payment: bd.ultimo, renew_notice: false, rol: bd.rol, token };
   }
   async function celular(b, o){
     const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
@@ -98,17 +98,46 @@ const b64u = b => Buffer.from(b).toString('base64').replace(/\+/g, '-').replace(
     await p.waitForTimeout(600);
     chk('…tres avisos seguidos = una sola consulta al servidor', bd.pedidos - antes === 1, 'consultas: ' + (bd.pedidos - antes));
 
-    // El administrador cambia el plan a gratis / cancela → la app lo toma sola.
+    // El administrador cancela → la app queda BLOQUEADA y solo ofrece pagar para reactivar.
+    const aviso = () => p.evaluate(id => __rtAviso('vs-' + id, 's'), NEG);
     bd.sub = { status: 'canceled', plan: 'pro', expiry: Date.now() + 30 * DIA };
-    await p.evaluate(id => __rtAviso('vs-' + id, 's'), NEG);
-    chk('Cancelar la suscripción: la app pasa a «cancelada» y plan gratis al instante', await listo(p, () => ventoSuscripcion.estado().status === 'canceled' && ventoSuscripcion.estado().plan === 'free', 4000), JSON.stringify(await estado(p)));
-    chk('…sin voz ni cámara con IA (ya no hay PRO)', await p.evaluate(() => !ventoSuscripcion.tiene('voice') && !ventoSuscripcion.tiene('ai_camera') && ventoSuscripcion.tiene('pos_basic')));
-    chk('…y la app sigue abierta para vender (plan gratis)', !(await puerta(p)));
+    await aviso();
+    chk('Cancelar: la app pasa a «cancelada» al instante', await listo(p, () => ventoSuscripcion.estado().status === 'canceled', 4000), JSON.stringify(await estado(p)));
+    chk('…y queda bloqueada: «Tu suscripción fue cancelada»', await listo(p, () => document.documentElement.getAttribute('data-vento-puerta') === 'pago' && /Tu suscripción fue cancelada/.test(document.getElementById('vpOv').innerText), 4000), JSON.stringify(await puerta(p)));
+    chk('…con UNA sola opción: «💳 Pagar para reactivar» (nada de la nube ni más botones)', await p.evaluate(() => { const b = [...document.querySelectorAll('#vpOv button')]; return b.length === 1 && b[0].dataset.vp === 'pagar' && /Pagar para reactivar/.test(b[0].textContent) && !/nube|cuenta/i.test(document.getElementById('vpOv').innerText); }));
+    await p.evaluate(() => document.querySelector('#vpOv [data-vp="pagar"]').click());
+    chk('Pagar abre los planes por encima del bloqueo', await listo(p, () => { const o = document.getElementById('vsOv'); return !!o && o.classList.contains('show') && +getComputedStyle(o).zIndex > +getComputedStyle(document.getElementById('vpOv')).zIndex; }, 4000));
+    chk('…solo planes pagos con su botón de pagar (sin el plan gratis ni el código de licencia)', await listo(p, () => !!document.querySelector('#vsOv [data-pagar="pro"]'), 5000) &&
+      await p.evaluate(() => !document.querySelector('#vsOv .vs-plan[data-plan="free"]') && !document.getElementById('vsLicBtn') && /Paga tu plan para reactivar/.test(document.getElementById('vsOv').innerText)));
+    await p.evaluate(() => document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')));
+    chk('Cerrar los planes NO abre la app: sigue bloqueada', !!(await puerta(p)) && (await puerta(p)).motivo === 'pago');
 
-    // Reactivar → vuelve PRO
+    // Paga → pago en revisión: sigue bloqueada, sin botón de pagar otra vez
+    bd.sub = { status: 'payment_review', plan: 'pro', expiry: Date.now() + 30 * DIA }; bd.pendiente = { id: 'pay-1', status: 'review', plan_id: 'pro', method: 'NEQUI', amount: 59900 };
+    await aviso();
+    chk('Pago en revisión: «Tu pago está en revisión», sin botón de pagar', await listo(p, () => /Tu pago está en revisión/.test((document.getElementById('vpOv') || {}).innerText || '') && !document.querySelector('#vpOv [data-vp="pagar"]'), 4000), JSON.stringify(await puerta(p)));
+    // El administrador aprueba → se abre sola
+    bd.sub = { status: 'active', plan: 'pro', expiry: Date.now() + 30 * DIA }; bd.pendiente = null;
+    await aviso();
+    chk('Aprobado / activado: la app se abre sola al instante con PRO', await listo(p, () => !document.getElementById('vpOv') && ventoSuscripcion.estado().plan === 'pro', 4000), JSON.stringify(await puerta(p)));
+
+    // Vencida y pago rechazado: también bloquean
+    bd.sub = { status: 'expired', plan: 'pro', expiry: Date.now() - DIA };
+    await aviso();
+    chk('Vencida: bloqueada con «Tu suscripción venció» y solo pagar', await listo(p, () => /Tu suscripción venció/.test((document.getElementById('vpOv') || {}).innerText || '') && document.querySelectorAll('#vpOv button').length === 1, 4000), JSON.stringify(await puerta(p)));
+    bd.sub = { status: 'rejected', plan: 'pro', expiry: 0 }; bd.ultimo = { id: 'pay-2', status: 'rejected', plan_id: 'pro', method: 'NEQUI', amount: 59900, reject_reason: 'No llegó el dinero' };
+    await aviso();
+    chk('Pago rechazado: bloqueada con el motivo y solo pagar', await listo(p, () => /Tu pago no fue aprobado/.test((document.getElementById('vpOv') || {}).innerText || '') && /No llegó el dinero/.test(document.getElementById('vpOv').innerText) && !!document.querySelector('#vpOv [data-vp="pagar"]'), 4000), JSON.stringify(await puerta(p)));
+    // Un cajero (no puede pagar): bloqueado y sin botón
+    bd.rol = 'caja';
+    await aviso();
+    chk('Cajero con la suscripción sin pagar: bloqueado, sin botón (le toca al dueño)', await listo(p, () => /el dueño o el administrador del negocio debe pagar/.test((document.getElementById('vpOv') || {}).innerText || '') && !document.querySelector('#vpOv button'), 4000), JSON.stringify(await puerta(p)));
+    bd.rol = 'dueno'; bd.ultimo = null;
+
+    // El administrador vuelve a activar → se abre sola
     bd.sub = { status: 'active', plan: 'pro', expiry: Date.now() + 30 * DIA };
-    await p.evaluate(id => __rtAviso('vs-' + id, 's'), NEG);
-    chk('Volver a activar: PRO otra vez al instante', await listo(p, () => ventoSuscripcion.estado().status === 'active' && ventoSuscripcion.estado().plan === 'pro', 4000));
+    await aviso();
+    chk('Volver a activar: PRO otra vez al instante y sin bloqueo', await listo(p, () => ventoSuscripcion.estado().status === 'active' && ventoSuscripcion.estado().plan === 'pro' && !document.getElementById('vpOv'), 4000));
 
     // ---------- Sin internet ----------
     bd.offline = true;

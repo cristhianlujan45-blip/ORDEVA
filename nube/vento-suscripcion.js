@@ -377,8 +377,8 @@
     if(s.status === 'payment_review') return '<div class="vs-estado esp"><b>⏳ Pago en revisión</b><small>Recibimos tu comprobante' + (s.pago ? ' de ' + plata(s.pago.amount) + ' por ' + esc((METODOS[s.pago.method] || {}).nombre || s.pago.method || '') : '') + '. Apenas lo aprobemos se activa tu plan. Mientras tanto sigues vendiendo con el plan gratis.</small></div>';
     if(s.status === 'rejected') return '<div class="vs-estado mal"><b>❌ Tu pago no fue aprobado</b><small>Motivo: ' + esc(s.rechazo || 'no se pudo comprobar el pago') + '</small></div>';
     if(s.status === 'expired') return '<div class="vs-estado mal"><b>⌛ Tu plan ' + P + ' venció' + (f ? ' el ' + f : '') + '</b><small>' +
-      (s.pago ? '⏳ Tu pago está en revisión: apenas lo aprobemos vuelve tu plan. Mientras tanto sigues vendiendo con el plan gratis.' : 'Sigues vendiendo con el plan gratis. Renueva para volver a usar la voz, la cámara con IA y lo demás.') + '</small></div>';
-    if(s.status === 'canceled') return '<div class="vs-estado mal"><b>🚫 Suscripción cancelada</b><small>Estás en el plan gratis. Puedes volver a activar tu plan cuando quieras.</small></div>';
+      (s.pago ? '⏳ Tu pago está en revisión: apenas lo aprobemos, Vento vuelve a funcionar.' : 'Paga tu plan para volver a usar Vento.') + '</small></div>';
+    if(s.status === 'canceled') return '<div class="vs-estado mal"><b>🚫 Suscripción cancelada</b><small>Paga tu plan para reactivar tu aplicación.</small></div>';
     return '<div class="vs-estado"><b>Elige tu plan</b><small>Estás en el plan gratis.</small></div>';
   }
   function planesHtml(s){
@@ -387,7 +387,7 @@
     if(!cat.planes.length) return '<div class="vs-estado"><small>No hay planes disponibles en este momento.</small></div>';
     var borr = lsGet(K_BORRADOR + s.negocio, null), actual = s.status === 'active' ? s.plan : 'free';
     var free = cat.planes.filter(function(p){ return !p.precio; })[0];
-    return '<div class="vs-planes">' + cat.planes.map(function(p){
+    return '<div class="vs-planes">' + cat.planes.filter(function(p){ return !(soloPagar && !p.precio); }).map(function(p){
       var gratis = !p.precio, yo = p.id === actual, nom = gratis ? 'FREE' : String(p.nombre).toUpperCase();
       // Plan pago: «Todo lo de FREE, y además:» con solo lo que agrega (más fácil de leer).
       var extra = !gratis && free ? p.ents.filter(function(k){ return free.ents.indexOf(k) < 0; }) : p.ents;
@@ -416,7 +416,7 @@
       if(s.renovar && !s.pago && !s.rechazo) h += '<div class="vs-aviso" id="vsAvisoRenovar"><span>⏰ Tu suscripción vence el ' + fecha(s.vence) + '.</span><button type="button" class="btn-primary" data-vs="renovar">RENOVAR</button></div>';
       if(s.status === 'rejected' || s.rechazo) h += '<div class="vs-acciones vs-sep"><button type="button" class="btn-primary vs-grande" data-vs="reintentar">📸 Enviar otro comprobante</button></div>';
       h += planesHtml(s);
-      h += '<div class="vs-acciones vs-sep"><button type="button" class="btn-ghost" id="vsLicBtn">🔑 Tengo un código de licencia</button></div>' +
+      if(!soloPagar) h += '<div class="vs-acciones vs-sep"><button type="button" class="btn-ghost" id="vsLicBtn">🔑 Tengo un código de licencia</button></div>' +
         '<div id="vsLicBox" hidden><input id="vsLicIn" class="mz-in" placeholder="VENTO-XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false" style="width:100%;box-sizing:border-box;text-align:center;letter-spacing:1px">' +
         '<div class="vs-acciones"><button type="button" class="btn-primary" id="vsLicGo">✅ Activar licencia</button></div></div>';
       pantalla('inicio', 'Tu plan Vento', h, function(c){
@@ -687,12 +687,19 @@
        espera  → conectado, pero todavía no llegó el estado firmado del servidor;
        sinconexion → el último estado firmado ya caducó (72 h) y no se pudo renovar.
      Con internet caído se sigue con el último estado firmado hasta su vencimiento («h»: 72 h). */
+  var BLOQUEA = { canceled: 1, expired: 1, rejected: 1, pending_payment: 1, payment_review: 1 }, soloPagar = false;
   function puerta(){
     var n = negocio();
     if(!nube() || !nube().configurada || !nube().configurada()) return { ok: false, motivo: 'cuenta', sinServidor: true };
     if(!n) return { ok: false, motivo: 'cuenta' };
     if(E.neg !== n.id || !E.p) return { ok: false, motivo: 'espera', error: E.error || '', cargando: !!E.cargando };
     if(!vivo(E.p) && E.error) return { ok: false, motivo: 'sinconexion', error: E.error };
+    /* Sin plan pago vigente (cancelada por el administrador, vencida, pago rechazado o sin pagar): la app no se
+       usa; lo único que queda es pagar para reactivarla (o esperar la revisión del pago enviado). */
+    var st = estado();
+    soloPagar = !!BLOQUEA[st.status];
+    if(soloPagar) return { ok: false, motivo: 'pago', status: st.status, manda: st.manda, revision: st.revision, rechazo: st.rechazo || '',
+      plan: nombrePlan(st.planSub || st.plan), vence: st.vence || 0 };
     return { ok: true };
   }
 
