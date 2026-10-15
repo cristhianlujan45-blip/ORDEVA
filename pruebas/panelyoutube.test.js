@@ -72,7 +72,7 @@ const LISTA = 'PLmilista000000000000001', PRIV = 'PLprivada0000000000000002';
     chk('1. Sin música: «No está sonando nada»', /No está sonando nada/.test(await p.textContent('#ypVideo')) && await p.isVisible('#ypNada'));
 
     // ===== 2. Buscar y poner =====
-    await p.fill('#ypQ', 'feid'); await p.click('#ypCuerpo .yp-buscar button');
+    await p.fill('#ypQ', 'feid'); await p.click('#ypBuscarF button');
     await p.waitForSelector('#ypRes .yp-fila');
     const res = await p.evaluate(() => [...document.querySelectorAll('#ypRes .yp-fila')].map(f => ({ t: f.querySelector('b').textContent, img: (f.querySelector('img') || {}).src || '' })));
     chk('2. Resultados de «feid» con portada, título y duración', res.length === 3 && res[0].t === 'Feid - Luna' && /i\.ytimg\.com\/vi\/feid0000001/.test(res[0].img) && /3:30/.test(await p.textContent('#ypRes .yp-fila')), res);
