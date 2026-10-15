@@ -1604,6 +1604,24 @@ body.mod-v #quickSaleBtn{ order:-1; background:var(--amber); color:#fff; border-
     border-top: 1px dashed var(--cream-soft);
   }
   .person-group-title:first-child{ border-top:none; padding-top:0; margin-top:0; }
+  .person-group-title{ flex-wrap:wrap; }
+  .person-group-title .pg-est{ flex:1 1 100%; font-size:12px; font-weight:600; color:var(--ink-soft); text-transform:none; letter-spacing:0; }
+  .person-group-title.pg-ok .pg-est{ color:#22c55e; }
+  .quien-pago{ border:1px solid var(--line); border-radius:14px; padding:10px 12px; margin:8px 0 10px; }
+  .quien-pago[hidden]{ display:none; }
+  .qp-t{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin-bottom:6px; }
+  .qp-t span{ font-size:12.5px; color:var(--ink-soft); }
+  .qp-f{ display:flex; align-items:center; gap:10px; padding:7px 0; border-top:1px solid var(--line); cursor:pointer; }
+  .qp-f:first-of-type{ border-top:0; }
+  .qp-n{ flex:1; min-width:0; display:flex; flex-direction:column; }
+  .qp-n small{ font-size:12px; color:var(--ink-soft); }
+  .qp-pagado .qp-n small{ color:#22c55e; font-weight:700; }
+  .qp-debe .qp-n small{ color:#f5a524; font-weight:700; }
+  .qp-v{ font-weight:800; font-variant-numeric:tabular-nums; }
+  .pay-quien{ display:inline-block; margin-left:6px; font-size:12px; font-weight:700; color:var(--ink-soft); }
+  .chip .chip-ok{ color:#22c55e; font-weight:800; }
+  .quien-pago .pc-av{ display:inline-grid; place-items:center; width:30px; height:30px; flex:0 0 30px; border-radius:50%; background:linear-gradient(135deg, var(--amber), var(--amber-deep)); color:#fff; font-style:normal; font-weight:800; font-size:13px; }
+  .quien-pago .qp-pagado .pc-av{ background:#22c55e; }
 
   /* Cierre de caja */
   .close-day-row{ margin-bottom: 20px; }
@@ -5781,6 +5799,70 @@ function tableBalance(tableId){
   return Math.max(0, tableTotal(tableId) - tablePaid(tableId) - tableDebt(tableId));
 }
 
+/* ---------- Quién pagó qué en una mesa con varias personas ----------
+   La mesa tiene la «cuenta general» (lo que no es de nadie en particular) y la parte de cada persona.
+   Antes cada persona solo contaba SUS pagos: si la cuenta principal pagaba toda la mesa, las personas seguían saliendo
+   como si debieran y no se veía quién había pagado. Ahora lo que sobra de un pago (de la cuenta general o de alguien que
+   pagó de más) cubre lo que les falta a los demás: primero la cuenta general y luego las personas, en orden. */
+function mesaEstado(tableId){
+  const t = data.tables[tableId] || {}, items = t.items || [], pays = t.payments || [], people = t.people || [];
+  const nombreDe = id => { if(id == null) return people.length ? 'Cuenta general' : tableLabel(tableId); const x = people.find(y => y.id === id); return x ? x.name : 'Cuenta general'; };
+  const grupos = [null].concat(people.map(x => x.id)).map(id => {
+    const ps = pays.filter(p => (p.personId || null) === id);
+    const total = items.filter(it => (it.personId || null) === id).reduce((a, it) => a + it.price * it.qty, 0);
+    const pagado = ps.filter(p => p.method !== 'debe').reduce((a, p) => a + p.amount, 0);
+    const debe = ps.filter(p => p.method === 'debe').reduce((a, p) => a + p.amount, 0);
+    return { id, nombre: nombreDe(id), total, pagado, debe, cubierto: 0, cubiertoDebe: 0, cubrio: 0, fuentes: [], pagos: ps };
+  });
+  // Lo que sobra de cada uno (primero lo pagado, después lo que quedó debiendo).
+  const bolsa = [];
+  grupos.forEach(g => {
+    const exP = Math.max(0, g.pagado - g.total), exD = Math.max(0, g.debe - Math.max(0, g.total - g.pagado));
+    if(exP) bolsa.push({ g, monto: exP, tipo: 'pago' });
+    if(exD) bolsa.push({ g, monto: exD, tipo: 'debe' });
+  });
+  grupos.forEach(g => {
+    let falta = Math.max(0, g.total - g.pagado - g.debe);
+    for(const b of bolsa){
+      if(falta <= 0) break;
+      if(b.monto <= 0 || b.g === g) continue;
+      const x = Math.min(falta, b.monto);
+      b.monto -= x; falta -= x; b.g.cubrio += x;
+      if(b.tipo === 'pago') g.cubierto += x; else g.cubiertoDebe += x;
+      g.fuentes.push({ de: b.g.id, nombre: b.g.nombre, monto: x, tipo: b.tipo });
+    }
+    g.saldo = falta;
+    g.estado = !g.total && !g.pagado && !g.debe ? 'vacio' : !g.total ? 'solo-paga' : g.saldo > 0 ? (g.pagado || g.cubierto ? 'parcial' : 'pendiente') : (g.debe || g.cubiertoDebe) ? 'debe' : 'pagado';
+  });
+  const conPartes = grupos.filter(g => g.total > 0);
+  return { grupos, personas: people.length, pagaron: conPartes.filter(g => g.estado === 'pagado' || g.estado === 'debe').length, partes: conPartes.length, saldo: tableBalance(tableId) };
+}
+// Texto corto del estado de una parte: «✅ Pagado por Cuenta general», «⏳ Abonó $10.000 · falta $5.000»…
+function mesaEstadoTexto(g){
+  if(!g || g.estado === 'vacio') return '';
+  const por = g.fuentes.filter(f => f.tipo === 'pago').map(f => f.nombre);
+  const bits = [];
+  if(g.estado === 'pagado') bits.push(g.cubierto && !g.pagado ? '✅ Pagado por ' + Array.from(new Set(por)).join(' y ') : g.cubierto ? '✅ Pagado (' + fmt(g.pagado) + ' suyo + ' + fmt(g.cubierto) + ' de ' + Array.from(new Set(por)).join(' y ') + ')' : '✅ Pagó ' + fmt(Math.min(g.pagado, g.total)));
+  else if(g.estado === 'debe') bits.push('📒 Quedó debiendo ' + fmt(Math.min(g.debe, Math.max(0, g.total - g.pagado)) + g.cubiertoDebe));
+  else if(g.estado === 'parcial') bits.push('⏳ Abonó ' + fmt(g.pagado + g.cubierto) + ' · falta ' + fmt(g.saldo));
+  else if(g.estado === 'pendiente') bits.push('⏳ Falta ' + fmt(g.saldo));
+  if(g.cubrio > 0) bits.push((g.estado === 'solo-paga' ? '💵 Pagó ' : 'también pagó ') + fmt(g.cubrio) + ' de los demás');
+  return bits.join(' · ');
+}
+// Al cerrar la parte de una persona que pagó otro: ese pago se va con ella (se descuenta de quien lo hizo), para que la
+// mesa no quede con plata de más. Devuelve el detalle para su historial.
+function mesaLlevarCubierto(t, g){
+  const det = [];
+  (g.fuentes || []).forEach(f => {
+    let resta = f.monto;
+    const ps = (t.payments || []).filter(p => (p.personId || null) === f.de && (f.tipo === 'debe' ? p.method === 'debe' : p.method !== 'debe'));
+    for(let i = ps.length - 1; i >= 0 && resta > 0; i--){ const x = Math.min(resta, ps[i].amount); ps[i].amount -= x; resta -= x; }
+    t.payments = (t.payments || []).filter(p => p.amount > 0);
+    det.push({ note: (f.tipo === 'debe' ? 'Queda debiendo (de ' : 'Pagado por ') + f.nombre + (f.tipo === 'debe' ? ')' : ''), amount: f.monto, method: f.tipo === 'debe' ? 'debe' : (ps[ps.length - 1] && ps[ps.length - 1].method) || 'efectivo' });
+  });
+  return det;
+}
+
 /* ---------- Resumen de cuenta (pedido por comando de voz) ---------- */
 const billSummaryOverlay = document.getElementById('billSummaryOverlay');
 
@@ -5811,6 +5893,12 @@ function openBillSummary(tableId){
   document.getElementById('billSummaryDebtRow').style.display = debt > 0 ? 'flex' : 'none';
   document.getElementById('billSummaryDebt').textContent = fmt(debt);
   document.getElementById('billSummaryTotal').textContent = fmt(balance);
+  // Con varias personas: quién pagó y cuánto le falta a cada uno.
+  if((t.people || []).length){
+    const est = mesaEstado(tableId);
+    const sep = document.createElement('div'); sep.className = 'bill-summary-item-row'; sep.innerHTML = '<b>👥 Quién pagó (' + est.pagaron + ' de ' + est.partes + ')</b><span></span>'; itemsEl.appendChild(sep);
+    est.grupos.filter(g => g.estado !== 'vacio').forEach(g => { const r = document.createElement('div'); r.className = 'bill-summary-item-row'; r.innerHTML = '<span>' + invEsc(g.nombre) + ' <small>' + invEsc(mesaEstadoTexto(g)) + '</small></span><span>' + fmt(g.total) + '</span>'; itemsEl.appendChild(r); });
+  }
   billSummaryOverlay.classList.add('show');
 }
 
@@ -8800,6 +8888,7 @@ function renderMesasList(){
       const units = t.items.reduce((s, it) => s + (Number(it.qty) || 0), 0);
       subLine = units + (units===1?' producto':' productos');
       if(paid > 0) subLine += ' · abonado ' + fmt(paid);
+      if((t.people || []).length){ try{ const e = mesaEstado(id); if(e.partes > 1) subLine += ' · 👥 ' + e.pagaron + '/' + e.partes + ' pagaron'; }catch(x){} }
     }
     card.innerHTML = `
       <div class="num"><svg class="tk-ic" viewBox="0 0 24 24" aria-hidden="true">${iconoEsp()}</svg>${tableLabel(id)}</div>
@@ -9262,7 +9351,9 @@ function personDebtAmt(personId){
   return personPaymentsList(personId).filter(p=>p.method === 'debe').reduce((s,p)=> s + p.amount, 0);
 }
 function personBalanceAmt(personId){
-  return Math.max(0, personTotalAmt(personId) - personPaidAmt(personId) - personDebtAmt(personId));
+  // Lo que de verdad le falta: también cuenta lo que pagó por ella la cuenta general (u otra persona).
+  const g = mesaEstado(currentTable).grupos.find(x => x.id === personId);
+  return g ? g.saldo : Math.max(0, personTotalAmt(personId) - personPaidAmt(personId) - personDebtAmt(personId));
 }
 
 function renderPeople(){
@@ -9273,12 +9364,13 @@ function renderPeople(){
   const pn = document.getElementById('personasN');
   if(pn) pn.textContent = t.people.length ? String(t.people.length) : '';
   t.people.forEach(p=>{
-    const bal = personTotalAmt(p.id);
+    const ge = mesaEstado(currentTable).grupos.find(x => x.id === p.id) || { total: 0, saldo: 0 };
+    const bal = ge.saldo, pagado = ge.total > 0 && !ge.saldo;
     const chip = document.createElement('span');
     chip.className = 'chip';
     chip.title = 'Ver cuenta aparte de ' + p.name;
     const ini = String(p.name || '?').trim().charAt(0).toUpperCase().replace(/[<>&"]/g, '');
-    chip.innerHTML = `<i class="pc-av">${ini}</i>${String(p.name).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))}${bal > 0 ? ' <small>' + fmt(bal) + '</small>' : ''}<span class="chip-del" data-id="${invEsc(p.id)}" title="Quitar persona">✕</span>`;
+    chip.innerHTML = `<i class="pc-av">${ini}</i>${String(p.name).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))}${pagado ? ' <small class="chip-ok">✅ pagó</small>' : bal > 0 ? ' <small>debe ' + fmt(bal) + '</small>' : ''}<span class="chip-del" data-id="${invEsc(p.id)}" title="Quitar persona">✕</span>`;
     chip.addEventListener('click', (e)=>{
       if(e.target.classList.contains('chip-del')) return;
       openPersonModal(p.id);
@@ -9529,15 +9621,17 @@ function renderModalItems(){
     container.innerHTML = '<div class="empty-note">Todavía no hay productos en esta cuenta.</div>';
   } else {
     const people = t.people || [];
+    const est = mesaEstado(currentTable);
     const groups = people.length ? [{ id: null, name: tableLabel(currentTable) + ' (general)' }, ...people] : [{ id: null, name: null }];
     groups.forEach(g=>{
       const groupItems = t.items.filter(it => (it.personId||null) === g.id);
       if(groupItems.length === 0) return;
       if(g.name){
         const subtotal = groupItems.reduce((s,it)=>s+it.price*it.qty,0);
+        const ge = est.grupos.find(x => x.id === (g.id || null)), et = mesaEstadoTexto(ge);
         const header = document.createElement('div');
-        header.className = 'person-group-title';
-        header.innerHTML = `<span>${invEsc(g.name)}</span><span>${fmt(subtotal)}</span>`;
+        header.className = 'person-group-title' + (ge && !ge.saldo && ge.total ? ' pg-ok' : '');
+        header.innerHTML = `<span>${invEsc(g.name)}</span><span>${fmt(subtotal)}</span>` + (et ? `<small class="pg-est">${invEsc(et)}</small>` : '');
         container.appendChild(header);
       }
       groupItems.forEach(it=>{
@@ -9623,9 +9717,22 @@ function renderModalItems(){
   }
 }
 
+// «👥 Quién pagó»: en una mesa con varias personas, cuánto le toca a cada uno, quién ya pagó y quién pagó por quién.
+function renderQuienPago(){
+  const t = data.tables[currentTable], cont = document.getElementById('paymentsContainer');
+  let box = document.getElementById('mesaQuienPago');
+  if(!box){ box = document.createElement('div'); box.id = 'mesaQuienPago'; box.className = 'quien-pago'; cont.parentNode.insertBefore(box, cont); }
+  if(!(t.people || []).length || !(t.items || []).length){ box.hidden = true; box.innerHTML = ''; return; }
+  const est = mesaEstado(currentTable);
+  box.hidden = false;
+  box.innerHTML = '<div class="qp-t"><b>👥 Quién pagó</b><span>' + est.pagaron + ' de ' + est.partes + (est.partes === 1 ? ' cuenta pagada' : ' cuentas pagadas') + '</span></div>' +
+    est.grupos.filter(g => g.estado !== 'vacio').map(g => '<div class="qp-f qp-' + g.estado + '"' + (g.id ? ' data-qp="' + invEsc(g.id) + '"' : '') + '><i class="pc-av">' + invEsc(String(g.nombre || '?').trim().charAt(0).toUpperCase()) + '</i><span class="qp-n"><b>' + invEsc(g.nombre) + '</b><small>' + invEsc(mesaEstadoTexto(g)) + '</small></span><span class="qp-v">' + fmt(g.total) + '</span></div>').join('');
+  box.querySelectorAll('[data-qp]').forEach(f => f.onclick = () => openPersonModal(f.dataset.qp));
+}
 function renderPayments(){
   const t = data.tables[currentTable];
   if(!t.payments) t.payments = [];
+  try{ renderQuienPago(); }catch(e){}
   const container = document.getElementById('paymentsContainer');
   container.innerHTML = '';
   if(t.payments.length === 0){
@@ -9638,7 +9745,7 @@ function renderPayments(){
     const row = document.createElement('div');
     row.className = 'line-item payment-item';
     row.innerHTML = `
-      <div><span class="li-name">${invEsc(p.note || 'Abono')}</span><span class="pay-method ${method}">${methodLabel[method] || method}</span>${payItemsHtml(p)}</div>
+      <div><span class="li-name">${invEsc(p.note || 'Abono')}</span><span class="pay-method ${method}">${methodLabel[method] || method}</span>${(t.people || []).length ? '<span class="pay-quien">👤 ' + invEsc(personLookupName(t, p.personId) || 'Cuenta general') + '</span>' : ''}${payItemsHtml(p)}</div>
       <div class="li-right">
         <span class="li-price">${fmt(p.amount)}</span>
         <button class="li-remove" data-idx="${idx}">✕</button>
@@ -9653,6 +9760,7 @@ function renderPayments(){
       t.payments.splice(idx,1);
       saveData();
       renderModalItems();
+      try{ renderPeople(); }catch(e){}
     });
   });
 }
@@ -9725,13 +9833,17 @@ document.getElementById('addPaymentBtn').addEventListener('click', ()=>{
   }
   const t = data.tables[currentTable];
   if(!t.payments) t.payments = [];
-  t.payments.push({ note: noteInput.value.trim(), amount, method: methodSelect.value, ...(payPick.table ? { items: payPick.table } : {}), ...receiptField('table') });
+  // «¿Quién paga?» con el nombre de una persona de la mesa: el pago queda a nombre de ella (no de la cuenta general).
+  const quien = fiAscii(noteInput.value.trim()).toLowerCase();
+  const persona = quien ? (t.people || []).find(x => fiAscii(String(x.name || '')).toLowerCase().trim() === quien) : null;
+  t.payments.push({ note: noteInput.value.trim(), amount, method: methodSelect.value, ...(persona ? { personId: persona.id } : {}), ...(payPick.table ? { items: payPick.table } : {}), ...receiptField('table') });
   payPick.table = null; updatePayPickInfo('table');
   noteInput.value = '';
   amountInput.value = '';
   methodSelect.value = 'efectivo';
   saveData();
   renderModalItems();
+  try{ renderPeople(); }catch(e){}
 });
 
 document.getElementById('addItemBtn').addEventListener('click', ()=>{
@@ -10122,11 +10234,18 @@ function renderPersonModalItems(){
   renderPersonModalPayments();
 
   const total = personTotalAmt(currentPersonId);
-  const paid = personPaidAmt(currentPersonId);
-  const debt = personDebtAmt(currentPersonId);
+  const ge = mesaEstado(currentTable).grupos.find(x => x.id === currentPersonId) || { cubierto: 0, cubiertoDebe: 0, fuentes: [] };
+  const paid = personPaidAmt(currentPersonId) + ge.cubierto;
+  const debt = personDebtAmt(currentPersonId) + ge.cubiertoDebe;
   const balance = personBalanceAmt(currentPersonId);
   document.getElementById('personModalConsumo').textContent = fmt(total);
   document.getElementById('personModalPagado').textContent = fmt(paid);
+  // Lo que pagó por esta persona la cuenta general (u otra persona), con quién.
+  let cub = document.getElementById('personModalCubierto');
+  if(!cub){ cub = document.createElement('div'); cub.id = 'personModalCubierto'; cub.className = 'li-paystatus after done'; const r = document.getElementById('personModalPagado').closest('.total-row'); r.parentNode.insertBefore(cub, r.nextSibling); }
+  const porQ = ge.fuentes.filter(f => f.tipo === 'pago');
+  cub.hidden = !porQ.length;
+  cub.textContent = porQ.length ? '✅ Incluye ' + porQ.map(f => fmt(f.monto) + ' que pagó ' + f.nombre).join(' y ') : '';
   document.getElementById('personModalDebeRow').style.display = debt > 0 ? 'flex' : 'none';
   document.getElementById('personModalDebe').textContent = fmt(debt);
   const balanceEl = document.getElementById('personModalTotal');
@@ -10142,8 +10261,10 @@ function renderPersonModalPayments(){
   const payments = personPaymentsList(currentPersonId);
   const container = document.getElementById('personPaymentsContainer');
   container.innerHTML = '';
+  const ge = mesaEstado(currentTable).grupos.find(x => x.id === currentPersonId);
+  const porOtros = ge ? ge.fuentes.filter(f => f.tipo === 'pago') : [];
   if(payments.length === 0){
-    container.innerHTML = '<div class="empty-note">Todavía no ha abonado.</div>';
+    container.innerHTML = porOtros.length ? '<div class="empty-note">✅ ' + invEsc(porOtros.map(f => f.nombre + ' pagó ' + fmt(f.monto) + ' de su cuenta').join(' · ')) + '</div>' : '<div class="empty-note">Todavía no ha abonado.</div>';
     return;
   }
   const methodLabel = { efectivo: 'Efectivo', transferencia: 'Transferencia', debe: 'Debe' };
@@ -10210,6 +10331,7 @@ document.getElementById('personChargeBtn').addEventListener('click', async ()=>{
   if(!ok) return;
   const total = personTotalAmt(currentPersonId);
   const balance = personBalanceAmt(currentPersonId);
+  const geC = mesaEstado(currentTable).grupos.find(x => x.id === currentPersonId);
   const paymentsDetail = personPaymentsList(currentPersonId).map(p=>({
     note: p.note || '',
     amount: p.amount,
@@ -10217,6 +10339,8 @@ document.getElementById('personChargeBtn').addEventListener('click', async ()=>{
     items: p.items || null,
     receiptId: p.receiptId || null
   }));
+  // Lo que pagó por ella la cuenta general (u otra persona) se va con ella y se descuenta de quien lo pagó.
+  if(geC && geC.fuentes.length) mesaLlevarCubierto(t, geC).forEach(d => paymentsDetail.push(d));
   if(balance > 0){
     paymentsDetail.push({ note: 'Saldo sin registrar al cerrar', amount: balance, method: 'debe' });
   }
