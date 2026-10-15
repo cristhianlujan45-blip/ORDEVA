@@ -65,4 +65,4 @@ Con la misma cuenta en varios equipos (por ejemplo el celular y el computador), 
   - `servidor/errores`: 20 comprobaciones, contra PostgreSQL real;
   - `erroresreal`: 15 comprobaciones, de punta a punta: la app, el QR y Vento Admin con el servidor local;
   - `musicaequipo`: 17 comprobaciones, con dos equipos de la misma cuenta y los canales reales.
-- **Suite completa:** ver el resultado al publicar.
+- **Suite completa:** 51 pruebas de la app y 4 del servidor (333 comprobaciones del servidor), todo bien.
