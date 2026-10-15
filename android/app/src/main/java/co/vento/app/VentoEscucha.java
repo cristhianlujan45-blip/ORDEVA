@@ -81,12 +81,16 @@ public class VentoEscucha extends NotificationListenerService {
         if (!AvisoPago.esBanco(app) && !AvisoPago.paqueteOficial(pkg)) return false;
         // ¿Es la app de verdad del banco? (la oficial, o instalada desde la tienda, o del celular). Una app con nombre de
         // banco instalada por fuera podría mostrar pagos falsos: ese aviso queda «⚠️ Revisar», nunca «Pago confirmado».
+        // Si Android no deja saber de dónde se instaló (algunos celulares lo esconden), se confía como antes: solo se marca
+        // «Revisar» cuando se SABE que se instaló por fuera de la tienda.
         String instalador = null;
+        boolean sabe = false;
         try {
             if (android.os.Build.VERSION.SDK_INT >= 30) instalador = pm.getInstallSourceInfo(pkg).getInstallingPackageName();
             else instalador = pm.getInstallerPackageName(pkg);
-        } catch (Exception ignorado) { }
-        boolean confiable = AvisoPago.confiable(pkg, instalador, (info.flags & android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0);
+            sabe = true;
+        } catch (Throwable ignorado) { }
+        boolean confiable = !sabe || AvisoPago.confiable(pkg, instalador, (info.flags & android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0);
         Bundle x = n.extras;
         if (x == null) return false;
         String titulo = texto(x.getCharSequence(Notification.EXTRA_TITLE));

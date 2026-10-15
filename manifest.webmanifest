@@ -1,7 +1,7 @@
 {
   "id": "./",
-  "name": "Vento",
-  "short_name": "Vento",
+  "name": "Vento Web",
+  "short_name": "Vento Web",
   "description": "Vento: cuentas, pedidos, inventario y caja de tu negocio.",
   "lang": "es-CO",
   "start_url": "./",

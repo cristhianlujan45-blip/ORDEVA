@@ -5,6 +5,55 @@
 <meta charset="UTF-8">
 <script src="lib/vento-errores.js"></script><!-- errores de este equipo → Vento Admin (🐞 Errores) -->
 <script>
+/* ==================== App Android o Vento Web ====================
+   En Android hay dos «Vento»: la APP (lee los avisos de DaviPlata/Nequi, dice «Pago confirmado» aunque esté minimizada)
+   y VENTO WEB (la página en el navegador o su acceso directo instalado desde el navegador), que NO puede leer los avisos
+   de otras apps. Antes no se distinguían y el paso a paso decía «Falta instalarla» con la app ya instalada.
+   ventoAbrirApp() abre la app (o la descarga si no está). */
+(function(){
+  var APK = 'https://github.com/cristhianlujan45-blip/cuentas/releases/latest/download/vento.apk';
+  var ua = navigator.userAgent || '';
+  window.ventoEnApp = function(){ return !!window.VentoAndroid; };
+  // La app sin su puente (no cargó bien): el navegador de la app dice «VentoAndroid/…» pero falta window.VentoAndroid.
+  window.ventoAppSinPuente = function(){ return /VentoAndroid\//.test(ua) && !window.VentoAndroid; };
+  window.ventoAndroidWeb = function(){ return /Android/i.test(ua) && !window.VentoAndroid && !/VentoAndroid\//.test(ua); };
+  window.ventoIntentApp = function(consulta){
+    return 'intent://abrir' + (consulta ? '?' + consulta : '') + '#Intent;scheme=vento;package=co.vento.app;S.browser_fallback_url=' + encodeURIComponent(APK) + ';end';
+  };
+  window.ventoAbrirApp = function(consulta){ location.href = window.ventoIntentApp(consulta || ''); };
+  try{
+    var q = new URLSearchParams(location.search), h = new URLSearchParams((location.hash || '').replace(/^#/, ''));
+    // En la app: la vuelta de Google llega como «?…&_h=<lo que iba después del #>» (el # no cabe en el enlace a la app).
+    if(q.get('_h') !== null){
+      var hh = q.get('_h'); q.delete('_h');
+      history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q.toString() : '') + (hh ? '#' + hh : ''));
+      return;
+    }
+    // En el navegador: «Conectar mi cuenta de YouTube» se empezó en la APP (state=vento-yt.app…), pero Google volvió al
+    // navegador (en la app Google no deja entrar). Se manda a la app, que es donde se terminó de conectar.
+    var st = q.get('state') || h.get('state') || '';
+    if(/^vento-yt\.app/.test(st) && !window.VentoAndroid && !/VentoAndroid\//.test(ua) && (q.get('code') || q.get('error') || h.get('access_token') || h.get('error'))){
+      var p = new URLSearchParams(location.search);
+      if((location.hash || '').length > 1) p.set('_h', location.hash.slice(1));
+      var ir = 'intent://abrir?' + p.toString() + '#Intent;scheme=vento;package=co.vento.app;end';
+      window.__ventoVolverApp = ir;
+      history.replaceState(null, '', location.pathname);       // Vento Web no la procesa (es de la app)
+      var pintar = function(){
+        var d = document.createElement('div');
+        d.id = 'ventoVolverApp';
+        d.setAttribute('style', 'position:fixed;inset:0;z-index:2147483647;background:#0b0a12;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;text-align:center;font:17px system-ui,sans-serif');
+        d.innerHTML = '<div style="font-size:44px">✅</div><b style="font-size:21px">Google listo</b><div>Vuelve a la <b>app Vento</b> para terminar de conectar tu cuenta de YouTube.</div>' +
+          '<a id="ventoVolverAppBtn" href="' + ir.replace(/"/g, '&quot;') + '" style="background:#22c55e;color:#06210f;font-weight:800;padding:16px 22px;border-radius:14px;text-decoration:none;font-size:18px">📲 Volver a la app Vento</a>' +
+          '<small style="opacity:.7">Si no se abre sola, toca el botón.</small>';
+        document.body.appendChild(d);
+      };
+      if(document.body) pintar(); else document.addEventListener('DOMContentLoaded', pintar);
+      setTimeout(function(){ try{ location.href = ir; }catch(e){} }, 300);
+    }
+  }catch(e){}
+})();
+</script>
+<script>
 // Un QR de mesa o link de domicilio que cae en la app del negocio abre la carta del cliente.
 (function(){var q=location.search;if(/[?&]c=\w/.test(q)&&/[?&](mesa=\d|dom=1)/.test(q))location.replace(location.pathname.replace(/[^/]*$/,'')+'pedido.html'+q+location.hash);})();
 </script>
@@ -22101,12 +22150,13 @@ function yLeeVuelta(){for(const st of [sessionStorage,localStorage]){try{const v
    «Conectar con Google» SIEMPRE conecta. */
 function yConectarHora(aviso){
   const c=yCfg();
-  const nonce=Array.from(crypto.getRandomValues(new Uint8Array(12)),b=>b.toString(16).padStart(2,'0')).join('');
+  const nonce=(window.VentoAndroid?'app':'')+Array.from(crypto.getRandomValues(new Uint8Array(12)),b=>b.toString(16).padStart(2,'0')).join('');   // «app…»: Google vuelve al navegador y de ahí a la app
   yGuardaVuelta({nonce,cid:c.cid,redir:yRedir(),at:Date.now(),hora:true});
   const q=new URLSearchParams({client_id:c.cid,redirect_uri:yRedir(),response_type:'token',scope:'https://www.googleapis.com/auth/youtube',include_granted_scopes:'true',state:'vento-yt.'+nonce});
   showToast(aviso||'Abriendo Google… elige tu cuenta y toca «Continuar». Vento vuelve sola.',6000);
   setTimeout(()=>{location.href='https://accounts.google.com/o/oauth2/v2/auth?'+q.toString();},aviso?2500:300);
 }
+window.ytConectarHora=yConectarHora;   // también para pruebas
 async function yConectarConCodigo(silencio,listo){
   const c=yCfg();
   const secret=(($('ytSecret')&&$('ytSecret').value)||'').replace(/\s+/g,'');
@@ -22117,7 +22167,7 @@ async function yConectarConCodigo(silencio,listo){
     let est=null;try{est=await window.ventoGoogle.estado();}catch(e){}
     if(!(est&&est.client_id===c.cid)){yConectarHora();listo();return;}   // sin Client Secret: conecta igual (la de siempre)
   }
-  const nonce=Array.from(crypto.getRandomValues(new Uint8Array(12)),b=>b.toString(16).padStart(2,'0')).join('');
+  const nonce=(window.VentoAndroid?'app':'')+Array.from(crypto.getRandomValues(new Uint8Array(12)),b=>b.toString(16).padStart(2,'0')).join('');   // «app…»: Google vuelve al navegador y de ahí a la app
   yGuardaVuelta({nonce,secret,cid:c.cid,redir:yRedir(),at:Date.now()});
   const q=new URLSearchParams({client_id:c.cid,redirect_uri:yRedir(),response_type:'code',scope:'https://www.googleapis.com/auth/youtube',
     access_type:'offline',prompt:'consent',include_granted_scopes:'true',state:'vento-yt.'+nonce});
@@ -25203,7 +25253,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-15 · v1.38.2';
+const MESORA_VERSION = '2026-10-15 · v1.38.3';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'Vento · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 // Si el navegador (o el celular, con la app agregada a la pantalla de inicio) se quedó con
@@ -28597,6 +28647,7 @@ let fotosListas = false;
         if(e.target === ov || e.target.closest('[data-gp="cerrar"]')){ ov.classList.remove('show'); clearInterval(ov.__t); return; }
         const a = e.target.closest('[data-gp]'); if(!a) return;
         const k = a.dataset.gp, A = AND();
+        if(k === 'abrirapp'){ try{ window.ventoAbrirApp(); }catch(x){} return; }
         if(k === 'prender'){ PG().on = true; saveData(); try{ pgConectar(); }catch(x){} if(A && !andEstado().on){ A.pagosAvisos(true); if(!andEstado().permiso) try{ A.mediosPermiso(); }catch(x){} } try{ pgPintar(); }catch(x){} }
         if(k === 'permiso' && A) try{ A.mediosPermiso(); }catch(x){}
         if(k === 'bateria' && A) try{ A.ajustesBateria(); }catch(x){}
@@ -28614,7 +28665,11 @@ let fotosListas = false;
         '<div class="modal-sub">Así, cada vez que te pasen plata a tu DaviPlata o Nequi, Vento te avisa <b>una sola vez</b>: «💜 Pagaron $20.000 por DaviPlata», lo dice en voz alta y te muestra de qué mesa es. <b>No necesitas convenio con Davivienda</b> ni ninguna clave del banco.</div>' +
         (iphone ? '<div class="gp-alerta">📱 En iPhone no se pueden leer los avisos de otras apps. Haz estos pasos en un <b>celular Android</b> que tenga DaviPlata (puede ser el del negocio). Este iPhone igual recibe los avisos.</div>' : '') +
         '<ol class="gp-lista">' +
-        paso(1, 'Instala la app Vento en el celular donde tienes DaviPlata', A ? 'Ya estás en la app Vento para Android. 👍' : '<a class="btn-primary gp-btn" href="' + APK + '" target="_blank" rel="noopener">📲 Descargar la app Vento (Android)</a><br><small>Ábrela, entra con tu misma cuenta y vuelve a este paso a paso (Ajustes → 💜 Pagos).</small>', ok(!!A, A ? 'Listo' : android ? 'Falta instalarla' : 'Hazlo en el Android')) +
+        paso(1, 'Usa la app Vento en el celular donde tienes DaviPlata', A ? 'Ya estás en la app Vento para Android. 👍'
+          : window.ventoAppSinPuente && window.ventoAppSinPuente() ? '⚠️ La app Vento no cargó bien. Ciérrala del todo (quítala de las apps recientes) y ábrela otra vez.'
+          : android ? '<b>Estás en Vento Web</b> (el navegador o su acceso directo «Vento Web»), no en la app. Los avisos de DaviPlata y Nequi <b>solo los puede leer la app Vento</b>.<br><button type="button" class="btn-primary gp-btn" data-gp="abrirapp">📲 Abrir la app Vento</button><br><small>Si no la tienes, se descarga sola: ábrela, entra con tu misma cuenta y prende los avisos allí (Ajustes → 💜 Pagos). De ahí en adelante abre siempre <b>la app</b> (ícono «Vento»), no Vento Web.</small>'
+          : '<a class="btn-primary gp-btn" href="' + APK + '" target="_blank" rel="noopener">📲 Descargar la app Vento (Android)</a><br><small>Ábrela, entra con tu misma cuenta y vuelve a este paso a paso (Ajustes → 💜 Pagos).</small>',
+          ok(!!A, A ? 'Listo' : window.ventoAppSinPuente && window.ventoAppSinPuente() ? 'Ábrela de nuevo' : android ? 'Estás en Vento Web' : 'Hazlo en el Android')) +
         paso(2, 'Prende «Recibir avisos de pagos»', 'Vento empieza a escuchar los avisos de plata que te llegan.' + (g.on && (!A || e.on) ? '' : '<br><button type="button" class="btn-primary gp-btn" data-gp="prender">Prender ahora</button>'), ok(g.on && (!A || e.on), g.on && (!A || e.on) ? 'Prendido' : 'Apagado')) +
         paso(3, 'Dale a Vento el permiso «Acceso a notificaciones»', 'Se abre una pantalla del celular: busca <b>Vento</b> en la lista, actívalo y toca <b>Permitir</b>. Luego vuelve con el botón de atrás. Vento solo toma los avisos de <b>plata recibida</b>: nunca códigos, claves ni compras.' + (A && !e.permiso ? '<br><button type="button" class="btn-primary gp-btn" data-gp="permiso">Abrir el permiso</button>' : ''), A ? ok(!!e.permiso, e.permiso ? 'Permiso dado' : 'Falta el permiso') : '') +
         paso(4, 'Deja prendidas las notificaciones de DaviPlata', 'En el celular: <b>Ajustes → Aplicaciones → DaviPlata → Notificaciones → Permitir</b> (todas). Abre DaviPlata una vez y entra con tu clave para que quede activa. Haz lo mismo con <b>Nequi</b> si también la usas.', '') +
@@ -28642,6 +28697,7 @@ let fotosListas = false;
       (enApp
         ? '<div class="settings-desc">Cuando te llega plata a <b>DaviPlata</b>, <b>Nequi</b> o tu banco, <b>la app de Vento lee directamente el aviso del banco en este celular</b> y te dice en voz alta <b>«Pago confirmado»</b> con el valor, quién pagó y de qué mesa es (como el parlante de Bold). No necesitas instalar nada más.</div>'
         : '<div class="settings-desc">Para que Vento te diga <b>«Pago confirmado»</b> apenas te llegue la plata, instala la <b>app Vento para Android</b> en el celular donde tienes DaviPlata o Nequi y prende esta opción allí: la app lee directamente el aviso del banco. Desde el navegador no se pueden leer los avisos de otras apps. Los demás celulares del negocio reciben el aviso por Vento Nube.</div>') +
+      '<div class="settings-desc" id="pgWebAviso" hidden style="border:1px solid #f5a524;border-radius:12px;padding:10px"><b>📲 Estás en Vento Web, no en la app.</b> Para que Vento lea los avisos de DaviPlata y Nequi y diga «Pago confirmado» (también con el celular bloqueado), abre <b>la app Vento</b> en este celular. <button type="button" class="btn-primary" id="pgAbrirApp" style="margin-top:8px;width:100%">📲 Abrir la app Vento</button></div>' +
       '<div class="settings-row"><div class="settings-row-text"><strong>Recibir avisos de pagos</strong><span id="pgEstado"></span></div><label class="switch"><input type="checkbox" id="pgOn"><span class="switch-slider"></span></label></div>' +
       '<div id="pgCaja" hidden>' +
       '<div class="settings-row" id="pgVolFila" style="flex-direction:column;align-items:stretch"><div class="settings-row-text"><strong>🔊 Volumen de la voz de los pagos: <span id="pgVolTxt"></span></strong><span>Qué tan alto dice «Pago confirmado. 200 pesos desde DaviPlata». ' + (enApp ? 'Suena a este volumen aunque la música o el celular estén bajitos, y luego deja el volumen como estaba. <b>Más de 100 % = más fuerte de lo normal.</b>' : 'En el navegador llega hasta 100 %; en la app Android se puede subir hasta 150 % (más fuerte de lo normal).') + '</span></div>' +
@@ -28662,6 +28718,7 @@ let fotosListas = false;
       '<div class="settings-row" style="flex-direction:column;align-items:stretch"><div class="settings-row-text"><strong>Últimos pagos que llegaron</strong></div><div id="pgLista"></div></div></div>';
     grupo.insertAdjacentElement('afterend', g);
     $p('pgGuiaBtn').onclick = pgGuia;
+    $p('pgAbrirApp').onclick = () => { try{ window.ventoAbrirApp(); }catch(e){} };
     const vol = $p('pgVol'), volMax = Number(vol.max);
     const volTxt = v => v + ' %' + (v > 100 ? ' · más fuerte de lo normal' : v === 100 ? ' · lo más alto del celular' : v <= 30 ? ' · bajito' : '');
     const volPoner = v => {
@@ -28711,7 +28768,9 @@ let fotosListas = false;
     $p('pgOn').checked = !!g.on; $p('pgCaja').hidden = !g.on; $p('pgUrl').value = urlExterna();
     if(document.activeElement !== $p('pgVol')){ const v = Math.min(pgVol(), Number($p('pgVol').max)); $p('pgVol').value = v; $p('pgVolTxt').textContent = v + ' %' + (v > 100 ? ' · más fuerte de lo normal' : v === 100 ? ' · lo más alto del celular' : v <= 30 ? ' · bajito' : ''); }
     const ea = AND() ? andEstado() : null;
-    $p('pgEstado').textContent = !g.on ? 'Apagado.' : ea && ea.on ? (ea.permiso ? '🟢 La app lee directo los avisos de pagos de este celular.' : '🟠 Falta el permiso «Acceso a notificaciones» para Vento.') : (es && es.readyState === 1 ? '🟢 Escuchando los avisos de pagos.' : '🟠 Conectando…');
+    const web = !ea && window.ventoAndroidWeb && window.ventoAndroidWeb();
+    if($p('pgWebAviso')) $p('pgWebAviso').hidden = !web;
+    $p('pgEstado').textContent = !g.on ? 'Apagado.' : web ? '🟠 Estás en Vento Web: aquí no se leen los avisos del banco. Abre la app Vento en este celular.' : ea && ea.on ? (ea.permiso ? '🟢 La app lee directo los avisos de pagos de este celular.' : '🟠 Falta el permiso «Acceso a notificaciones» para Vento.') : (es && es.readyState === 1 ? '🟢 Escuchando los avisos de pagos.' : '🟠 Conectando…');
     if($p('pgAndOn')){
       const e = andEstado();
       $p('pgAndOn').checked = !!e.on;
@@ -28727,7 +28786,17 @@ let fotosListas = false;
       showToast('✅ Listo: ' + plata(x.monto) + ' de ' + (x.de || x.app) + ' quedó como revisado en la app.');
     };
   }
-  const arr = setInterval(() => { if(typeof data !== 'undefined' && data){ clearInterval(arr); pgPintar(); pgConectar(); } }, 1000);
+  const arr = setInterval(() => { if(typeof data !== 'undefined' && data){ clearInterval(arr); pgPintar(); pgConectar(); pgAvisarWeb(); } }, 1000);
+  // Vento Web en Android con los avisos de pagos prendidos: aquí no se leen los avisos del banco (antes no se decía y
+  // parecía que la app había dejado de avisar). Una vez por sesión.
+  function pgAvisarWeb(){
+    try{
+      if(!PG().on || !(window.ventoAndroidWeb && window.ventoAndroidWeb()) || sessionStorage.getItem('vento_pg_web')) return;
+      sessionStorage.setItem('vento_pg_web', '1');
+      setTimeout(() => { try{ showToast('📲 Estás en Vento Web: aquí no se leen los avisos de DaviPlata y Nequi. Para que suenen los pagos abre la app Vento (Ajustes → 💜 Pagos → «Abrir la app Vento»).', 12000); }catch(e){} }, 4000);
+    }catch(e){}
+  }
+  if(window.ventoAppSinPuente && window.ventoAppSinPuente()) try{ window.ventoError && window.ventoError('app', 'La app Android abrió la página sin su puente (VentoAndroid)', { ua: navigator.userAgent.slice(0, 160) }, 'app|sin-puente'); }catch(e){}
   try{ const A = window.VentoAndroid; A && A.pagosVolumen && A.pagosVolumen(pgVol()); }catch(e){}
 })();
 </script>
