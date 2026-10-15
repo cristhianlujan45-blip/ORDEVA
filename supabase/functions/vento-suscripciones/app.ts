@@ -94,12 +94,39 @@ async function estado(req: Request, env: Env, b: Record<string, unknown>) {
   // Licencias que el proveedor compartió con el correo de quien entra: se activan solas (dueño o administrador).
   let licencias: unknown = [];
   if (rol === "dueno" || rol === "admin") {
-    try { const me = await yo.rpc<{ id: string }>("sub_yo"); licencias = await db.rpc("srv_lic_auto", { p_negocio: negocio, p_usuario: me.id }); }
+    try { const me = await yo.rpc<{ id: string }>("sub_yo"); licencias = await db.rpc("srv_lic_auto", { p_negocio: negocio, p_usuario: me.id, p_equipo: equipoDe(b) }); }
     catch (x) { log("warn", "lic_auto", { negocio, error: x instanceof Error ? x.message : String(x) }); }
   }
-  const e = await N.estado(db, negocio);
+  let e = await N.estado(db, negocio);
+  // Licencia con código: funciona en UN solo equipo. En los demás, «otro_equipo» y sin funciones (lo firma el servidor).
+  let licEquipo: Record<string, unknown> | null = null;
+  try {
+    const le = await db.rpc<Record<string, unknown>>("srv_lic_equipo", { p_negocio: negocio, p_equipo: equipoDe(b) });
+    if (le && le.ok === false) {
+      licEquipo = { codigo: le.codigo, desde: le.desde, mover_desde: le.mover_desde };
+      const ents = Object.fromEntries(Object.keys(e.entitlements || {}).map((k) => [k, false]));
+      e = { ...e, plan_efectivo: "free", entitlements: ents, subscription: e.subscription ? { ...e.subscription, status: "otro_equipo" } : e.subscription } as typeof e;
+    }
+  } catch (x) { log("warn", "lic_equipo", { negocio, error: x instanceof Error ? x.message : String(x) }); }
   const token = await N.firmarToken(db, negocio, e, cacheId(env));
-  return { ok: true, ...N.paraRol(e, rol), rol, token, ...(Array.isArray(licencias) && licencias.length ? { licencias_activadas: licencias } : {}) };
+  return { ok: true, ...N.paraRol(e, rol), rol, token, ...(licEquipo ? { licencia_equipo: licEquipo } : {}),
+    ...(Array.isArray(licencias) && licencias.length ? { licencias_activadas: licencias } : {}) };
+}
+
+// Código de este equipo (el mismo que «registrar_instalacion»): la licencia con código vive en uno solo.
+function equipoDe(b: Record<string, unknown>): string | null {
+  const v = String(b.equipo || "").trim();
+  return /^[A-Za-z0-9_-]{6,64}$/.test(v) ? v : null;
+}
+
+// ---------- /licencia-mover: pasar la licencia del negocio a ESTE equipo ----------
+async function licenciaMover(req: Request, env: Env, b: Record<string, unknown>) {
+  const negocio = negocioDe(b);
+  const me = await usuario(req, env).rpc<{ id: string }>("sub_yo");
+  const db = servidor(env);
+  const r = await db.rpc<Record<string, unknown>>("srv_lic_mover", { p_negocio: negocio, p_usuario: me.id, p_equipo: String(b.equipo || "") });
+  log("info", "licencia_movida", { negocio, codigo: String(r.codigo || ""), repetido: !!r.repetido });
+  return { ...r, ok: true };
 }
 
 // ---------- /licencia ----------
@@ -107,7 +134,7 @@ async function licencia(req: Request, env: Env, b: Record<string, unknown>) {
   const negocio = negocioDe(b);
   const me = await usuario(req, env).rpc<{ id: string }>("sub_yo");
   const db = servidor(env);
-  const r = await db.rpc<Record<string, unknown>>("srv_lic_canjear", { p_codigo: String(b.codigo || ""), p_negocio: negocio, p_usuario: me.id });
+  const r = await db.rpc<Record<string, unknown>>("srv_lic_canjear", { p_codigo: String(b.codigo || ""), p_negocio: negocio, p_usuario: me.id, p_equipo: equipoDe(b) });
   log("info", "licencia_canjeada", { negocio, codigo: String(r.codigo || "") });
   return { ...r, ok: true, estado: await N.estado(db, negocio) };
 }
@@ -228,6 +255,7 @@ export async function manejar(req: Request, env: Env): Promise<Response> {
     if (r0 === "estado") return json(200, await estado(req, env, b), cors);
     if (r0 === "pago") return json(200, await pago(req, env, b), cors);
     if (r0 === "licencia") return json(200, await licencia(req, env, b), cors);
+    if (r0 === "licencia-mover") return json(200, await licenciaMover(req, env, b), cors);
     if (r0 === "admin") return json(200, await admin(req, env, ruta[1] || "yo", b), cors);
     return json(404, { ok: false, error: "ruta" }, cors);
   } catch (e) {

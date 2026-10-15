@@ -12,6 +12,7 @@ el micrófono, la APK y los servicios externos se simulan.
 | `vozundo` | Deshacer / repetir pedidos por voz y preguntas de cuenta |
 | `divtest` | Dividir la cuenta entre N personas |
 | `suscrip` | Prueba gratis, licencias firmadas, bloqueo al vencer (con una llave de prueba temporal) |
+| `adminversion` | Vento Admin se actualiza solo: la versión de `admin.html` es la de `version.txt`; con una versión nueva recién abierto se recarga sin caché (`?v=`), si el servidor sigue con la vieja no se queda recargando (deja «Actualizar ahora») y escribiendo en el panel solo avisa |
 | `puertaytiemporeal` | Puerta y tiempo real: sin cuenta de Vento Nube la app queda tapada («Conecta Vento a tu cuenta», con botón para entrar); con cuenta y estado firmado abre; cuando la base de datos avisa (canal `vs-<negocio>` simulado) activar PRO, cancelar y reactivar se ven al instante (< 3 s) y tres avisos seguidos = una sola consulta; sin internet sigue con el estado firmado vigente; vencido y sin poder renovarlo → «Sin conexión con Vento»; al volver el internet abre sola. La puerta se fuerza con `?puerta=1` (en localhost está apagada para las demás pruebas) |
 | `suscripnube` | Suscripción con Vento Nube (servidor simulado que firma con una llave temporal): planes → Nequi/DaviPlata → comprobante (foto JPEG, idem, doble toque), pago en revisión sin premium, PRO activo, vencido (deja vender), rechazado con motivo, RENOVAR, token alterado, sin internet hasta «h», flag a mano, cambio de celular y mesero sin pagos |
 | `googletest` | Entrar con Google (Vento Nube simulada) |

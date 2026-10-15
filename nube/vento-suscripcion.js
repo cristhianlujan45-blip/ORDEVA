@@ -53,6 +53,12 @@
   var telefono = function(t){ t = String(t || '').replace(/\D/g, ''); return t.length === 10 ? t.slice(0, 3) + ' ' + t.slice(3, 6) + ' ' + t.slice(6) : t; };
   function idAzar(){ var a = new Uint8Array(12); try{ crypto.getRandomValues(a); }catch(e){ for(var i = 0; i < a.length; i++) a[i] = Math.random() * 256 | 0; } return 'vs-' + Date.now().toString(36) + '-' + Array.prototype.map.call(a, function(b){ return ('0' + b.toString(16)).slice(-2); }).join(''); }
   function nube(){ return window.ventoNube || null; }
+  // Código de este equipo (el mismo de «registrar_instalacion»): la licencia con código vive en uno solo.
+  function equipo(){
+    var c = ''; try{ c = localStorage.getItem('mesora-equipo') || ''; }catch(e){}
+    if(!c && typeof window.codigoEquipo === 'function') try{ c = window.codigoEquipo(); }catch(e){}
+    return /^[A-Za-z0-9_-]{6,64}$/.test(c) ? c : '';
+  }
   function negocio(){ try{ var n = nube(); return n && n.negocio ? n.negocio() : null; }catch(e){ return null; } }
   function enCuenta(){ return !!negocio(); }
 
@@ -206,7 +212,7 @@
     var n = negocio(); if(!n) return Promise.resolve(estado());
     if(E.cargando) return forzar === true ? E.cargando.then(function(){ return refrescar(); }) : E.cargando;
     var id = n.id;
-    E.cargando = api('estado', { negocio: id }).then(function(j){
+    E.cargando = api('estado', { negocio: id, equipo: equipo() }).then(function(j){
       if(E.neg !== id) return;
       var tok = j.token, info = Object.assign({}, j); delete info.token; delete info.ok;
       if(j.licencias_activadas && j.licencias_activadas.length){ var la = j.licencias_activadas[j.licencias_activadas.length - 1];
@@ -598,7 +604,14 @@
     var c = String(codigo || '').toUpperCase().replace(/\s+/g, '');
     if(!/^VENTO-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(c)) return Promise.reject(errorDe('licencia_formato', 'Escribe el código completo: VENTO-XXXX-XXXX-XXXX.'));
     var id = negId(); if(!id) return Promise.reject(errorDe('sin_nube', 'Para activar una licencia entra con tu cuenta de Vento Nube (correo y contraseña).'));
-    return api('licencia', { negocio: id, codigo: c }).then(function(r){ return refrescar(true).then(function(){ return r; }); });
+    return api('licencia', { negocio: id, codigo: c, equipo: equipo() }).then(function(r){ return refrescar(true).then(function(){ return r; }); });
+  }
+  /* Licencia con código: funciona en UN solo equipo. El dueño o administrador la pasa a ESTE equipo (cambió de
+     celular); el anterior queda bloqueado al instante. Máximo un cambio cada 30 días (lo controla el servidor). */
+  function moverLicencia(){
+    var id = negId(); if(!id) return Promise.reject(errorDe('sin_sesion'));
+    var eq = equipo(); if(!eq) return Promise.reject(errorDe('equipo_invalido', 'No se reconoce este equipo. Cierra y vuelve a abrir Vento.'));
+    return api('licencia-mover', { negocio: id, equipo: eq }).then(function(r){ return refrescar(true).then(function(){ return r; }); });
   }
   function abrirPlanes(motivo){ abrir(vInicio(motivo || '')); if(!E.cat && manda()) cargarCatalogo().catch(function(){}); }
   function abrirRenovar(){ abrir(vInicio('')); pagarPlan(planParaRenovar()); }
@@ -697,6 +710,11 @@
     /* Sin plan pago vigente (cancelada por el administrador, vencida, pago rechazado o sin pagar): la app no se
        usa; lo único que queda es pagar para reactivarla (o esperar la revisión del pago enviado). */
     var st = estado();
+    if(st.status === 'otro_equipo'){
+      soloPagar = false;
+      var le = (E.info && E.info.licencia_equipo) || {};
+      return { ok: false, motivo: 'equipo', manda: st.manda, codigo: String(le.codigo || ''), moverDesde: aMs(le.mover_desde) };
+    }
     soloPagar = !!BLOQUEA[st.status];
     if(soloPagar) return { ok: false, motivo: 'pago', status: st.status, manda: st.manda, revision: st.revision, rechazo: st.rechazo || '',
       plan: nombrePlan(st.planSub || st.plan), vence: st.vence || 0 };
@@ -705,7 +723,7 @@
 
   // ---------- API ----------
   window.ventoSuscripcion = {
-    puerta: puerta,
+    puerta: puerta, moverLicencia: moverLicencia, equipo: equipo,
     estado: estado, refrescar: refrescar, enCuenta: enCuenta, verificado: function(){ return !!E.p; },
     tiene: function(ent){ return ents().indexOf(String(ent)) >= 0; }, entitlements: ents,
     planEfectivo: function(){ return estado().plan; },

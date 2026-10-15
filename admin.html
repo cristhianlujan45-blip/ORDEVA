@@ -484,7 +484,7 @@
   <section data-tab="licencias">
     <div class="card">
       <h2>🔑 Nueva licencia</h2>
-      <p class="soft">Solo tú puedes crear licencias. Cada licencia da un plan por el tiempo que elijas. Si escribes correos, <b>solo esas cuentas</b> la pueden usar (se les activa sola al entrar a Vento); así nadie puede revenderla ni pasarla.</p>
+      <p class="soft">Solo tú puedes crear licencias. Cada licencia es <b>única</b>: un solo cliente, un solo uso y <b>un solo equipo</b> (si cambia de celular, él mismo la pasa al nuevo, una vez cada 30 días). Para otra sede, crea otra licencia. Si escribes el correo del cliente, <b>solo esa cuenta</b> la puede usar (se le activa sola al entrar a Vento).</p>
       <div class="f2">
         <div><label for="lsPlan">Plan</label><select id="lsPlan"><option value="pro">PRO</option></select></div>
         <div><label for="lsTipo">Duración</label><select id="lsTipo">
@@ -492,12 +492,9 @@
         <div id="lsCantBox"><label for="lsCant">Cuántos</label><input id="lsCant" type="number" min="1" max="1200" value="1" inputmode="numeric"></div>
         <div id="lsFechaBox" hidden><label for="lsFecha">Vence el</label><input id="lsFecha" type="date"></div>
       </div>
-      <label for="lsCorreos">Correos con los que se comparte (uno por renglón o separados por coma)</label>
-      <textarea id="lsCorreos" placeholder="cliente@gmail.com&#10;socio@gmail.com"></textarea>
-      <div class="f2">
-        <div><label for="lsUsos">Usos (negocios que la pueden activar)</label><input id="lsUsos" type="number" min="1" max="1000" placeholder="Automático" inputmode="numeric"></div>
-        <div><label for="lsNota">Nota (para ti)</label><input id="lsNota" placeholder="Ej: Bar El Paisa, pagó en efectivo"></div>
-      </div>
+      <label for="lsCorreos">Correo del cliente (uno solo)</label>
+      <input id="lsCorreos" type="email" autocomplete="off" placeholder="cliente@gmail.com">
+      <label for="lsNota">Nota (para ti)</label><input id="lsNota" placeholder="Ej: Bar El Paisa, sede centro, pagó en efectivo">
       <div class="row"><button class="b p" id="lsCrear" type="button">🔑 Crear licencia</button></div>
       <div id="lsRes" hidden class="out"></div>
       <div class="row" id="lsResBtns" hidden><button class="b" type="button" id="lsCopiar">📋 Copiar</button><a class="b" id="lsWa" target="_blank" rel="noopener">💬 Enviar por WhatsApp</a><a class="b" id="lsMail">📧 Enviar por correo</a></div>
@@ -888,6 +885,57 @@
   </div>
 </dialog>
 
+<script>
+/* Vento Admin se actualiza SOLO. La app Android (y el navegador) pueden quedarse con la página guardada: cada pocos
+   minutos, al abrir y al volver a la app se revisa version.txt (unos bytes, sin caché). Si hay una versión nueva:
+   • panel bloqueado, recién abierto o volviendo a la app → se recarga sola, sin caché (no se pierde nada);
+   • trabajando en el panel → aviso arriba «Actualizar ahora» (para no cortar lo que se está haciendo).
+   Si después de recargar el servidor todavía entrega la versión vieja, no se queda recargando: deja el aviso. */
+(function(){
+  'use strict';
+  var ADMIN_VERSION = '2026-10-15 · v1.39.3';
+  var ultima = 0, oculto = 0, inicio = Date.now();
+  function corta(v){ return String(v).split('·').pop().trim(); }
+  function libre(){
+    var lk = document.getElementById('lock');
+    if(lk && !lk.hidden) return true;                               // todavía no entró: no hay nada que perder
+    if(document.querySelector('dialog[open]')) return false;
+    var a = document.activeElement; if(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return false;
+    return true;
+  }
+  function recargar(v){
+    try{ if(sessionStorage.getItem('vento-admin-recargo') === v) return aviso(v); sessionStorage.setItem('vento-admin-recargo', v); }catch(e){}
+    location.replace(location.pathname + '?v=' + encodeURIComponent(corta(v)) + location.hash);
+  }
+  function aviso(v){
+    if(document.getElementById('adminNuevaVersion') || !document.body) return;
+    var b = document.createElement('div'); b.id = 'adminNuevaVersion';
+    b.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:99999;background:#2d7d46;color:#fff;padding:10px 14px;display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;font:600 14px system-ui';
+    b.innerHTML = '<span>🔄 Hay una versión nueva de Vento Admin (' + corta(v) + ').</span><button type="button" style="background:#fff;color:#2d7d46;border:0;border-radius:8px;padding:7px 14px;font:700 14px system-ui">Actualizar ahora</button>';
+    b.querySelector('button').onclick = function(){ try{ sessionStorage.removeItem('vento-admin-recargo'); }catch(e){} location.replace(location.pathname + '?v=' + encodeURIComponent(corta(v)) + '&r=' + Date.now() + location.hash); };
+    document.body.appendChild(b);
+  }
+  function revisar(volviendo){
+    if(location.protocol === 'file:' || Date.now() - ultima < 15000) return;
+    ultima = Date.now();
+    fetch(new URL('version.txt', location.href).href + '?t=' + Date.now(), { cache: 'no-store' })
+      .then(function(r){ return r.ok ? r.text() : ''; }).then(function(t){
+        var v = String(t || '').trim();
+        if(!v || v.length > 60 || v.indexOf('·') < 0 || v === ADMIN_VERSION) return;
+        if(volviendo || Date.now() - inicio < 15000 || libre()) recargar(v); else aviso(v);
+      }).catch(function(){});
+  }
+  window.ventoAdminVersion = ADMIN_VERSION;
+  setTimeout(function(){ revisar(false); }, 1500);
+  setInterval(function(){ if(document.visibilityState === 'visible') revisar(false); }, 2 * 60000);
+  document.addEventListener('visibilitychange', function(){
+    if(document.visibilityState === 'hidden'){ oculto = Date.now(); return; }
+    var largo = oculto && Date.now() - oculto > 30000; oculto = 0;
+    if(largo) ultima = 0;
+    revisar(largo && libre());
+  });
+})();
+</script>
 <script>
 (function(){
   'use strict';
@@ -2140,10 +2188,11 @@
     $('lsLista').innerHTML = l.length ? l.map(x => '<div class="sxc" data-lic="' + esc(x.id) + '"><div class="ph"><div class="t"><b class="lic-cod">' + esc(x.codigo) + '</b><small class="soft"> ' + esc(nomPlan(x.plan_id) + ' · ' + lsDur(x)) + '</small></div>' +
       '<span class="pill ' + (x.estado === 'activa' ? 'ok' : 'bad') + '">' + (x.estado === 'activa' ? 'Activa' : 'Anulada') + '</span></div>' +
       (x.nota ? '<div class="soft">📝 ' + esc(x.nota) + '</div>' : '') +
-      '<div class="soft">Usada ' + x.usos + ' de ' + x.usos_max + ' · creada ' + fCo(x.creada_en) + '</div>' +
+      '<div class="soft">' + (x.usos ? '✅ Activada' : '⏳ Sin activar') + ' · creada ' + fCo(x.creada_en) + '</div>' +
       '<div class="chips">' + (x.correos.length ? x.correos.map(c => '<span class="chip' + (c.usada ? ' ok' : '') + (x.estado === 'activa' ? ' x' : '') + '" data-quitar="' + esc(c.email) + '" title="' + (c.usada ? 'Ya la activó' : c.registrado ? 'Tiene cuenta; se activa al entrar' : 'Todavía no tiene cuenta') + '">' + (c.usada ? '✅ ' : c.registrado ? '👤 ' : '✉️ ') + esc(c.email) + (x.estado === 'activa' ? ' ✕' : '') + '</span>').join('') : '<span class="soft">Por código (cualquier cuenta)</span>') + '</div>' +
-      (x.activaciones.length ? '<div class="soft">🏪 ' + x.activaciones.map(a => esc((a.negocio || '¿?') + ' (' + (a.email || '') + ') hasta ' + fCo(a.hasta))).join(' · ') + '</div>' : '') +
-      (x.estado === 'activa' ? '<div class="row" style="margin-top:4px"><button class="b" type="button" data-la="correo">➕ Correo</button><button class="b" type="button" data-la="enviar">📤 Enviar</button><button class="b" type="button" data-la="anular">⛔ Anular</button></div>' : '') +
+      (x.activaciones.length ? '<div class="soft">🏪 ' + x.activaciones.map(a => esc((a.negocio || '¿?') + ' (' + (a.email || '') + ') hasta ' + fCo(a.hasta)) +
+        ' · 📲 ' + esc(a.equipo ? 'equipo ' + a.equipo : 'sin equipo todavía') + (a.cambios ? esc(' · cambió de equipo ' + a.cambios + ' vez' + (a.cambios === 1 ? '' : 'es') + (a.movida_en ? ' (último ' + fCo(a.movida_en) + ')' : '')) : '')).join(' · ') + '</div>' : '') +
+      (x.estado === 'activa' ? '<div class="row" style="margin-top:4px">' + (x.correos.length ? '' : '<button class="b" type="button" data-la="correo">➕ Correo</button>') + '<button class="b" type="button" data-la="enviar">📤 Enviar</button><button class="b" type="button" data-la="anular">⛔ Anular</button></div>' : '') +
       '</div>').join('') : '<div class="empty">' + (ad.lics.length ? 'Nada coincide.' : 'Todavía no has creado licencias.') + '</div>';
   }
   $('lsBuscar').oninput = lsPintar; $('lsFiltro').onchange = lsPintar; $('lsRef').onclick = lsCargar;
@@ -2166,13 +2215,13 @@
     const L = { plan: $('lsPlan').value || 'pro', correos, nota: $('lsNota').value.trim() };
     if(t === 'd') L.dias = n; else if(t === 'm') L.dias = Math.round(n * 30.44); else if(t === 'a') L.dias = n * 365; else if(t === 's') L.para_siempre = true;
     else { const f = $('lsFecha').value; if(!f){ toast('Elige la fecha de vencimiento.'); return; } L.hasta = new Date(f + 'T23:59:59-05:00').toISOString(); }
-    if(+$('lsUsos').value) L.usos_max = Math.round(+$('lsUsos').value);
-    if(!correos.length && !confirm('Sin correos, cualquiera que tenga el código la puede activar (' + (L.usos_max || 1) + ' vez/veces). ¿Seguro? Con correos nadie más la puede usar.')) return;
+    if(correos.length > 1){ toast('Una licencia es para un solo cliente: escribe un solo correo.'); return; }
+    if(!correos.length && !confirm('Sin correo, cualquiera que tenga el código la puede activar (una sola vez, en un solo equipo). ¿Seguro? Con el correo nadie más la puede usar.')) return;
     $('lsCrear').disabled = true;
     const j = await intentar(() => sxApi('licencia_crear', { licencia: L }));
     $('lsCrear').disabled = false;
     if(!j) return;
-    toast('🔑 Licencia creada.'); lsMostrar(j.licencia); $('lsCorreos').value = ''; $('lsNota').value = ''; $('lsUsos').value = '';
+    toast('🔑 Licencia creada.'); lsMostrar(j.licencia); $('lsCorreos').value = ''; $('lsNota').value = '';
     ad.lics.unshift(j.licencia); lsPintar();
   };
   $('lsLista').addEventListener('click', async e => {
@@ -2182,7 +2231,7 @@
     if(ch && x.estado === 'activa'){ if(!confirm('¿Quitar ' + ch.dataset.quitar + ' de esta licencia?')) return; const j = await intentar(() => sxApi('licencia_correos', { licencia: x.id, quitar: [ch.dataset.quitar] })); if(j){ Object.assign(x, j.licencia); lsPintar(); } return; }
     const b = e.target.closest('[data-la]'); if(!b) return;
     if(b.dataset.la === 'enviar'){ lsMostrar(x); $('lsRes').scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
-    if(b.dataset.la === 'correo'){ const c = lsCorreosDe(prompt('Correo(s) con los que compartir esta licencia:') || ''); if(!c.length) return; const j = await intentar(() => sxApi('licencia_correos', { licencia: x.id, agregar: c })); if(j){ Object.assign(x, j.licencia); lsPintar(); toast('✅ Agregado. Se le activa sola al entrar a Vento.'); } return; }
+    if(b.dataset.la === 'correo'){ const c = lsCorreosDe(prompt('Correo del cliente (uno solo):') || ''); if(!c.length) return; if(c.length > 1){ toast('Una licencia es para un solo cliente: un solo correo.'); return; } const j = await intentar(() => sxApi('licencia_correos', { licencia: x.id, agregar: c })); if(j){ Object.assign(x, j.licencia); lsPintar(); toast('✅ Agregado. Se le activa sola al entrar a Vento.'); } return; }
     if(b.dataset.la === 'anular'){
       if(!confirm('¿Anular la licencia ' + x.codigo + '? Ya no se podrá activar.')) return;
       const quitar = x.usos > 0 && confirm('¿También quitarle el plan a los negocios que ya la activaron? (Aceptar = sí, Cancelar = que les dure hasta su fecha)');
