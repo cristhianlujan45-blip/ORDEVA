@@ -9,3 +9,4 @@ pruebas/node_modules/
 *.keystore
 # Paquetes sueltos que no son de la app
 *.whl
+pruebas/node_modules
