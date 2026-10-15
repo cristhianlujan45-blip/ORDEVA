@@ -22536,6 +22536,8 @@ function vigilarAtascado(){
   // el video no arranca: la canción se marcaba «bloqueada» sin estarlo. Ahora: a los 12 s se le da play una vez, y solo
   // si a los 60 s sigue quieta se prueba otra versión (sin marcarla como mala para siempre).
   const t=Date.now()-cargadoEn;
+  // Con la app minimizada el celular puede frenar el video: a los 7 s se le da play otra vez (y nunca se descarta).
+  if(fondoMusica()&&t>=7000){try{yPl.playVideo();}catch(e){}cargadoEn=Date.now();return;}
   if(t>=12000&&atascoPlay!==cargadoEn&&!pausaManual){atascoPlay=cargadoEn;try{yPl.playVideo();}catch(e){}return;}
   if(t<60000)return;
   // Con la app minimizada el celular puede frenar el video un momento: se le da play otra vez en vez de
