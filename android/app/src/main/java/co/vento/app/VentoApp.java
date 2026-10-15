@@ -82,7 +82,8 @@ public class VentoApp extends Application {
             String[][] cs = {
                 {"vento_pedidos2", "Pedidos y cuentas", "alto"},
                 {"vento_musica2", "Canciones pedidas", "alto"},
-                {"vento_avisos2", "Avisos de Vento (IA y soporte)", "normal"}};
+                {"vento_avisos2", "Avisos de Vento (IA y soporte)", "normal"},
+                {"vento_pagos", "💜 Pagos que te llegan", "alto"}};
             for (String[] c : cs) {
                 if (nm.getNotificationChannel(c[0]) != null) continue;
                 android.app.NotificationChannel ch = new android.app.NotificationChannel(c[0], c[1],
@@ -90,6 +91,12 @@ public class VentoApp extends Application {
                 ch.setDescription("Suena aunque Vento esté cerrada.");
                 ch.enableVibration("alto".equals(c[2]));
                 ch.setLockscreenVisibility(android.app.Notification.VISIBILITY_PUBLIC);
+                if ("vento_pagos".equals(c[0])) {
+                    // Los pagos suenan aunque el celular esté bloqueado o en silencio de notificaciones del resto.
+                    ch.setDescription("«Pago confirmado»: suena aunque la pantalla esté bloqueada o Vento cerrada.");
+                    ch.setVibrationPattern(new long[]{0, 250, 120, 250});
+                    ch.setBypassDnd(true);
+                }
                 nm.createNotificationChannel(ch);
             }
         } catch (Exception e) { /* sin notificaciones no pasa nada */ }
@@ -148,7 +155,7 @@ public class VentoApp extends Application {
         decirPago(AvisoPago.frase(appBanco, monto));
         try {
             if (notif) app.new Puente().notificar("💜 Pagaron " + AvisoPago.plata(monto) + " por " + AvisoPago.nombreApp(appBanco),
-                    "Pago confirmado por la app de " + AvisoPago.nombreApp(appBanco) + ".", "pedidos", false);
+                    "Pago confirmado por la app de " + AvisoPago.nombreApp(appBanco) + ".", "pagos", false);
         } catch (Exception ignorado) { }
     }
 
@@ -157,7 +164,7 @@ public class VentoApp extends Application {
         if (app == null || monto <= 0) return;
         try {
             app.new Puente().notificar("💜 Pagaron " + AvisoPago.plata(monto) + " por " + AvisoPago.nombreApp(banco),
-                    "Pago confirmado por SMS de " + AvisoPago.nombreApp(banco) + ".", "pedidos", false);
+                    "Pago confirmado por SMS de " + AvisoPago.nombreApp(banco) + ".", "pagos", false);
         } catch (Exception ignorado) { }
     }
 
@@ -188,7 +195,27 @@ public class VentoApp extends Application {
                 .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH).build();
     }
 
+    // Con la pantalla bloqueada, Android congela la app apenas termina de leer el aviso del banco: el procesador se
+    // mantiene despierto mientras se prepara y se dice la voz (máximo 45 s).
+    private static android.os.PowerManager.WakeLock despierto;
+
+    static void mantenerDespierto() {
+        try {
+            if (despierto == null) {
+                android.os.PowerManager pm = (android.os.PowerManager) app.getSystemService(Context.POWER_SERVICE);
+                despierto = pm.newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "vento:pago");
+                despierto.setReferenceCounted(false);
+            }
+            despierto.acquire(45_000L);
+        } catch (Throwable ignorado) { }
+    }
+
+    private static void soltarDespierto() {
+        try { if (despierto != null && despierto.isHeld()) despierto.release(); } catch (Throwable ignorado) { }
+    }
+
     static void decirPago(final String frase) {
+        mantenerDespierto();
         ui.post(() -> {
             if (ttsPago != null && ttsPagoListo) { hablarPago(frase); return; }
             pagosEnFila.add(frase);
@@ -346,6 +373,7 @@ public class VentoApp extends Application {
 
     private static void subirMusica() {
         devolverVolumen();
+        soltarDespierto();
         try {
             Object f = focoPago;
             focoPago = null;
@@ -728,7 +756,7 @@ public class VentoApp extends Application {
                 android.app.NotificationManager nm = (android.app.NotificationManager) getSystemService(NOTIFICATION_SERVICE);
                 if (nm == null) return false;
                 if (Build.VERSION.SDK_INT >= 33 && !tiene("android.permission.POST_NOTIFICATIONS")) return false;
-                String id = "musica".equals(canal) ? "vento_musica2" : "avisos".equals(canal) ? "vento_avisos2" : "vento_pedidos2";
+                String id = "musica".equals(canal) ? "vento_musica2" : "avisos".equals(canal) ? "vento_avisos2" : "pagos".equals(canal) ? "vento_pagos" : "vento_pedidos2";
                 crearCanales();
                 int flags = Build.VERSION.SDK_INT >= 23 ? android.app.PendingIntent.FLAG_IMMUTABLE : 0;
                 android.app.PendingIntent abrir = android.app.PendingIntent.getActivity(VentoApp.this, 2,
@@ -743,6 +771,7 @@ public class VentoApp extends Application {
                         .setWhen(System.currentTimeMillis()).setShowWhen(true);
                 if (Build.VERSION.SDK_INT < 26) b.setDefaults(android.app.Notification.DEFAULT_ALL).setPriority(android.app.Notification.PRIORITY_HIGH);
                 if (Build.VERSION.SDK_INT >= 21) b.setCategory("musica".equals(canal) ? android.app.Notification.CATEGORY_EVENT : android.app.Notification.CATEGORY_MESSAGE);
+                if ("pagos".equals(canal)) b.setVisibility(android.app.Notification.VISIBILITY_PUBLIC);
                 nm.notify(avisoN++, b.build());
                 return true;
             } catch (Exception e) {
@@ -1029,6 +1058,46 @@ public class VentoApp extends Application {
                     for (Runnable r : fila) r.run();
                 }));
             });
+        }
+
+        /** Marca del celular (Xiaomi, Samsung, OPPO…): para dar los pasos de «que no la cierre» de esa marca. */
+        @JavascriptInterface
+        public String fabricante() { return (Build.MANUFACTURER == null ? "" : Build.MANUFACTURER) + "|" + (Build.BRAND == null ? "" : Build.BRAND); }
+
+        /** «Inicio automático» de la marca (Xiaomi, OPPO, vivo, Huawei, Honor…): sin él, esas marcas cierran Vento y los
+         *  avisos de pagos dejan de sonar con la app cerrada. Si la marca no lo tiene, abre la información de la app. */
+        @JavascriptInterface
+        public boolean abrirInicioAutomatico() {
+            String[][] pantallas = {
+                    {"com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity"},
+                    {"com.coloros.safecenter", "com.coloros.safecenter.permission.startup.StartupAppListActivity"},
+                    {"com.coloros.safecenter", "com.coloros.safecenter.startupapp.StartupAppListActivity"},
+                    {"com.oplus.safecenter", "com.oplus.safecenter.permission.startup.StartupAppListActivity"},
+                    {"com.oppo.safe", "com.oppo.safe.permission.startup.StartupAppListActivity"},
+                    {"com.vivo.permissionmanager", "com.vivo.permissionmanager.activity.BgStartUpManagerActivity"},
+                    {"com.iqoo.secure", "com.iqoo.secure.ui.phoneoptimize.AddWhiteListActivity"},
+                    {"com.huawei.systemmanager", "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity"},
+                    {"com.huawei.systemmanager", "com.huawei.systemmanager.optimize.process.ProtectActivity"},
+                    {"com.hihonor.systemmanager", "com.hihonor.systemmanager.startupmgr.ui.StartupNormalAppListActivity"},
+                    {"com.asus.mobilemanager", "com.asus.mobilemanager.powersaver.PowerSaverSettings"},
+                    {"com.letv.android.letvsafe", "com.letv.android.letvsafe.AutobootManageActivity"},
+                    {"com.transsion.phonemanager", "com.itel.autobootmanager.activity.AutoBootMgrActivity"}};
+            android.content.Context c = ventana != null ? ventana : VentoApp.this;
+            for (String[] x : pantallas) {
+                try {
+                    Intent i = new Intent().setComponent(new android.content.ComponentName(x[0], x[1]));
+                    if (ventana == null) i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    if (i.resolveActivity(getPackageManager()) == null) continue;
+                    c.startActivity(i);
+                    return true;
+                } catch (Exception ignorado) { }
+            }
+            try {
+                Intent i = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName()));
+                if (ventana == null) i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                c.startActivity(i);
+            } catch (Exception ignorado) { }
+            return false;
         }
 
         /** Volumen de la voz de los pagos (10 a 150 %; más de 100 % = más fuerte de lo normal). */

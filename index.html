@@ -25259,7 +25259,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-15 · v1.38.5';
+const MESORA_VERSION = '2026-10-15 · v1.38.6';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'Vento · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 // Si el navegador (o el celular, con la app agregada a la pantalla de inicio) se quedó con
@@ -28456,6 +28456,8 @@ let fotosListas = false;
 
   // ---------- Leer la notificación ----------
   const APPS = [[/daviplata/i, 'DaviPlata'], [/nequi/i, 'Nequi'], [/bancolombia/i, 'Bancolombia'], [/movii/i, 'Movii'], [/\bdale\b/i, 'Dale'], [/davivienda/i, 'Davivienda'], [/bre-?b/i, 'Bre-B']];
+  const PG_NUNCA = /solicitud|(?:te|le) pide|(?:te|le) pidi[oó]|(?:te|le) cobr|cobro pendiente|rechazad|fall[oó]|no se pudo|reversad|programad/i;
+  const PG_FUERTE = /(?:te|le) (?:envi[oó]|enviaron|pas[oó]|pasaron|transfiri[oó]|transfirieron|consign[oó]|consignaron|mand[oó]|mandaron|gir[oó]|giraron|pag[oó]|pagaron)|(?:recibiste|recibi[oó]|ha recibido|has recibido)\s+(?:\$|cop|\d|una transferencia|un pago|dinero|plata)|transferencia recibida|pago recibido|a (?:tu|su) llave|(?:te|le) lleg[oó]\s+(?:\$|cop|\d|plata|dinero)/i;
   const PG_PROMO = /¿|pr[eé]stamo|te prestamos|le prestamos|cr[eé]dito (?:de libre|pre|para|f[aá]cil|aprobado|express|r[aá]pido)|tarjeta de cr[eé]dito|colch[oó]n|oferta|promo|descuento|cashback|sorteo|particip|\bgan(?:a|e|ar)\b|aprovecha|beneficio|invit|hasta \$|\bcupo\b|activa tu|desc[aá]rga/i;
   // ---------- Voz de los pagos con su propio volumen (Ajustes → Pagos) ----------
   // En la app Android la dice la voz de pagos de Android (canal de la alarma, al volumen elegido; más de 100 % = reforzada,
@@ -28473,12 +28475,15 @@ let fotosListas = false;
     if(!t) return null;
     // Nequi habla de «tú» («Te llegó plata»); DaviPlata y varios bancos de «usted» («Le llegó plata», «Le pasaron»,
     // «Recibió», «Ha recibido»). Antes solo se entendía la forma de «tú» y los avisos de DaviPlata no salían.
-    const recibido = /(recibiste|has recibido|ha recibido|(?:te|le) lleg(?:[oó]|aron)|(?:te|le) pas(?:[oó]|aron)|pasaron plata|(?:te|le) envi(?:[oó]|aron)|(?:te|le) transfiri(?:[oó]|eron)|(?:te|le) pag(?:[oó]|aron)|(?:te|le) consign|(?:te|le) abon|consignaron|abonaron|entr[oó] plata|lleg[oó] plata|ingres[oó]|recibi[oó]|recepci[oó]n|pago recibido|dinero recibido|transferencia recibida|abono a (?:tu|su) cuenta)/i.test(t);
+    const recibido = /(recibiste|has recibido|ha recibido|(?:te|le) lleg(?:[oó]|aron)|(?:te|le) pas(?:[oó]|aron)|pasaron plata|(?:te|le) envi(?:[oó]|aron)|(?:te|le) transfiri(?:[oó]|eron)|(?:te|le) pag(?:[oó]|aron)|(?:te|le) consign|(?:te|le) abon|consignaron|abonaron|entr[oó] plata|lleg[oó] plata|ingres[oó]|recibi[oó]|recepci[oó]n|pago recibido|dinero recibido|transferencia recibida|abono a (?:tu|su) cuenta|(?:te|le) mand(?:o|ó|aron)|(?:te|le) gir(?:o|ó|aron)|(?:te|le) deposit|dep[oó]sito recibido|(?:te|le|se) acredit|acredit\w*\s+(?:a|en)\s+(?:tu|su)\s+(?:cuenta|llave|nequi|daviplata)|lleg(?:o|ó|aron)\s+(?:\$|cop|plata|dinero)|a (?:tu|su) llave|(?:recib|lleg|entr|ingres)[^.]{0,40}bre-?b|bre-?b[^.]{0,40}(?:recib|lleg|entr|ingres)|entr[oó] dinero|lleg[oó] dinero)/i.test(t);
     const salida = /(enviaste|pagaste|transferiste|retiraste|compraste|sacaste|usted (?:envi|pag|transfiri|pas)|c[oó]digo|clave din|otp|contrase)/i.test(t);
     if(!recibido || salida && !/(recibiste|recibi[oó]|ha recibido|(?:te|le) lleg)/i.test(t)) return null;
     // Publicidad del banco que se parece a un pago («¿Te llegó la prima?…», «Te prestamos hasta $5.000.000»): NO es plata
     // que llegó (la misma regla de la app Android: AvisoPago.PROMO).
-    if(PG_PROMO.test(t)) return null;
+    // Solicitudes y cobros («JUAN te pidió $20.000»), rechazados o fallidos: nunca son plata que llegó.
+    if(PG_NUNCA.test(t)) return null;
+    // Un «¿…?» o «bolsillo» junto a un pago de verdad («te envió $20.000. ¿La guardas?») no lo vuelve publicidad.
+    if(PG_PROMO.test(t) && !PG_FUERTE.test(t)) return null;
     // Con signo ($20.000), «COP 20.000» o sin él («Recibiste 25.000 pesos», «transferencia por 30.000»)
     const m = t.match(/(?:\$|\bCOP)\s?(\d{1,3}(?:[.,]\d{3})+|\d+)/i) || t.match(/(\d{1,3}(?:[.,]\d{3})+|\d{4,})\s*(?:pesos|cop)\b/i) || t.match(/\b(?:recibiste|por|de)\s+(\d{1,3}(?:[.,]\d{3})+)\b/i);
     if(!m) return null;
@@ -28486,7 +28491,7 @@ let fotosListas = false;
     if(!(monto > 0)) return null;
     const app = (APPS.find(([re]) => re.test(t)) || [0, 'Transferencia'])[1];
     const NOM = "[A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ'.]+(?:\\s+[A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ'.]+){0,3}";
-    let de = (t.match(new RegExp('(' + NOM + ')\\s+(?:te|le)\\s+(?:envi|transfiri|pag|pas|consign|abon)')) || [])[1]
+    let de = (t.match(new RegExp('(' + NOM + ')\\s+(?:te|le)\\s+(?:envi|transfiri|pag|pas|consign|abon|mand|gir)')) || [])[1]
           || (t.match(new RegExp('\\bde\\s+(' + NOM + ')')) || [])[1] || '';
     if(/^(nequi|daviplata|bancolombia|tu|su|la|el|le|dinero|plata|recibiste|te|usted)$/i.test(de.split(' ')[0])) de = '';
     de = de.split(' ').map(x => x.charAt(0).toUpperCase() + x.slice(1).toLowerCase()).join(' ');
@@ -28651,6 +28656,18 @@ let fotosListas = false;
   // Para recibir los avisos NO hace falta convenio con Davivienda ni la API: la app Vento para Android lee el aviso
   // que DaviPlata ya muestra en el celular («¡Le llegó plata!…») y lo convierte en «Pago confirmado» + el aviso del celular.
   const APK = 'https://github.com/cristhianlujan45-blip/cuentas/releases/latest/download/vento.apk';
+  // Marca del celular (Xiaomi, Samsung…) y sus pasos para que no cierre Vento (esas marcas cierran las apps de fondo).
+  function pgMarca(){ try{ const A = window.VentoAndroid; const f = A && A.fabricante ? String(A.fabricante()) : ''; return f.split('|')[0] || ''; }catch(e){ return ''; } }
+  function pgPasosMarca(){
+    const m = (pgMarca() + ' ' + (navigator.userAgent || '')).toLowerCase();
+    if(/xiaomi|redmi|poco/.test(m)) return '<li><b>Xiaomi / Redmi / POCO:</b> Ajustes → Apps → Vento → <b>Inicio automático</b> ✅ y <b>Ahorro de batería → Sin restricciones</b>. En «Notificaciones», deja prendida <b>«Pantalla de bloqueo»</b>.</li>';
+    if(/samsung/.test(m)) return '<li><b>Samsung:</b> Ajustes → Batería → Límites de uso en segundo plano → quita Vento de «Apps en suspensión» y agrégala a <b>«Apps que nunca se suspenden»</b>.</li>';
+    if(/oppo|realme|oneplus/.test(m)) return '<li><b>OPPO / realme / OnePlus:</b> Ajustes → Apps → Vento → Uso de batería → <b>Permitir actividad en segundo plano</b> e <b>Inicio automático</b>.</li>';
+    if(/vivo|iqoo/.test(m)) return '<li><b>vivo:</b> Ajustes → Batería → Consumo en segundo plano → Vento → <b>Permitir</b>, y <b>Inicio automático</b> ✅.</li>';
+    if(/huawei|honor/.test(m)) return '<li><b>Huawei / Honor:</b> Ajustes → Batería → Inicio de aplicaciones → Vento → <b>Administrar manualmente</b> (todo prendido).</li>';
+    if(/motorola|moto/.test(m)) return '<li><b>Motorola:</b> Ajustes → Apps → Vento → Batería → <b>Sin restricciones</b>.</li>';
+    return '';
+  }
   // «🔎 Este equipo: …»: con un pantallazo se sabe si es la app o Vento Web (y cuál navegador).
   function pgDondeEstoy(){
     const ua = navigator.userAgent || '';
@@ -28673,6 +28690,7 @@ let fotosListas = false;
         if(k === 'prender'){ PG().on = true; saveData(); try{ pgConectar(); }catch(x){} if(A && !andEstado().on){ A.pagosAvisos(true); if(!andEstado().permiso) try{ A.mediosPermiso(); }catch(x){} } try{ pgPintar(); }catch(x){} }
         if(k === 'permiso' && A) try{ A.mediosPermiso(); }catch(x){}
         if(k === 'bateria' && A) try{ A.ajustesBateria(); }catch(x){}
+        if(k === 'autoinicio' && A) try{ A.abrirInicioAutomatico(); showToast('Busca «Vento» en la lista y actívalo. Luego vuelve con el botón de atrás.', 8000); }catch(x){}
         if(k === 'probar'){ pgRecibir('DaviPlata | ¡Le llegó plata! | PRUEBA VENTO le pasó $1.000 a su DaviPlata', 'prueba-' + Date.now()); }
         if(k === 'macro'){ ov.classList.remove('show'); clearInterval(ov.__t); try{ pgPintar(); const d = $p('pgGrupo') && $p('pgGrupo').querySelector('details'); if(d){ d.open = true; d.scrollIntoView({ behavior: 'smooth', block: 'start' }); } }catch(x){} }
         setTimeout(pintar, 400);
@@ -28701,7 +28719,11 @@ let fotosListas = false;
         paso(2, 'Prende «Recibir avisos de pagos»', 'Vento empieza a escuchar los avisos de plata que te llegan.' + (g.on && (!A || e.on) ? '' : '<br><button type="button" class="btn-primary gp-btn" data-gp="prender">Prender ahora</button>'), ok(g.on && (!A || e.on), g.on && (!A || e.on) ? 'Prendido' : 'Apagado')) +
         paso(3, 'Dale a Vento el permiso «Acceso a notificaciones»', 'Se abre una pantalla del celular: busca <b>Vento</b> en la lista, actívalo y toca <b>Permitir</b>. Luego vuelve con el botón de atrás. Vento solo toma los avisos de <b>plata recibida</b>: nunca códigos, claves ni compras.' + (A && !e.permiso ? '<br><button type="button" class="btn-primary gp-btn" data-gp="permiso">Abrir el permiso</button>' : ''), A ? ok(!!e.permiso, e.permiso ? 'Permiso dado' : 'Falta el permiso') : '') +
         paso(4, 'Deja prendidas las notificaciones de DaviPlata', 'En el celular: <b>Ajustes → Aplicaciones → DaviPlata → Notificaciones → Permitir</b> (todas). Abre DaviPlata una vez y entra con tu clave para que quede activa. Haz lo mismo con <b>Nequi</b> si también la usas. <b>¿Tu banco te avisa por SMS?</b> La app también lee esos mensajes de texto (con el mismo permiso): mira «📩 Confirmar también los SMS del banco» en Ajustes → 💜 Pagos.', '') +
-        paso(5, 'Que el celular no duerma a Vento', 'Así el aviso llega aunque Vento esté cerrada o la pantalla apagada.' + (A && perm.bateria === false ? '<br><button type="button" class="btn-ghost gp-btn" data-gp="bateria">⚡ Quitar el ahorro de batería</button>' : ''), A && perm.bateria !== undefined ? ok(!!perm.bateria, perm.bateria ? 'Listo' : 'Falta') : '') +
+        paso(5, 'Que suene siempre: con la pantalla bloqueada o Vento cerrada', 'Así «Pago confirmado» suena aunque el celular esté bloqueado o no hayas abierto Vento.' +
+          (A && perm.bateria === false ? '<br><b>1.</b> <button type="button" class="btn-primary gp-btn" data-gp="bateria">⚡ Quitar el ahorro de batería</button> (elige <b>Sin restricciones</b> / <b>Permitir</b>)' : A ? '<br>✅ Sin ahorro de batería.' : '') +
+          (A && A.abrirInicioAutomatico ? '<br><b>' + (perm.bateria === false ? '2.' : '') + '</b> <button type="button" class="btn-ghost gp-btn" data-gp="autoinicio">🚀 Permitir «Inicio automático»</button>' + (pgMarca() ? ' <small>(' + escp(pgMarca()) + ')</small>' : '') : '') +
+          (A ? '<ul style="margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5">' + pgPasosMarca() + '<li>En las apps recientes, deja presionada Vento y toca <b>🔒 Bloquear</b> (así el celular no la cierra al limpiar).</li><li>Deja Vento abierta una vez después de instalarla: desde ahí trabaja sola de fondo (aviso fijo «Vento está trabajando»).</li></ul>' : ''),
+          A && perm.bateria !== undefined ? ok(!!perm.bateria, perm.bateria ? 'Listo' : 'Falta') : '') +
         paso(6, 'Prueba', 'Pídele a alguien que te pase <b>$1.000</b> a tu DaviPlata. Vento dirá <i>«Pago confirmado. 1000 pesos desde DaviPlata»</i> y en el celular sale <b>«💜 Pagaron $1.000 por DaviPlata»</b>.<br><button type="button" class="btn-ghost gp-btn" data-gp="probar">▶️ Ver cómo se ve (simulado)</button>', ok(!!llego, llego ? 'Ya llegó un pago real de DaviPlata (' + plata(llego.monto) + ')' : 'Esperando el primer pago')) +
         '</ol>' +
         '<div class="settings-desc" style="margin-top:8px"><b>¿Y los demás celulares del negocio?</b> Con tu misma cuenta (Vento Nube) también ven el pago al instante. <b>¿No usas la app Vento en ese celular?</b> <button type="button" class="btn-ghost gp-btn" data-gp="macro">Usar MacroDroid</button><br><small>«Conectar DaviPlata» (API oficial) es otra cosa: sirve para <b>cobrar con código</b> y necesita convenio con Davivienda. Para que Vento te avise los pagos <b>no lo necesitas</b>.</small></div>' +

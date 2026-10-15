@@ -32,6 +32,7 @@ public class VentoEscucha extends NotificationListenerService {
     @Override
     public void onListenerConnected() {
         activa = this;
+        seguirViva();
         // Los pagos que llegaron mientras Vento no estaba escuchando (el celular la cerró, se reinició…) siguen en la barra
         // de notificaciones: se toman ahora (los que ya se habían visto no se repiten).
         try {
@@ -54,7 +55,15 @@ public class VentoEscucha extends NotificationListenerService {
 
     @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
-        try { if (leer(sbn, false)) avisarPagina(); } catch (Exception ignorado) { }
+        try { if (leer(sbn, false)) { seguirViva(); avisarPagina(); } } catch (Exception ignorado) { }
+    }
+
+    /** Que Vento siga viva: si el servicio de fondo se había cerrado (la quitaron de recientes, el celular la cerró),
+     *  se vuelve a prender. (Android lo permite si Vento no tiene ahorro de batería.) */
+    private void seguirViva() {
+        try {
+            if (!VentoServicio.activo && getSharedPreferences("vento", MODE_PRIVATE).getBoolean("fondo", true)) VentoServicio.arrancar(this);
+        } catch (Throwable ignorado) { }
     }
 
     private static void avisarPagina() {
@@ -134,6 +143,19 @@ public class VentoEscucha extends NotificationListenerService {
         String todo = titulo + " " + cuerpo;
         if (!AvisoPago.esRecibido(todo)) return false;
         long monto = AvisoPago.monto(todo);
+        // Sin valor en el aviso («¡Te llegó plata! Entra a Nequi»): igual suena, sin el valor.
+        if (monto <= 0 && AvisoPago.esPlataSinValor(todo)) {
+            String id0 = prefijo + (app + " | " + titulo + " | " + cuerpo).hashCode();
+            if (!marcarVisto(sp, id0)) return false;
+            if (!callado) {
+                VentoApp.decirPago(AvisoPago.fraseSinValor(app));
+                if (sp.getBoolean(PREF_NOTIF, true)) try {
+                    VentoApp.app.new Puente().notificar("💜 Llegó plata por " + AvisoPago.nombreApp(app), "Ábrela para ver el valor.", "pagos", false);
+                } catch (Throwable ignorado) { }
+            }
+            guardar(sp, id0, app + " | " + titulo + " | " + cuerpo, !callado, null, false, null);
+            return true;
+        }
         String txt = app + " | " + titulo + " | " + cuerpo;
         String id = prefijo + txt.hashCode();
         if (!marcarVisto(sp, id)) return false;

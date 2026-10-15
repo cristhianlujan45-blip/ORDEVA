@@ -15,6 +15,8 @@
 // 12. SMS del banco (los lee la app): del código corto → «⚠️ Revisar»; si el dueño eligió confirmarlos → confirmado; desde un
 //     celular → FALSO. El mismo pago por SMS y por la app → uno solo (confirmado). Interruptor «📩 Confirmar los SMS».
 // 13. «🔎 Este equipo: App Vento para Android» al final del paso a paso.
+// 14. Bre-B (de otros bancos por la llave) y Nequi con «¿…?» en el aviso: suenan. Solicitudes («te pidió») no.
+// 15. Paso 5 «Que suene siempre»: ahorro de batería, «🚀 Inicio automático» y los pasos de la marca (Xiaomi).
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 
@@ -34,6 +36,8 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
         pagosNotif: v => { A.notifPagos.push(!!v); },
         pagosVolumen: v => { A.vol = v; }, pagosProbarVoz: () => { A.probo = (A.probo || 0) + 1; },
         pagosSmsConfiar: v => { A.smsOk = !!v; }, pagosSmsConfiarActual: () => !!A.smsOk,
+        fabricante: () => 'Xiaomi|Redmi', abrirInicioAutomatico: () => { A.autoinicio = (A.autoinicio || 0) + 1; return true; },
+        permisos: () => JSON.stringify({ bateria: false, fondo: true }), ajustesBateria: () => { A.bateria = (A.bateria || 0) + 1; },
       };
     });
     const p = await ctx.newPage(); p.on('pageerror', e => errs.push(e.message));
@@ -159,6 +163,28 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     await p.evaluate(() => window.ventoPagosGuia()); await p.waitForTimeout(300);
     const g13 = await p.evaluate(() => document.getElementById('pgGuiaOv').innerText);
     chk('13. Paso a paso: «🔎 Este equipo: App Vento para Android» y el paso de los SMS', /Este equipo: App Vento para Android/.test(g13) && /te avisa por SMS/.test(g13), g13.slice(-400));
+    await p.evaluate(() => document.getElementById('pgGuiaOv').classList.remove('show'));
+
+    // 14. Bre-B y Nequi
+    const v14 = (await p.evaluate(() => (window.__and.decir || []).length));
+    await llega('b1', false, 'DaviPlata | DaviPlata | Llegaron $51.000 a tu llave @juan');
+    await llega('b2', false, 'Nequi | Nequi | ¡Te llegó plata! ANA RUIZ te envió $52.000. ¿La guardas en un bolsillo?');
+    await llega('b3', false, 'Nequi | ¡Te llegó plata por Bre-B! | MARIA LOPEZ te envió $53.000');
+    await llega('b4', false, 'Nequi | Nequi | JUAN PEREZ te pidió $54.000');
+    const l14 = await p.evaluate(() => [51000, 52000, 53000, 54000].map(m => (data.pagos.lista || []).filter(x => x.monto === m).length));
+    const vz14 = await p.evaluate(n => (window.__and.decir || []).slice(n), v14);   // en la app: la voz de pagos de Android
+    chk('14. Bre-B a la llave de DaviPlata: «Llegaron $51.000 a tu llave» → pago registrado', l14[0] === 1, l14);
+    chk('14. Nequi con «¿La guardas en un bolsillo?» en el aviso → SÍ es pago (antes se tomaba por publicidad)', l14[1] === 1, l14);
+    chk('14. Bre-B a Nequi → registrado', l14[2] === 1, l14);
+    chk('14. «JUAN te pidió $54.000» (solicitud) NO es pago', l14[3] === 0, l14);
+    chk('14. … y suenan: «Pago confirmado. 52000 pesos desde Nequi» y «… 51000 pesos desde DaviPlata»', vz14.some(t => /^Pago confirmado\. 52000 pesos desde Nequi/.test(t)) && vz14.some(t => /^Pago confirmado\. 51000 pesos desde DaviPlata/.test(t)), vz14);
+
+    // 15. Paso 5: que suene siempre
+    await p.evaluate(() => window.ventoPagosGuia()); await p.waitForTimeout(300);
+    const g15 = await p.evaluate(() => document.getElementById('pgGuiaOv').innerText);
+    chk('15. Paso 5 «Que suene siempre»: ahorro de batería + «🚀 Inicio automático» + pasos de Xiaomi + bloquear en recientes', /Que suene siempre/.test(g15) && /Quitar el ahorro de batería/.test(g15) && /Inicio automático/.test(g15) && /Xiaomi \/ Redmi \/ POCO/.test(g15) && /Bloquear/.test(g15), g15.slice(0, 100));
+    await p.click('[data-gp="autoinicio"]'); await p.click('[data-gp="bateria"]');
+    chk('15. Los botones abren «Inicio automático» y el ahorro de batería en Android', await p.evaluate(() => window.__and.autoinicio === 1 && window.__and.bateria === 1));
     await p.evaluate(() => document.getElementById('pgGuiaOv').classList.remove('show'));
 
     // 11. Navegador (sin la app): la voz sale con el volumen elegido (hasta 100 %)

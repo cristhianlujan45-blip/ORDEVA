@@ -58,6 +58,16 @@ async function pruebas(sb) {
   chk('6. Publicidad del banco («¿Te llegó la prima?…», «Te prestamos hasta $5.000.000») no es un pago',
     A.leerAviso('Nequi | Nequi | ¿Te llegó la prima? Guárdala en un colchón') === null && A.leerAviso('DaviPlata | DaviPlata | Te prestamos hasta $5.000.000, ¡le llegó la oportunidad!') === null);
   chk('6. «Recibiste COP 45.000 de ANA RUIZ» → 45000', (A.leerAviso('Bancolombia | Bancolombia | Recibiste COP 45.000 de ANA RUIZ') || {}).monto === 45000, A.leerAviso('Bancolombia | Bancolombia | Recibiste COP 45.000 de ANA RUIZ'));
+  // 7. Bre-B (de otros bancos por la llave) y Nequi con «¿…?»
+  const casos7 = [
+    ['DaviPlata | DaviPlata | Llegaron $50.000 a tu llave @juan', 50000, 'DAVIPLATA'],
+    ['Nequi | ¡Te llegó plata por Bre-B! | MARIA LOPEZ te envió $35.000', 35000, 'NEQUI'],
+    ['DaviPlata | DaviPlata | Recibió $80.000 a través de Bre-B de CARLOS RUIZ', 80000, 'DAVIPLATA'],
+    ['Nequi | Nequi | ¡Te llegó plata! ANA RUIZ te envió $20.000. ¿La guardas en un bolsillo?', 20000, 'NEQUI'],
+    ['Nequi | Nequi | PEDRO GOMEZ te mandó $9.000', 9000, 'NEQUI'],
+  ];
+  for (const [t, m, met] of casos7) { const a = A.leerAviso(t); chk('7. «' + t.split('|').slice(1).join('|').trim() + '» → ' + m, a && a.monto === m && a.metodo === met && a.confianza === 'app', a); }
+  chk('7. Solicitudes y rechazos no son pagos («te pidió», «solicitud», «rechazada»)', A.leerAviso('Nequi | Nequi | JUAN PEREZ te pidió $20.000') === null && A.leerAviso('Nequi | Nequi | Recibiste una solicitud de plata de $15.000') === null && A.leerAviso('Nequi | Nequi | Tu transferencia Bre-B de $10.000 fue rechazada') === null);
   chk('6. «Usted envió $5.000» (plata que SALE) no es un pago', A.leerAviso('DaviPlata | DaviPlata | Usted envió $5.000 a PEDRO') === null);
   l = await pagos(NEG);
   chk('Total: 4 pagos (2 de $200, $15.000 y $7.500)', l.length === 4, l);

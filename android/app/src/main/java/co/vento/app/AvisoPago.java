@@ -16,9 +16,19 @@ public final class AvisoPago {
 
     static final Pattern BANCO = Pattern.compile("daviplata|nequi|bancolombia|davivienda|movii|\\bdale\\b|bre-?b|banco|\\bnu\\b|lulo|rappipay|powwi|ual[aá]|bbva|scotiabank|av villas|colpatria|occidente|caja social", Pattern.CASE_INSENSITIVE);
     // DaviPlata escribe de «usted»: «Le llegó plata», «Le pasaron»; Nequi de «tú»: «Te llegó plata».
-    static final Pattern RECIBIDO = Pattern.compile("recibiste|has recibido|ha recibido|(te|le) lleg[oó]|(te|le) llegaron|(te|le) pas[oó]|(te|le) pasaron|pasaron plata|(te|le) envi[oó]|(te|le) enviaron|(te|le) transfiri|(te|le) pag[oó]|(te|le) pagaron|(te|le) consign|(te|le) abon|consignaron|abonaron|entr[oó] plata|lleg[oó] plata|ingres[oó]|recibi[oó]|recepci[oó]n|pago recibido|dinero recibido|transferencia recibida|abono a (tu|su) cuenta", Pattern.CASE_INSENSITIVE);
+    // También las transferencias de OTROS bancos por la llave Bre-B («Llegaron $50.000 a tu llave», «Recibiste $X por Bre-B»,
+    // «Te mandaron», «Te giraron», «Se acreditó en tu cuenta»).
+    static final Pattern RECIBIDO = Pattern.compile("recibiste|has recibido|ha recibido|(te|le) lleg[oó]|(te|le) llegaron|(te|le) pas[oó]|(te|le) pasaron|pasaron plata|(te|le) envi[oó]|(te|le) enviaron|(te|le) transfiri|(te|le) pag[oó]|(te|le) pagaron|(te|le) consign|(te|le) abon|consignaron|abonaron|entr[oó] (plata|dinero)|lleg[oó] (plata|dinero)|ingres[oó]|recibi[oó]|recepci[oó]n|pago recibido|dinero recibido|transferencia recibida|abono a (tu|su) cuenta"
+            + "|(te|le) mand(o|ó|aron)|(te|le) gir(o|ó|aron)|(te|le) deposit|dep[oó]sito recibido|(te|le|se) acredit|acredit\\w*\\s+(a|en)\\s+(tu|su)\\s+(cuenta|llave|nequi|daviplata)"
+            + "|lleg(o|ó|aron)\\s+(\\$|cop|plata|dinero)|a (tu|su) llave|(recib|lleg|entr|ingres)[^.]{0,40}bre-?b|bre-?b[^.]{0,40}(recib|lleg|entr|ingres)", Pattern.CASE_INSENSITIVE);
     static final Pattern PRIVADO = Pattern.compile("c[oó]digo|clave|otp|contrase|token|enviaste|pagaste|transferiste|retiraste|compraste|sacaste|usted (envi|pag|transfiri|pas)", Pattern.CASE_INSENSITIVE);
     static final Pattern SEGURO = Pattern.compile("recibiste|recibi[oó]|ha recibido|(te|le) lleg", Pattern.CASE_INSENSITIVE);
+    // Nunca es plata que llegó, diga lo que diga: solicitudes y cobros («JUAN te pidió $20.000», «Recibiste una solicitud»),
+    // pagos rechazados, fallidos, reversados o programados.
+    static final Pattern NUNCA = Pattern.compile("solicitud|(te|le) pide|(te|le) pidi[oó]|(te|le) cobr|cobro pendiente|rechazad|fall[oó]|no se pudo|reversad|programad", Pattern.CASE_INSENSITIVE);
+    // Frases que solo trae un pago de verdad: con ellas un «¿…?» o un «bolsillo» en el mismo aviso no lo vuelven publicidad
+    // (antes un «¿La guardas en un bolsillo?» en el aviso de Nequi hacía que el pago no sonara).
+    static final Pattern FUERTE = Pattern.compile("(te|le) (envi[oó]|enviaron|pas[oó]|pasaron|transfiri[oó]|transfirieron|consign[oó]|consignaron|mand[oó]|mandaron|gir[oó]|giraron|pag[oó]|pagaron)\\b|(recibiste|recibi[oó]|ha recibido|has recibido)\\s+(\\$|cop|\\d|una transferencia|un pago|dinero|plata)|transferencia recibida|pago recibido|a (tu|su) llave|(te|le) lleg[oó]\\s+(\\$|cop|\\d|plata|dinero)", Pattern.CASE_INSENSITIVE);
     // Publicidad del banco que se parece a un pago («¿Te llegó la prima? Guárdala en un colchón», «Te prestamos hasta
     // $5.000.000»): NO es plata que llegó. Los avisos de pago de verdad no preguntan ni ofrecen nada.
     static final Pattern PROMO = Pattern.compile("¿|pr[eé]stamo|te prestamos|le prestamos|cr[eé]dito (de libre|pre|para|f[aá]cil|aprobado|express|r[aá]pido)|tarjeta de cr[eé]dito|colch[oó]n|oferta|promo|descuento|cashback|sorteo|particip|\\bgan(a|e|ar)\\b|aprovecha|beneficio|invit|hasta \\$|\\bcupo\\b|activa tu|desc[aá]rga", Pattern.CASE_INSENSITIVE);
@@ -28,8 +38,15 @@ public final class AvisoPago {
     static boolean esBanco(String app) { return app != null && BANCO.matcher(app).find(); }
 
     static boolean esRecibido(String todo) {
-        if (todo == null || !RECIBIDO.matcher(todo).find() || PROMO.matcher(todo).find()) return false;
+        if (todo == null || !RECIBIDO.matcher(todo).find() || NUNCA.matcher(todo).find()) return false;
+        if (PROMO.matcher(todo).find() && !FUERTE.matcher(todo).find()) return false;
         return !PRIVADO.matcher(todo).find() || SEGURO.matcher(todo).find();
+    }
+
+    /** Aviso de plata que llegó pero SIN el valor («¡Te llegó plata! Entra a Nequi para verla»): igual se avisa. */
+    static boolean esPlataSinValor(String todo) {
+        return todo != null && monto(todo) <= 0 && esRecibido(todo)
+                && Pattern.compile("(te|le) lleg[oó] (plata|dinero)|lleg[oó] (plata|dinero)|(te|le) (enviaron|pasaron|mandaron|transfirieron|consignaron) (plata|dinero)|recibiste (plata|dinero|una transferencia)|recibi[oó] (plata|dinero|una transferencia)|transferencia recibida|a (tu|su) llave", Pattern.CASE_INSENSITIVE).matcher(todo).find();
     }
 
     /** El valor del aviso en pesos (0 si no se entiende). «$20.000,00» → 20000; «$200,00» → 200. */
@@ -130,6 +147,11 @@ public final class AvisoPago {
         if (txt == null) return "";
         Matcher m = BANCO.matcher(txt);
         return m.find() ? m.group() : "";
+    }
+
+    /** «Llegó plata por Nequi. Mira el valor en la aplicación.» (el aviso no traía el valor) */
+    static String fraseSinValor(String app) {
+        return "Llegó plata por " + nombreApp(app) + ". Mira el valor en la aplicación.";
     }
 
     /** «Pago confirmado. 200 pesos desde DaviPlata.» */

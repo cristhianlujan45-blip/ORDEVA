@@ -41,6 +41,29 @@ public class AvisoPagoPrueba {
         chk("Volumen 100 % y 150 % → nivel máximo", AvisoPago.nivel(100, 7) == 7 && AvisoPago.nivel(150, 7) == 7, AvisoPago.nivel(150, 7));
         chk("Volumen 10 % → al menos nivel 1 (nunca mudo)", AvisoPago.nivel(10, 7) == 1, AvisoPago.nivel(10, 7));
         chk("Refuerzo: 100 % = nada; 150 % = +12 dB (más fuerte de lo normal)", AvisoPago.refuerzo(100) == 0 && AvisoPago.refuerzo(150) == 1200 && AvisoPago.refuerzo(120) == 480, AvisoPago.refuerzo(150));
+        // Bre-B (de otros bancos a DaviPlata o Nequi por la llave) y Nequi
+        String[][] breb = {
+            {"Llegaron $50.000 a tu llave @juan123", "50000"},
+            {"¡Te llegó plata por Bre-B! MARIA LOPEZ te envió $35.000", "35000"},
+            {"DaviPlata Recibió $80.000 a través de Bre-B de CARLOS RUIZ", "80000"},
+            {"Transferencia Bre-B recibida por $120.000 desde Bancolombia", "120000"},
+            {"Le llegaron $15.000 a su llave 3001234567", "15000"},
+            {"PEDRO GOMEZ te mandó $9.000", "9000"},
+            {"Se acreditaron $45.000 en tu cuenta Nequi", "45000"},
+            {"¡Te llegó plata! ANA RUIZ te envió $20.000. ¿La guardas en un bolsillo?", "20000"},
+            {"Nequi: Recibiste $7.500 de LUIS. ¿Quieres ver tus movimientos?", "7500"},
+            {"Ingresó dinero: $60.000 a tu llave Bre-B", "60000"},
+        };
+        for (String[] r : breb) {
+            chk("Bre-B / Nequi: «" + r[0] + "»", AvisoPago.esRecibido(r[0]), r[0]);
+            chk("  … valor " + r[1], AvisoPago.monto(r[0]) == Long.parseLong(r[1]), AvisoPago.monto(r[0]));
+        }
+        String[] pedidos = { "JUAN PEREZ te pidió $20.000", "Recibiste una solicitud de plata de $15.000 de ANA", "Tu transferencia Bre-B de $10.000 fue rechazada",
+                "La transferencia de $30.000 no se pudo completar", "Enviaste $50.000 a la llave @maria por Bre-B" };
+        for (String n : pedidos) chk("No es plata que llegó: «" + n + "»", !AvisoPago.esRecibido(n), n);
+        chk("Sin valor: «¡Te llegó plata! Entra a Nequi para verla» → igual avisa", AvisoPago.esPlataSinValor("Nequi ¡Te llegó plata! Entra a Nequi para verla"), "");
+        chk("Sin valor: frase «Llegó plata por Nequi. Mira el valor en la aplicación.»", AvisoPago.fraseSinValor("Nequi").equals("Llegó plata por Nequi. Mira el valor en la aplicación."), AvisoPago.fraseSinValor("Nequi"));
+        chk("Sin valor NO toma «Recibiste un mensaje nuevo»", !AvisoPago.esPlataSinValor("Nequi Recibiste un mensaje nuevo"), "");
         // SMS del banco
         chk("App de SMS: Mensajes de Google", AvisoPago.esAppSms("com.google.android.apps.messaging", null), "");
         chk("App de SMS: la de SMS por defecto del celular", AvisoPago.esAppSms("com.xiaomi.otra", "com.xiaomi.otra"), "");
