@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
+<script src="lib/vento-errores.js"></script><!-- errores de este equipo → Vento Admin (🐞 Errores) -->
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
 <script>
 /* Pantalla siempre al ancho del celular: si Chrome abre la página como «sitio para computadoras»
@@ -1211,7 +1212,9 @@ setInterval(()=>{
   const l=jget(MISK,[]);let cambio=false;
   l.forEach(x=>{if(x.e!=='enviado'||!x.body)return;const s=Date.now()-x.at;
     if(s>45000&&!x.re){x.re=1;cambio=true;canalPost(x.body).then(ok=>{if(!ok)outboxAgregar(x.body);});}
-    if(s>180000&&!x.av){x.av=1;cambio=true;setMsg(()=>t('pedSinConfirmar'),'err');}});
+    if(s>180000&&!x.av){x.av=1;cambio=true;setMsg(()=>t('pedSinConfirmar'),'err');
+      // → Vento Admin: el local no confirmó un pedido del QR en 3 min (¿la app del local está cerrada o sin internet?).
+      try{window.ventoError&&window.ventoError('pedido','El local no confirmó un pedido del QR en 3 minutos',{mesa:String(mesa||'').slice(0,10),reenviado:!!x.re},'pedido|sin-confirmar');}catch(e){}}});
   if(cambio)jset(MISK,l);
 },10000);
 setTimeout(()=>{pintarEstados();escucharEstados()},800);
@@ -1296,6 +1299,7 @@ $('b').onclick=async()=>{
     }catch(e){}
     $('b').disabled=false;
     // Sin conexión: el pedido NO se pierde ni se manda a otra app; queda guardado y se reintenta solo.
+    try{if(navigator.onLine!==false)window.ventoError&&window.ventoError('pedido','No se pudo enviar '+(modo=='c'?'una canción':'un pedido')+' por el QR (con internet)',{mesa:String(mesa||'').slice(0,10),modo},'pedido|no-sale|'+modo);}catch(e){}
     if(modo=='p'||modo=='c'){
       outboxAgregar(cuerpo);
       if(modo=='p'){guardarRonda(env);aprender(env);lineas=[];pintarLineas();pintarRonda();pintarChips()}

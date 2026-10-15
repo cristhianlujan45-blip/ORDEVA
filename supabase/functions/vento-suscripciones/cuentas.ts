@@ -117,6 +117,13 @@ export async function accionAdmin(env: Env, db: Db, adminId: string, accion: str
       return { ok: true, licencia: await db.rpc("srv_lic_crear", { p: b.licencia && typeof b.licencia === "object" ? b.licencia : {}, p_admin: adminId }) };
     case "licencia_correos":
       return { ok: true, licencia: await db.rpc("srv_lic_correos", { p_id: uuid(b.licencia, "licencia"), p_agregar: b.agregar || [], p_quitar: b.quitar || [], p_admin: adminId }) };
+    case "errores":
+      return { ok: true, errores: await db.rpc("srv_admin_errores", { p_estado: b.estado ? String(b.estado) : "abiertos", p_limite: Number(b.limite) || 200 }) };
+    case "errores_abiertos":
+      return { ok: true, abiertos: await db.rpc("srv_admin_errores_abiertos") };
+    case "error_resolver":
+      if (!b.huella) throw new ErrorVento("falta_huella", "Falta el error.", 400);
+      return { ok: true, r: await db.rpc("srv_admin_error_resolver", { p_huella: String(b.huella).slice(0, 200), p_resuelto: b.resuelto !== false }) };
     case "licencia_revocar":
       return { ok: true, licencia: await db.rpc("srv_lic_revocar", { p_id: uuid(b.licencia, "licencia"), p_quitar_acceso: !!b.quitar_acceso, p_admin: adminId }) };
   }

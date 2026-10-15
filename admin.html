@@ -249,6 +249,7 @@
     <button type="button" data-t="resumen" class="on">📊 Resumen</button>
     <button type="button" data-t="usuarios">👥 Usuarios</button>
     <button type="button" data-t="soporte">🎧 Soporte<span class="nb" id="spBadge" hidden></span></button>
+    <button type="button" data-t="errores">🐞 Errores<span class="nb" id="erBadge" hidden></span></button>
     <button type="button" data-t="licencias">🔑 Licencias</button>
     <button type="button" data-t="subs">💳 Suscripciones<span class="nb" id="sxBadge" hidden></span></button>
     <button type="button" data-t="equipo">🧑‍💻 Equipo</button>
@@ -321,6 +322,27 @@
       <button class="b" id="spRef" type="button" title="Actualizar">🔄</button>
     </div>
     <div class="list" id="spLista"><div class="empty">Cargando…</div></div>
+  </section>
+
+  <!-- ===================== ERRORES (lo que falla en los equipos de los clientes) ===================== -->
+  <section data-tab="errores">
+    <p class="soft" style="margin-top:0">Lo que falla en los equipos de tus clientes llega aquí solo: errores de la app, música que no suena, pedidos por QR que el local no confirma y avisos de pago que Vento no entendió. El mismo error se agrupa (cuántas veces, en cuántos equipos y negocios). Solo llega el error: nunca ventas, productos ni datos de sus clientes.</p>
+    <div class="bar">
+      <select id="erEstado" aria-label="Errores">
+        <option value="abiertos">🔴 Sin resolver</option>
+        <option value="todos">Todos (también los resueltos)</option>
+      </select>
+      <select id="erTipo" aria-label="Tipo">
+        <option value="">Todos los tipos</option>
+        <option value="musica">🎵 Música</option>
+        <option value="pedido">🍺 Pedidos por QR</option>
+        <option value="pago">💜 Pagos</option>
+        <option value="js">🐞 Errores de la app</option>
+      </select>
+      <input id="erBuscar" type="search" placeholder="🔎 Negocio, mensaje o versión">
+      <button class="b" id="erRef" type="button" title="Actualizar">🔄</button>
+    </div>
+    <div class="list" id="erLista"><div class="empty">Cargando…</div></div>
   </section>
 
   <!-- ===================== SUSCRIPCIONES (Vento Nube) ===================== -->
@@ -815,6 +837,16 @@
   </div>
 </dialog>
 <!-- ===================== SOPORTE: caso ===================== -->
+<dialog id="dlgEr" class="ancho">
+  <div class="dh"><h2 id="erTit">Error</h2><button class="x" type="button" data-cerrar>✕</button></div>
+  <div class="db">
+    <div id="erInfo"></div>
+    <div class="row">
+      <button class="b p" id="erResolver" type="button">✅ Ya lo arreglé</button>
+      <button class="b" id="erReabrir" type="button" hidden>↩️ Volver a abrir</button>
+    </div>
+  </div>
+</dialog>
 <dialog id="dlgSp" class="ancho">
   <div class="dh"><h2 id="spTit">Caso</h2><button class="x" type="button" data-cerrar>✕</button></div>
   <div class="db">
@@ -1778,6 +1810,7 @@
     if(b.dataset.t === 'resumen') rsCargar();
     if(b.dataset.t === 'usuarios') usCargar();
     if(b.dataset.t === 'soporte') spCargar();
+    if(b.dataset.t === 'errores') erCargar();
     if(b.dataset.t === 'licencias') lsCargar();
   });
   async function intentar(fn, caja){
@@ -1799,7 +1832,7 @@
       ['acc', R.equipos_30d, 'Equipos usando Vento (30 días)', 'usuarios'], ['soft', R.equipos_locales, 'Equipos sin cuenta en la nube', 'usuarios']];
     $('rsKpis').innerHTML = K.map(k => '<div class="kpi ' + k[0] + '" data-ir-tab="' + k[3] + '" tabindex="0"><b>' + esc(k[1] == null ? '—' : k[1]) + '</b><span>' + esc(k[2]) + '</span></div>').join('');
     $('rsRecientes').innerHTML = (R.recientes || []).length ? R.recientes.map(u => '<div class="item" data-us="' + esc(u.id) + '"><div class="av">' + inicial(u.email) + '</div><div class="t"><b>' + esc(u.email) + '</b><small>' + esc((u.negocio || 'sin negocio todavía') + ' · ' + hace(u.creado_en)) + '</small></div></div>').join('') : '<div class="empty">Todavía no hay cuentas registradas.</div>';
-    spBadge(R.soporte_abiertos);
+    spBadge(R.soporte_abiertos); erContar();
     const c = await intentar(() => sxApi('soporte', { estado: 'abierto' }), $('rsSoporte'));
     if(c) $('rsSoporte').innerHTML = (c.casos || []).length ? c.casos.slice(0, 6).map(spItem).join('') : '<div class="empty">🎉 Nada por responder.</div>';
   }
@@ -1922,6 +1955,50 @@
       esc([c.email || c.cuenta_email || '', c.telefono || '', c.negocio_nombre || '', hace(c.actualizado_en)].filter(Boolean).join(' · ')) + '<br>' + esc((ult.autor === 'admin' ? 'Tú: ' : '') + String(ult.texto || '').slice(0, 120)) + '</small></div>' +
       (c.sin_leer ? '<span class="pill bad">' + c.sin_leer + ' nuevo' + (c.sin_leer === 1 ? '' : 's') + '</span>' : '') + '<span class="pill ' + est[1] + '">' + esc(est[0]) + '</span></div>';
   }
+  // ---------- 🐞 Errores ----------
+  const ER_TIPO = { js: '🐞 Error de la app', promesa: '🐞 Error de la app', musica: '🎵 Música', pedido: '🍺 Pedido por QR', pago: '💜 Pago', red: '📶 Conexión', otro: '❔ Otro' };
+  function erBadge(n){ $('erBadge').textContent = n ? String(n) : ''; $('erBadge').hidden = !n; }
+  async function erCargar(){
+    const j = await intentar(() => sxApi('errores', { estado: $('erEstado').value }), $('erLista')); if(!j) return;
+    ad.errores = j.errores || []; erPintar();
+    if($('erEstado').value === 'abiertos') erBadge(ad.errores.length);
+  }
+  function erItem(e){
+    const t = ER_TIPO[e.tipo] || e.tipo;
+    return '<div class="item" data-error="' + esc(e.huella) + '"><div class="av">' + esc(t.split(' ')[0]) + '</div><div class="t"><b>' + esc(e.mensaje) + '</b><small>' +
+      esc([t.replace(/^\S+\s/, ''), e.veces + ' ' + (e.veces === 1 ? 'vez' : 'veces'), e.equipos + ' equipo' + (e.equipos === 1 ? '' : 's'), e.negocios + ' negocio' + (e.negocios === 1 ? '' : 's'),
+        (e.casos && e.casos[0] && e.casos[0].negocio) || '', e.version ? 'v' + e.version : '', hace(e.ultimo)].filter(Boolean).join(' · ')) + '</small></div>' +
+      (e.resuelto ? '<span class="pill ok">✅ Resuelto</span>' : '<span class="pill ' + (e.equipos > 1 || e.veces >= 10 ? 'bad' : 'warn') + '">' + (e.equipos > 1 ? 'Varios equipos' : 'Abierto') + '</span>') + '</div>';
+  }
+  function erPintar(){
+    const q = $('erBuscar').value.trim().toLowerCase(), tp = $('erTipo').value;
+    const l = (ad.errores || []).filter(e => (!tp || e.tipo === tp || (tp === 'js' && e.tipo === 'promesa')) && (!q || JSON.stringify([e.mensaje, e.version, e.pagina, (e.casos || []).map(c => [c.negocio, c.usuario, c.version])]).toLowerCase().includes(q)));
+    $('erLista').innerHTML = l.length ? l.map(erItem).join('') : '<div class="empty">' + ((ad.errores || []).length ? 'Nada coincide.' : '🎉 No hay errores sin resolver. Todo está funcionando.') + '</div>';
+  }
+  $('erEstado').onchange = erCargar; $('erTipo').onchange = erPintar; $('erBuscar').oninput = erPintar; $('erRef').onclick = erCargar;
+  document.addEventListener('click', e => { const it = e.target.closest('[data-error]'); if(it && !e.target.closest('button,a')) erAbrir(it.dataset.error); });
+  function erAbrir(h){
+    const e = (ad.errores || []).find(x => x.huella === h); if(!e) return;
+    ad.error = e;
+    $('erTit').textContent = (ER_TIPO[e.tipo] || e.tipo) + ' · ' + e.veces + ' ' + (e.veces === 1 ? 'vez' : 'veces');
+    const casos = e.casos || [];
+    $('erInfo').innerHTML = '<p><b>' + esc(e.mensaje) + '</b></p><dl class="kv">' + kv('Primera vez', fCoHora(e.primero)) + kv('Última vez', fCoHora(e.ultimo)) + kv('Equipos', e.equipos) + kv('Negocios', e.negocios) +
+      kv('Página', e.pagina || '—') + kv('Versión', e.version ? 'v' + e.version : '—') + '</dl>' +
+      '<h3 style="margin:14px 0 6px">Dónde pasó</h3><div class="list">' + (casos.length ? casos.map(c => '<div class="item"><div class="av">' + (c.plataforma === 'apk' ? '📲' : /android|iphone/.test(c.plataforma || '') ? '📱' : '💻') + '</div><div class="t"><b>' +
+        esc(c.negocio || 'Sin nombre de negocio') + '</b><small>' + esc([c.usuario || '', c.plataforma || '', c.version ? 'v' + c.version : '', c.veces + (c.veces === 1 ? ' vez' : ' veces'), hace(c.ultimo)].filter(Boolean).join(' · ')) +
+        (c.detalle ? '<br><code style="white-space:pre-wrap;word-break:break-word;font-size:12px">' + esc(JSON.stringify(c.detalle, null, 1).slice(0, 1200)) + '</code>' : '') + '</small></div>' + (c.resuelto ? '<span class="pill ok">✅</span>' : '') + '</div>').join('') : '<div class="empty">Sin detalle.</div>') + '</div>';
+    $('erResolver').hidden = !!e.resuelto; $('erReabrir').hidden = !e.resuelto;
+    if(!$('dlgEr').open) $('dlgEr').showModal();
+  }
+  async function erMarcar(resuelto){
+    const e = ad.error; if(!e) return;
+    const j = await intentar(() => sxApi('error_resolver', { huella: e.huella, resuelto })); if(!j) return;
+    toast(resuelto ? '✅ Marcado como arreglado. Si vuelve a pasar, aparece otra vez aquí.' : '↩️ Abierto otra vez.');
+    $('dlgEr').close(); erCargar();
+  }
+  $('erResolver').onclick = () => erMarcar(true); $('erReabrir').onclick = () => erMarcar(false);
+  async function erContar(){ const j = await intentar(() => sxApi('errores_abiertos')); if(j) erBadge(j.abiertos || 0); }
+
   async function spCargar(){
     const j = await intentar(() => sxApi('soporte', { estado: $('spEstado').value }), $('spLista')); if(!j) return;
     ad.casos = j.casos || []; spPintar();
@@ -1992,7 +2069,7 @@
     }
   });
   // Casos nuevos: revisa cada minuto (con el panel a la vista)
-  setInterval(() => { if($('lock').hidden && document.visibilityState === 'visible' && !document.querySelector('dialog[open]')) intentar(() => sxApi('resumen')).then(j => { if(j){ ad.resumen = j.resumen; spBadge(j.resumen.soporte_abiertos); } }); }, 60000);
+  setInterval(() => { if($('lock').hidden && document.visibilityState === 'visible' && !document.querySelector('dialog[open]')) intentar(() => sxApi('resumen')).then(j => { if(j){ ad.resumen = j.resumen; spBadge(j.resumen.soporte_abiertos); erContar(); } }); }, 60000);
 
   // ---------- Licencias ----------
   function lsPlanes(){ const pl = sx.planes.filter(p => p.id !== 'free' && p.active !== false); if(pl.length) $('lsPlan').innerHTML = pl.map(p => '<option value="' + esc(p.id) + '">' + esc(p.name || p.id) + '</option>').join(''); }
@@ -2078,7 +2155,7 @@
     sx.yo = j; $('sxQuien').textContent = j.email || '';
     $('lock').hidden = true;
     const t = document.querySelector('#tabs button.on'); const tab = t ? t.dataset.t : 'resumen';
-    if(tab === 'resumen') rsCargar(); else if(tab === 'usuarios') usCargar(); else if(tab === 'soporte') spCargar(); else if(tab === 'licencias') lsCargar();
+    if(tab === 'resumen') rsCargar(); else if(tab === 'usuarios') usCargar(); else if(tab === 'soporte') spCargar(); else if(tab === 'errores') erCargar(); else if(tab === 'licencias') lsCargar();
     if(tab !== 'resumen') rsCargar();
     return true;
   }

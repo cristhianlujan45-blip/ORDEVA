@@ -3,6 +3,7 @@
 <head>
 <link rel="preconnect" href="https://generativelanguage.googleapis.com">
 <meta charset="UTF-8">
+<script src="lib/vento-errores.js"></script><!-- errores de este equipo → Vento Admin (🐞 Errores) -->
 <script>
 // Un QR de mesa o link de domicilio que cae en la app del negocio abre la carta del cliente.
 (function(){var q=location.search;if(/[?&]c=\w/.test(q)&&/[?&](mesa=\d|dom=1)/.test(q))location.replace(location.pathname.replace(/[^/]*$/,'')+'pedido.html'+q+location.hash);})();
@@ -21816,7 +21817,7 @@ async function ytUno(id){
     if(!it.vid&&!it.novid){
       const v=await ySearch(it.song,it.probados);
       l=cola();it=l.find(x=>x.id===id);if(!it||v===undefined)return;
-      if(v){it.vid=v;it.ok=false;if(ytDurCache[v])it.dur=ytDurCache[v];}else{it.novid=true;it.yt='no';it.status='error';it.done=true;it.endedAt=Date.now();try{mzAlHistorial(it);}catch(e){}showToast('⚠️ No encontré una versión de «'+it.song+'» que se pueda reproducir aquí.');}
+      if(v){it.vid=v;it.ok=false;if(ytDurCache[v])it.dur=ytDurCache[v];}else{it.novid=true;it.yt='no';it.status='error';it.done=true;it.endedAt=Date.now();try{mzAlHistorial(it);}catch(e){}showToast('⚠️ No encontré una versión de «'+it.song+'» que se pueda reproducir aquí.');try{window.ventoError&&window.ventoError('musica','No se encontró ninguna versión que se pueda reproducir',{cancion:String(it.song).slice(0,80),fuente:yFuente||''},'musica|sin-version');}catch(e){}}
       SS('vito_cola',l);
       tvPublicar();
       if(v)setTimeout(()=>{try{verificarCola();}catch(e){}},50);   // se comprueba y, si no hay música, suena ya
@@ -22146,6 +22147,7 @@ async function reemplazarBloqueada(){
         }
       }
       showToast('⏭️ «'+now.song+'» no se deja reproducir fuera de YouTube; paso a la siguiente.');
+      try{window.ventoError&&window.ventoError('musica','Canción bloqueada: ninguna versión se dejó reproducir',{cancion:String(now.song).slice(0,80),probados:probados.length},'musica|bloqueada');}catch(e){}
     }
     try{const a=mzActual();if(a&&a.fuente==='app')mzTermino(a.id,'error');}catch(e){}
     ytMostrar(false);
@@ -22222,6 +22224,28 @@ function mzAsegurarReproductor(callado){
   try{mzAutoPintar();}catch(e){}
   return prendi?'prendido':true;
 }
+/* Vigía de la música → Vento Admin (🐞 Errores): avisa cuando hay canciones esperando y no suena nada, para arreglarlo
+   antes de que el negocio tenga que contarlo. Una vez por problema (el reporte se agrupa solo). */
+const mzVigia={};
+function mzVigilar(){
+  try{
+    if(typeof data==='undefined'||!data||data.musicOn===false)return;
+    const o=ordenJusto(cola()),esperan=o.filter(y=>!y.fondo&&y.vid),viejo=esperan.length?Date.now()-Math.min(...esperan.map(y=>y.ts||Date.now())):0;
+    const marca=(k,si,ms,fn)=>{if(!si){delete mzVigia[k];return;}if(!mzVigia[k])mzVigia[k]=Date.now();else if(Date.now()-mzVigia[k]>ms&&!mzVigia[k+'!']){mzVigia[k+'!']=1;fn();}};
+    // 1) Piden canciones y en este equipo nadie las pone (ni el reproductor de Vento, ni el TV, ni YouTube Music).
+    marca('sinrep',typeof mqOtro==='function'?!mqOtro()&&mzSinReproductor()&&viejo>0:mzSinReproductor()&&viejo>0,3*6e4,()=>window.ventoError&&window.ventoError('musica','Canciones esperando y ningún reproductor prendido',{esperando:esperan.length,minutos:Math.round(viejo/6e4)},'musica|sin-reproductor'));
+    // 2) El reproductor está prendido, hay canciones listas y no suena nada.
+    const a=mzActual(),listas=o.filter(y=>y.vid&&(y.ok||!yTestListo));
+    const quieto=AUTO()&&!mzHayTV()&&listas.length>0&&!a&&!sonando;
+    marca('quieto',quieto,9e4,()=>{let st=-2;try{st=yPl&&yPl.getPlayerState?yPl.getPlayerState():-2;}catch(e){}
+      window.ventoError&&window.ventoError('musica','Hay canciones listas pero el reproductor no arranca',{listas:listas.length,yListo:!!yListo,probador:!!yTestListo,toque:!!gestoUsuario,estado:st,visible:!document.hidden},'musica|no-arranca');});
+    // 3) Sonando «de mentiras»: dice que suena pero el video lleva 2 min quieto (sin pausa a mano).
+    let st=-2;try{st=yPl&&yPl.getPlayerState?yPl.getPlayerState():-2;}catch(e){}
+    marca('pegada',AUTO()&&sonando&&!pausaManual&&st!==1&&st!==3,12e4,()=>window.ventoError&&window.ventoError('musica','El reproductor quedó pegado (no avanza)',{estado:st,cancion:String(a&&(a.title||a.song)||'').slice(0,80)},'musica|pegada'));
+  }catch(e){}
+}
+setInterval(mzVigilar,15000);
+window.vitoMusicaVigilar=mzVigilar;window.__mzVigia=mzVigia;   // para las pruebas (adelantar el reloj del vigía)
 function siguienteAuto(){
   if(!AUTO()||!yListo||sonando)return;
   if(!gestoUsuario)return;                            // sin el primer toque el navegador no deja sonar: se espera
@@ -28059,7 +28083,13 @@ let fotosListas = false;
     const g = PG();
     if(id){ if(g.vistos.includes(id)) return; g.vistos.push(id); g.vistos = g.vistos.slice(-300); }
     const p = pgLeer(txt);
-    if(!p) return;
+    if(!p){
+      // Un aviso de PLATA RECIBIDA del banco (ya filtrado por la app Android) que Vento no supo leer: se reporta (sin
+      // nombres ni valores) para enseñarle a Vento ese formato, como pasó con los avisos de DaviPlata.
+      if(String(id || '').startsWith('and-')) try{ const pz = String(txt).split('|').map(x => x.trim());
+        window.ventoError && window.ventoError('pago', 'Aviso de pago que Vento no entendió (' + (pz[0] || 'app') + ')', { app: (pz[0] || '').slice(0, 40), texto: pz.slice(1).join(' | ').replace(/\b[A-ZÁÉÍÓÚÑ]{2,}(?:\s+[A-ZÁÉÍÓÚÑ]{2,})*\b/g, 'NOMBRE').replace(/\d[\d.,]*/g, '#').slice(0, 200) }, 'pago|no-entendido|' + (pz[0] || '').toLowerCase().slice(0, 30)); }catch(e){}
+      return;
+    }
     // Una sola vez: el MISMO aviso que llega por dos caminos (la app Vento de este celular y MacroDroid) no se cuenta dos veces.
     // Por el mismo camino cada aviso ya trae su propio ID (dos clientes que pagan lo mismo sí son dos pagos).
     const via = String(id || '').startsWith('and-') ? 'and' : 'canal', mismo = String(txt).slice(0, 200).replace(/^\s*[^|]*\|/, '');
