@@ -20,6 +20,7 @@ public class PagoActivity extends Activity {
     private final Handler h = new Handler(Looper.getMainLooper());
     private final Runnable cerrar = this::finish;
     static volatile long abierta = 0;      // cuándo se mostró la última (para el registro: ¿sí se abrió?)
+    static volatile long vista = 0;        // cuándo quedó A LA VISTA (onResume): así se sabe si de verdad se vio
 
     @Override
     protected void onCreate(Bundle b) {
@@ -30,6 +31,9 @@ public class PagoActivity extends Activity {
         getWindow().setBackgroundDrawable(new ColorDrawable(0xFF14101F));   // opaca: tapa la pantalla de bloqueo
         pintar(getIntent());
     }
+
+    @Override
+    protected void onResume() { super.onResume(); vista = System.currentTimeMillis(); }
 
     @Override
     protected void onNewIntent(Intent i) { super.onNewIntent(i); setIntent(i); pintar(i); }

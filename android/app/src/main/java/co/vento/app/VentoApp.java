@@ -181,22 +181,45 @@ public class VentoApp extends Application {
         PlanVentana plan = ventana ? PlanVentana.de(Build.VERSION.SDK_INT, bloqueado, alFrente, VentanaPago.puedeEncima(app), VentanaPago.puedePantallaCompleta(app),
                 VentanaPago.esXiaomi(), VentanaPago.xiaomiPermiso(app, 10021), VentanaPago.xiaomiPermiso(app, 10020)) : new PlanVentana();
         Intent vi = VentanaPago.intent(app, valor, banco, frase, o, tipo);
+        final long desde = System.currentTimeMillis();
+        // Primero se prende la pantalla y DESPUÉS se abre la ventana: con la pantalla apagada varios celulares no dejan
+        // abrir una pantalla (antes se prendía al final).
+        prenderPantalla();
         try { app.new Puente().publicar(titulo, txt, "pagos", true, plan.pantallaCompleta ? vi : null); } catch (Exception ignorado) { }
         if (plan.encima) VentanaPago.mostrarEncima(app, valor, banco, frase, o, tipo);
         if (plan.directo) { if (plan.ancla) VentanaPago.ancla(app); VentanaPago.abrirPantalla(app, vi); }
-        prenderPantalla();
-        // 🪟 Registro (Ajustes → Pagos y 🐞 Errores del panel): ¿la ventana SÍ se abrió en este celular? Si no, por qué.
+        // 🪟 ¿Se VIO la ventana? Si no, se vuelve a intentar a los 1,5 s y a los 4 s. DaviPlata avisa dos veces (la app y el
+        // SMS del 85888, segundos después) y su segundo aviso la abría aunque el primero fallara mientras el celular se
+        // despertaba. Nequi avisa UNA sola vez: si ese intento fallaba, no salía nunca. Ahora todos tienen sus intentos.
         if (ventana && (plan.pantallaCompleta || plan.directo || plan.encima)) {
-            final long desde = System.currentTimeMillis(); final PlanVentana pl = plan; final boolean bl = bloqueado; final String t0 = titulo;
-            ui.postDelayed(() -> {
-                try {
-                    boolean abrio = PagoActivity.abierta >= desde || (pl.encima && VentanaPago.mostrandoEncima());
-                    String r = abrio ? "🪟 ventana abierta" : "🪟 la ventana no se abrió (" + (bl ? "celular bloqueado" : "usando otra app") + ", " + Build.MANUFACTURER + " Android " + Build.VERSION.RELEASE
-                            + (pl.falta.isEmpty() ? "" : ", falta el permiso: " + pl.falta) + ")";
-                    VentoEscucha.traza(app.getSharedPreferences("vento", MODE_PRIVATE), "Vento", t0, r);
-                } catch (Throwable ignorado) { }
-            }, 3000);
+            final PlanVentana pl = plan; final String t0 = titulo, v0 = valor, b0 = banco, f0 = frase, o0 = o, ti0 = tipo;
+            ui.postDelayed(() -> asegurarVentana(desde, pl, vi, t0, v0, b0, f0, o0, ti0, 1), 1500);
         }
+    }
+
+    /** ¿La ventana del pago quedó a la vista? Si no (y Vento no se está viendo), se intenta otra vez con el celular ya
+     *  despierto; al final queda en el registro (Ajustes → Pagos y 🐞 Errores del panel) si se vio y en qué intento. */
+    // onResume (no onCreate): una ventana creada DETRÁS de la pantalla de bloqueo no cuenta como vista.
+    private static boolean seVio(long desde) { return PagoActivity.vista >= desde || VentanaPago.mostrandoEncima(); }
+    static void asegurarVentana(long desde, PlanVentana pl, Intent vi, String titulo, String valor, String banco, String frase, String o, String tipo, int intento) {
+        try {
+            if (app == null) return;
+            boolean visto = seVio(desde), encima = VentanaPago.puedeEncima(app);
+            String otra = PlanVentana.reintento(visto, alFrente, VentanaPago.prendida(app), intento, VentanaPago.bloqueado(app), encima);
+            if (!otra.isEmpty()) {
+                prenderPantalla();
+                if ("encima".equals(otra)) VentanaPago.mostrarEncima(app, valor, banco, frase, o, tipo);
+                else { if (encima && Build.VERSION.SDK_INT >= 29) VentanaPago.ancla(app); VentanaPago.abrirPantalla(app, vi); }
+                ui.postDelayed(() -> asegurarVentana(desde, pl, vi, titulo, valor, banco, frase, o, tipo, intento + 1), intento == 1 ? 2500 : 2000);
+                return;
+            }
+            boolean bl = VentanaPago.bloqueado(app);
+            String r = visto ? "🪟 ventana abierta" + (intento > 1 ? " (al intento " + intento + ")" : "")
+                    : alFrente ? "🪟 ventana: Vento ya estaba a la vista"
+                    : "🪟 la ventana no se abrió (" + (bl ? "celular bloqueado" : "usando otra app") + ", " + Build.MANUFACTURER + " Android " + Build.VERSION.RELEASE
+                    + (pl.falta.isEmpty() ? "" : ", falta el permiso: " + pl.falta) + ", 3 intentos)";
+            VentoEscucha.traza(app.getSharedPreferences("vento", MODE_PRIVATE), "Vento", titulo, r);
+        } catch (Throwable ignorado) { }
     }
 
     /** Prende la pantalla unos segundos (si estaba apagada) para que se vea la notificación del pago. */

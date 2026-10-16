@@ -40,6 +40,14 @@ public class PlanVentanaPrueba {
         chk("Xiaomi bloqueado sin «Mostrar en pantalla de bloqueo»: pide los permisos de Xiaomi", "xiaomi".equals(PlanVentana.de(34, true, false, true, true, true, true, false).falta), PlanVentana.de(34, true, false, true, true, true, true, false));
         chk("Xiaomi usando otra app sin «ventanas en segundo plano»: pide los permisos de Xiaomi", "xiaomi".equals(PlanVentana.de(33, false, false, true, true, true, false, true).falta), PlanVentana.de(33, false, false, true, true, true, false, true));
         chk("Xiaomi con todo: no falta nada", "".equals(PlanVentana.de(33, true, false, true, true, true, true, true).falta) && "".equals(PlanVentana.de(33, false, false, true, true, true, true, true).falta), "");
+        // Reintentos (1.43.1): Nequi avisa UNA vez; si ese intento no se vio, se vuelve a intentar (como el 2º aviso de DaviPlata)
+        chk("No se vio y bloqueado: se reintenta como pantalla (sobre la pantalla de bloqueo)", "pantalla".equals(PlanVentana.reintento(false, false, true, 1, true, true)), PlanVentana.reintento(false, false, true, 1, true, true));
+        chk("No se vio usando otra app con permiso de encima: se reintenta encima", "encima".equals(PlanVentana.reintento(false, false, true, 1, false, true)), PlanVentana.reintento(false, false, true, 1, false, true));
+        chk("No se vio usando otra app SIN permiso de encima: se reintenta como pantalla", "pantalla".equals(PlanVentana.reintento(false, false, true, 2, false, false)), "");
+        chk("Ya se vio: no se reintenta (no sale doble)", "".equals(PlanVentana.reintento(true, false, true, 1, true, true)), "");
+        chk("Vento a la vista: no se reintenta (la muestra la página)", "".equals(PlanVentana.reintento(false, true, true, 1, false, true)), "");
+        chk("Ventana apagada en Ajustes: no se reintenta", "".equals(PlanVentana.reintento(false, false, false, 1, true, true)), "");
+        chk("Máximo 2 reintentos (a los 1,5 s y a los 4 s)", !"".equals(PlanVentana.reintento(false, false, true, 2, true, true)) && "".equals(PlanVentana.reintento(false, false, true, 3, true, true)), "");
         chk("Total: " + combinaciones + " combinaciones de celular y permisos revisadas", combinaciones == 160, combinaciones);
         System.out.println("RESULTADO " + ok + " bien " + mal + " mal");
         System.exit(mal > 0 ? 1 : 0);

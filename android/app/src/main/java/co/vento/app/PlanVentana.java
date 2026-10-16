@@ -32,5 +32,13 @@ final class PlanVentana {
         return p;
     }
 
+    /** ¿Se vuelve a intentar abrir la ventana? (a los 1,5 s y a los 4 s). "" = no; "encima" = encima de la app que se
+     *  esté usando; "pantalla" = como pantalla (sobre la pantalla de bloqueo si está bloqueado). Nunca si ya se vio, si
+     *  Vento está a la vista (ahí la muestra la página), si la ventana está apagada o después del 2º reintento. */
+    static String reintento(boolean visto, boolean alFrente, boolean prendida, int intento, boolean bloqueado, boolean puedeEncima) {
+        if (visto || alFrente || !prendida || intento > 2) return "";
+        return !bloqueado && puedeEncima ? "encima" : "pantalla";
+    }
+
     @Override public String toString() { return (pantallaCompleta ? "completa " : "") + (directo ? "directo " : "") + (encima ? "encima " : "") + (ancla ? "ancla " : "") + (falta.isEmpty() ? "" : "falta:" + falta); }
 }
