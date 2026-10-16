@@ -26,10 +26,32 @@
   Si algún negocio quedó con el tipo duplicado de una prueba anterior, pasa solo a la Boutique.
 - Migración `20261023000000_cambio_tipo_negocio` y rutas `/tipo-pedir`, `/admin/tipos`, `/admin/tipo_resolver`.
 
+## 1c. Equipo: empleados según el negocio, permisos del dueño, segundo administrador y actividad
+- **Rol «empleado»** además de mesero y cajero. Se llama según el negocio: en una tienda de ropa «Asesor de ventas»,
+  en un consultorio «Médico», en una barbería «Barbero», en un salón «Estilista», en un taller «Mecánico», etc.
+- **El equipo (empleado, cajero, mesero) no ve lo del negocio:** estadísticas, contabilidad, historial, productos,
+  inventario ni ajustes. Vende y atiende. El dueño (o el segundo administrador) decide qué más puede hacer cada rol
+  en **Ajustes → Negocio → 👥 Permisos del equipo**, y le llega al instante a sus celulares.
+- **Segundo administrador:** solo lo nombra el dueño. Maneja el negocio, pero no puede nombrar a otro administrador.
+- **📜 Actividad del equipo** (Ajustes → Negocio, SOLO el dueño): cada venta, venta borrada o cambiada, producto
+  creado o borrado, cambio de precio, costo, nombre o inventario, lo que se pide o se quita de una cuenta, permisos,
+  reinicios… de cada persona, con su cuenta, su rol y la hora, filtrable por persona. Queda en el servidor: nadie la
+  puede cambiar ni borrar, y el segundo administrador no la puede ver (ni tapar lo suyo). Sin internet queda en cola.
+- Migración `20261024000000_equipo_actividad` (rol empleado, `actividad_registrar`, `actividad_ver`).
+
+## 1d. Sin «nube» para los clientes
+- Al crear la cuenta de Vento (correo y contraseña) los datos ya se guardan solos en la cuenta y se ven en todos los
+  celulares: ya no hay «Vento Nube» aparte. La entrada tiene «👥 Me invitaron a un negocio (tengo un código)» y
+  Ajustes tiene **👥 Mi cuenta y mi equipo** (invitar, roles, quitar, cerrar sesión). Sincronizar, respaldos y la base
+  de datos quedan solo para el administrador de Vento.
+
 ## 2. Plan vencido → modo gratis; cancelada → solo pagar
 - **Vencida, pago rechazado, sin pagar o pago en revisión:** la app sigue en el plan **Gratis** con sus funciones
   limitadas (vender, mesas, inventario y gastos, según el plan Gratis del panel). Las PRO piden el plan.
-- **Cancelada por el administrador:** bloqueada con un solo botón, «💳 Pagar para reactivar».
+- **Cancelada por el administrador:** bloqueada con «💳 Pagar para reactivar» y «🚪 Cerrar sesión» (para entrar con
+  otra cuenta). En los avisos de plan vencido o sin aprobar también está «🚪 Cerrar sesión».
+- **Activar desde Vento Admin llega en menos de 3 s:** por el canal en tiempo real (≈1 s) y, si ese canal se cayó, la
+  app que espera la activación (cancelada o pago en revisión) pregunta cada 2 s.
 
 ## 3. Soporte con fotos y pantallazos, y avisos al administrador
 - **En la app** (Ajustes → Guía y soporte): «📎 Agregar fotos o pantallazos» (hasta 3) al escribir y «📎 Foto» al
@@ -86,9 +108,10 @@
 
 ## Servidor y migraciones
 - `20261018000000_suscripciones_tiempo_real` (ya aplicada), `20261019000000_suscripciones_reactivar` (ya aplicada),
-  `20261020000000_licencias_un_negocio`, `20261021000000_soporte_fotos_avisos`, `20261022000000_seguridad`.
+  `20261020000000_licencias_un_negocio`, `20261021000000_soporte_fotos_avisos`, `20261022000000_seguridad`,
+  `20261023000000_cambio_tipo_negocio`, `20261024000000_equipo_actividad`.
 - Rutas nuevas: `/soporte-adjunto`, `/soporte-avisar`, `/admin/soporte_imagen`, `/admin/push_guardar`, `/admin/push_clave`.
 
 ## Pruebas
-- `servidor/admin` 95, `servidor/suscripciones` 154, `adminsubreal` 35, `adminreal` 44, `cuentacliente` 35,
-  `puertaytiemporeal` 29, `adminversion` 7, `seguridadqr` 6 (nueva) y el resto de la suite.
+- `equipoactividad` 22 (nueva), `servidor/admin` 130, `servidor/suscripciones` 154, `adminsubreal` 35, `adminreal` 44, `cuentacliente` 35,
+  `puertaytiemporeal` 34, `adminversion` 7, `seguridadqr` 6 (nueva) y el resto de la suite.

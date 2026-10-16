@@ -141,7 +141,7 @@ const b64u = s => Buffer.from(s).toString('base64url');
     async function subirNegocio(cel, nombre){
       cel.respuestas.push(nombre);                                    // prompt «Nombre del negocio en la nube»
       await cel.p.click('#nubeSubirEste');
-      return esperar(cel.p, n => { const x = window.ventoNube.negocio(); return !!x && x.nombre === n && /ya está en la nube/.test(document.getElementById('nubeMsg').textContent); }, nombre);
+      return esperar(cel.p, n => { const x = window.ventoNube.negocio(); return !!x && x.nombre === n && /quedó en tu cuenta/.test(document.getElementById('nubeMsg').textContent); }, nombre);
     }
     const negocioId = p => p.evaluate(() => (window.ventoNube.negocio() || {}).id);
     // El micrófono: se toca el botón de verdad; abrir el reconocedor de voz se simula (se anota que se abrió).

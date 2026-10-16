@@ -53,7 +53,7 @@ const b64u = b => Buffer.from(b).toString('base64').replace(/\+/g, '-').replace(
       const q = () => { const o = { select(){ return o; }, eq(){ return o; }, order(){ return o; }, limit(){ return o; }, maybeSingle: async () => ({ data: { version: 1 } }), single: async () => ({ data: { datos: null, version: 1 } }), then(f, g){ return Promise.resolve({ data: [] }).then(f, g); } }; return o; };
       // Realtime simulado: guarda quién escucha y deja que la prueba «mande el aviso de la base de datos».
       window.__rt = { canales: {}, quitados: 0 };
-      const canal = nombre => { const c = { nombre, cbs: [], on(tipo, filtro, cb){ c.cbs.push({ tipo, filtro, cb }); return c; }, subscribe(f){ window.__rt.canales[nombre] = c; setTimeout(() => f && f('SUBSCRIBED'), 10); return c; } }; return c; };
+      const canal = nombre => { const c = { nombre, cbs: [], on(tipo, filtro, cb){ c.cbs.push({ tipo, filtro, cb }); return c; }, subscribe(f){ c.f = f; window.__rt.canales[nombre] = c; setTimeout(() => f && f('SUBSCRIBED'), 10); return c; } }; return c; };
       window.__rtAviso = (nombre, evento) => { const c = window.__rt.canales[nombre]; if(!c) return false; c.cbs.filter(x => x.tipo === 'broadcast' && x.filtro.event === evento).forEach(x => x.cb({ event: evento, payload: {} })); return true; };
       window.supabase = { createClient: () => ({ auth: { getSession: async () => ({ data: { session: { access_token: 'TOK' } } }), onAuthStateChange(){ return { data: { subscription: { unsubscribe(){} } } }; }, signOut: async () => ({}) },
         from: () => q(), rpc: async () => ({ data: [] }), channel: canal, removeChannel: async c => { window.__rt.quitados++; delete window.__rt.canales[c.nombre]; } }) };
@@ -174,6 +174,18 @@ const b64u = b => Buffer.from(b).toString('base64').replace(/\+/g, '-').replace(
     bd.offline = false; bd.vidaToken = 72 * H;
     await p.evaluate(() => window.dispatchEvent(new Event('online')));
     chk('Vuelve el internet: la app abre sola', await listo(p, () => !document.getElementById('vpOv'), 6000), JSON.stringify(await puerta(p)));
+
+    // ---------- Se cae el canal en tiempo real y el administrador activa: igual llega en menos de 3 s ----------
+    bd.sub = { status: 'canceled', plan: 'pro', expiry: Date.now() + 30 * DIA };
+    await aviso();
+    await listo(p, () => ventoSuscripcion.estado().status === 'canceled', 4000);
+    await p.evaluate(id => { const c = window.__rt.canales['vs-' + id]; if(c && c.f) c.f('CHANNEL_ERROR'); }, NEG);
+    await p.waitForTimeout(2500);
+    bd.sub = { status: 'active', plan: 'pro', expiry: Date.now() + 30 * DIA };
+    const t1 = Date.now();
+    chk('Sin el canal en tiempo real, al activar la suscripción cancelada la app se abre sola', await listo(p, () => ventoSuscripcion.estado().status === 'active' && !document.getElementById('vpOv'), 6000));
+    const seg2 = (Date.now() - t1) / 1000;
+    chk('…en menos de 3 s (respaldo cada 2 s mientras espera)', seg2 < 3, seg2 + ' s');
     await ctx.close();
     chk('Sin errores de página', errs.length === 0, errs.join(' | '));
   }catch(e){ mal++; console.log('❌ ' + e.stack); }

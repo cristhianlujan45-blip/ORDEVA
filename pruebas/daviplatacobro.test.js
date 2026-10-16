@@ -84,7 +84,7 @@ const RAIZ = path.resolve(__dirname, '..');
     await p.click('#nubeCrear'); await p.waitForSelector('#nubeSubirEste', { state: 'visible' });
     respuestas.push('Bar Davi');
     await p.click('#nubeSubirEste');
-    const subido = await esperar(() => { const x = window.ventoNube.negocio(); return !!x && /ya está en la nube/.test(document.getElementById('nubeMsg').textContent); });
+    const subido = await esperar(() => { const x = window.ventoNube.negocio(); return !!x && /quedó en tu cuenta/.test(document.getElementById('nubeMsg').textContent); });
     const NEG = await p.evaluate(() => (window.ventoNube.negocio() || {}).id);
     chk('1. Negocio subido a Vento Nube (dueña)', subido && /^[0-9a-f-]{36}$/.test(NEG || ''), NEG);
     // Al volver a abrir Vento arranca el módulo de pagos con el negocio (registra el celular y consulta el servidor).

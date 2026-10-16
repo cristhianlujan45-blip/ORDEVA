@@ -684,13 +684,14 @@
   setInterval(function(){ var id = negId(); if(id !== E.neg) cambiarNegocio(id); }, 3000);   // entró o cambió de negocio
   /* Respaldo del tiempo real (la activación debe llegar en menos de 3 s):
      • con el canal en tiempo real conectado, el aviso llega solo; el respaldo es cada minuto;
-     • esperando que el administrador active (pago en revisión o suscripción cancelada): cada 3 s;
-     • sin el canal (red que lo bloquea, celular que se durmió): cada 3 s mientras se espera, si no cada 15 s. */
+     • esperando que el administrador active (pago en revisión o suscripción cancelada): cada 2 s, aunque el canal
+       en tiempo real se haya caído (red que lo bloquea, celular que se durmió);
+     • sin el canal y sin nada pendiente: cada 15 s. */
   function cadaCuanto(){
     var s = E.p ? estado() : null, espera = !!s && (s.revision || s.status === 'canceled');
-    return espera ? 3e3 : rt.vivo ? REFRESCO_MS : 15e3;
+    return espera ? 2e3 : rt.vivo ? REFRESCO_MS : 15e3;
   }
-  setInterval(function(){ if(E.neg && !document.hidden && !E.cargando && Date.now() - (E.intento || 0) >= (E.error === 'red' ? 15e3 : cadaCuanto()) - 250) refrescar(); }, 1000);
+  setInterval(function(){ if(E.neg && !document.hidden && !E.cargando && Date.now() - (E.intento || 0) >= (E.error === 'red' ? 15e3 : cadaCuanto()) - 250) refrescar(); }, 500);
   document.addEventListener('visibilitychange', function(){ if(!document.hidden && E.neg && Date.now() - E.ultimo > 5e3) refrescar(); });
   window.addEventListener('online', function(){ if(E.neg) refrescar(); });
 
