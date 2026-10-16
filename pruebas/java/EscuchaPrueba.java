@@ -106,6 +106,14 @@ public class EscuchaPrueba {
         app(sp, "Nequi", "Envío", "MARIBE ARIAS te envió 1500, ¡lo mejor!", "k7b:");
         chk("Nequi «Envío · MARIBE ARIAS te envió 1500, ¡lo mejor!» → suena «Recibiste 1500 pesos por Nequi.» y sale «💜 Recibiste $1.500 por Nequi»", VentoApp.dichos.contains("Recibiste 1500 pesos por Nequi.") && VentoApp.notifs.stream().anyMatch(n -> n[0].equals("💜 Recibiste $1.500 por Nequi") && n[3].equals("$1.500")), VentoApp.dichos);
 
+        // 7c) Nequi que llega primero por SMS (sin número corto confirmado → «revísalo») y luego por la app: la app de Nequi
+        //     lo CONFIRMA → suena «Recibiste…», con su notificación y su ventana. Antes se tomaba como «ya dicho» y no abría.
+        sp = nuevo();
+        VentoEscucha.leerSms(sp, "85954", "", conv(new Object[]{"Nequi: MARIBE ARIAS te envio $1.500", ahora - 1000}), "k7c:", false);
+        VentoApp.notifs.clear(); VentoApp.dichos.clear();
+        app(sp, "Nequi", "Envío", "MARIBE ARIAS te envió 1500, ¡lo mejor!", "k7d:");
+        chk("Nequi por SMS («revísalo») y luego por la app: la app lo confirma con voz, notificación y 🪟 ventana «$1.500»", VentoApp.dichos.contains("Recibiste 1500 pesos por Nequi.") && VentoApp.notifs.stream().anyMatch(n -> n[3].equals("$1.500") && n[5].equals("ok")), VentoApp.dichos + " " + VentoApp.notifs.size());
+
         // 8) «Pasaste $100 a otro DaviPlata» (plata que SALE): no suena
         limpiar();
         app(sp, "DaviPlata", "DaviPlata", "Pasaste $100 a otro DaviPlata. Para saber mas, consulta tus movimientos.", "k8:");

@@ -20,7 +20,7 @@ import java.net.URL;
 
 /**
  * 🔄 La app se actualiza SOLA (sin descargar ni instalar a mano cada vez).
- *  • Revisa cada 3 h (y al abrir Vento) el archivo version.json de la publicación «android».
+ *  • Revisa cada 30 min (y al abrir Vento) el archivo version.json de la publicación «android».
  *  • Si hay una versión nueva, baja el APK y lo instala con el instalador de Android. Lo hace cuando Vento NO se está
  *    usando (para no cortar nada); al terminar, Android vuelve a prender Vento de fondo (Arranque, MY_PACKAGE_REPLACED).
  *  • La primera vez Android pide un permiso («Instalar apps desconocidas» para Vento) y confirmar una vez. Desde ahí
@@ -32,7 +32,8 @@ final class Actualizador {
     static final String BASE = "https://github.com/cristhianlujan45-blip/cuentas/releases/latest/download/";
     static final String ACCION = "co.vento.app.ACTUALIZACION";
     static final String P_REV = "actRevisado", P_NUEVA = "actNueva", P_NOMBRE = "actNuevaNombre", P_ESTADO = "actEstado", P_INTENTOS = "actIntentos", P_AUTO = "actAuto";
-    private static final long CADA = 3 * 3600_000L;
+    // Cada 30 min (antes 3 h: si se publicaban varias versiones seguidas, el celular se quedaba atrás horas).
+    private static final long CADA = 30 * 60_000L;
     private static volatile boolean trabajando = false;
 
     private static SharedPreferences sp(Context c) { return c.getSharedPreferences("vento", Context.MODE_PRIVATE); }

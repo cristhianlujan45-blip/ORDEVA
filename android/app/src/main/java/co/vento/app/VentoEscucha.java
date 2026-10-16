@@ -291,9 +291,13 @@ public class VentoEscucha extends NotificationListenerService {
         if (monto <= 0) callado = true;
         // ¿Ya llegó este mismo pago por SMS (el banco avisa por los dos lados)? Entonces este aviso de la app lo confirma
         // y reemplaza al del SMS (no son dos pagos).
-        String reemplaza = monto > 0 && confiable ? parear(sp, monto, false, id) : null;
-        // Si el SMS de este mismo pago ya llegó (y ya se dijo, de una), no se repite la voz.
-        if (confiable && !callado && reemplaza == null) { VentoApp.anunciarPago(app, monto, sp.getBoolean(PREF_NOTIF, true), todo); voz = true; }
+        JSONObject par = monto > 0 && confiable ? parear(sp, monto, false, id, true) : null;
+        String reemplaza = par != null ? par.optString("id") : null;
+        // Si el SMS de este mismo pago ya se dijo como CONFIRMADO (el 85888 de DaviPlata), no se repite. Pero si el SMS
+        // solo se dijo como «revísalo» (Nequi y otros bancos no tienen un número corto confirmado), ahora la app del banco
+        // lo confirma: se dice, con su notificación y su 🪟 ventana. Antes ese Nequi no abría la ventana.
+        boolean yaDicho = par != null && par.optBoolean("ok");
+        if (confiable && !callado && !yaDicho) { VentoApp.anunciarPago(app, monto, sp.getBoolean(PREF_NOTIF, true), todo); voz = true; }
         else if (confiable && !callado) voz = true;
         else if (!confiable && !callado) {
             String f = "Ojo. Llegó un aviso de " + monto + " pesos de una aplicación que no es la oficial de " + AvisoPago.nombreApp(app) + ". Revísalo en la aplicación del banco antes de entregar.";
@@ -337,7 +341,7 @@ public class VentoEscucha extends NotificationListenerService {
                 return true;
             }
             // El mismo pago ya llegó por la app del banco con su valor (confirmado): el SMS no se cuenta otra vez.
-            if (parear(sp, monto, true, id) != null) return false;
+            if (parear(sp, monto, true, id, banco != null || sp.getBoolean(PREF_SMS_OK, false)) != null) return false;
             // El código corto OFICIAL del banco (85888 = DaviPlata) cuenta como confirmado: el valor del pago solo llega por
             // ahí (la app de DaviPlata no lo trae). Otros códigos cortos: «revísalo», salvo que el dueño elija confirmarlos.
             final boolean confiar = banco != null || sp.getBoolean(PREF_SMS_OK, false);
@@ -418,21 +422,22 @@ public class VentoEscucha extends NotificationListenerService {
 
     /** El mismo pago por los dos lados (app del banco y SMS, mismo valor, en 3 min): devuelve el ID del otro aviso si
      *  todavía no estaba emparejado (y los empareja); si no, guarda este para emparejarlo después. */
-    private static synchronized String parear(SharedPreferences sp, long monto, boolean esSms, String id) {
+    private static synchronized JSONObject parear(SharedPreferences sp, long monto, boolean esSms, String id, boolean ok) {
         try {
             JSONArray l = new JSONArray(sp.getString(PREF_RECIENTES, "[]")), out = new JSONArray();
             long ahora = System.currentTimeMillis();
-            String par = null;
+            JSONObject par = null;
             for (int i = 0; i < l.length(); i++) {
                 JSONObject o = l.getJSONObject(i);
                 if (ahora - o.optLong("t") > 5 * 60_000L) continue;
                 if (par == null && !o.optBoolean("par") && o.optLong("m") == monto && o.optBoolean("sms") != esSms && ahora - o.optLong("t") <= 3 * 60_000L) {
                     o.put("par", true);
-                    par = o.optString("id");
+                    par = o;
                 }
                 out.put(o);
             }
-            if (par == null) out.put(new JSONObject().put("id", id).put("m", monto).put("sms", esSms).put("t", ahora));
+            // «ok»: ese aviso ya se dijo como pago CONFIRMADO (la app del banco o el SMS del 85888). Un SMS de «revísalo» no.
+            if (par == null) out.put(new JSONObject().put("id", id).put("m", monto).put("sms", esSms).put("t", ahora).put("ok", ok));
             while (out.length() > 40) out.remove(0);
             sp.edit().putString(PREF_RECIENTES, out.toString()).apply();
             return par;

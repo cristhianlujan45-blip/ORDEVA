@@ -460,12 +460,14 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
       E.nueva = 37; E.nuevaNombre = '1.0.37'; window.ventoActualizacion.pintar();
       const hay = document.getElementById('appActEl').innerText;
       document.querySelector('#appActEl [data-act="ahora"]').click();
-      return { vieja, sinPermiso, alDia, hay, act: window.__act.slice() };
+      const banNueva = ban(); const bn = document.querySelector('#actBanner [data-act="ahora"]'); if(bn) bn.click();
+      return { vieja, sinPermiso, alDia, hay, banNueva, act: window.__act.slice() };
     });
     chk('25. App Android sin el actualizador: Ajustes dice «todavía no se actualiza sola · Instálala una última vez»', /todavía no se actualiza sola/.test(r25.vieja) && /una última vez/.test(r25.vieja), r25);
     chk('25. Falta el permiso de Android: aviso «Que Vento se actualice sola» y «🔓 Dar el permiso» lo abre', /se actualice sola/.test(r25.sinPermiso.ban) && /falta el permiso/.test(r25.sinPermiso.aj) && r25.act[0] === 'permiso', r25);
     chk('25. Con el permiso: Ajustes dice «App Android 1.0.36 · ✅ se actualiza sola» y el aviso se va', !r25.alDia.ban && /1\.0\.36 · ✅ se actualiza sola/.test(r25.alDia.aj), r25);
     chk('25. Hay una nueva: «se instala sola cuando no estés usando Vento» y «Actualizar ahora»', /hay una nueva \(1\.0\.37\)/.test(r25.hay) && r25.act[1] === 'ahora', r25);
+    chk('25. Hay una nueva: aviso «🔄 Hay una versión nueva de Vento (1.0.37)» con «Actualizar ahora»', /Hay una versión nueva de Vento \(1\.0\.37\)/.test(r25.banNueva) && r25.act[2] === 'ahora', r25);
 
     // 26. Un pago que entiende la PÁGINA (como el Nequi «te envió 1500» con la app de antes) va por el MISMO camino que los
     //     de la app Android: notificación + 🪟 ventana fuera de Vento (también bloqueado). Antes solo salía la notificación.

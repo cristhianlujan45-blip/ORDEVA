@@ -124,7 +124,7 @@ public class MainActivity extends Activity {
         VentoApp.alFrente = true;
         VentoApp.motor(this);
         try { web.onResume(); } catch (Exception ignorado) { }
-        try { Actualizador.revisar(this, false); } catch (Throwable ignorado) { }   // ¿hay versión nueva? (cada 3 h)
+        try { Actualizador.revisar(this, false); } catch (Throwable ignorado) { }   // ¿hay versión nueva? (cada 30 min)
         VentoApp.js("try{window.__ventoAlFrente=true;document.dispatchEvent(new Event('visibilitychange'))}catch(e){}");
     }
 

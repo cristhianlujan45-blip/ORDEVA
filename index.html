@@ -25516,7 +25516,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-16 · v1.41.6';
+const MESORA_VERSION = '2026-10-16 · v1.41.7';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'Vento · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 /* 🔄 La app Android se actualiza SOLA (Actualizador): revisa cada 3 h, baja la versión nueva y la instala cuando no se
@@ -25544,7 +25544,8 @@ try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent =
         : '✅ se actualiza sola') + (e.estado && /error|no se pudo|confirmes/.test(e.estado) ? '<br><small>' + String(e.estado).replace(/[<>&]/g, '') + '</small>' : '');
     }
     let luego = 0; try{ luego = Number(localStorage.getItem(LUEGO)) || 0; }catch(x){}
-    banner(!e.permiso && Date.now() > luego ? 'permiso' : '');
+    // Hay una versión nueva esperando (p. ej. Android pide confirmar «Actualizar» la primera vez): un toque la instala.
+    banner(!e.permiso && Date.now() > luego ? 'permiso' : hay && Date.now() > luego ? 'nueva' : '');
     return e;
   }
   // Sale UNA vez cada vez que se abre Vento y se esconde sola a los 20 s; deja pasar los toques (solo sus botones
@@ -25561,6 +25562,10 @@ try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent =
       b.style.cssText = 'position:fixed;left:8px;right:8px;bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:9997;background:#1e3a8a;color:#fff;border-radius:14px;padding:10px 12px;font-size:14px;line-height:1.4;box-shadow:0 6px 20px rgba(0,0,0,.35);pointer-events:none';
       document.body.appendChild(b);
     }
+    if(k === 'nueva'){ const e = est();
+      b.innerHTML = '<style>#actBanner a,#actBanner button{pointer-events:auto}</style><div>🔄 <b>Hay una versión nueva de Vento' + (e.nuevaNombre ? ' (' + String(e.nuevaNombre).replace(/[<>&]/g, '') + ')' : '') + '</b>: trae arreglos de los pagos. Se instala en segundos y Vento vuelve sola.</div>' +
+        '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap"><button type="button" data-act="ahora" style="background:#fff;color:#1e3a8a;border:0;border-radius:10px;padding:7px 12px;font-weight:800">🔄 Actualizar ahora</button><button type="button" data-act="luego" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,.6);border-radius:10px;padding:6px 10px">Luego</button></div>';
+      b.hidden = false; return; }
     b.innerHTML = '<style>#actBanner a,#actBanner button{pointer-events:auto}</style>' + (k === 'vieja' ? '<div>📲 <b>Instala la app Vento nueva una última vez</b>: desde esa versión se actualiza sola, sin instalar a mano.</div>' : '<div>🔄 <b>Que Vento se actualice sola</b>, sin descargar ni instalar a mano: dale un permiso una sola vez.</div>') +
       '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">' + (k === 'vieja' ? '<a href="https://github.com/cristhianlujan45-blip/cuentas/releases/latest/download/vento.apk" download="vento.apk" rel="noopener" style="background:#fff;color:#1e3a8a;border-radius:10px;padding:7px 12px;font-weight:800;text-decoration:none">⬇️ Instalar la nueva</a>' : '<button type="button" data-act="permiso" style="background:#fff;color:#1e3a8a;border:0;border-radius:10px;padding:7px 12px;font-weight:800">🔓 Dar el permiso</button>') + '<button type="button" data-act="luego" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,.6);border-radius:10px;padding:6px 10px">Luego</button></div>';
     b.hidden = false;
