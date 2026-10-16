@@ -314,10 +314,62 @@ async function pruebas(sb) {
   r = await rest('plans', 'POST', { id: 'gratis-para-mi', name: 'x', price: 0 }, dueno.token);
   chk('Nadie crea planes escribiendo directo', r.st >= 400, r);
 
+  // ===== Equipo: empleado (vendedor, médico, barbero…), segundo administrador y ACTIVIDAD de cada persona =====
+  r = await signup('emp@bar.co', 'clave123'); const emp = { id: r.j.user.id, token: r.j.access_token };
+  r = await signup('admin2@bar.co', 'clave123'); const adm2 = { id: r.j.user.id, token: r.j.access_token };
+  r = await rpc('crear_invitacion', { p_negocio: neg, p_rol: 'empleado' }, dueno.token);
+  chk('El dueño invita a un EMPLEADO', r.st === 200 && typeof r.j === 'string', r);
+  r = await rpc('unirse_con_codigo', { p_codigo: r.j, p_nombre: 'Laura' }, emp.token);
+  chk('El empleado entra con el código', r.st === 200, r);
+  chk('Queda con el rol empleado', (await uno('select rol from miembros where negocio_id=$1 and usuario_id=$2', [neg, emp.id])).rol === 'empleado');
+  r = await rpc('crear_invitacion', { p_negocio: neg, p_rol: 'admin' }, dueno.token);
+  await rpc('unirse_con_codigo', { p_codigo: r.j, p_nombre: 'Segundo admin' }, adm2.token);
+  chk('El dueño nombra un segundo administrador', (await uno('select rol from miembros where negocio_id=$1 and usuario_id=$2', [neg, adm2.id])).rol === 'admin');
+  r = await rpc('crear_invitacion', { p_negocio: neg, p_rol: 'admin' }, adm2.token);
+  chk('El segundo administrador NO puede nombrar otro administrador', r.st >= 400, r);
+  r = await rpc('crear_invitacion', { p_negocio: neg, p_rol: 'empleado' }, emp.token);
+  chk('Un empleado no invita a nadie', r.st >= 400, r);
+  r = await rpc('cambiar_rol', { p_negocio: neg, p_usuario: emp.id, p_rol: 'admin' }, adm2.token);
+  chk('Solo el dueño cambia roles', r.st >= 400, r);
+  r = await rpc('cambiar_rol', { p_negocio: neg, p_usuario: emp.id, p_rol: 'jefe' }, dueno.token);
+  chk('Un rol inventado no se acepta', r.st >= 400, r);
+  r = await rpc('pagos_puedo', { p_negocio: neg, p_accion: 'cobrar' }, emp.token);
+  chk('El empleado puede cobrar', r.st === 200, r);
+  r = await rpc('pagos_puedo', { p_negocio: neg, p_accion: 'configurar' }, emp.token);
+  chk('El empleado NO configura los pagos', r.st >= 400, r);
+
+  r = await rpc('actividad_registrar', { p_negocio: neg, p_eventos: [{ a: 'venta', d: 'Mesa 3 · 2 Cerveza', m: 12000, u: 'laura', t: Date.now() }, { a: 'venta borrada', d: 'Venta #12 de $8.000', m: -8000 }, { a: '' }, 'x'] }, emp.token);
+  chk('La app del empleado manda lo que hace (lo vacío o raro no entra)', r.st === 200 && r.j === 2, r);
+  r = await rpc('actividad_registrar', { p_negocio: neg, p_eventos: [{ a: 'precio cambiado', d: 'Cerveza $5.000 → $4.000' }] }, adm2.token);
+  chk('Lo del segundo administrador también queda', r.st === 200 && r.j === 1, r);
+  r = await rpc('actividad_registrar', { p_negocio: neg, p_eventos: [{ a: 'venta' }] }, sinNeg.token);
+  chk('Alguien de afuera no puede escribir en la actividad del negocio', r.st >= 400, r);
+  r = await rpc('actividad_registrar', { p_negocio: neg, p_eventos: Array.from({ length: 101 }, () => ({ a: 'x' })) }, emp.token);
+  chk('Lotes de más de 100 eventos se rechazan', r.st >= 400, r);
+  r = await rpc('actividad_ver', { p_negocio: neg }, dueno.token);
+  const act = r.j || {};
+  chk('El DUEÑO ve toda la actividad, con quién y con qué rol', r.st === 200 && act.eventos.length >= 3 &&
+    act.eventos.some(e => e.accion === 'app:venta borrada' && e.email === 'emp@bar.co' && e.rol === 'empleado' && e.detalle.m === -8000) &&
+    act.eventos.some(e => e.accion === 'app:precio cambiado' && e.rol === 'admin'), r);
+  chk('Trae la lista de personas para filtrar', (act.personas || []).length >= 3, act.personas);
+  r = await rpc('actividad_ver', { p_negocio: neg, p_usuario: emp.id }, dueno.token);
+  chk('Se filtra por persona', r.st === 200 && r.j.eventos.length === 2 && r.j.eventos.every(e => e.usuario_id === emp.id), r);
+  r = await rpc('actividad_ver', { p_negocio: neg }, adm2.token);
+  chk('El segundo administrador NO puede ver la actividad (no puede tapar lo suyo)', r.st >= 400, r);
+  r = await rpc('actividad_ver', { p_negocio: neg }, emp.token);
+  chk('El empleado no ve la actividad', r.st >= 400, r);
+  r = await rest('auditoria', 'GET', null, adm2.token);
+  chk('Leyendo la tabla directo, el segundo administrador no ve nada', r.st >= 400 || (Array.isArray(r.j) && r.j.length === 0), r);
+  r = await rest('auditoria?accion=like.app:*', 'DELETE', null, dueno.token);
+  const quedan = (await uno("select count(*)::int n from auditoria where negocio_id=$1 and accion like 'app:%'", [neg])).n;
+  chk('Nadie borra la actividad (ni el dueño)', quedan >= 3, { r, quedan });
+  r = await rest('auditoria', 'POST', { negocio_id: neg, accion: 'app:falso' }, dueno.token);
+  chk('Nadie escribe directo en la actividad', r.st >= 400, r);
+
   // ===== La migración se puede volver a correr =====
   let errMig = null;
   try { await sb.sql(fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', '20261015000000_admin_soporte_licencias.sql'), 'utf8')); } catch (x) { errMig = x.message; }
-  for (const m of ['20261020000000_licencias_un_negocio.sql', '20261021000000_soporte_fotos_avisos.sql', '20261022000000_seguridad.sql', '20261023000000_cambio_tipo_negocio.sql'])
+  for (const m of ['20261020000000_licencias_un_negocio.sql', '20261021000000_soporte_fotos_avisos.sql', '20261022000000_seguridad.sql', '20261023000000_cambio_tipo_negocio.sql', '20261024000000_equipo_actividad.sql'])
     try { if(!errMig) await sb.sql(fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', m), 'utf8')); } catch (x) { errMig = m + ': ' + x.message; }
   r = await rpc('crear_negocio', { p_nombre: 'Otra más', p_datos: {} }, dueno.token);
   chk('Las migraciones se vuelven a correr sin errores ni perder datos (y la regla sigue)', !errMig && (await uno('select count(*) n from licencias')).n === 4 && r.st >= 400, errMig || r);

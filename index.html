@@ -2621,10 +2621,17 @@ body.mod-v #quickSaleBtn{ order:-1; background:var(--amber); color:#fff; border-
   .auth-users button.on{ border-color:var(--amber); background:color-mix(in srgb, var(--amber) 20%, transparent); }
   .auth-users small{ opacity:.7; font-weight:500; }
   /* Modo mesero (usuario con rol Mesero en este equipo): solo lo del servicio */
-  body.modo-mesero nav button[data-view="productos"], body.modo-mesero nav button[data-view="inventario"], body.modo-mesero nav button[data-view="estadisticas"],
-  body.modo-mesero nav button[data-view="historial"], body.modo-mesero nav button[data-view="ajustes"], body.modo-mesero .more-tile[data-go="estadisticas"], body.modo-mesero nav button[data-view="contabilidad"], body.modo-mesero .more-tile[data-go="contabilidad"],
-  body.modo-mesero .more-tile[data-go="historial"], body.modo-mesero .more-tile[data-go="ajustes"], body.modo-mesero .more-tile[data-go="ia"],
+  /* (las pantallas que ve el equipo las deciden los permisos: body.rol-equipo / body.no-…) */
+  body.modo-mesero nav button[data-view="ajustes"], body.modo-mesero .more-tile[data-go="ajustes"], body.modo-mesero .more-tile[data-go="ia"],
   body.modo-mesero #asisFab, body.modo-mesero #voiceFabAI, body.modo-mesero #mesoraFixPill{ display:none !important; }
+  /* Equipo (cajero, empleado, mesero): lo que el dueño no le permite no se ve */
+  body.no-historial nav button[data-view="historial"], body.no-historial .more-tile[data-go="historial"],
+  body.no-productos nav button[data-view="productos"], body.no-productos .more-tile[data-go="productos"],
+  body.no-inventario nav button[data-view="inventario"], body.no-inventario .more-tile[data-go="inventario"],
+  body.no-estadisticas nav button[data-view="estadisticas"], body.no-estadisticas .more-tile[data-go="estadisticas"],
+  body.no-contabilidad nav button[data-view="contabilidad"], body.no-contabilidad .more-tile[data-go="contabilidad"],
+  body.rol-equipo nav button[data-view="ajustes"], body.rol-equipo .more-tile[data-go="ajustes"], body.rol-equipo .more-tile[data-go="ia"],
+  body.rol-equipo #asisFab, body.rol-equipo #voiceFabAI{ display:none !important; }
   .mesero-chip{ display:inline-flex; align-items:center; gap:8px; height:40px; padding:0 6px 0 12px; border-radius:999px; border:1px solid var(--line); background:var(--surface); color:var(--ink); font:700 13px var(--font-main); }
   .mesero-chip button{ height:30px; padding:0 10px; border-radius:999px; border:1px solid var(--line); background:var(--surface-2); color:var(--brick); font:700 12px var(--font-main); cursor:pointer; }
   #subOverlay .modal{ max-height:calc(100vh - 32px); overflow-y:auto; }
@@ -18942,7 +18949,8 @@ function accUsuariosPintar(){
 }
 // Modo mesero: con un usuario de rol Mesero se ve solo lo del servicio.
 function aplicarModoMesero(){
-  const mesero = !!authUser && !authIsAdmin();
+  try{ window.ventoRoles && window.ventoRoles.aplicar(); }catch(e){}
+  const mesero = !!authUser && !authIsAdmin();      // todo el equipo (cajero, empleado, mesero): «modo servicio»
   document.body.classList.toggle('modo-mesero', mesero);
   let chip = document.getElementById('meseroChip');
   if(mesero){
@@ -18952,14 +18960,15 @@ function aplicarModoMesero(){
       const row = document.getElementById('topActionsRow') || document.getElementById('topActions');
       if(row) row.appendChild(chip);
     }
-    chip.querySelector('span').textContent = '🧑‍🍳 ' + authUser;
-    const act = document.querySelector('nav button.active');
-    if(act && /^(productos|inventario|estadisticas|contabilidad|historial|ajustes)$/.test(act.dataset.view)){ const b = document.querySelector('nav button[data-view="mesas"]'); if(b) b.click(); }
+    let rn = ''; try{ rn = window.ventoRoles ? window.ventoRoles.rolNombre(window.ventoRoles.rol()) : ''; }catch(e){}
+    chip.querySelector('span').textContent = '🧑‍🍳 ' + authUser + (rn ? ' · ' + rn : '');
   } else if(chip) chip.remove();
 }
 function authIsAdmin(){
   // Usuario de Vento Nube: el rol lo da la nube (el mesero entra en «modo mesero»; dueño, admin y cajero usan toda la app).
-  try{ if(window.ventoNube && authUser && window.ventoNube.correo() === authUser) return window.ventoNube.rolActivo() !== 'mesero'; }catch(e){}
+  // Con la cuenta de Vento, solo el dueño y el administrador manejan el negocio; cajero, empleado y mesero no
+  // (ven lo de su trabajo y lo que el dueño les permita: ver «Permisos del equipo»).
+  try{ if(window.ventoNube && authUser && window.ventoNube.correo() === authUser){ const r = window.ventoNube.rolActivo(); return r === 'dueno' || r === 'admin'; } }catch(e){}
   const u = authUsers().find(x => x.user === authUser);
   return !u || u.role === 'admin';   // sin usuarios (dato viejo antes de roles) se trata como admin
 }
@@ -31481,6 +31490,93 @@ window.mesoraCelebrar = function(emojis){
     const p = document.querySelector('#pagosOv .modal, #pagosPanelOv .modal'); if(p) botonEn(p, p.querySelector('.modal-actions'));
     const g = document.getElementById('vpGrupo'); if(g && g.innerHTML && !g.querySelector('.comp-btn')) botonEn(g, g.querySelector('.vp-checks'));
   }).observe(document.body, { childList: true, subtree: true });
+})();
+</script>
+<script>
+/* ================= Roles del equipo y permisos =================
+   • Dueño y administrador (segundo administrador, lo asigna solo el dueño): todo. Lo que hace cada uno queda en la
+     actividad del equipo (solo el dueño la ve: «📜 Actividad del equipo»).
+   • Cajero, empleado y mesero: lo de su trabajo (vender, mesas, pedidos, música, carta). NO ven estadísticas,
+     contabilidad, historial ni ajustes, ni cambian productos, precios o inventario, salvo lo que el dueño o el
+     administrador les permitan en «👥 Permisos del equipo» (por rol).
+   • El «empleado» se llama según el negocio: vendedor, asesor de ventas, médico, barbero, estilista, técnico… */
+(function(){
+  'use strict';
+  const EMP_TIPO = { barberia: 'Barbero', salon_belleza: 'Estilista', estetica: 'Esteticista', manicure: 'Manicurista', gimnasio: 'Entrenador',
+    tatuajes: 'Tatuador', peluqueria_canina: 'Peluquero', consultorio: 'Médico', odontologia: 'Odontólogo', psicologia: 'Psicólogo',
+    fisioterapia: 'Fisioterapeuta', veterinaria: 'Veterinario', optica: 'Optómetra', laboratorio: 'Bacteriólogo', mecanico: 'Mecánico',
+    montallantas: 'Montallantero', servicio_tecnico: 'Técnico', lavadero: 'Lavador', abogado: 'Asesor', fotografia: 'Fotógrafo', sastreria: 'Modista',
+    zapateria: 'Zapatero', cerrajeria: 'Cerrajero', imprenta: 'Diseñador', ropa: 'Asesor de ventas', ropa_segunda: 'Asesor de ventas', cosmeticos: 'Asesor de ventas',
+    joyeria: 'Asesor de ventas', drogueria: 'Auxiliar de droguería', academia: 'Profesor', escuela_conduccion: 'Instructor', yoga: 'Instructor',
+    guarderia: 'Profesor', hotel: 'Recepcionista', hostal: 'Recepcionista', motel: 'Recepcionista', apartamentos: 'Anfitrión', salon_eventos: 'Coordinador',
+    distribuidora: 'Vendedor de ruta', discoteca: 'Bartender', karaoke: 'Bartender', bar: 'Mesero', parqueadero: 'Operador', cancha: 'Encargado' };
+  const EMP_FAM = { comida: 'Mesero', bar: 'Mesero', tienda: 'Vendedor', servicio: 'Estilista', orden: 'Técnico', salud: 'Profesional', aloja: 'Recepcionista',
+    ocio: 'Encargado', educa: 'Profesor', otro: 'Empleado' };
+  const plural = t => { const w = String(t).split(' '); w[0] = /[aeiouáéíóú]$/i.test(w[0]) ? w[0] + 's' : w[0] + 'es'; return w.join(' ').replace(/ónes\b/, 'ones'); };
+  function tipoActual(){ try{ return (typeof tipoNegocio === 'function' && tipoNegocio()) || null; }catch(e){ return null; } }
+  function empleadoNombre(pl){
+    const t = tipoActual(), k = t ? t.k : (typeof data !== 'undefined' && data && data.businessType) || '';
+    const n = EMP_TIPO[k] || (t && EMP_FAM[t.fam]) || 'Empleado';
+    return pl ? plural(n) : n;
+  }
+  function rolNombre(r, pl){
+    const m = { dueno: ['Dueño', 'Dueños'], admin: ['Administrador', 'Administradores'], cajero: ['Cajero', 'Cajeros'], mesero: ['Mesero', 'Meseros'] };
+    if(r === 'empleado') return empleadoNombre(pl);
+    return (m[r] || [r, r])[pl ? 1 : 0];
+  }
+  // Rol de quien usa este equipo: el de su cuenta de Vento (si entró con ella) o el del usuario local.
+  function rol(){
+    try{ if(window.ventoNube && typeof authUser !== 'undefined' && authUser && window.ventoNube.correo() === authUser) return window.ventoNube.rolActivo() || 'dueno'; }catch(e){}
+    try{ const u = authUsers().find(x => x.user === authUser); if(!u || u.role === 'admin') return 'dueno'; return u.role === 'empleado' ? 'empleado' : u.role === 'cajero' ? 'cajero' : 'mesero'; }catch(e){ return 'dueno'; }
+  }
+  const esJefe = () => { const r = rol(); return r === 'dueno' || r === 'admin'; };
+  const PERMISOS = [
+    ['historial', '📜', 'Ver el historial de ventas'],
+    ['productos', '✏️', 'Crear y editar productos y precios'],
+    ['inventario', '📦', 'Ver y ajustar el inventario'],
+    ['estadisticas', '📊', 'Ver las estadísticas del negocio'],
+    ['contabilidad', '📒', 'Ver la contabilidad y los gastos']
+  ];
+  const ROLES_EQUIPO = ['cajero', 'empleado', 'mesero'];
+  function permisos(){ if(typeof data === 'undefined' || !data) return {}; if(!data.permisosEquipo || typeof data.permisosEquipo !== 'object') data.permisosEquipo = {}; return data.permisosEquipo; }
+  function puede(p){ if(esJefe()) return true; const r = rol(); return !!((permisos()[r] || {})[p]); }
+  let ultimo = '';
+  function aplicar(){
+    if(typeof data === 'undefined' || !data || typeof authUser === 'undefined' || !authUser) return;
+    const equipo = !esJefe(), b = document.body;
+    const clave = rol() + '|' + PERMISOS.map(x => puede(x[0]) ? 1 : 0).join('');
+    b.classList.toggle('rol-equipo', equipo);
+    PERMISOS.forEach(x => b.classList.toggle('no-' + x[0], equipo && !puede(x[0])));
+    if(equipo){
+      const act = document.querySelector('nav button.active'), v = act && act.dataset.view;
+      if(v && (v === 'ajustes' || (PERMISOS.some(x => x[0] === v) && !puede(v)))){ const m = document.querySelector('nav button[data-view="mesas"]'); if(m) m.click(); }
+    }
+    if(clave !== ultimo){ ultimo = clave; pintarPanel(); }
+  }
+  // Panel del dueño / administrador: Ajustes → Negocio → «👥 Permisos del equipo»
+  function pintarPanel(){
+    const g = document.querySelector('#view-ajustes .settings-group[data-cat="negocio"]'); if(!g) return;
+    let box = document.getElementById('permisosEquipo');
+    if(!esJefe()){ if(box) box.remove(); return; }
+    if(!box){ box = document.createElement('div'); box.id = 'permisosEquipo'; box.className = 'settings-row'; box.style.cssText = 'flex-direction:column;align-items:stretch;gap:8px'; g.appendChild(box); }
+    const P = permisos(), e = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    box.innerHTML = '<div class="settings-row-text"><strong>👥 Permisos del equipo</strong><span>Tu equipo (' + e(rolNombre('cajero', true).toLowerCase()) + ', ' + e(rolNombre('empleado', true).toLowerCase()) + ' y ' +
+      e(rolNombre('mesero', true).toLowerCase()) + ') vende y atiende, pero NO ve las estadísticas, la contabilidad, el historial ni los ajustes, ni cambia productos o inventario. Aquí decides qué más puede hacer cada uno. Todo lo que hagan queda en la actividad del equipo.</span></div>' +
+      ROLES_EQUIPO.map(r => '<details' + (r === 'empleado' ? ' open' : '') + '><summary style="font-weight:700;cursor:pointer;padding:6px 0">' + e(rolNombre(r, true)) + '</summary>' +
+        PERMISOS.map(x => '<label style="display:flex;gap:10px;align-items:center;padding:6px 2px"><input type="checkbox" data-perm="' + r + '.' + x[0] + '"' + ((P[r] || {})[x[0]] ? ' checked' : '') + ' style="width:auto"> ' + x[1] + ' ' + e(x[2]) + '</label>').join('') + '</details>').join('');
+    box.onchange = ev => {
+      const c = ev.target.closest('[data-perm]'); if(!c) return;
+      const [r, p] = c.dataset.perm.split('.');
+      const P2 = permisos(); P2[r] = P2[r] || {}; P2[r][p] = c.checked;
+      try{ window.ventoAuditar && window.ventoAuditar('permiso ' + (c.checked ? 'dado' : 'quitado'), rolNombre(r, true) + ': ' + (PERMISOS.find(x => x[0] === p) || [p, '', p])[2]); }catch(x){}
+      try{ saveData(); }catch(x){}
+      showToast((c.checked ? '✅ ' : '🚫 ') + rolNombre(r, true) + ': ' + (PERMISOS.find(x => x[0] === p) || [p, '', p])[2].toLowerCase());
+    };
+  }
+  window.ventoRoles = { rol, esJefe, puede, aplicar, rolNombre, empleadoNombre, PERMISOS };
+  window.ventoRolNombre = rolNombre;
+  setInterval(aplicar, 2000);
+  document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('nav button[data-view], .more-tile[data-go]'); if(b) setTimeout(aplicar, 50); }, true);
 })();
 </script>
 </body>
