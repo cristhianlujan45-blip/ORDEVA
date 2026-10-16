@@ -41,7 +41,9 @@ public final class AvisoPago {
     private static final Pattern PESOS = Pattern.compile("(?:\\$|\\bCOP)\\s?(\\d{1,3}(?:[.,]\\d{3})+|\\d+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern PESOS2 = Pattern.compile("(\\d{1,3}(?:[.,]\\d{3})+|\\d+)\\s*(?:pesos|cop)\\b", Pattern.CASE_INSENSITIVE);
     // Sin signo: el SMS de DaviPlata (85888) dice «recibiste 100,000 en tu DaviPlata» o «Recibiste 140,000. Para saber mas…».
-    private static final Pattern PESOS3 = Pattern.compile("\\b(?:recibiste|recibi[oó]|has recibido|ha recibido|te llegaron|le llegaron|llegaron|abono de|ingreso de|por|de)\\s+(\\d{1,3}(?:[.,]\\d{3})+(?![.,]?\\d)|\\d{1,7}(?!\\d|[.,]\\d))(?!\\s*(?:%|min|seg|horas?|d[ií]as?|veces))", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PESOS3 = Pattern.compile("\\b(?:recibiste|recibi[oó]|has recibido|ha recibido|te llegaron|le llegaron|llegaron|abono de|ingreso de|por|de"
+            // Nequi también escribe el valor sin $: «MARIBE ARIAS te envió 1500, ¡lo mejor!» (1.41.3)
+            + "|(?:te|le)\\s+(?:envi[oó]|enviaron|pas[oó]|pasaron|mand[oó]|mandaron|transfiri[oó]|transfirieron|consign[oó]|consignaron|gir[oó]|giraron|pag[oó]|pagaron))\\s+(\\d{1,3}(?:[.,]\\d{3})+(?![.,]?\\d)|\\d{1,7}(?!\\d|[.,]\\d))(?!\\s*(?:%|min|seg|horas?|d[ií]as?|veces))", Pattern.CASE_INSENSITIVE);
 
     static boolean esBanco(String app) { return app != null && BANCO.matcher(app).find(); }
 

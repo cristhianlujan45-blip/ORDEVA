@@ -141,6 +141,12 @@ public class AvisoPagoPrueba {
         String[] otraNo = { "Enviaste $20.000 a otra entidad", "Transferencia a otro banco por $50.000 rechazada", "Pagaste $10.000 desde tu DaviPlata a otra entidad" };
         for (String x : otraNo) chk("No es plata recibida: «" + x + "»", !AvisoPago.esRecibido(x), x);
 
+        // Nequi real (captura del dueño, 16-oct 1:45 p. m.): título «Envío», el valor SIN $ → antes no sonaba
+        String nq = "Envío MARIBE ARIAS te envió 1500, ¡lo mejor!";
+        chk("Nequi «MARIBE ARIAS te envió 1500, ¡lo mejor!» (sin $) → $1500", AvisoPago.esRecibido(nq) && AvisoPago.monto(nq) == 1500, AvisoPago.esRecibido(nq) + " " + AvisoPago.monto(nq));
+        chk("Nequi «te envió 25,000» → $25000 y «te envió 1.500.000» → $1500000", AvisoPago.monto("JUAN te envió 25,000") == 25000 && AvisoPago.monto("ANA te envió 1.500.000, ¡lo mejor!") == 1500000, AvisoPago.monto("JUAN te envió 25,000"));
+        chk("Voz: «Recibiste 1500 pesos por Nequi.»", "Recibiste 1500 pesos por Nequi.".equals(AvisoPago.frase("Nequi", 1500, nq)), AvisoPago.frase("Nequi", 1500, nq));
+
         String llaves = "DaviPlata | Transaccion exitosa: Recibiste Plata de otra entidad usando Llaves, consulta el detalle de tus movimientos desde el app DaviPlata.";
         chk("DaviPlata por llave (sin valor): es plata recibida y SIN valor → se espera el SMS", AvisoPago.esRecibido(llaves) && AvisoPago.monto(llaves) == 0 && AvisoPago.esPlataSinValor(llaves) && AvisoPago.esBreB(llaves), AvisoPago.monto(llaves));
         String sms1 = "DaviPlata: recibiste  100,000 en tu DaviPlata. Usalos de forma segura para pagar, comprar y mucho mas! Conoce todo lo que puedes hacer en www.daviplata.com";

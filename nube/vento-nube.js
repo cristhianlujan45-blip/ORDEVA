@@ -201,7 +201,7 @@
         return rpc('guardar_datos', { p_negocio: st.negocio.id, p_datos: mezcla, p_version: nube.version });
       }).then(function(v){
         st.version = v; st.sucio = false; st.ultimo = Date.now(); guardarSt(); avisarOtros(v);
-        aviso('🔄 Otro celular también hizo cambios: se juntaron los dos.');
+        // (sin aviso: los datos de los celulares se juntan solos, en silencio — el dueño pidió quitar esos avisos)
         return base('put', clonar(mezcla));
       });
     }).catch(function(e){ ultimoError = msgError(e); clearTimeout(tSubir); tSubir = setTimeout(subir, 10000); });
@@ -221,9 +221,8 @@
         if(r.data.version > (st.version || 0)){ if(st.sucio) return subir(); return bajar().then(function(){ avisoBajada(); }); }
       }).catch(function(e){ ultimoError = msgError(e); pintarEstado(); });
   }
-  // «Datos actualizados»: como mucho un aviso por minuto (con la sincronización al instante llegarían seguido).
-  var tAvisoBajada = 0;
-  function avisoBajada(){ if(Date.now() - tAvisoBajada > 60000){ tAvisoBajada = Date.now(); aviso('🔄 Datos al día con tus otros equipos.'); } }
+  // «Datos al día con tus otros equipos»: ya no se avisa (el dueño lo pidió); los datos se actualizan solos, en silencio.
+  function avisoBajada(){ }
 
   // ---------- Canal en vivo: «hay datos nuevos» llega a los demás equipos al instante ----------
   // Solo viaja el número de versión (nunca los datos): el equipo que lo recibe los baja con su sesión.

@@ -101,6 +101,11 @@ public class EscuchaPrueba {
         chk("Nequi: notificación «💜 Recibiste $2.500 por Nequi» con el texto del banco (se ve con el celular bloqueado)", VentoApp.notifs.size() == 1 && VentoApp.notifs.get(0)[0].equals("💜 Recibiste $2.500 por Nequi") && VentoApp.notifs.get(0)[2].contains("ANA RUIZ te envió $2.500"), VentoApp.notifs.size());
         chk("Nequi: la ventana emergente lleva el valor «$2.500», «Nequi» y es un pago confirmado", VentoApp.notifs.size() == 1 && VentoApp.notifs.get(0)[3].equals("$2.500") && VentoApp.notifs.get(0)[4].equals("Nequi") && VentoApp.notifs.get(0)[5].equals("ok"), VentoApp.notifs.isEmpty() ? "" : String.join(" | ", VentoApp.notifs.get(0)));
 
+        // 7b) Nequi real (captura del 16-oct): título «Envío» y el valor SIN $ → suena, con notificación y ventana
+        sp = nuevo();
+        app(sp, "Nequi", "Envío", "MARIBE ARIAS te envió 1500, ¡lo mejor!", "k7b:");
+        chk("Nequi «Envío · MARIBE ARIAS te envió 1500, ¡lo mejor!» → suena «Recibiste 1500 pesos por Nequi.» y sale «💜 Recibiste $1.500 por Nequi»", VentoApp.dichos.contains("Recibiste 1500 pesos por Nequi.") && VentoApp.notifs.stream().anyMatch(n -> n[0].equals("💜 Recibiste $1.500 por Nequi") && n[3].equals("$1.500")), VentoApp.dichos);
+
         // 8) «Pasaste $100 a otro DaviPlata» (plata que SALE): no suena
         limpiar();
         app(sp, "DaviPlata", "DaviPlata", "Pasaste $100 a otro DaviPlata. Para saber mas, consulta tus movimientos.", "k8:");
