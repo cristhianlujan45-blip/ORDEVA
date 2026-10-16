@@ -482,6 +482,20 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     chk('26. Nequi que entiende la página: por el camino de la app Android (notificación + ventana) con «$1.500» y «Nequi»', r26.pn.some(x => x.t === '💜 Recibiste $1.500 por Nequi' && x.v === '$1.500' && x.b === 'Nequi' && x.tipo === 'ok' && /MARIBE ARIAS te envió 1500/.test(x.o)) && r26.notifs === 0, r26);
     chk('26. Un SMS falso también abre su ventana roja («🚨 Mensaje de pago FALSO»)', r26.pn.some(x => /FALSO/.test(x.t) && x.tipo === 'falso' && x.v === '$9.000'), r26);
 
+    // 27. 🪟 Si en un celular la ventana del pago NO se abrió, el registro lo dice (con marca, Android y el permiso que falta)
+    //     y le llega al administrador a 🐞 Errores, para saber en qué celular falla sin pedir pantallazos.
+    const r27 = await p.evaluate(() => {
+      const A = window.VentoAndroid, e0 = window.ventoError; window.__e27 = [];
+      window.ventoError = (a, b, c, d) => { window.__e27.push({ a, b, c }); };
+      A.pagosAvisosDiag = () => JSON.stringify({ ultimo: Date.now(), vivo: true, lista: [], traza: [
+        { t: Date.now() - 2000, app: 'Nequi', txt: 'Envío NOMBRE te envió #, ¡lo mejor!', r: '🔊 Recibiste 1500 pesos por Nequi.' },
+        { t: Date.now(), app: 'Vento', txt: '💜 Recibiste $# por Nequi', r: '🪟 la ventana no se abrió (celular bloqueado, samsung Android 14, falta el permiso: completa)' } ] });
+      window.ventoPagosDiag();
+      window.ventoError = e0;
+      return window.__e27;
+    });
+    chk('27. «🪟 la ventana no se abrió (celular bloqueado, samsung Android 14, falta el permiso…)» le llega al administrador', r27.some(x => x.a === 'pago' && /la ventana no se abrió/.test(x.b) && /samsung Android 14/.test(x.b)), r27);
+
     // 11. Navegador (sin la app): la voz sale con el volumen elegido (hasta 100 %)
     const ctx2 = await b.newContext({ viewport: { width: 1200, height: 900 } });
     await ctx2.route('**/*', r => new URL(r.request().url()).hostname === 'localhost' ? r.continue() : r.abort());

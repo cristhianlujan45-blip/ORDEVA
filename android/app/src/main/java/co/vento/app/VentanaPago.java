@@ -136,6 +136,8 @@ final class VentanaPago {
         try { c.startActivity(new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:" + c.getPackageName())).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); return true; } catch (Throwable e) { return false; }
     }
 
+    static boolean mostrandoEncima() { return vista != null; }
+
     static void cerrar() { Runnable r = cerrarVista; if (r != null) try { r.run(); } catch (Throwable ignorado) { } }
 
     private static int dp(Context c, float v) { return Math.round(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, c.getResources().getDisplayMetrics())); }

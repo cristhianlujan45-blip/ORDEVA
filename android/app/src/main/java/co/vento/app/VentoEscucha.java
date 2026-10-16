@@ -512,7 +512,7 @@ public class VentoEscucha extends NotificationListenerService {
 
     static synchronized void traza(SharedPreferences sp, String app, String texto, String resultado) {
         try {
-            resultado = (resultado == null ? "" : resultado) + demora();
+            resultado = (resultado == null ? "" : resultado) + ("Vento".equals(app) ? "" : demora());   // (las líneas de la ventana no llevan la demora del banco)
             JSONArray l = new JSONArray(sp.getString(PREF_TRAZA, "[]"));
             l.put(new JSONObject().put("t", System.currentTimeMillis()).put("app", app == null ? "" : app).put("txt", AvisoPago.sinDatos(texto)).put("r", resultado == null ? "" : resultado));
             while (l.length() > 25) l.remove(0);

@@ -77,7 +77,7 @@
         <activity
             android:name=".PagoActivity"
             android:exported="false"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen"
             android:launchMode="singleTop"
             android:taskAffinity="co.vento.app.pago"
             android:excludeFromRecents="true"

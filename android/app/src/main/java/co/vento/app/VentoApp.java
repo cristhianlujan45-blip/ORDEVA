@@ -185,6 +185,18 @@ public class VentoApp extends Application {
         if (plan.encima) VentanaPago.mostrarEncima(app, valor, banco, frase, o, tipo);
         if (plan.directo) { if (plan.ancla) VentanaPago.ancla(app); VentanaPago.abrirPantalla(app, vi); }
         prenderPantalla();
+        // 🪟 Registro (Ajustes → Pagos y 🐞 Errores del panel): ¿la ventana SÍ se abrió en este celular? Si no, por qué.
+        if (ventana && (plan.pantallaCompleta || plan.directo || plan.encima)) {
+            final long desde = System.currentTimeMillis(); final PlanVentana pl = plan; final boolean bl = bloqueado; final String t0 = titulo;
+            ui.postDelayed(() -> {
+                try {
+                    boolean abrio = PagoActivity.abierta >= desde || (pl.encima && VentanaPago.mostrandoEncima());
+                    String r = abrio ? "🪟 ventana abierta" : "🪟 la ventana no se abrió (" + (bl ? "celular bloqueado" : "usando otra app") + ", " + Build.MANUFACTURER + " Android " + Build.VERSION.RELEASE
+                            + (pl.falta.isEmpty() ? "" : ", falta el permiso: " + pl.falta) + ")";
+                    VentoEscucha.traza(app.getSharedPreferences("vento", MODE_PRIVATE), "Vento", t0, r);
+                } catch (Throwable ignorado) { }
+            }, 3000);
+        }
     }
 
     /** Prende la pantalla unos segundos (si estaba apagada) para que se vea la notificación del pago. */
