@@ -3918,7 +3918,7 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
           <input id="ytPl" class="mz-in" placeholder="ID de la lista (si lo dejas vacío, se crea sola)" autocapitalize="none" autocomplete="off">
           <div class="mz-actions"><button class="btn-warn" id="ytConn" type="button">Conectar con Google</button><button class="btn-ghost" id="ytOpen" type="button">Abrir lista en YouTube Music</button></div>
         </div>
-        <div class="settings-desc" id="ytAutoInfo">🔄 <b>Reconexión automática:</b> con Vento Nube y el Servidor Vento activos, pega una vez el <b>Client Secret</b> (Google Cloud → Credenciales → tu ID de cliente de OAuth) y toca «Conectar con Google». El servidor guarda la llave de renovación cifrada y Vento renueva la conexión solo antes de que venza, en todos los celulares, sin ventanas ni botón «Reconectar». <b>Importante:</b> en Google Cloud → «Pantalla de consentimiento de OAuth» toca <b>Publicar app</b> (pasar a «En producción»); si la dejas «En prueba», Google vence la llave cada 7 días. Al conectar, Vento va a Google y Google la devuelve sola (sin ventanitas): esta dirección debe estar en «URIs de redireccionamiento autorizados»: <b id="ytRedirUri"></b></div>
+        <div class="settings-desc" id="ytAutoInfo">🔄 <b>Reconexión automática:</b> con tu cuenta de Vento y el Servidor Vento activos, pega una vez el <b>Client Secret</b> (Google Cloud → Credenciales → tu ID de cliente de OAuth) y toca «Conectar con Google». El servidor guarda la llave de renovación cifrada y Vento renueva la conexión solo antes de que venza, en todos los celulares, sin ventanas ni botón «Reconectar». <b>Importante:</b> en Google Cloud → «Pantalla de consentimiento de OAuth» toca <b>Publicar app</b> (pasar a «En producción»); si la dejas «En prueba», Google vence la llave cada 7 días. Al conectar, Vento va a Google y Google la devuelve sola (sin ventanitas): esta dirección debe estar en «URIs de redireccionamiento autorizados»: <b id="ytRedirUri"></b></div>
         <details class="settings-desc"><summary>Cómo obtener el Client ID (una sola vez)</summary>
           1) En console.cloud.google.com crea un proyecto. 2) Habilita «YouTube Data API v3». 3) En «Pantalla de consentimiento de OAuth» elige Externo y agrega tu correo como usuario de prueba. 4) En Credenciales crea un «ID de cliente de OAuth» tipo Aplicación web y en «Orígenes de JavaScript autorizados» pon la dirección https donde tienes esta app (sin / al final). 5) Copia el Client ID aquí. Para que la app busque y reproduzca sola solo necesitas una «Clave de API» (Credenciales → Crear credencial → Clave de API, limitada a YouTube Data API v3): no caduca cada hora. El Client ID solo hace falta para copiar las canciones a la lista de YouTube Music. No funciona si abres la app como archivo del celular: debe estar en esa dirección https. La conexión dura cerca de 1 hora; después toca Conectar otra vez.
         </details>
@@ -3958,7 +3958,7 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
       <button type="button" class="ajustes-cat" data-cat="apariencia"><span class="ac-icon">🎨</span><span class="ac-label">Apariencia</span><span class="ac-arrow">›</span></button>
       <button type="button" class="ajustes-cat" data-cat="voz"><span class="ac-icon">🎤</span><span class="ac-label">Voz</span><span class="ac-arrow">›</span></button>
       <button type="button" class="ajustes-cat" data-cat="sonidos"><span class="ac-icon">🔊</span><span class="ac-label">Sonidos</span><span class="ac-arrow">›</span></button>
-      <button type="button" class="ajustes-cat" data-cat="nube"><span class="ac-icon">☁️</span><span class="ac-label">Nube y usuarios</span><span class="ac-arrow">›</span></button>
+      <button type="button" class="ajustes-cat" data-cat="nube"><span class="ac-icon">👥</span><span class="ac-label">Mi cuenta y mi equipo</span><span class="ac-arrow">›</span></button>
       <button type="button" class="ajustes-cat" data-cat="datos"><span class="ac-icon">💾</span><span class="ac-label">Datos y herramientas</span><span class="ac-arrow">›</span></button>
       <button type="button" class="ajustes-cat" data-cat="ayuda"><span class="ac-icon">📖</span><span class="ac-label">Guía y soporte</span><span class="ac-arrow">›</span></button>
       <button type="button" class="ajustes-cat ajustes-cat-danger" data-cat="peligro"><span class="ac-icon">⚠️</span><span class="ac-label">Zona de riesgo</span><span class="ac-arrow">›</span></button>
@@ -4138,10 +4138,10 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
     </div>
 
     <div class="settings-group" hidden data-cat="nube">
-      <h2>☁️ Vento Nube: usuarios y varios celulares</h2>
-      <div class="settings-desc">Cada persona entra con su correo y contraseña, y todos los celulares del negocio (caja, meseros, el dueño desde la casa) ven los mismos datos al instante. Roles: dueño, administrador, cajero y mesero. Respaldos automáticos en la nube. Es opcional: sin la nube todo sigue guardándose en este celular.</div>
-      <div class="settings-row"><div class="settings-row-text"><strong>Estado</strong><span id="nubeEstadoAj">…</span></div></div>
-      <button type="button" class="btn-primary" id="nubeAbrirAj" style="width:100%">☁️ Abrir Vento Nube</button>
+      <h2>👥 Mi cuenta y mi equipo</h2>
+      <div class="settings-desc">Tus datos se guardan solos en tu cuenta de Vento y se ven al instante en todos tus celulares. Invita a tu equipo (empleados, meseros, cajeros o un segundo administrador): cada persona entra con su propio correo y solo ve lo de su trabajo y lo que tú le permitas.</div>
+      <div class="settings-row"><div class="settings-row-text"><strong>Cuenta</strong><span id="nubeEstadoAj">…</span></div></div>
+      <button type="button" class="btn-primary" id="nubeAbrirAj" style="width:100%">👥 Invitar y manejar mi equipo</button>
     </div>
     <div class="settings-group" hidden data-cat="datos">
       <h2>Datos y transferencia</h2>
@@ -5371,7 +5371,7 @@ export default {
     <button type="button" class="btn-ghost auth-nueva" id="authNueva" hidden>➕ Crear cuenta nueva</button>
     <button type="button" class="auth-link" id="authForgot">¿Olvidaste tu contraseña?</button>
     <button type="button" class="auth-google" id="authGoogle" hidden><svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>Continuar con Google</button>
-    <button type="button" class="btn-ghost" id="authNube">☁️ Entrar con Vento Nube (equipo con varios celulares)</button>
+    <button type="button" class="btn-ghost" id="authNube">👥 Me invitaron a un negocio (tengo un código)</button>
     <button type="button" class="auth-link" id="authRestoreBtn">📥 ¿Ya tenías una cuenta? Restaura tu copia de respaldo</button>
     <input type="file" id="authRestoreFile" accept="application/json,.json" hidden>
   </form>
@@ -5597,6 +5597,7 @@ window.ventoAplicarDatosNube = async (obj, respaldarLocal) => {
     await storageSet(STORAGE_KEY, JSON.stringify(obj));
     if(typeof authUser !== 'undefined' && authUser) await loadData();
   }finally{ window.__nubeAplicando = false; }
+  try{ window.dispatchEvent(new Event('vento-datos-remotos')); }catch(e){}
   // Llegaron datos de otro equipo: si traen fotos nuevas de productos, se bajan también.
   setTimeout(() => { try{ window.fotosDeLaNube && window.fotosDeLaNube(); }catch(e){} }, 600);
 };
@@ -8718,6 +8719,15 @@ async function cerrarSesion(){
   location.reload();
 }
 window.cerrarSesion = cerrarSesion;
+// «Cerrar sesión» desde los avisos de la suscripción (cancelada, vencida, sin pagar): sin preguntar otra vez (el botón
+// ya lo dice), guarda todo, cierra también la sesión de la cuenta de Vento en este celular y vuelve a la entrada,
+// donde se puede entrar con otra cuenta. Los datos no se borran.
+window.ventoSalir = async function(){
+  try{ saveData(); }catch(e){}
+  try{ if(window.ventoNube && window.ventoNube.salir) await Promise.race([window.ventoNube.salir(), new Promise(r => setTimeout(r, 4000))]); }catch(e){}
+  try{ localStorage.removeItem(AUTH_SESSION_KEY); }catch(e){}
+  location.reload();
+};
 navMoreSheet.addEventListener('click', e => {
   if(e.target === navMoreSheet){ navMoreSheet.classList.remove('show'); return; }
   const tile = e.target.closest('.more-tile[data-go]');
@@ -18667,7 +18677,7 @@ document.addEventListener('click', e => {
   const n = rcptNube();
   if(!n){ showToast('Ese comprobante no está en este dispositivo.'); return; }
   showToast('☁️ Trayendo el comprobante…', 2000);
-  n.bajar('rcpt/' + rid).then(u => { if(u) ver(u); else showToast('Ese comprobante no está en la nube ni en este dispositivo.'); });
+  n.bajar('rcpt/' + rid).then(u => { if(u) ver(u); else showToast('Ese comprobante no está en tu cuenta ni en este dispositivo.'); });
 }, true);
 document.getElementById('rcptClose').addEventListener('click', () => document.getElementById('rcptOverlay').classList.remove('show'));
 
@@ -18929,7 +18939,7 @@ function accUsuariosPintar(){
         localStorage.setItem(AUTH_USERS_KEY, JSON.stringify(l)); showToast('✅ Contraseña de ' + u.user + ' cambiada.');
         // Cuenta con correo: la contraseña es la misma en todos los celulares (se cambia también en la nube).
         const nb = authEsCorreo(u.user) && u.user === authUser ? authNubeCuentas() : null;
-        if(nb && nb.conectado(u.user)) nb.nuevaClave(np).catch(e => showToast('⚠️ En este celular quedó cambiada, pero en la nube no (' + nb.msgError(e) + '). En otros celulares sigue la anterior.', 8000));
+        if(nb && nb.conectado(u.user)) nb.nuevaClave(np).catch(e => showToast('⚠️ En este celular quedó cambiada, pero en tu cuenta no (' + nb.msgError(e) + '). En otros celulares sigue la anterior.', 8000));
       };
       row.append(bRol, bPw);
       if(u.user !== authUser){
@@ -19109,9 +19119,9 @@ async function authEnlaceProcesar(){
   try{ correo = await nb.correoDeEnlace(L.tok); }
   catch(e){ return authEnlaceDialogo('📧 El enlace no sirvió', 'El enlace del correo ya se usó o venció. Vuelve a pedir otro en «¿Olvidaste tu contraseña?».'); }
   if(L.nube){                                                  // cuenta de Vento Nube
-    const p = await authEnlaceDialogo('🔑 Contraseña nueva', 'Correo comprobado: ' + correo + '.\nEscribe tu contraseña nueva de Vento Nube.', true);
+    const p = await authEnlaceDialogo('🔑 Contraseña nueva', 'Correo comprobado: ' + correo + '.\nEscribe tu contraseña nueva de Vento.', true);
     if(!p) return nb.soltarEnlace(L.tok);
-    try{ await nb.claveConEnlace(L.tok, p); showToast('✅ Contraseña de Vento Nube cambiada. Entra con tu correo y la contraseña nueva.', 8000); }
+    try{ await nb.claveConEnlace(L.tok, p); showToast('✅ Contraseña de Vento cambiada. Entra con tu correo y la contraseña nueva.', 8000); }
     catch(e){ showToast('⚠️ ' + (nb.msgError ? nb.msgError(e) : e.message), 8000); }
     return nb.soltarEnlace(L.tok);
   }
@@ -19531,18 +19541,18 @@ async function authConectarNube(email, pass, crearSiFalta){
     catch(e){
       if(!authClaveMala(e) || !crearSiFalta) throw e;
       // Cuenta vieja que solo existía en este celular: se crea en la nube con el mismo correo y contraseña.
-      try{ const r = await nb.crearCuenta(email, pass, ''); if(!r.sesion){ showToast('📧 Te mandamos un correo a ' + email + ' para confirmar la cuenta. Al confirmarla, tus datos quedan en la nube.', 9000); return; } lista = []; }
+      try{ const r = await nb.crearCuenta(email, pass, ''); if(!r.sesion){ showToast('📧 Te mandamos un correo a ' + email + ' para confirmar la cuenta. Al confirmarla, tus datos quedan guardados en tu cuenta.', 9000); return; } lista = []; }
       catch(e2){
-        if(authYaExiste(e2)){ showToast('⚠️ ' + email + ' ya tiene cuenta en Vento Nube con OTRA contraseña. Para ver los mismos datos en todos tus celulares: cierra sesión y entra con la contraseña de esa cuenta.', 10000); return; }
+        if(authYaExiste(e2)){ showToast('⚠️ ' + email + ' ya tiene cuenta de Vento con OTRA contraseña. Para ver los mismos datos en todos tus celulares: cierra sesión y entra con la contraseña de esa cuenta.', 10000); return; }
         throw e2;
       }
     }
     if(lista.length) await nb.vincular(lista[0], authDatosPristinos(data));
     else await nb.crearNegocio((data && data.businessName) || 'Mi negocio');
-    showToast('☁️ Cuenta conectada: con ' + email + ' ves los mismos datos en cualquier celular.', 5000);
+    showToast('✅ Cuenta conectada: con ' + email + ' ves los mismos datos en cualquier celular.', 5000);
   }catch(e){
     if(/not confirmed/i.test(String(e && e.message))) showToast('📧 Falta confirmar el correo ' + email + ': abre el mensaje que te llegó. Mientras tanto los datos quedan solo en este celular.', 8000);
-    else if(!authSinRed(e)) showToast('⚠️ Vento Nube: ' + nb.msgError(e), 6000);
+    else if(!authSinRed(e)) showToast('⚠️ Tu cuenta de Vento: ' + nb.msgError(e), 6000);
   }
 }
 // Entrar con una cuenta de la nube que no está en este celular (celular nuevo) o cuya contraseña se cambió
@@ -19574,7 +19584,7 @@ async function authEntrarDesdeNube(email, pass){
   if(n) await nb.vincular(n, true);          // se bajan los datos del negocio a este celular
   await enterApp(email, null);
   if(!n) await nb.crearNegocio((data && data.businessName) || 'Mi negocio');
-  showToast(n ? '☁️ Listo: estos son los datos de «' + n.nombre + '», los mismos de tus otros celulares.' : '☁️ Cuenta lista en este celular.', 5000);
+  showToast(n ? '✅ Listo: estos son los datos de «' + n.nombre + '», los mismos de tus otros celulares.' : '✅ Cuenta lista en este celular.', 5000);
 }
 function showAuth(firstRun){
   const ov = document.getElementById('authOverlay');
@@ -19710,8 +19720,8 @@ function showAuth(firstRun){
           localStorage.setItem(CURRENT_SEDE_KEY, sede.id);
         }
         await enterApp(user, setup);
-        if(enNube === 'ok') nb.crearNegocio(biz || (data && data.businessName) || 'Mi negocio').catch(x => { if(!authSinRed(x)) showToast('⚠️ Vento Nube: ' + nb.msgError(x), 6000); });
-        else if(enNube === 'confirmar') showToast('📧 Te mandamos un correo a ' + user + ' para confirmar la cuenta. Al confirmarla, tus datos quedan en la nube.', 9000);
+        if(enNube === 'ok') nb.crearNegocio(biz || (data && data.businessName) || 'Mi negocio').catch(x => { if(!authSinRed(x)) showToast('⚠️ Tu cuenta de Vento: ' + nb.msgError(x), 6000); });
+        else if(enNube === 'confirmar') showToast('📧 Te mandamos un correo a ' + user + ' para confirmar la cuenta. Al confirmarla, tus datos quedan guardados en tu cuenta.', 9000);
       }else{
         const waitMin = authLoginLocked(user);
         if(waitMin){ err.textContent = '🔒 Demasiados intentos con "' + user + '". Espera ' + waitMin + ' min. e intenta de nuevo.'; return; }
@@ -22345,7 +22355,7 @@ async function yConectarConCodigo(silencio,listo){
     avisar('⏳ Terminando la conexión con Google…',5000);
     // Vento Nube tarda unos segundos en estar lista después de abrir la app: se espera hasta 90 s.
     let n=0;const t=setInterval(()=>{
-      if(!ySrv()){if(++n>180){clearInterval(t);avisar('⚠️ No pude terminar la conexión con Google: entra a Vento Nube (Ajustes) y toca «Conectar con Google» otra vez.');}return;}
+      if(!ySrv()){if(++n>180){clearInterval(t);avisar('⚠️ No pude terminar la conexión con Google: entra a Ajustes → YouTube y toca «Conectar con Google» otra vez.');}return;}
       clearInterval(t);
       window.ventoGoogle.canjear(code,v.cid,v.secret||'',v.redir).then(async j=>{
         yGuardaVuelta(null);
@@ -26206,7 +26216,7 @@ async function licActivar(texto, silencioso){
   // Licencia del proveedor (VENTO-XXXX-XXXX-XXXX): la activa el servidor en el negocio de la cuenta.
   const lic = /VENTO-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}/i.exec(String(texto || '').replace(/\s+/g, ''));
   if(lic){
-    if(!(window.ventoSuscripcion && window.ventoSuscripcion.canjear)){ if(!silencioso) showToast('⚠️ Para activar esa licencia entra con tu cuenta de Vento Nube (correo y contraseña).', 8000); return false; }
+    if(!(window.ventoSuscripcion && window.ventoSuscripcion.canjear)){ if(!silencioso) showToast('⚠️ Para activar esa licencia entra con tu cuenta de Vento (correo y contraseña).', 8000); return false; }
     try{ const r = await window.ventoSuscripcion.canjear(lic[0]); showToast('🎉 Licencia activada: plan ' + String(r.plan_id || '').toUpperCase() + ' hasta el ' + new Date(r.hasta).toLocaleDateString('es-CO') + '.', 9000); return true; }
     catch(e){ if(!silencioso) showToast('⚠️ ' + ((e && e.message) || 'No se pudo activar la licencia.'), 8000); return false; }
   }
@@ -26366,9 +26376,11 @@ function subPaywall(motivo){
         '<button class="btn-primary" id="subWa" type="button" style="width:100%;padding:13px;font-size:15px">✅ Ya pagué: enviar comprobante por WhatsApp</button>' +
         '<input id="subInput" class="mz-in" placeholder="¿Ya pagaste? Pega aquí tu código de activación" autocomplete="off" autocapitalize="none" spellcheck="false" style="width:100%;box-sizing:border-box">' +
         '<button class="btn-ghost" id="subGo" type="button" style="width:100%">✅ Activar</button>' +
+        '<button class="btn-ghost" id="subSalir" type="button" hidden style="width:100%">🚪 Cerrar sesión</button>' +
         '<button class="btn-close" id="subNo" type="button">Cerrar</button></div></div>';
     document.body.appendChild(ov);
     ov.querySelector('#subNo').onclick = () => ov.classList.remove('show');
+    ov.querySelector('#subSalir').onclick = () => { try{ window.ventoSalir(); }catch(e){ location.reload(); } };
     ov.querySelector('#subWa').onclick = subRenovarWa;
     ov.querySelector('#subGo').onclick = async () => { if(await licActivar(ov.querySelector('#subInput').value)){ ov.classList.remove('show'); } };
   }
@@ -26380,6 +26392,7 @@ function subPaywall(motivo){
      st.k === 'gracia' ? 'Tu suscripción está por cortarse: te quedan <b>' + st.dias + ' día' + (st.dias === 1 ? '' : 's') + '</b> de gracia. Renueva tu suscripción' :
      'Renueva tu suscripción') + (SUSCRIPCION_PRECIO_TEXTO ? ': <b>' + SUSCRIPCION_PRECIO_TEXTO + '</b>.' : '.') + ' Escríbenos por WhatsApp con el código de tu negocio y te mandamos tu código de activación.';
   ov.querySelector('#subCod').textContent = codigoNegocio();
+  ov.querySelector('#subSalir').hidden = !(st.suspendido || st.k === 'vencida');   // se acabó la mensualidad: también puede salir
   subPlanesPintar(ov.querySelector('#subPlanes'));
   ov.classList.add('show');
 }
@@ -28852,7 +28865,7 @@ let fotosListas = false;
         paso(1, 'Usa la app Vento en el celular donde tienes DaviPlata', A ? 'Ya estás en la app Vento para Android. 👍' + (window.ventoAppSinSms && window.ventoAppSinSms() ? '<br><small>Para que también lea los <b>SMS</b> del banco, actualízala: <a href="' + APK + '" download="vento.apk" rel="noopener">⬇️ vento.apk</a> (se instala encima, no se borra nada).</small>' : '')
           : window.ventoAppVieja && window.ventoAppVieja() ? '<b>Estás en la app Vento, pero es una versión VIEJA' + (window.ventoAppVersion() ? ' (' + escp(window.ventoAppVersion()) + ')' : '') + '</b> que todavía no lee los avisos de pagos. Actualízala:' +
             '<br><a class="btn-primary gp-btn" href="' + APK + '" download="vento.apk" rel="noopener">⬇️ Descargar la app nueva (vento.apk)</a>' +
-            '<ol style="margin:6px 0 0;padding-left:20px;line-height:1.5;font-size:14px"><li>Ábrela desde la notificación de la descarga o en <b>Archivos → Descargas</b>.</li><li>Si pregunta, <b>Configuración → Permitir de esta fuente</b>.</li><li>Toca <b>Actualizar</b> (no se borra nada) y luego <b>Abrir</b>.</li><li>Si dice <b>«No se instaló la app»</b> o <b>«conflicto con un paquete»</b>: revisa que tu cuenta esté en Vento Nube (Ajustes), desinstala la Vento vieja e instala la nueva; al entrar con tu correo vuelven tus datos.</li></ol>'
+            '<ol style="margin:6px 0 0;padding-left:20px;line-height:1.5;font-size:14px"><li>Ábrela desde la notificación de la descarga o en <b>Archivos → Descargas</b>.</li><li>Si pregunta, <b>Configuración → Permitir de esta fuente</b>.</li><li>Toca <b>Actualizar</b> (no se borra nada) y luego <b>Abrir</b>.</li><li>Si dice <b>«No se instaló la app»</b> o <b>«conflicto con un paquete»</b>: revisa que entraste con tu correo (tu cuenta de Vento), desinstala la Vento vieja e instala la nueva; al entrar con tu correo vuelven tus datos.</li></ol>'
           : window.ventoAppSinPuente && window.ventoAppSinPuente() ? '⚠️ La app Vento no cargó bien. Ciérrala del todo (quítala de las apps recientes) y ábrela otra vez.'
           : android ? '<b>Estás en Vento Web</b> (el navegador o su acceso directo «Vento Web»), no en la app. Los avisos de DaviPlata y Nequi <b>solo los puede leer la app Vento</b> (el archivo <b>vento.apk</b>).' +
             '<br><b>¿Todavía no tienes la app?</b><br><a class="btn-primary gp-btn" href="' + APK + '" download="vento.apk" rel="noopener">⬇️ Descargar la app (vento.apk)</a>' +
@@ -28870,7 +28883,7 @@ let fotosListas = false;
           A && perm.bateria !== undefined ? ok(!!perm.bateria, perm.bateria ? 'Listo' : 'Falta') : '') +
         paso(6, 'Prueba', 'Pídele a alguien que te pase <b>$1.000</b> a tu DaviPlata. Vento dirá <i>«Pago confirmado. 1000 pesos desde DaviPlata»</i> y en el celular sale <b>«💜 Pagaron $1.000 por DaviPlata»</b>.<br><button type="button" class="btn-ghost gp-btn" data-gp="probar">▶️ Ver cómo se ve (simulado)</button>', ok(!!llego, llego ? 'Ya llegó un pago real de DaviPlata (' + plata(llego.monto) + ')' : 'Esperando el primer pago')) +
         '</ol>' +
-        '<div class="settings-desc" style="margin-top:8px"><b>¿Y los demás celulares del negocio?</b> Con tu misma cuenta (Vento Nube) también ven el pago al instante. <b>¿No usas la app Vento en ese celular?</b> <button type="button" class="btn-ghost gp-btn" data-gp="macro">Usar MacroDroid</button><br><small>«Conectar DaviPlata» (API oficial) es otra cosa: sirve para <b>cobrar con código</b> y necesita convenio con Davivienda. Para que Vento te avise los pagos <b>no lo necesitas</b>.</small></div>' +
+        '<div class="settings-desc" style="margin-top:8px"><b>¿Y los demás celulares del negocio?</b> Con tu misma cuenta de Vento también ven el pago al instante. <b>¿No usas la app Vento en ese celular?</b> <button type="button" class="btn-ghost gp-btn" data-gp="macro">Usar MacroDroid</button><br><small>«Conectar DaviPlata» (API oficial) es otra cosa: sirve para <b>cobrar con código</b> y necesita convenio con Davivienda. Para que Vento te avise los pagos <b>no lo necesitas</b>.</small></div>' +
         '<div class="settings-desc" style="margin-top:6px;opacity:.75"><small>🔎 Este equipo: ' + escp(pgDondeEstoy()) + '</small></div>' +
         '<div class="modal-actions"><button type="button" class="btn-close" data-gp="cerrar">Listo</button></div></div>';
       // Solo si algo cambió (el estado se revisa cada 3 s) y sin volver arriba: antes el paso a paso se rehacía cada 3 s y
@@ -28897,7 +28910,7 @@ let fotosListas = false;
       '<button type="button" class="btn-primary" id="pgGuiaBtn" style="width:100%;margin:2px 0 10px">📘 Paso a paso: agregar DaviPlata o Nequi</button>' +
       (enApp
         ? '<div class="settings-desc">Cuando te llega plata a <b>DaviPlata</b>, <b>Nequi</b> o tu banco, <b>la app de Vento lee directamente el aviso del banco en este celular</b> y te dice en voz alta <b>«Pago confirmado»</b> con el valor, quién pagó y de qué mesa es (como el parlante de Bold). No necesitas instalar nada más.</div>'
-        : '<div class="settings-desc">Para que Vento te diga <b>«Pago confirmado»</b> apenas te llegue la plata, instala la <b>app Vento para Android</b> en el celular donde tienes DaviPlata o Nequi y prende esta opción allí: la app lee directamente el aviso del banco. Desde el navegador no se pueden leer los avisos de otras apps. Los demás celulares del negocio reciben el aviso por Vento Nube.</div>') +
+        : '<div class="settings-desc">Para que Vento te diga <b>«Pago confirmado»</b> apenas te llegue la plata, instala la <b>app Vento para Android</b> en el celular donde tienes DaviPlata o Nequi y prende esta opción allí: la app lee directamente el aviso del banco. Desde el navegador no se pueden leer los avisos de otras apps. Los demás celulares del negocio reciben el aviso por tu cuenta de Vento.</div>') +
       '<div class="settings-desc" id="pgWebAviso" hidden style="border:1px solid #f5a524;border-radius:12px;padding:10px"><b id="pgWebAvisoTit">📲 Estás en Vento Web, no en la app.</b> Para que Vento lea los avisos de DaviPlata y Nequi y diga «Pago confirmado» (también con el celular bloqueado), usa <b>la app Vento</b> (archivo vento.apk) en este celular. <a class="btn-primary" id="pgBajarApk" href="https://github.com/cristhianlujan45-blip/cuentas/releases/latest/download/vento.apk" download="vento.apk" rel="noopener" style="margin-top:8px;width:100%;display:block;text-align:center;box-sizing:border-box">⬇️ Descargar la app (vento.apk)</a><button type="button" class="btn-ghost" id="pgAbrirApp" style="margin-top:8px;width:100%">📲 Ya la tengo: abrir la app Vento</button></div>' +
       '<div class="settings-row"><div class="settings-row-text"><strong>Recibir avisos de pagos</strong><span id="pgEstado"></span></div><label class="switch"><input type="checkbox" id="pgOn"><span class="switch-slider"></span></label></div>' +
       '<div id="pgCaja" hidden>' +
@@ -31577,6 +31590,148 @@ window.mesoraCelebrar = function(emojis){
   window.ventoRolNombre = rolNombre;
   setInterval(aplicar, 2000);
   document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('nav button[data-view], .more-tile[data-go]'); if(b) setTimeout(aplicar, 50); }, true);
+})();
+</script>
+<script>
+/* ================= Actividad del equipo (huella de cada persona) =================
+   Cada venta, venta borrada o cambiada, producto creado/borrado, cambio de precio, de nombre o de inventario, lo que
+   se agrega o se quita de una cuenta, y todo lo que ya anotaba la auditoría de Vento (reinicios, permisos, grupos…),
+   se manda al servidor con la cuenta y el rol de quien lo hizo (actividad_registrar). Allí nadie lo puede cambiar ni
+   borrar —ni el segundo administrador— y SOLO EL DUEÑO lo ve: Ajustes → Negocio → «📜 Actividad del equipo».
+   Lo que llega de otro celular no se anota aquí (lo anota el celular donde se hizo). Sin internet queda en cola. */
+(function(){
+  'use strict';
+  const COLA = 'vento-actividad-cola', MAX_COLA = 3000;
+  const N = () => window.ventoNube, neg = () => { try{ return N() && N().negocio(); }catch(e){ return null; } };
+  const quien = () => (typeof authUser !== 'undefined' && authUser) || '';
+  const $ = n => { try{ return typeof fmt === 'function' ? fmt(n) : '$' + Math.round(+n || 0).toLocaleString('es-CO'); }catch(e){ return String(n); } };
+  const lee = () => { try{ const c = JSON.parse(localStorage.getItem(COLA) || '[]'); return Array.isArray(c) ? c : []; }catch(e){ return []; } };
+  const guarda = c => { try{ localStorage.setItem(COLA, JSON.stringify(c.slice(-MAX_COLA))); }catch(e){} };
+  function anotar(a, d, m){
+    if(!a) return;
+    const c = lee(); c.push({ a: String(a).slice(0, 60), d: String(d || '').slice(0, 300), m: typeof m === 'number' && isFinite(m) ? Math.round(m) : undefined, u: quien(), t: Date.now(), n: (neg() || {}).id || '' });
+    guarda(c); programar();
+  }
+  // ---------- Diferencias entre lo que había y lo que hay ----------
+  const mesaNom = (id, t) => { try{ return typeof tableLabel === 'function' ? tableLabel(id) : ((t && t.name) || ('Mesa ' + id)); }catch(e){ return 'Mesa ' + id; } };
+  function foto(){
+    if(typeof data === 'undefined' || !data) return null;
+    const h = {}, p = {}, m = {};
+    (data.history || []).forEach(x => { if(x && x.id != null) h[x.id] = { total: +x.total || 0, items: (x.items || []).map(i => (i.qty || 1) + ' ' + i.name).join(', ').slice(0, 160), mesa: x.tableName || x.table || '' }; });
+    (data.products || []).forEach(x => { if(x && x.id != null) p[x.id] = { name: x.name, price: +x.price || 0, cost: x.cost, stock: x.stock }; });
+    Object.keys(data.tables || {}).forEach(id => { const t = data.tables[id], q = {}; ((t && t.items) || []).forEach(i => { q[i.name] = (q[i.name] || 0) + (+i.qty || 1); }); m[id] = { q, nom: mesaNom(id, t) }; });
+    const au = data.auditoria || [];
+    return { ref: data, h, p, m, aud: au.length ? (+au[au.length - 1].t || 0) : 0 };
+  }
+  let antes = null;
+  function comparar(){
+    const ahora = foto(); if(!ahora) return;
+    if(!antes || antes.ref !== ahora.ref || window.__nubeAplicando){ antes = ahora; return; }   // datos nuevos (otro negocio, otro celular): no se anotan aquí
+    const A = antes; antes = ahora;
+    Object.keys(ahora.h).forEach(id => { if(!A.h[id]){ const v = ahora.h[id]; anotar('venta', (v.mesa ? 'Mesa ' + v.mesa + ' · ' : '') + v.items + ' · ' + $(v.total), v.total); }
+      else if(A.h[id].total !== ahora.h[id].total) anotar('venta cambiada', 'De ' + $(A.h[id].total) + ' a ' + $(ahora.h[id].total) + ' · ' + ahora.h[id].items, ahora.h[id].total - A.h[id].total); });
+    Object.keys(A.h).forEach(id => { if(!ahora.h[id]){ const v = A.h[id]; anotar('venta borrada', (v.mesa ? 'Mesa ' + v.mesa + ' · ' : '') + v.items + ' · ' + $(v.total), -v.total); } });
+    Object.keys(ahora.p).forEach(id => { const n = ahora.p[id], o = A.p[id];
+      if(!o) return anotar('producto creado', n.name + ' · ' + $(n.price), n.price);
+      if(o.name !== n.name) anotar('producto renombrado', o.name + ' → ' + n.name);
+      if(o.price !== n.price) anotar('precio cambiado', n.name + ': ' + $(o.price) + ' → ' + $(n.price), n.price - o.price);
+      if(o.cost !== n.cost && (o.cost != null || n.cost != null)) anotar('costo cambiado', n.name + ': ' + (o.cost == null ? '—' : $(o.cost)) + ' → ' + (n.cost == null ? '—' : $(n.cost)));
+      if(o.stock !== n.stock && (o.stock != null || n.stock != null)) anotar('inventario', n.name + ': ' + (o.stock == null ? '—' : o.stock) + ' → ' + (n.stock == null ? '—' : n.stock), (+n.stock || 0) - (+o.stock || 0)); });
+    Object.keys(A.p).forEach(id => { if(!ahora.p[id]) anotar('producto borrado', A.p[id].name + ' · ' + $(A.p[id].price)); });
+    // Lo que se agrega o se quita de una cuenta abierta (al cobrarla se vacía: eso ya es la «venta»).
+    const vendidas = Object.keys(ahora.h).filter(id => !A.h[id]).length > 0;
+    Object.keys(ahora.m).forEach(id => { const o = (A.m[id] || {}).q || {}, n = ahora.m[id].q;
+      const mas = [], menos = [];
+      Object.keys(n).forEach(k => { const d = n[k] - (o[k] || 0); if(d > 0) mas.push(d + ' ' + k); });
+      Object.keys(o).forEach(k => { const d = o[k] - (n[k] || 0); if(d > 0) menos.push(d + ' ' + k); });
+      if(mas.length) anotar('pedido', ahora.m[id].nom + ': ' + mas.join(', '));
+      if(menos.length && !vendidas) anotar('quitado de la cuenta', ahora.m[id].nom + ': ' + menos.join(', ')); });
+    // Lo que ya anota la auditoría de Vento (reiniciar, combinar, permisos…)
+    if(ahora.aud > A.aud) (data.auditoria || []).filter(x => (+x.t || 0) > A.aud).forEach(x => anotar(x.accion, x.detalle));
+  }
+  window.addEventListener('vento-datos-remotos', () => { antes = foto(); });
+  // Después de cada guardado (lo hace la persona en este celular) se compara.
+  let tCmp = null;
+  const orig = window.saveData;
+  if(typeof orig === 'function'){
+    window.saveData = function(){ const r = orig.apply(this, arguments); if(!window.__nubeAplicando){ clearTimeout(tCmp); tCmp = setTimeout(comparar, 300); } else antes = null; return r; };
+    try{ saveData = window.saveData; }catch(e){}
+  }
+  setTimeout(() => { antes = foto(); }, 1500);
+  setInterval(() => { if(!antes) antes = foto(); }, 5000);
+  // ---------- Envío al servidor ----------
+  let tEnv = null, enviando = false;
+  function programar(){ clearTimeout(tEnv); tEnv = setTimeout(enviar, 2500); }
+  async function enviar(){
+    if(enviando) return; const n = neg(); if(!n || !navigator.onLine) return;
+    let c = lee(); const mios = c.filter(x => !x.n || x.n === n.id).slice(0, 100); if(!mios.length) return;
+    enviando = true;
+    try{
+      const cl = await N().cliente();
+      const r = await cl.rpc('actividad_registrar', { p_negocio: n.id, p_eventos: mios.map(x => ({ a: x.a, d: x.d, m: x.m, u: x.u, t: x.t })) });
+      if(r.error){ if(/sin_permiso|actividad_invalida/.test(r.error.message || '')){ c = lee().filter(x => mios.indexOf(x) < 0 && !mios.some(y => y.t === x.t && y.a === x.a && y.d === x.d)); guarda(c); } return; }
+      c = lee().filter(x => !mios.some(y => y.t === x.t && y.a === x.a && y.d === x.d && y.u === x.u)); guarda(c);
+      if(c.some(x => !x.n || x.n === n.id)) programar();
+    }catch(e){} finally{ enviando = false; }
+  }
+  setInterval(enviar, 20000);
+  window.addEventListener('online', programar);
+  window.ventoActividad = { anotar, enviar, cola: lee, _comparar: comparar };
+
+  // ---------- Vista del dueño: «📜 Actividad del equipo» ----------
+  const esDueno = () => { try{ return !!neg() && neg().rol === 'dueno'; }catch(e){ return false; } };
+  const e = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const ICON = { venta: '💰', 'venta borrada': '🗑️', 'venta cambiada': '✏️', 'producto creado': '🆕', 'producto borrado': '❌', 'precio cambiado': '🏷️', 'costo cambiado': '🏷️', 'producto renombrado': '✏️', inventario: '📦', pedido: '🧾', 'quitado de la cuenta': '➖' };
+  function boton(){
+    const g = document.querySelector('#view-ajustes .settings-group[data-cat="negocio"]'); if(!g) return;
+    let b = document.getElementById('actividadEquipo');
+    if(!esDueno()){ if(b) b.remove(); return; }
+    if(b) return;
+    b = document.createElement('div'); b.id = 'actividadEquipo'; b.className = 'settings-row';
+    b.innerHTML = '<div class="settings-row-text"><strong>📜 Actividad del equipo</strong><span>Cada venta, venta borrada, cambio de precio, de producto o de inventario de cada persona (también del segundo administrador). Solo tú la ves y nadie la puede borrar.</span></div><button type="button" class="btn-ghost">Ver</button>';
+    b.querySelector('button').onclick = abrir;
+    g.appendChild(b);
+  }
+  let ov = null, filtro = '', ultimoId = null, lista = [];
+  async function cargar(mas){
+    const n = neg(); if(!n) return;
+    const cuerpo = ov.querySelector('#actLista'), info = ov.querySelector('#actInfo');
+    info.textContent = 'Cargando…';
+    try{
+      await enviar();
+      const cl = await N().cliente();
+      const r = await cl.rpc('actividad_ver', { p_negocio: n.id, p_usuario: filtro || null, p_antes: mas ? ultimoId : null, p_limite: 200 });
+      if(r.error) throw r.error;
+      const j = r.data || {}, ev = j.eventos || [];
+      const sel = ov.querySelector('#actPersona');
+      if(sel && !sel.dataset.listo){ sel.dataset.listo = '1'; sel.innerHTML = '<option value="">Todas las personas</option>' + (j.personas || []).map(p => '<option value="' + e(p.usuario_id) + '">' + e(p.nombre || p.email) + ' · ' + e((window.ventoRolNombre ? window.ventoRolNombre(p.rol) : p.rol)) + '</option>').join(''); sel.value = filtro; }
+      lista = mas ? lista.concat(ev) : ev;
+      ultimoId = lista.length ? lista[lista.length - 1].id : null;
+      cuerpo.innerHTML = lista.length ? lista.map(x => {
+        const ac = String(x.accion || '').replace(/^app:/, ''), d = x.detalle || {}, f = new Date(x.creado_en);
+        const rol = window.ventoRolNombre ? window.ventoRolNombre(x.rol) : x.rol;
+        return '<div style="display:flex;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line)"><span style="font-size:20px">' + (ICON[ac] || '•') + '</span><div style="flex:1;min-width:0"><b>' + e(ac.charAt(0).toUpperCase() + ac.slice(1)) + '</b>' +
+          (d.d ? '<div style="font-size:13.5px;line-height:1.4;word-break:break-word">' + e(d.d) + '</div>' : (x.detalle && !d.d ? '<div style="font-size:12.5px;opacity:.75;word-break:break-word">' + e(JSON.stringify(x.detalle).slice(0, 200)) + '</div>' : '')) +
+          '<small style="opacity:.75">' + e(x.nombre || x.email || '—') + ' · ' + e(rol || '') + (d.u && d.u !== x.email ? ' (' + e(d.u) + ')' : '') + ' · ' + f.toLocaleString('es-CO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) + '</small></div></div>';
+      }).join('') : '<p style="opacity:.8">Todavía no hay actividad.</p>';
+      info.textContent = lista.length + ' registro' + (lista.length === 1 ? '' : 's');
+      ov.querySelector('#actMas').hidden = ev.length < 200;
+    }catch(x){ info.textContent = '⚠️ No se pudo cargar la actividad' + (navigator.onLine ? '' : ' (sin internet)') + '.'; }
+  }
+  function abrir(){
+    if(!ov){
+      ov = document.createElement('div'); ov.id = 'actOv'; ov.className = 'overlay'; ov.setAttribute('data-novocab', ''); ov.style.zIndex = '10050';
+      ov.innerHTML = '<div class="modal" role="dialog" aria-label="Actividad del equipo" style="max-width:560px;width:100%;max-height:calc(100vh - 32px);display:flex;flex-direction:column"><div style="display:flex;align-items:center;gap:8px"><h2 style="flex:1;margin:0">📜 Actividad del equipo</h2><button type="button" class="btn-ghost" data-act="cerrar">Cerrar</button></div>' +
+        '<select id="actPersona" style="margin:10px 0"></select><small id="actInfo" style="opacity:.8"></small><div id="actLista" style="overflow:auto;flex:1;margin-top:6px"></div><button type="button" class="btn-ghost" id="actMas" hidden style="margin-top:8px">Ver más antiguos</button></div>';
+      document.body.appendChild(ov);
+      ov.addEventListener('click', ev => { if(ev.target === ov || (ev.target.closest && ev.target.closest('[data-act="cerrar"]'))) ov.classList.remove('show'); });
+      ov.querySelector('#actPersona').onchange = ev => { filtro = ev.target.value; cargar(false); };
+      ov.querySelector('#actMas').onclick = () => cargar(true);
+    }
+    ov.classList.add('show'); cargar(false);
+  }
+  window.ventoActividad.abrir = abrir;
+  setInterval(boton, 2000); setTimeout(boton, 800);
 })();
 </script>
 </body>

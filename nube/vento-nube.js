@@ -156,9 +156,15 @@
   function textoEstado(){
     if(!configurada()) return 'Sin configurar: todo se guarda solo en este celular.';
     if(!st.negocio) return st.email ? 'Conectado como ' + st.email + ' · elige o crea un negocio.' : 'Configurada · nadie ha entrado en este celular.';
-    return '☁️ ' + st.negocio.nombre + ' · ' + (st.email || '') + ' (' + ROLES[st.negocio.rol] + ')' + (st.sucio ? ' · cambios por subir…' : ' · al día') + (st.ultimo ? ' · ' + new Date(st.ultimo).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) : '') + (ultimoError ? ' · ⚠️ ' + ultimoError : '');
+    return '🔐 ' + st.negocio.nombre + ' · ' + (st.email || '') + ' (' + ROLES[st.negocio.rol] + ')' + (st.sucio ? ' · cambios por subir…' : ' · al día') + (st.ultimo ? ' · ' + new Date(st.ultimo).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) : '') + (ultimoError ? ' · ⚠️ ' + ultimoError : '');
   }
-  var ROLES = { dueno: 'dueño', admin: 'administrador', cajero: 'cajero', mesero: 'mesero' };
+  var ROLES0 = { dueno: 'dueño', admin: 'administrador', cajero: 'cajero', mesero: 'mesero', empleado: 'empleado' };
+  // El «empleado» se llama según el negocio (vendedor, médico, barbero…): lo dice index.html (window.ventoRolNombre).
+  var ROLES = new Proxy(ROLES0, { get: function(o, k){ try{ if(window.ventoRolNombre){ var t = window.ventoRolNombre(k); if(t) return String(t).toLowerCase(); } }catch(e){} return o[k] || String(k); } });
+  function opcionesRol(sel, conAdmin){
+    return ['empleado', 'mesero', 'cajero'].concat(conAdmin ? ['admin'] : []).map(function(r){
+      var t = ROLES[r]; return '<option value="' + r + '"' + (sel === r ? ' selected' : '') + '>' + esc(t.charAt(0).toUpperCase() + t.slice(1)) + (r === 'admin' ? ' (segundo administrador)' : '') + '</option>'; }).join('');
+  }
 
   // El negocio de la nube va atado al negocio de ESTE celular con el que se conectó (puede haber varios en
   // un mismo celular): si se abre otro, no se sube ni se baja nada hasta volver al suyo.
@@ -195,7 +201,7 @@
         return rpc('guardar_datos', { p_negocio: st.negocio.id, p_datos: mezcla, p_version: nube.version });
       }).then(function(v){
         st.version = v; st.sucio = false; st.ultimo = Date.now(); guardarSt(); avisarOtros(v);
-        aviso('☁️ Otro celular también hizo cambios: se juntaron los dos.');
+        aviso('🔄 Otro celular también hizo cambios: se juntaron los dos.');
         return base('put', clonar(mezcla));
       });
     }).catch(function(e){ ultimoError = msgError(e); clearTimeout(tSubir); tSubir = setTimeout(subir, 10000); });
@@ -217,7 +223,7 @@
   }
   // «Datos actualizados»: como mucho un aviso por minuto (con la sincronización al instante llegarían seguido).
   var tAvisoBajada = 0;
-  function avisoBajada(){ if(Date.now() - tAvisoBajada > 60000){ tAvisoBajada = Date.now(); aviso('☁️ Datos al día con tus otros equipos.'); } }
+  function avisoBajada(){ if(Date.now() - tAvisoBajada > 60000){ tAvisoBajada = Date.now(); aviso('🔄 Datos al día con tus otros equipos.'); } }
 
   // ---------- Canal en vivo: «hay datos nuevos» llega a los demás equipos al instante ----------
   // Solo viaja el número de versión (nunca los datos): el equipo que lo recibe los baja con su sesión.
@@ -463,7 +469,7 @@
     opts = opts || {}; alEntrar = opts.alEntrar || null;
     if(!ov){
       ov = document.createElement('div'); ov.className = 'overlay'; ov.id = 'nubeOv';
-      ov.innerHTML = '<div class="modal nube-modal" role="dialog" aria-label="Vento Nube"><div class="nube-h"><h2>☁️ Vento Nube</h2><button type="button" class="btn-ghost" data-n="cerrar">Cerrar</button></div><div id="nubeCuerpo"></div><div class="nube-msg" id="nubeMsg"></div></div>';
+      ov.innerHTML = '<div class="modal nube-modal" role="dialog" aria-label="Mi cuenta y mi equipo"><div class="nube-h"><h2 id="nubeTit">👥 Mi cuenta y mi equipo</h2><button type="button" class="btn-ghost" data-n="cerrar">Cerrar</button></div><div id="nubeCuerpo"></div><div class="nube-msg" id="nubeMsg"></div></div>';
       document.body.appendChild(ov);
       var css = document.createElement('style');
       css.textContent = '#nubeOv{z-index:10050}#nubeOv .nube-modal{max-width:460px;width:100%}.nube-h{display:flex;justify-content:space-between;align-items:center;gap:8px}.nube-h h2{margin:0}' +
@@ -505,13 +511,13 @@
     }
     if(!st.email){
       c.innerHTML = '<button type="button" class="nube-google" id="nubeGoogle" hidden><svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>Continuar con Google</button>' +
-        '<p class="nube-p">O entra con tu correo. Si es tu primera vez, crea la cuenta (el dueño la crea primero y después invita a los demás).</p>' +
+        '<p class="nube-p">Entra con el correo de tu cuenta de Vento. ¿Te invitaron a un negocio? Crea tu cuenta aquí y después escribe el código que te dio el dueño.</p>' +
         '<label>Correo<input id="nubeEmail" type="email" autocomplete="username" autocapitalize="none"></label>' +
         '<label>Contraseña<input id="nubePass" type="password" autocomplete="current-password"></label>' +
         '<label>Tu nombre (solo para crear la cuenta)<input id="nubeNombre" autocomplete="name" placeholder="Ej: Ana"></label>' +
         '<div class="nube-fila"><button type="button" class="btn-primary" id="nubeEntrar">Entrar</button><button type="button" class="btn-ghost" id="nubeCrear">Crear cuenta</button></div>' +
         '<button type="button" class="auth-link" id="nubeOlvide">¿Olvidaste tu contraseña? Te mando un enlace al correo</button>' +
-        '<button type="button" class="auth-link" id="nubeCambiarCfg">Cambiar la base de datos conectada</button>';
+        '';
       googleDisponible().then(function(ok){ var gb = q('nubeGoogle'); if(gb){ gb.hidden = !ok; gb.onclick = function(){ accion(gb, conGoogle); }; } });
       var datos = function(){ return { e: q('nubeEmail').value.trim().toLowerCase(), p: q('nubePass').value, n: q('nubeNombre').value.trim() }; };
       q('nubeEntrar').onclick = function(){ var d = datos(); if(!d.e || !d.p) return msg('Escribe tu correo y contraseña.', true); accion(this, function(){ return entrar(d.e, d.p).then(pintar); }); };
@@ -524,62 +530,55 @@
           msg('📧 Te mandé un enlace a ' + e + ' (revisa también «Spam»). Ábrelo desde este celular: Vento te pide la contraseña nueva.');
         }); });
       };
-      q('nubeCambiarCfg').onclick = function(){ if(confirm('¿Desconectar esta base de datos de este celular?')){ localStorage.removeItem(K_CFG); sb = null; pintar(); } };
       return;
     }
     if(!st.negocio){
       c.innerHTML = '<p class="nube-p">Conectado como <b>' + esc(st.email) + '</b>.</p><div id="nubeLista" class="nube-p">Buscando tus negocios…</div>' +
-        '<button type="button" class="btn-primary" id="nubeSubirEste">☁️ Subir el negocio de este celular a la nube</button>' +
-        '<div class="nube-fila"><input id="nubeCodigo" placeholder="Código de invitación" autocapitalize="characters" maxlength="12"><button type="button" class="btn-ghost" id="nubeUnirme">Unirme</button></div>' +
-        '<button type="button" class="auth-link" id="nubeSalir">Cerrar sesión de la nube</button>';
+        '<p class="nube-p"><b>¿Te invitaron a un negocio?</b> Escribe el código que te dio el dueño:</p>' +
+        '<div class="nube-fila"><input id="nubeCodigo" placeholder="Código de invitación" autocapitalize="characters" maxlength="12"><button type="button" class="btn-primary" id="nubeUnirme">Unirme</button></div>' +
+        '<button type="button" class="btn-ghost" id="nubeSubirEste">🏪 Es mi negocio: crearlo con los datos de este celular</button>' +
+        '<button type="button" class="auth-link" id="nubeSalir">Cerrar sesión</button>';
       misNegocios().then(function(l){
         var box = q('nubeLista'); if(!box) return;
-        if(!l || !l.length){ box.textContent = 'Todavía no perteneces a ningún negocio: sube el de este celular o únete con un código.'; return; }
+        if(!l || !l.length){ box.textContent = 'Todavía no perteneces a ningún negocio: únete con el código que te dieron o crea el tuyo.'; return; }
         box.innerHTML = '<b>Tus negocios:</b>' + l.map(function(n, i){ return '<div class="nube-li"><span>' + esc(n.nombre) + ' <small>· ' + ROLES[n.rol] + '</small></span><button type="button" class="btn-ghost" data-elegir="' + i + '">Usar este</button></div>'; }).join('');
         box.querySelectorAll('[data-elegir]').forEach(function(b){ b.onclick = function(){
           var n = l[+b.dataset.elegir];
-          if(!confirm('Se cargarán en este celular los datos de «' + n.nombre + '» que están en la nube. Lo que hay ahora en este celular se reemplaza (queda un punto de restauración local). ¿Seguir?')) return;
+          if(!confirm('Se cargarán en este celular los datos de «' + n.nombre + '». Lo que hay ahora en este celular se reemplaza (queda un punto de restauración local). ¿Seguir?')) return;
           accion(b, function(){ return elegir(n).then(function(){ pintar(); msg('✅ Listo: este celular ya usa «' + n.nombre + '».'); entrarApp(); }); });
         }; });
       }).catch(function(e){ var box = q('nubeLista'); if(box) box.textContent = msgError(e); });
-      q('nubeSubirEste').onclick = function(){ var d = datosApp() || {}; var nom = prompt('Nombre del negocio en la nube:', d.businessName || 'Mi negocio'); if(!nom) return;
-        accion(this, function(){ return crearNegocio(nom.trim()).then(function(){ pintar(); msg('✅ Tu negocio ya está en la nube. Ahora invita a tu equipo.'); entrarApp(); }); }); };
+      q('nubeSubirEste').onclick = function(){ var d = datosApp() || {}; var nom = prompt('Nombre de tu negocio:', d.businessName || 'Mi negocio'); if(!nom) return;
+        accion(this, function(){ return crearNegocio(nom.trim()).then(function(){ pintar(); msg('✅ Listo: tu negocio quedó en tu cuenta. Ahora invita a tu equipo.'); entrarApp(); }); }); };
       q('nubeUnirme').onclick = function(){ var cod = q('nubeCodigo').value.trim(); if(!cod) return msg('Escribe el código que te dio el dueño.', true);
         accion(this, function(){ return unirse(cod, st.nombre).then(function(){ pintar(); msg('✅ Te uniste a «' + st.negocio.nombre + '».'); entrarApp(); }); }); };
       q('nubeSalir').onclick = function(){ accion(this, function(){ return salir().then(pintar); }); };
       return;
     }
     var manda = st.negocio.rol === 'dueno' || st.negocio.rol === 'admin';
-    c.innerHTML = '<p class="nube-p" id="nubeEstadoTxt">' + esc(textoEstado()) + '</p>' +
-      '<button type="button" class="btn-primary" id="nubeSync">🔄 Sincronizar ahora</button>' +
-      (manda ? '<div class="nube-fila"><select id="nubeRolInv"><option value="mesero">Mesero</option><option value="cajero">Cajero</option>' + (st.negocio.rol === 'dueno' ? '<option value="admin">Administrador</option>' : '') + '</select><button type="button" class="btn-ghost" id="nubeInvitar">➕ Invitar</button></div><div id="nubeInvRes"></div>' : '') +
+    // Sin «nube» a la vista: los datos se guardan solos en la cuenta de Vento. Aquí solo la cuenta y el equipo
+    // (invitar, roles, quitar). Lo técnico (sincronizar, respaldos, base de datos) es del administrador de Vento.
+    c.innerHTML = '<p class="nube-p">🔐 <b>' + esc(st.negocio.nombre) + '</b> · ' + esc(st.email || '') + ' · ' + esc(ROLES[st.negocio.rol]) + '<br><small>Tus datos se guardan solos en tu cuenta de Vento y se ven al instante en todos tus celulares.</small></p>' +
+      (manda ? '<p class="nube-p"><b>Invitar a alguien de tu equipo:</b></p><div class="nube-fila"><select id="nubeRolInv">' + opcionesRol('empleado', st.negocio.rol === 'dueno') + '</select><button type="button" class="btn-primary" id="nubeInvitar">➕ Invitar</button></div><div id="nubeInvRes"></div>' : '') +
       '<div id="nubeMiembros" class="nube-p">Cargando el equipo…</div>' +
-      (manda ? '<details><summary>🗂️ Respaldos en la nube</summary><div id="nubeResp" class="nube-p">…</div></details>' : '') +
-      (manda ? '<button type="button" class="btn-ghost" id="nubeLinkCfg">📋 Copiar link para conectar otro celular</button>' : '') +
-      '<div class="nube-fila"><button type="button" class="btn-ghost" id="nubeOtro">Cambiar de negocio</button><button type="button" class="btn-ghost" id="nubeSalir">Cerrar sesión de la nube</button></div>';
-    q('nubeSync').onclick = function(){ accion(this, function(){ return (st.sucio ? subir() : bajar()).then(function(){ msg('✅ Al día.'); var e = q('nubeEstadoTxt'); if(e) e.textContent = textoEstado(); }); }); };
+      '<div class="nube-fila"><button type="button" class="btn-ghost" id="nubeSalir">🚪 Cerrar sesión</button></div>';
     if(manda){
       q('nubeInvitar').onclick = function(){ var rol = q('nubeRolInv').value; accion(this, function(){ return invitar(rol).then(function(cod){
-        q('nubeInvRes').innerHTML = '<p class="nube-p">Código para un <b>' + ROLES[rol] + '</b> (un solo uso, vence en 7 días):</p><div class="nube-cod">' + esc(cod) + '</div><p class="nube-p">La persona abre Vento en su celular → «☁️ Entrar con Vento Nube» → crea su cuenta → escribe este código.</p>'; }); }); };
-      q('nubeLinkCfg').onclick = function(){ var u = linkConfig(); (navigator.clipboard ? navigator.clipboard.writeText(u) : Promise.reject()).then(function(){ msg('📋 Link copiado: mándalo por WhatsApp a tu equipo.'); }, function(){ prompt('Copia este link:', u); }); };
-      respaldos().then(function(l){ var b = q('nubeResp'); if(!b) return; if(!l.length){ b.textContent = 'Aún no hay respaldos (se crea uno por hora mientras se usa la app).'; return; }
-        b.innerHTML = l.map(function(r){ return '<div class="nube-li"><span>' + new Date(r.creado_en).toLocaleString('es-CO') + ' <small>· v' + r.version + '</small></span><button type="button" class="btn-ghost" data-rest="' + r.id + '">Restaurar</button></div>'; }).join('');
-        b.querySelectorAll('[data-rest]').forEach(function(x){ x.onclick = function(){ if(!confirm('¿Volver los datos de TODOS los celulares a ese momento? Lo actual queda guardado como otro respaldo.')) return; accion(x, function(){ return restaurar(+x.dataset.rest).then(function(){ msg('✅ Restaurado.'); }); }); }; });
-      }).catch(function(e){ var b = q('nubeResp'); if(b) b.textContent = msgError(e); });
+        q('nubeInvRes').innerHTML = '<p class="nube-p">Código para un <b>' + esc(ROLES[rol]) + '</b> (un solo uso, vence en 7 días):</p><div class="nube-cod">' + esc(cod) + '</div><p class="nube-p">La persona abre Vento en su celular → «👥 Me invitaron a un negocio» → crea su cuenta → escribe este código.' +
+          (rol === 'admin' ? ' Como segundo administrador maneja el negocio, pero TODO lo que haga queda en tu «📜 Actividad del equipo» y no puede verla ni borrarla.' : ' Solo verá lo de su trabajo y lo que tú le permitas en «👥 Permisos del equipo».') + '</p>'; }); }); };
     }
     miembros().then(function(l){
       var b = q('nubeMiembros'); if(!b) return;
       b.innerHTML = '<b>Equipo (' + l.length + '):</b>' + l.map(function(m){
-        var yo = m.email === st.email, puede = !yo && m.rol !== 'dueno' && (st.negocio.rol === 'dueno' || (st.negocio.rol === 'admin' && (m.rol === 'cajero' || m.rol === 'mesero')));
-        return '<div class="nube-li"><span>' + esc(m.nombre || m.email || 'Sin nombre') + ' <small>· ' + esc(m.email || '') + ' · ' + ROLES[m.rol] + (yo ? ' · tú' : '') + '</small></span>' +
-          (puede && st.negocio.rol === 'dueno' ? '<select data-rol="' + esc(m.usuario_id) + '"><option value="mesero"' + (m.rol === 'mesero' ? ' selected' : '') + '>Mesero</option><option value="cajero"' + (m.rol === 'cajero' ? ' selected' : '') + '>Cajero</option><option value="admin"' + (m.rol === 'admin' ? ' selected' : '') + '>Admin</option></select>' : '') +
+        var yo = m.email === st.email, puede = !yo && m.rol !== 'dueno' && (st.negocio.rol === 'dueno' || (st.negocio.rol === 'admin' && (m.rol === 'cajero' || m.rol === 'mesero' || m.rol === 'empleado')));
+        return '<div class="nube-li"><span>' + esc(m.nombre || m.email || 'Sin nombre') + ' <small>· ' + esc(m.email || '') + ' · ' + esc(ROLES[m.rol]) + (yo ? ' · tú' : '') + '</small></span>' +
+          (puede && st.negocio.rol === 'dueno' ? '<select data-rol="' + esc(m.usuario_id) + '">' + opcionesRol(m.rol, true) + '</select>' : '') +
           (puede ? '<button type="button" class="btn-ghost" data-quitar="' + esc(m.usuario_id) + '">Quitar</button>' : '') + '</div>';
       }).join('');
       b.querySelectorAll('[data-quitar]').forEach(function(x){ x.onclick = function(){ if(!confirm('¿Quitarle el acceso a esta persona? Ya no verá el negocio.')) return; accion(x, function(){ return quitar(x.dataset.quitar).then(pintar); }); }; });
       b.querySelectorAll('[data-rol]').forEach(function(x){ x.onchange = function(){ accion(null, function(){ return cambiarRol(x.dataset.rol, x.value).then(function(){ msg('✅ Rol cambiado.'); }); }); }; });
     }).catch(function(e){ var b = q('nubeMiembros'); if(b) b.textContent = msgError(e); });
-    q('nubeOtro').onclick = function(){ accion(this, function(){ var p = st.sucio ? subir() : Promise.resolve(); return p.then(function(){ clearInterval(tPoll); delete st.negocio; st.version = 0; guardarSt(); pintar(); }); }); };
-    q('nubeSalir').onclick = function(){ if(!confirm('¿Cerrar la sesión de la nube en este celular? Los datos se quedan aquí y en la nube.')) return; accion(this, function(){ return salir().then(pintar); }); };
+    q('nubeSalir').onclick = function(){ if(!confirm('¿Cerrar sesión en este celular? Tus datos quedan guardados en tu cuenta.')) return; accion(this, function(){ var p = st.sucio ? subir().catch(function(){}) : Promise.resolve(); return p.then(salir).then(function(){ try{ if(window.ventoSalir){ window.ventoSalir(); return; } }catch(e){} pintar(); }); }); };
   }
   function entrarApp(){ if(typeof alEntrar === 'function'){ var f = alEntrar; alEntrar = null; setTimeout(function(){ cerrar(); f(st.email); }, 700); } }
 

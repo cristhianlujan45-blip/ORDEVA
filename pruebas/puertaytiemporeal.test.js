@@ -60,6 +60,9 @@ const b64u = b => Buffer.from(b).toString('base64').replace(/\+/g, '-').replace(
     }, { neg: NEG, nube: o.nube !== false });
     const p = await ctx.newPage(); p.on('pageerror', e => errs.push(e.message));
     await p.goto(BASE + '/index.html?puerta=1'); await p.waitForTimeout(1800);
+    // Ya entró a la app (en la pantalla de entrada la tapa se aparta: ahí se entra o se cambia de cuenta).
+    if(!o.entrada) await p.evaluate(() => { const a = document.getElementById('authOverlay'); if(a) a.hidden = true; });
+    await p.waitForTimeout(o.entrada ? 0 : 1700);
     return { ctx, p };
   }
   const listo = (p, cond, ms) => p.waitForFunction(cond, null, { timeout: ms || 6000 }).then(() => true, () => false);
@@ -76,7 +79,13 @@ const b64u = b => Buffer.from(b).toString('base64').replace(/\+/g, '-').replace(
       chk('…con el botón para entrar o crear la cuenta', await p.evaluate(() => !!document.querySelector('#vpOv [data-vp="cuenta"]')));
       chk('…y la tapa cubre toda la pantalla, por encima de la app', await p.evaluate(() => { const r = document.getElementById('vpOv').getBoundingClientRect(); return r.width >= innerWidth && r.height >= innerHeight && +getComputedStyle(document.getElementById('vpOv')).zIndex > 9999; }));
       await p.evaluate(() => document.querySelector('#vpOv [data-vp="cuenta"]').click()); await p.waitForTimeout(500);
-      chk('El botón abre Vento Nube por encima de la tapa', await p.evaluate(() => { const n = document.getElementById('nubeOv'); return !!n && n.classList.contains('show') && +getComputedStyle(n).zIndex > +getComputedStyle(document.getElementById('vpOv')).zIndex; }));
+      chk('El botón abre «Mi cuenta» por encima de la tapa', await p.evaluate(() => { const n = document.getElementById('nubeOv'); return !!n && n.classList.contains('show') && +getComputedStyle(n).zIndex > +getComputedStyle(document.getElementById('vpOv')).zIndex; }));
+      chk('…sin hablar de «la nube» (la cuenta de Vento ya guarda todo)', await p.evaluate(() => !/nube/i.test(document.getElementById('nubeOv').innerText)), await p.evaluate(() => document.getElementById('nubeOv').innerText));
+      await ctx.close(); }
+    { const { ctx, p } = await celular(b, { nube: false, entrada: true });
+      await p.waitForTimeout(1700);
+      chk('En la pantalla de entrada (sin sesión) la tapa se aparta: ahí se entra o se crea la cuenta', await p.evaluate(() => !document.getElementById('vpOv') && !document.getElementById('authOverlay').hidden));
+      chk('…y la entrada no ofrece «Vento Nube» aparte', await p.evaluate(() => !/nube/i.test(document.getElementById('authOverlay').innerText)), await p.evaluate(() => document.getElementById('authOverlay').innerText));
       await ctx.close(); }
 
     // ---------- Con cuenta: abre, y todo cambia al instante ----------
@@ -104,7 +113,7 @@ const b64u = b => Buffer.from(b).toString('base64').replace(/\+/g, '-').replace(
     await aviso();
     chk('Cancelar: la app pasa a «cancelada» al instante', await listo(p, () => ventoSuscripcion.estado().status === 'canceled', 4000), JSON.stringify(await estado(p)));
     chk('…y queda bloqueada: «Tu suscripción fue cancelada»', await listo(p, () => document.documentElement.getAttribute('data-vento-puerta') === 'pago' && /Tu suscripción fue cancelada/.test(document.getElementById('vpOv').innerText), 4000), JSON.stringify(await puerta(p)));
-    chk('…con UNA sola opción: «💳 Pagar para reactivar» (nada de la nube ni más botones)', await p.evaluate(() => { const b = [...document.querySelectorAll('#vpOv button')]; return b.length === 1 && b[0].dataset.vp === 'pagar' && /Pagar para reactivar/.test(b[0].textContent) && !/nube|cuenta/i.test(document.getElementById('vpOv').innerText); }));
+    chk('…solo «💳 Pagar para reactivar» y «🚪 Cerrar sesión» (nada de la nube ni más botones)', await p.evaluate(() => { const b = [...document.querySelectorAll('#vpOv button')]; return b.length === 2 && b[0].dataset.vp === 'pagar' && /Pagar para reactivar/.test(b[0].textContent) && b[1].dataset.vp === 'salir' && /Cerrar sesión/.test(b[1].textContent) && !/nube/i.test(document.getElementById('vpOv').innerText); }));
     await p.evaluate(() => document.querySelector('#vpOv [data-vp="pagar"]').click());
     chk('Pagar abre los planes por encima del bloqueo', await listo(p, () => { const o = document.getElementById('vsOv'); return !!o && o.classList.contains('show') && +getComputedStyle(o).zIndex > +getComputedStyle(document.getElementById('vpOv')).zIndex; }, 4000));
     chk('…solo planes pagos con su botón de pagar (sin el plan gratis ni el código de licencia)', await listo(p, () => !!document.querySelector('#vsOv [data-pagar="pro"]'), 5000) &&
@@ -115,8 +124,9 @@ const b64u = b => Buffer.from(b).toString('base64').replace(/\+/g, '-').replace(
     // Cancelada y un cajero (no puede pagar): bloqueado y sin botón
     bd.rol = 'caja';
     await aviso();
-    chk('Cajero con la suscripción cancelada: bloqueado, sin botón (le toca al dueño)', await listo(p, () => /el dueño o el administrador del negocio debe pagar/.test((document.getElementById('vpOv') || {}).innerText || '') && !document.querySelector('#vpOv button'), 4000), JSON.stringify(await puerta(p)));
+    chk('Cajero con la suscripción cancelada: bloqueado, sin pagar (le toca al dueño), solo «Cerrar sesión»', await listo(p, () => /el dueño o el administrador del negocio debe pagar/.test((document.getElementById('vpOv') || {}).innerText || '') && !document.querySelector('#vpOv [data-vp="pagar"]') && document.querySelectorAll('#vpOv button').length === 1 && !!document.querySelector('#vpOv [data-vp="salir"]'), 4000), JSON.stringify(await puerta(p)));
     bd.rol = 'dueno';
+    await aviso(); await listo(p, () => !!document.querySelector('#vpOv [data-vp="pagar"]'), 4000);
 
     // Paga → pago en revisión: la app se abre en el plan gratis mientras lo revisan
     bd.sub = { status: 'payment_review', plan: 'pro', expiry: Date.now() + 30 * DIA }; bd.pendiente = { id: 'pay-1', status: 'review', plan_id: 'pro', method: 'NEQUI', amount: 59900 };

@@ -348,8 +348,9 @@ const b64u = s => Buffer.from(s).toString('base64url');
     await pC.evaluate(() => ventoSuscripcion.abrirPlanes());
     t = await textoOv(pC);
     chk('6. Cajero: no ve precios ni botones de pagar', !t.includes(PRECIO_TXT) && !/\$\d/.test(t) && !/PAGAR|RENOVAR/.test(t) && !(await pC.$('#vsOv [data-pagar], #vsOv [data-metodo]')) && /dueño o el administrador/.test(t), t);
-    await irAjustes(pC, 'negocio');
-    chk('6. Cajero: Ajustes sin «Planes y pagos»', await pC.evaluate(() => { const x = document.getElementById('subNubePanel'); return !!x && !x.hidden && !x.querySelector('[data-panel]') && !/Planes y pagos|\$\d/.test(x.innerText); }));
+    await cerrarTodo(pC);
+    chk('6. Cajero: no ve Ajustes (ni «Planes y pagos»): solo lo de su trabajo', await pC.evaluate(() => { const t = document.querySelector('.more-tile[data-go="ajustes"]'), b = document.querySelector('nav button[data-view="ajustes"]');
+      return document.body.classList.contains('rol-equipo') && (!t || getComputedStyle(t).display === 'none') && (!b || getComputedStyle(b).display === 'none'); }));
     const pedidosCaja = C.pedidos.slice();   // lo que pidió la app del cajero (antes de la prueba «a mano» de abajo)
     const caja = await pC.evaluate(async b64 => {
       const c = await ventoNube.cliente(), s = (await c.auth.getSession()).data.session, cfg = ventoNube.config();
@@ -363,13 +364,11 @@ const b64u = s => Buffer.from(s).toString('base64url');
     await C.ctx.close();
     await B.ctx.close();
     // Celular A se pone al día con lo que subieron B y el cajero (si no, la app lo baja sola en ≤ 15 s).
-    await abrirNubeAjustes(pA);
-    await pA.click('#nubeSync');
-    const alDia = await esperar(pA, () => /Al día/.test(document.getElementById('nubeMsg').textContent));
+    // (ya no hay botón «Sincronizar»: los datos se guardan y se bajan solos; el cliente no ve «la nube»)
+    const alDia = await pA.evaluate(() => ventoNube.bajar().then(() => true, () => false));
     const vA = await pA.evaluate(() => JSON.parse(localStorage.getItem('vento_nube_estado')).version);
     const vS = (await uno('select version from datos_negocio where negocio_id = $1', [NEG])).version;
-    chk('6. Celular A: «🔄 Sincronizar ahora» queda al día con lo que subieron los otros celulares', alDia && Number(vA) === Number(vS), [vA, vS]);
-    await pA.click('#nubeOv [data-n="cerrar"]');
+    chk('6. Celular A: queda al día solo con lo que subieron los otros celulares', alDia && Number(vA) === Number(vS), [vA, vS]);
 
     // =====================================================================
     // 7. Otro negocio en plan Gratis: datos falsos en localStorage no dan PRO

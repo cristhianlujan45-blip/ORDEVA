@@ -205,7 +205,7 @@
   function refrescar(forzar){
     var n = negocio(); if(!n) return Promise.resolve(estado());
     if(E.cargando) return forzar === true ? E.cargando.then(function(){ return refrescar(); }) : E.cargando;
-    var id = n.id;
+    var id = n.id; E.intento = Date.now();
     E.cargando = api('estado', { negocio: id }).then(function(j){
       if(E.neg !== id) return;
       var tok = j.token, info = Object.assign({}, j); delete info.token; delete info.ok;
@@ -343,6 +343,7 @@
       var a = b.dataset.vs;
       if(a === 'cerrar') cerrar(); else if(a === 'atras') atras(); else if(a === 'planes') ir(vInicio(''));
       else if(a === 'renovar') pagarPlan(planParaRenovar()); else if(a === 'reintentar') reintentar();
+      else if(a === 'salir'){ b.disabled = true; b.textContent = 'Cerrando sesión…'; try{ if(window.ventoSalir) window.ventoSalir(); else location.reload(); }catch(x){ location.reload(); } }
     });
     window.addEventListener('keydown', function(e){ if(e.key === 'Escape' && ov.classList.contains('show')){ e.stopPropagation(); cerrar(); } }, true);
     return ov;
@@ -409,8 +410,10 @@
     var fn = function(){
       var s = estado(), h = motivo ? '<div class="vs-aviso"><span>' + esc(motivo) + '</span></div>' : '';
       h += tarjetaEstado(s);
+      // Se acabó la mensualidad (vencida, cancelada, sin aprobar): también se puede cerrar sesión y entrar con otra cuenta.
+      var salir = /^(expired|canceled|rejected)$/.test(s.status || '') ? '<div class="vs-acciones"><button type="button" class="btn-ghost" data-vs="salir">🚪 Cerrar sesión</button></div>' : '';
       if(!s.manda){
-        pantalla('inicio', 'Plan del negocio', h + '<p class="vs-nota">Los pagos del plan los maneja el dueño o el administrador del negocio. Si necesitas una función PRO, pídeselo.</p><div class="vs-acciones"><button type="button" class="btn-primary vs-grande" data-vs="cerrar">Entendido</button></div>');
+        pantalla('inicio', 'Plan del negocio', h + '<p class="vs-nota">Los pagos del plan los maneja el dueño o el administrador del negocio. Si necesitas una función PRO, pídeselo.</p><div class="vs-acciones"><button type="button" class="btn-primary vs-grande" data-vs="cerrar">Entendido</button></div>' + salir);
         return;
       }
       if(s.renovar && !s.pago && !s.rechazo) h += '<div class="vs-aviso" id="vsAvisoRenovar"><span>⏰ Tu suscripción vence el ' + fecha(s.vence) + '.</span><button type="button" class="btn-primary" data-vs="renovar">RENOVAR</button></div>';
@@ -419,6 +422,7 @@
       if(!soloPagar) h += '<div class="vs-acciones vs-sep"><button type="button" class="btn-ghost" id="vsLicBtn">🔑 Tengo un código de licencia</button></div>' +
         '<div id="vsLicBox" hidden><input id="vsLicIn" class="mz-in" placeholder="VENTO-XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false" style="width:100%;box-sizing:border-box;text-align:center;letter-spacing:1px">' +
         '<div class="vs-acciones"><button type="button" class="btn-primary" id="vsLicGo">✅ Activar licencia</button></div></div>';
+      h += salir;
       pantalla('inicio', 'Tu plan Vento', h, function(c){
         var lb = c.querySelector('#vsLicBtn'); if(lb) lb.onclick = function(){ c.querySelector('#vsLicBox').hidden = false; lb.hidden = true; c.querySelector('#vsLicIn').focus(); };
         var lg = c.querySelector('#vsLicGo'); if(lg) lg.onclick = function(){
@@ -678,8 +682,16 @@
   function negId(){ var n = negocio(); return n ? n.id : null; }
   cambiarNegocio(negId());
   setInterval(function(){ var id = negId(); if(id !== E.neg) cambiarNegocio(id); }, 3000);   // entró o cambió de negocio
-  setInterval(function(){ if(E.neg && !document.hidden) refrescar(); }, REFRESCO_MS);
-  document.addEventListener('visibilitychange', function(){ if(!document.hidden && E.neg && Date.now() - E.ultimo > 60e3) refrescar(); });
+  /* Respaldo del tiempo real (la activación debe llegar en menos de 3 s):
+     • con el canal en tiempo real conectado, el aviso llega solo; el respaldo es cada minuto;
+     • esperando que el administrador active (pago en revisión o suscripción cancelada): cada 3 s;
+     • sin el canal (red que lo bloquea, celular que se durmió): cada 3 s mientras se espera, si no cada 15 s. */
+  function cadaCuanto(){
+    var s = E.p ? estado() : null, espera = !!s && (s.revision || s.status === 'canceled');
+    return espera ? 3e3 : rt.vivo ? REFRESCO_MS : 15e3;
+  }
+  setInterval(function(){ if(E.neg && !document.hidden && !E.cargando && Date.now() - (E.intento || 0) >= (E.error === 'red' ? 15e3 : cadaCuanto()) - 250) refrescar(); }, 1000);
+  document.addEventListener('visibilitychange', function(){ if(!document.hidden && E.neg && Date.now() - E.ultimo > 5e3) refrescar(); });
   window.addEventListener('online', function(){ if(E.neg) refrescar(); });
 
   /* Puerta: ¿esta app puede funcionar? Solo con la base de datos de Vento:
