@@ -366,6 +366,24 @@ async function pruebas(sb) {
   r = await rest('auditoria', 'POST', { negocio_id: neg, accion: 'app:falso' }, dueno.token);
   chk('Nadie escribe directo en la actividad', r.st >= 400, r);
 
+  // ===== Soporte: el diagnóstico (códigos de error) va al administrador, el cliente no lo ve =====
+  const diag = { version: '1.40.2', plataforma: 'apk', pagina: 'index.html', vista: 'mesas', modelo: 'Android 14; Redmi',
+    errores: [{ cod: 'E-1K9Z', tipo: 'guardar', msg: 'No se pudo guardar: QuotaExceededError', donde: 'saveData', n: 3, t: Date.now() }], extra: 'x'.repeat(50) };
+  r = await rpc('soporte_crear', { p: { tipo: 'error', asunto: 'No guarda', mensaje: 'Las ventas no se guardan', negocio_id: neg, diagnostico: diag } }, dueno.token);
+  const casoDiag = r.j || {};
+  chk('El reporte se crea con el diagnóstico, y al cliente NO le vuelve (ni códigos ni errores)', r.st === 200 && casoDiag.id && !JSON.stringify(casoDiag).includes('E-1K9Z') && !('diagnostico' in (casoDiag.caso || {})), r);
+  r = await rpc('soporte_mis_casos', { p_claves: [] }, dueno.token);
+  chk('En «Mis casos» del cliente tampoco aparece el diagnóstico', r.st === 200 && !JSON.stringify(r.j).includes('E-1K9Z') && !JSON.stringify(r.j).includes('diagnostico'), r);
+  r = await api('/admin/soporte', { estado: 'todos' }, admin.token);
+  const casoAdm = ((r.j && r.j.casos) || []).find(c => c.id === casoDiag.id) || {};
+  chk('El administrador ve el diagnóstico del equipo: código, qué pasó, dónde, veces, versión y equipo', casoAdm.diagnostico && casoAdm.diagnostico.errores[0].cod === 'E-1K9Z' && casoAdm.diagnostico.errores[0].n === 3 && casoAdm.diagnostico.version === '1.40.2' && casoAdm.diagnostico.vista === 'mesas' && !('extra' in casoAdm.diagnostico), casoAdm.diagnostico);
+  r = await rpc('soporte_diagnostico', { p_caso: casoDiag.id, p_clave: casoDiag.clave, p: Object.assign({}, diag, { errores: [{ cod: 'E-ZZ01', tipo: 'js', msg: 'otro', n: 1 }] }) });
+  chk('Al volver a escribir, el diagnóstico se pone al día (con la clave del caso)', r.st === 200 && r.j === true && (await uno('select diagnostico from soporte_casos where id = $1', [casoDiag.id])).diagnostico.errores[0].cod === 'E-ZZ01', r);
+  r = await rpc('soporte_diagnostico', { p_caso: casoDiag.id, p_clave: 'mala', p: diag });
+  chk('Sin la clave (ni la cuenta) no se puede cambiar el diagnóstico de otro', r.st === 200 && r.j === false, r);
+  r = await rpc('soporte_crear', { p: { tipo: 'error', asunto: 'Grande', mensaje: 'Diagnóstico enorme', equipo: 'EQ-grande-01', diagnostico: { errores: [{ msg: 'x'.repeat(20000) }] } } });
+  chk('Un diagnóstico enorme no se guarda (el caso sí)', r.st === 200 && (await uno('select diagnostico from soporte_casos where id = $1', [r.j.id])).diagnostico === null, r);
+
   // ===== Aviso de PAGO (push) solo al dueño, al administrador y a quien cobra esa mesa =====
   r = await signup('caja2@bar.co', 'clave123'); const caja2 = { id: r.j.user.id, token: r.j.access_token };
   r = await rpc('crear_invitacion', { p_negocio: neg, p_rol: 'cajero' }, dueno.token);
@@ -391,7 +409,7 @@ async function pruebas(sb) {
   // ===== La migración se puede volver a correr =====
   let errMig = null;
   try { await sb.sql(fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', '20261015000000_admin_soporte_licencias.sql'), 'utf8')); } catch (x) { errMig = x.message; }
-  for (const m of ['20261020000000_licencias_un_negocio.sql', '20261021000000_soporte_fotos_avisos.sql', '20261022000000_seguridad.sql', '20261023000000_cambio_tipo_negocio.sql', '20261024000000_equipo_actividad.sql', '20261025000000_avisos_pago_a_quien_cobra.sql'])
+  for (const m of ['20261020000000_licencias_un_negocio.sql', '20261021000000_soporte_fotos_avisos.sql', '20261022000000_seguridad.sql', '20261023000000_cambio_tipo_negocio.sql', '20261024000000_equipo_actividad.sql', '20261025000000_avisos_pago_a_quien_cobra.sql', '20261026000000_soporte_diagnostico.sql'])
     try { if(!errMig) await sb.sql(fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', m), 'utf8')); } catch (x) { errMig = m + ': ' + x.message; }
   r = await rpc('crear_negocio', { p_nombre: 'Otra más', p_datos: {} }, dueno.token);
   chk('Las migraciones se vuelven a correr sin errores ni perder datos (y la regla sigue)', !errMig && (await uno('select count(*) n from licencias')).n === 4 && r.st >= 400, errMig || r);

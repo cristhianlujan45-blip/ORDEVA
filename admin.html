@@ -347,7 +347,7 @@
         <option value="pago">💜 Pagos</option>
         <option value="js">🐞 Errores de la app</option>
       </select>
-      <input id="erBuscar" type="search" placeholder="🔎 Negocio, mensaje o versión">
+      <input id="erBuscar" type="search" placeholder="🔎 Código (E-XXXX), negocio, mensaje o versión">
       <button class="b" id="erRef" type="button" title="Actualizar">🔄</button>
     </div>
     <div class="list" id="erLista"><div class="empty">Cargando…</div></div>
@@ -901,7 +901,7 @@
    Si después de recargar el servidor todavía entrega la versión vieja, no se queda recargando: deja el aviso. */
 (function(){
   'use strict';
-  var ADMIN_VERSION = '2026-10-16 · v1.40.2';
+  var ADMIN_VERSION = '2026-10-16 · v1.40.3';
   var ultima = 0, oculto = 0, inicio = Date.now();
   function corta(v){ return String(v).split('·').pop().trim(); }
   function libre(){
@@ -2086,16 +2086,18 @@
     ad.errores = j.errores || []; erPintar();
     if($('erEstado').value === 'abiertos') erBadge(ad.errores.length);
   }
+  // El código corto del error (E-XXXX): el que la app guarda en el equipo y manda en el diagnóstico de soporte.
+  const erCodigo = e => { const c = (e.casos || []).map(x => x.detalle && x.detalle.codigo).find(Boolean); return c || ((String(e.mensaje || '').match(/^\[(E-[0-9A-Z]{4,})\]/) || [])[1]) || ''; };
   function erItem(e){
-    const t = ER_TIPO[e.tipo] || e.tipo;
-    return '<div class="item" data-error="' + esc(e.huella) + '"><div class="av">' + esc(t.split(' ')[0]) + '</div><div class="t"><b>' + esc(e.mensaje) + '</b><small>' +
+    const t = ER_TIPO[e.tipo] || e.tipo, cod = erCodigo(e);
+    return '<div class="item" data-error="' + esc(e.huella) + '"><div class="av">' + esc(t.split(' ')[0]) + '</div><div class="t"><b>' + (cod ? '<span style="font-family:monospace">' + esc(cod) + '</span> · ' : '') + esc(String(e.mensaje || '').replace(/^\[E-[0-9A-Z]{4,}\]\s*/, '')) + '</b><small>' +
       esc([t.replace(/^\S+\s/, ''), e.veces + ' ' + (e.veces === 1 ? 'vez' : 'veces'), e.equipos + ' equipo' + (e.equipos === 1 ? '' : 's'), e.negocios + ' negocio' + (e.negocios === 1 ? '' : 's'),
         (e.casos && e.casos[0] && e.casos[0].negocio) || '', e.version ? 'v' + e.version : '', hace(e.ultimo)].filter(Boolean).join(' · ')) + '</small></div>' +
       (e.resuelto ? '<span class="pill ok">✅ Resuelto</span>' : '<span class="pill ' + (e.equipos > 1 || e.veces >= 10 ? 'bad' : 'warn') + '">' + (e.equipos > 1 ? 'Varios equipos' : 'Abierto') + '</span>') + '</div>';
   }
   function erPintar(){
     const q = $('erBuscar').value.trim().toLowerCase(), tp = $('erTipo').value;
-    const l = (ad.errores || []).filter(e => (!tp || e.tipo === tp || (tp === 'js' && e.tipo === 'promesa')) && (!q || JSON.stringify([e.mensaje, e.version, e.pagina, (e.casos || []).map(c => [c.negocio, c.usuario, c.version])]).toLowerCase().includes(q)));
+    const l = (ad.errores || []).filter(e => (!tp || e.tipo === tp || (tp === 'js' && e.tipo === 'promesa')) && (!q || JSON.stringify([erCodigo(e), e.mensaje, e.version, e.pagina, (e.casos || []).map(c => [c.negocio, c.usuario, c.version])]).toLowerCase().includes(q)));
     $('erLista').innerHTML = l.length ? l.map(erItem).join('') : '<div class="empty">' + ((ad.errores || []).length ? 'Nada coincide.' : '🎉 No hay errores sin resolver. Todo está funcionando.') + '</div>';
   }
   $('erEstado').onchange = erCargar; $('erTipo').onchange = erPintar; $('erBuscar').oninput = erPintar; $('erRef').onclick = erCargar;
@@ -2105,7 +2107,7 @@
     ad.error = e;
     $('erTit').textContent = (ER_TIPO[e.tipo] || e.tipo) + ' · ' + e.veces + ' ' + (e.veces === 1 ? 'vez' : 'veces');
     const casos = e.casos || [];
-    $('erInfo').innerHTML = '<p><b>' + esc(e.mensaje) + '</b></p><dl class="kv">' + kv('Primera vez', fCoHora(e.primero)) + kv('Última vez', fCoHora(e.ultimo)) + kv('Equipos', e.equipos) + kv('Negocios', e.negocios) +
+    $('erInfo').innerHTML = '<p><b>' + esc(e.mensaje) + '</b></p><dl class="kv">' + (erCodigo(e) ? kv('Código', erCodigo(e)) : '') + kv('Primera vez', fCoHora(e.primero)) + kv('Última vez', fCoHora(e.ultimo)) + kv('Equipos', e.equipos) + kv('Negocios', e.negocios) +
       kv('Página', e.pagina || '—') + kv('Versión', e.version ? 'v' + e.version : '—') + '</dl>' +
       '<h3 style="margin:14px 0 6px">Dónde pasó</h3><div class="list">' + (casos.length ? casos.map(c => '<div class="item"><div class="av">' + (c.plataforma === 'apk' ? '📲' : /android|iphone/.test(c.plataforma || '') ? '📱' : '💻') + '</div><div class="t"><b>' +
         esc(c.negocio || 'Sin nombre de negocio') + '</b><small>' + esc([c.usuario || '', c.plataforma || '', c.version ? 'v' + c.version : '', c.veces + (c.veces === 1 ? ' vez' : ' veces'), hace(c.ultimo)].filter(Boolean).join(' · ')) +
@@ -2173,6 +2175,21 @@
     if(!$('dlgSp').open) $('dlgSp').showModal();
     if(c.sin_leer) intentar(() => sxApi('soporte_responder', { caso: c.id, texto: '' })).then(j => { if(j){ Object.assign(c, j.caso); spPintar(); } });
   }
+  // 🐞 Diagnóstico del equipo del cliente (códigos de error E-XXXX y qué pasó): lo manda la app sola con el reporte y
+  // SOLO lo ve el administrador (el cliente nunca ve los códigos).
+  function spDiagTexto(c){
+    const d = c.diagnostico || {}, l = Array.isArray(d.errores) ? d.errores : [];
+    return 'Caso ' + c.id + ' · ' + (c.negocio_nombre || '') + ' · v' + (d.version || '?') + ' · ' + (d.plataforma || '') + ' · ' + (d.pagina || '') + (d.vista ? ' (' + d.vista + ')' : '') + '\n' + (d.modelo || '') + '\n' +
+      (l.length ? l.map(e => (e.cod || '—') + ' [' + (e.tipo || '') + '] ×' + (e.n || 1) + ' ' + (e.t ? new Date(+e.t).toISOString() : '') + ' · ' + (e.msg || '') + (e.donde ? ' @ ' + e.donde : '')).join('\n') : 'Sin errores registrados en el equipo.');
+  }
+  function spDiagHtml(d){
+    if(!d) return '<p class="soft" style="margin:6px 0 0">🐞 Sin diagnóstico (reporte de una versión vieja de la app).</p>';
+    const l = Array.isArray(d.errores) ? d.errores : [];
+    return '<details class="sp-diag" style="margin-top:8px"' + (l.length ? ' open' : '') + '><summary style="cursor:pointer;font-weight:700">🐞 Diagnóstico del equipo (' + l.length + ' error' + (l.length === 1 ? '' : 'es') + ') · solo tú lo ves</summary>' +
+      '<div class="soft" style="font-size:12.5px;margin:4px 0">v' + esc(d.version || '?') + ' · ' + esc(d.plataforma || '') + ' · ' + esc(d.pagina || '') + (d.vista ? ' · pantalla ' + esc(d.vista) : '') + '<br>' + esc(d.modelo || '') + '</div>' +
+      (l.length ? l.map(e => '<div style="padding:5px 0;border-top:1px solid var(--line,#333)"><b style="font-family:monospace">' + esc(e.cod || '—') + '</b> <small class="soft">' + esc(e.tipo || '') + ' · ' + (e.n || 1) + ' vez' + ((e.n || 1) === 1 ? '' : 'es') + (e.t ? ' · ' + esc(fCoHora(new Date(+e.t).toISOString())) : '') + '</small><br>' + esc(e.msg || '') + (e.donde ? '<br><small class="soft">' + esc(e.donde) + '</small>' : '') + '</div>').join('') : '<p class="soft">Sin errores registrados en el equipo.</p>') +
+      '<div class="row"><button class="b" type="button" data-spdiag-copiar>📋 Copiar diagnóstico</button></div></details>';
+  }
   function spPintarCaso(){
     const c = ad.caso; if(!c) return;
     $('spTit').textContent = (SP_TIPO[c.tipo] || '') + ' · ' + c.asunto;
@@ -2181,7 +2198,9 @@
     $('spInfo').innerHTML = '<dl class="kv">' + kv('Quién', [c.nombre, c.email || c.cuenta_email].filter(Boolean).join(' · ') || 'sin datos') + kv('Celular', tel || '—') +
       kv('Negocio', c.negocio_nombre || '—') + kv('Cuenta en la nube', cuenta ? 'Sí' : 'No (equipo sin cuenta)') + kv('Estado', (SP_EST[c.estado] || [c.estado])[0]) + kv('Creado', fCoHora(c.creado_en)) + '</dl>' +
       (c.tipo === 'clave' && tel && c.telefono_de_la_cuenta && telWa(c.telefono_de_la_cuenta) !== telWa(c.telefono) ? '<p class="warn-t">⚠️ El celular que escribió (' + esc(c.telefono) + ') NO es el que tiene guardado la cuenta (' + esc(c.telefono_de_la_cuenta) + '). Verifica que sea el dueño antes de cambiar la contraseña.</p>' : '') +
-      (c.tipo === 'clave' && tel && c.telefono_de_la_cuenta && telWa(c.telefono_de_la_cuenta) === telWa(c.telefono) ? '<p class="ok-t">✅ El celular coincide con el de la cuenta.</p>' : '');
+      (c.tipo === 'clave' && tel && c.telefono_de_la_cuenta && telWa(c.telefono_de_la_cuenta) === telWa(c.telefono) ? '<p class="ok-t">✅ El celular coincide con el de la cuenta.</p>' : '') + spDiagHtml(c.diagnostico);
+    const cp = document.querySelector('[data-spdiag-copiar]');
+    if(cp) cp.onclick = () => { const t = spDiagTexto(c); (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => toast('📋 Diagnóstico copiado.'), () => { prompt('Copia el diagnóstico:', t); }); };
     $('spHilo').innerHTML = (c.mensajes || []).map(m => '<div class="sp-m' + (m.autor === 'admin' ? ' adm' : '') + '">' + esc(m.texto) +
       (m.adjunto ? '<div data-spimgbox="' + esc(m.id) + '"><button class="b" type="button" data-spimg="' + esc(m.id) + '" style="margin-top:6px">🖼 Ver imagen</button></div>' : '') +
       '<small>' + (m.autor === 'admin' ? 'Tú · ' : '') + esc(fCoHora(m.creado_en)) + '</small></div>').join('');

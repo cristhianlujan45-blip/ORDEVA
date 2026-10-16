@@ -296,6 +296,9 @@
       try{ localStorage.setItem(K, JSON.stringify(l.slice(-30))); }catch(x){}
       window.__mesoraErrMem = l.slice(-30);   // por si el almacenamiento está lleno
       try{ window.dispatchEvent(new CustomEvent('mesora-error', { detail: { cod: cod, msg: msg } })); }catch(x){}
+      // Al administrador de Vento (🐞 Errores) con su código: el cliente no lo ve. Los errores de la página («js», «promesa»)
+      // ya los manda lib/vento-errores.js (con el mismo código).
+      if(tipo !== 'js' && tipo !== 'promesa' && tipo !== 'recurso') try{ window.ventoError && window.ventoError('otro', '[' + cod + '] ' + msg, { codigo: cod, tipo: String(tipo || ''), donde: String(donde || '').slice(0, 160) }, 'reg|' + cod); }catch(x){}
       return cod;
     }catch(e){}
   }
@@ -5644,7 +5647,7 @@ async function saveData(){
   }catch(e){
     const cod = window.mesoraLogError ? window.mesoraLogError('guardar', 'No se pudo guardar: ' + (e && (e.name + ' ' + e.message) || e), 'saveData') : '';
     const lleno = e && (e.name === 'QuotaExceededError' || /quota/i.test(e.message || ''));
-    showToast((lleno ? '⚠️ La memoria de la app está llena y no se pudo guardar.' : '⚠️ Error al guardar los datos.') + (cod ? ' (' + cod + ')' : '') + ' Abre Vento y dile "arregla los errores".', 6000);
+    showToast((lleno ? '⚠️ La memoria de la app está llena y no se pudo guardar.' : '⚠️ Error al guardar los datos.') + ' Abre Vento y dile "arregla los errores". El detalle ya le llegó a Vento.', 6000);
   }
 }
 
@@ -25487,7 +25490,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-16 · v1.40.2';
+const MESORA_VERSION = '2026-10-16 · v1.40.3';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'Vento · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 // Si el navegador (o el celular, con la app agregada a la pantalla de inicio) se quedó con
@@ -28024,22 +28027,22 @@ async function mesoraDiagnosticoChat(userText){
   let hechos = [];
   try{ hechos = mesoraReparar({ enChat: true }); }catch(e){}
   let txt = pend.length
-    ? 'Revisé la app y encontré ' + (pend.length === 1 ? 'este error' : 'estos errores') + ':\n' + pend.map(e => '• ' + e.cod + (e.n > 1 ? ' (' + e.n + ' veces)' : '') + ': ' + mesoraExplicar(e)).join('\n')
+    ? 'Revisé la app y encontré ' + (pend.length === 1 ? 'este problema' : 'estos problemas') + ':\n' + pend.map(e => '• ' + mesoraExplicar(e) + (e.n > 1 ? ' (' + e.n + ' veces)' : '')).join('\n')
     : 'Revisé la app y no encontré errores registrados.';
   txt += '\n\nLo que hice:\n' + (hechos.length ? hechos.map(h => (h.charAt(0) === '⚠' ? '' : '✅ ') + h).join('\n') : '✅ Revisé tus datos, la memoria y las pantallas: todo está en orden.');
   if(hasAIKey()){
     try{
       const prompt = 'Eres Vento, el asistente de la app Vento (cuentas de mesas de un negocio en Colombia). Hablas con el dueño, que no sabe de tecnología. ' +
         'La persona dijo: "' + String(userText || '').slice(0, 300) + '". ' +
-        'Errores técnicos registrados en la app: ' + JSON.stringify(pend.map(e => ({ codigo: e.codigo || e.cod, tipo: e.tipo, mensaje: e.msg, donde: e.donde, veces: e.n }))) + '. ' +
+        'Errores técnicos registrados en la app: ' + JSON.stringify(pend.map(e => ({ tipo: e.tipo, mensaje: e.msg, donde: e.donde, veces: e.n }))) + '. ' +
         'Reparaciones que la app YA hizo sola: ' + JSON.stringify(hechos) + '. ' +
         'En máximo 4 frases cortas y sencillas, sin palabras técnicas ni markdown: di qué pasó y qué debe hacer la persona si el problema sigue ' +
-        '(por ejemplo: recargar la app, revisar el internet, conectar la IA en ⚙️ Configurar IA, o escribir a soporte por WhatsApp en Ajustes → Guía y soporte con el código del error). No inventes nada que no esté en los datos.';
+        '(por ejemplo: recargar la app, revisar el internet, conectar la IA en ⚙️ Configurar IA, o escribir a soporte en Ajustes → Guía y soporte; el detalle técnico le llega solo a Vento). Nunca muestres códigos de error ni nombres técnicos. No inventes nada que no esté en los datos.';
       const r = await aiText({ prompt, maxOutputTokens: 260, timeoutMs: 12000, retries: 1, maxMs: ASIS_MAX_MS });
       if(r && r.trim()) txt += '\n\n' + r.trim().replace(/\*\*/g, '');
     }catch(e){}
   }
-  if(pend.length) txt += '\n\nSi vuelve a pasar, dime "arregla los errores" o escribe a soporte con el código.';
+  if(pend.length) txt += '\n\nSi vuelve a pasar, dime "arregla los errores" o escríbenos a soporte: el detalle técnico ya le llegó a Vento.';
   mesoraMarcarVistos(); mesoraPill(false);
   asisBusy = false;
   asisBot(txt, { quick: ['Recargar la app', '¿Qué sabes hacer?'] });
@@ -28054,7 +28057,7 @@ function mesoraPill(show, cod){
     p.onclick = () => { mesoraPill(false); asisOpen(); asisAsk('Arregla los errores'); };
     document.body.appendChild(p);
   }
-  if(show){ p.innerHTML = ''; p.append(mesiEl(), document.createTextNode('Algo falló' + (cod ? ' (' + cod + ')' : '') + ' · Toca y lo arreglo')); }
+  if(show){ p.innerHTML = ''; p.append(mesiEl(), document.createTextNode('Algo falló · Toca y lo arreglo')); }   // el código lo ve solo el administrador de Vento
   p.classList.toggle('show', !!show);
 }
 window.addEventListener('mesora-error', ev => {

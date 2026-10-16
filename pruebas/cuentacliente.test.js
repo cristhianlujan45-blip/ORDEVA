@@ -78,6 +78,8 @@ const ADMIN = 'cristhianwkh@gmail.com';
     // ===== 2. Soporte =====
     await irAjustes(A.p, 'ayuda');
     chk('2. Ajustes → Guía y soporte: «🎧 Soporte de Vento»', await esperar(A.p, () => !!document.getElementById('vcSoporte') && document.getElementById('vcSoporte').offsetParent !== null));
+    // Un error que registró la app en este equipo (el cliente no ve su código)
+    const codErr = await A.p.evaluate(() => window.mesoraLogError('imprimir', 'La impresora no respondió (timeout)', 'imprimirCuenta'));
     await A.p.click('#vcNuevo');
     await A.p.fill('#vcAsunto', 'No me imprime'); await A.p.fill('#vcMsg', 'Hola, no me imprime la cuenta de la mesa 3'); await A.p.fill('#vcTel', '3001112233');
     // Pantallazo del error (PNG de verdad, 900×600): la app lo achica y lo manda con el mensaje
@@ -94,6 +96,11 @@ const ADMIN = 'cristhianwkh@gmail.com';
     chk('2. Mensaje enviado', await esperar(A.p, () => /Enviado/.test(document.getElementById('vcEstado').textContent), null, 20000), await A.p.evaluate(() => document.getElementById('vcEstado').textContent));
     const caso = await uno("select c.* from soporte_casos c join auth.users u on u.id = c.usuario_id where u.email = 'dueno@soporte.co'");
     chk('2. El caso llega al servidor con su cuenta, negocio y celular', caso && caso.asunto === 'No me imprime' && caso.negocio_id === NEG && caso.telefono === '3001112233', caso);
+    chk('2. El reporte lleva solo el diagnóstico del equipo con el código del error (para el administrador)', caso && caso.diagnostico && caso.diagnostico.errores.some(e => e.cod === codErr && /impresora no respondió/.test(e.msg)) && caso.diagnostico.version, caso && caso.diagnostico);
+    chk('2. El cliente nunca ve el código del error en su pantalla', !(await A.p.evaluate(c => document.body.innerText.includes(c), codErr)) && /^E-[0-9A-Z]{4}$/.test(codErr), codErr);
+    const casoAdm = ((await api('/admin/soporte', {}, adm.token)).j.casos || []).find(c => c.id === caso.id) || {};
+    chk('2. El administrador lo ve en el caso, con el código', casoAdm.diagnostico && casoAdm.diagnostico.errores.some(e => e.cod === codErr), casoAdm.diagnostico);
+    chk('2. …y el error también le llega a «🐞 Errores» con su código', await (async () => { for(let i = 0; i < 30; i++){ await A.p.evaluate(() => window.ventoErrores && window.ventoErrores.enviar()); const r = await uno("select count(*)::int n from app_errores where mensaje like $1", ['[' + codErr + ']%']).catch(() => ({ n: -1 })); if(r.n > 0) return true; await new Promise(x => setTimeout(x, 700)); } return false; })());
     const imgMsg = await uno('select id, adjunto, adjunto_tipo from soporte_mensajes where caso_id = $1 and adjunto is not null', [caso.id]);
     chk('2. El pantallazo llega al servidor (JPEG achicado, almacenamiento privado)', imgMsg && imgMsg.adjunto_tipo === 'image/jpeg' && /^soporte\//.test(imgMsg.adjunto), imgMsg);
     const fImg = await api('/admin/soporte_imagen', { mensaje: imgMsg && imgMsg.id }, adm.token);
