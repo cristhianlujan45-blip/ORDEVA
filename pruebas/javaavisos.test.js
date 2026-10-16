@@ -1,5 +1,6 @@
 // Avisos de pago de la app Android, SIN celular (Java):
 //  • AvisoPagoPrueba: las reglas (qué es plata recibida, el valor, la frase) con avisos reales de DaviPlata, Nequi y Bre-B.
+//  • PlanVentanaPrueba: cómo se abre la ventana del pago en Samsung, Xiaomi, Motorola… (Android 7 a 15, con y sin permisos).
 //  • EscuchaPrueba: la lectura completa (VentoEscucha) con los SMS reales del 85888 («Recibiste 200.», la conversación con
 //    los mensajes viejos, dos pagos iguales seguidos, la llave Bre-B sin valor + el SMS, Nequi, «Pasaste»). Necesita la
 //    librería de Android para compilar: VENTO_ANDROID_ALL=/ruta/android-all.jar (si no está, se omite esa parte).
@@ -17,9 +18,12 @@ function contar(salida, nombre){
 }
 if(correr('javac', ['-version']).status !== 0){ console.log('RESULTADO 0 bien 0 mal (sin Java: se omitió)'); process.exit(0); }
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'vento-java-'));
-let r = correr('javac', ['-encoding', 'UTF-8', '-d', path.join(tmp, 'a'), path.join(src, 'AvisoPago.java'), path.join(__dirname, 'java/AvisoPagoPrueba.java')]);
+let r = correr('javac', ['-encoding', 'UTF-8', '-d', path.join(tmp, 'a'), path.join(src, 'AvisoPago.java'), path.join(src, 'PlanVentana.java'), path.join(__dirname, 'java/AvisoPagoPrueba.java'), path.join(__dirname, 'java/PlanVentanaPrueba.java')]);
 if(r.status !== 0){ mal++; console.log('❌ No compila AvisoPago: ' + r.stderr.slice(0, 800)); }
-else contar(correr('java', ['-Dstdout.encoding=UTF-8', '-cp', path.join(tmp, 'a'), 'co.vento.app.AvisoPagoPrueba']).stdout, 'Reglas de los avisos (AvisoPagoPrueba)');
+else {
+  contar(correr('java', ['-Dstdout.encoding=UTF-8', '-cp', path.join(tmp, 'a'), 'co.vento.app.AvisoPagoPrueba']).stdout, 'Reglas de los avisos (AvisoPagoPrueba)');
+  contar(correr('java', ['-Dstdout.encoding=UTF-8', '-cp', path.join(tmp, 'a'), 'co.vento.app.PlanVentanaPrueba']).stdout, 'Ventana del pago en todo tipo de celular (PlanVentanaPrueba)');
+}
 const jar = process.env.VENTO_ANDROID_ALL;   // ej.: android-all de Robolectric (org.robolectric:android-all 14), solo para compilar
 if(jar && fs.existsSync(jar)){
   const sim = path.join(__dirname, 'java/simulado');

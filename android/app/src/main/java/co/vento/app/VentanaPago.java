@@ -84,8 +84,25 @@ final class VentanaPago {
         });
     }
 
+    /** Android 15: para abrir una pantalla desde el fondo con el permiso de «encima de otras apps», Vento tiene que tener
+     *  una ventana encima en ese momento. Se pone una invisible de 1 punto durante 3 s. */
+    static void ancla(Context c) {
+        H.post(() -> {
+            try {
+                WindowManager wm = (WindowManager) c.getSystemService(Context.WINDOW_SERVICE);
+                final View v = new View(c);
+                WindowManager.LayoutParams p = new WindowManager.LayoutParams(1, 1,
+                        Build.VERSION.SDK_INT >= 26 ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY : WindowManager.LayoutParams.TYPE_PHONE,
+                        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE, PixelFormat.TRANSLUCENT);
+                p.gravity = Gravity.TOP | Gravity.START;
+                wm.addView(v, p);
+                H.postDelayed(() -> { try { wm.removeView(v); } catch (Throwable ignorado) { } }, 3000);
+            } catch (Throwable ignorado) { }
+        });
+    }
+
     /** Abre la ventana del pago como pantalla (PagoActivity), sobre la pantalla de bloqueo si está bloqueado. */
-    static void abrirPantalla(Context c, Intent i) { try { c.startActivity(i); } catch (Throwable ignorado) { } }
+    static void abrirPantalla(Context c, Intent i) { H.postDelayed(() -> { try { c.startActivity(i); } catch (Throwable ignorado) { } }, 150); }
 
     // ---------- Xiaomi / Redmi / POCO (MIUI, HyperOS): sus permisos propios ----------
     // Xiaomi bloquea por su cuenta que una app abra ventanas sola: «Mostrar ventanas emergentes mientras se ejecuta en

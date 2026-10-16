@@ -177,14 +177,13 @@ public class VentoApp extends Application {
         if (o.length() > 220) o = o.substring(0, 220) + "…";
         String txt = (frase == null ? "" : frase) + (o.isEmpty() ? "" : "\n«" + o + "»");
         boolean ventana = VentanaPago.prendida(app), bloqueado = VentanaPago.bloqueado(app);
-        Intent pc = ventana && bloqueado ? VentanaPago.intent(app, valor, banco, frase, o, tipo) : null;
-        try { app.new Puente().publicar(titulo, txt, "pagos", true, pc); } catch (Exception ignorado) { }
-        if (ventana && !bloqueado) VentanaPago.mostrarEncima(app, valor, banco, frase, o, tipo);
-        // Bloqueado y con permiso de «encima de otras apps»: se abre también directo (algunos celulares no abren la
-        // pantalla completa de la notificación).
-        // Bloqueado: además de la notificación de pantalla completa, se abre la ventana directo (algunos celulares, como
-        // Xiaomi, no abren la pantalla completa de la notificación). Antes solo con el permiso de encima de otras apps.
-        if (pc != null) VentanaPago.abrirPantalla(app, pc);
+        // Cómo se abre la ventana en ESTE celular (ver PlanVentana: el mismo plan para Samsung, Xiaomi y todos los demás).
+        PlanVentana plan = ventana ? PlanVentana.de(Build.VERSION.SDK_INT, bloqueado, alFrente, VentanaPago.puedeEncima(app), VentanaPago.puedePantallaCompleta(app),
+                VentanaPago.esXiaomi(), VentanaPago.xiaomiPermiso(app, 10021), VentanaPago.xiaomiPermiso(app, 10020)) : new PlanVentana();
+        Intent vi = VentanaPago.intent(app, valor, banco, frase, o, tipo);
+        try { app.new Puente().publicar(titulo, txt, "pagos", true, plan.pantallaCompleta ? vi : null); } catch (Exception ignorado) { }
+        if (plan.encima) VentanaPago.mostrarEncima(app, valor, banco, frase, o, tipo);
+        if (plan.directo) { if (plan.ancla) VentanaPago.ancla(app); VentanaPago.abrirPantalla(app, vi); }
         prenderPantalla();
     }
 
@@ -1085,6 +1084,14 @@ public class VentoApp extends Application {
         @JavascriptInterface
         public boolean alFrente() { return VentoApp.alFrente; }
 
+        /** Un pago que entendió la PÁGINA (formato nuevo, frase del administrador…): el mismo camino que los de la app —
+         *  notificación, ventana encima (también con el celular bloqueado) y pantalla prendida. Antes la página solo sacaba
+         *  la notificación y la ventana no se abría fuera de Vento. tipo: ok · sinvalor · revisar · falso. */
+        @JavascriptInterface
+        public void pagoNotificar(String titulo, String frase, String original, String valor, String banco, String tipo) {
+            ui.post(() -> notificarPago(titulo, frase, original, valor, banco, tipo));
+        }
+
         @JavascriptInterface
         public void ventanaPagoOn(boolean on) { getSharedPreferences("vento", MODE_PRIVATE).edit().putBoolean(VentanaPago.PREF, on).apply(); }
 
@@ -1109,11 +1116,8 @@ public class VentoApp extends Application {
         /** «▶ Probar»: la ventana de un pago de prueba encima de otras apps (en 3 s, para salir de Vento y verla). */
         @JavascriptInterface
         public void ventanaPagoProbar() {
-            ui.postDelayed(() -> {
-                if (VentanaPago.bloqueado(VentoApp.this)) { try { startActivity(VentanaPago.intent(VentoApp.this, "$20.000", "Nequi", "Recibiste 20000 pesos por Nequi.", "Prueba de Vento", "ok")); } catch (Throwable ignorado) { } }
-                else if (VentoApp.alFrente) { /* con Vento a la vista, la ventana la muestra la página */ }
-                else VentanaPago.mostrarEncima(VentoApp.this, "$20.000", "Nequi", "Recibiste 20000 pesos por Nequi.", "Prueba de Vento", "ok");
-            }, 3000);
+            // El MISMO camino que un pago de verdad (notificación, pantalla completa, ventana directo / encima).
+            ui.postDelayed(() -> { if (!VentoApp.alFrente) notificarPago("🧪 Prueba: Recibiste $20.000 por Nequi", "Recibiste 20000 pesos por Nequi.", "Prueba de Vento", "$20.000", "Nequi", "ok"); }, 3000);
         }
 
         /** Avisos de banco que hablaban de plata pero no se tomaron como pago (sin datos), para revisarlos. */

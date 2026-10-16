@@ -25516,7 +25516,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-16 · v1.41.4';
+const MESORA_VERSION = '2026-10-16 · v1.41.5';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'Vento · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 /* 🔄 La app Android se actualiza SOLA (Actualizador): revisa cada 3 h, baja la versión nueva y la instala cuando no se
@@ -28913,6 +28913,11 @@ let fotosListas = false;
     try{ ov.querySelector('[data-pv="cerrar"]').focus({ preventScroll: true }); }catch(e){}
   }
   window.ventoPagoVentana = pgVentana;
+  /** Notificación + ventana por la app Android (el mismo camino de los pagos que entiende la app). false si la app es vieja. */
+  function pgNotificarAndroid(titulo, frase, orig, valor, banco, tipo){
+    const A = window.VentoAndroid; if(!A || !A.pagoNotificar) return false;
+    try{ A.pagoNotificar(String(titulo).slice(0, 80), String(frase || '').slice(0, 300), String(orig || '').slice(0, 220), String(valor || ''), String(banco || ''), tipo || 'ok'); return true; }catch(e){ return false; }
+  }
   window.ventoPagoVentanaCerrar = pgVentanaCerrar;
 
   // ---------- 💜 Frases de pago del administrador (Vento Admin) ----------
@@ -28974,6 +28979,7 @@ let fotosListas = false;
       try{ showToast('💜 Llegó plata por ' + fr.app + ' (el aviso no trae el valor). Mira el valor en la app del banco.', 12000); }catch(e){}
       try{ const A = window.VentoAndroid; if(A && A.alFrente ? A.alFrente() : document.visibilityState === 'visible') pgVentana({ monto: 0, app: fr.app, txt: String(txt).split('|').slice(1).join(' · ').trim().slice(0, 220), nivel: 'app' }); }catch(e){}
       if(!op.voz) window.ventoDecirPago('Llegó plata por ' + fr.app + '. Mira el valor en la aplicación.');
+      if(!op.voz) pgNotificarAndroid('💜 Llegó plata por ' + fr.app, 'Llegó plata por ' + fr.app + '. Mira el valor en la aplicación.', String(txt).split('|').slice(1).join(' · ').trim().slice(0, 220), '', fr.app, 'sinvalor');
       saveData(); return;
     }
     if(!p){
@@ -29024,12 +29030,14 @@ let fotosListas = false;
     if(f.nivel === 'falso'){
       try{ showToast('🚨 OJO, PAGO FALSO: un SMS dice que llegaron ' + plata(p.monto) + ', pero ' + f.txt + '. No entregues nada.', 15000); }catch(e){}
       if(!op.voz) window.ventoDecirPago('Ojo. Llegó un mensaje de pago sospechoso por ' + p.monto + ' pesos. Parece falso. No entregues nada hasta revisar la aplicación del banco.');
+      if(!op.voz) pgNotificarAndroid('🚨 Mensaje de pago FALSO: ' + plata(p.monto), 'Parece falso: ' + f.txt + '. No entregues nada.', origTxt, plata(p.monto), p.app, 'falso');
       if(navigator.vibrate) try{ navigator.vibrate([500, 150, 500, 150, 500]); }catch(e){}
       pgPintar(); return;
     }
     if(f.nivel === 'revisar'){
       try{ showToast('⚠️ ' + p.app + ': ' + plata(p.monto) + (p.de ? ' de ' + p.de : '') + (mesa ? ' (sería de ' + tableLabel(mesa) + ')' : '') + '. ' + f.txt + '. Luego toca «✅ Lo vi en la app».', 12000); }catch(e){}
       if(!op.voz) window.ventoDecirPago(op.revisar ? 'Ojo. Llegó un aviso de ' + p.monto + ' pesos de una aplicación que no es la oficial. Revísalo en la aplicación del banco antes de entregar.' : 'Llegó un aviso de ' + p.monto + ' pesos por mensaje de texto. Revísalo en la aplicación del banco antes de entregar.');
+      if(!op.voz) pgNotificarAndroid('⚠️ Aviso de ' + plata(p.monto) + ': revísalo', f.txt, origTxt, plata(p.monto), p.app, 'revisar');
       if(navigator.vibrate) try{ navigator.vibrate([150, 80, 150]); }catch(e){}
       pgPintar(); return;
     }
@@ -29038,8 +29046,11 @@ let fotosListas = false;
     try{ showToast(msg, 9000); }catch(e){}
     // Notificación del celular SIEMPRE (con Vento abierta, cerrada o el celular bloqueado): el valor y el texto.
     // «💜 Recibiste $20.000 por Nequi» · «Recibiste 20000 pesos por Nequi, de Ana Ruiz. Mesa 3.» + lo que dijo el banco.
+    // Con la app Android: por el MISMO camino que los pagos que entiende la app (notificación + 🪟 ventana fuera de Vento,
+    // también con el celular bloqueado). Antes un pago que entendía la página solo sacaba la notificación.
     if(!op.voz) try{ if(!window.ventoAvisoOn || window.ventoAvisoOn('pagos')){ const orig = origTxt;
-      window.ventoAvisoCel && window.ventoAvisoCel('💜 Recibiste ' + plata(p.monto) + ' por ' + (p.breb ? 'Bre-B en ' : '') + p.app, 'Recibiste ' + p.monto + ' pesos por ' + p.app + (p.de ? ', de ' + p.de : '') + '.' + (mesa ? ' ' + tableLabel(mesa) + '.' : '') + (orig ? '\n«' + orig + '»' : ''), 'pagos'); } }catch(e){}
+      const tit = '💜 Recibiste ' + plata(p.monto) + ' por ' + (p.breb ? 'Bre-B en ' : '') + p.app, fr = 'Recibiste ' + p.monto + ' pesos por ' + p.app + (p.de ? ', de ' + p.de : '') + '.' + (mesa ? ' ' + tableLabel(mesa) + '.' : '');
+      if(!pgNotificarAndroid(tit, fr, orig, plata(p.monto), (p.breb ? 'Bre-B en ' : '') + p.app, 'ok')) window.ventoAvisoCel && window.ventoAvisoCel(tit, fr + (orig ? '\n«' + orig + '»' : ''), 'pagos'); } }catch(e){}
     try{ window.ventoSonidos && window.ventoSonidos.success(); }catch(e){}
     // «Pago confirmado. 200 pesos desde DaviPlata» (o «desde Nequi»…), con quién pagó y la mesa si se sabe.
     if(!op.voz) window.ventoDecirPago('Recibiste ' + p.monto + ' pesos ' + (p.breb ? 'por Bre-B, en ' : 'por ') + p.app + (p.de ? ', de ' + p.de : '') + (mesa ? ', de la ' + tableLabel(mesa) : ''));

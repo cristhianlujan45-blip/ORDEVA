@@ -18,6 +18,7 @@
 // 14. Bre-B (de otros bancos por la llave) y Nequi con «¿…?» en el aviso: suenan. Solicitudes («te pidió») no.
 // 15. Paso 5 «Que suene siempre»: ahorro de batería, «🚀 Inicio automático» y los pasos de la marca (Xiaomi).
 // 19. Avisos «crudos» (la app no los entendió): la página los revisa y, si son pago, los dice.
+// 26. Pagos que entiende la página: notificación + ventana por la app Android (también bloqueado).
 // 25. La app Android se actualiza sola: estado en Ajustes, permiso (una vez) y «Actualizar ahora».
 // 24. Permisos de la ventana fuera de Vento (encima de otras apps / celular bloqueado): aviso con «🪟 Permitir».
 // 23. Ventana emergente de cada pago: valor, banco y texto, «Cerrar» y se cierra sola a los 15 s.
@@ -465,6 +466,21 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     chk('25. Falta el permiso de Android: aviso «Que Vento se actualice sola» y «🔓 Dar el permiso» lo abre', /se actualice sola/.test(r25.sinPermiso.ban) && /falta el permiso/.test(r25.sinPermiso.aj) && r25.act[0] === 'permiso', r25);
     chk('25. Con el permiso: Ajustes dice «App Android 1.0.36 · ✅ se actualiza sola» y el aviso se va', !r25.alDia.ban && /1\.0\.36 · ✅ se actualiza sola/.test(r25.alDia.aj), r25);
     chk('25. Hay una nueva: «se instala sola cuando no estés usando Vento» y «Actualizar ahora»', /hay una nueva \(1\.0\.37\)/.test(r25.hay) && r25.act[1] === 'ahora', r25);
+
+    // 26. Un pago que entiende la PÁGINA (como el Nequi «te envió 1500» con la app de antes) va por el MISMO camino que los
+    //     de la app Android: notificación + 🪟 ventana fuera de Vento (también bloqueado). Antes solo salía la notificación.
+    const r26 = await p.evaluate(() => {
+      const A = window.VentoAndroid; window.__pn = []; window.__and.notifs = [];
+      A.pagoNotificar = (t, f, o, v, b, tipo) => window.__pn.push({ t, f, o, v, b, tipo });
+      A.alFrente = () => false;
+      const on0 = window.ventoAvisoOn; window.ventoAvisoOn = () => true;   // «Avisos de pagos» prendido (otra prueba lo apagó)
+      window.pagosRecibirTexto('Nequi | Envío | MARIBE ARIAS te envió 1500, ¡lo mejor!', 'and-r26a');
+      window.pagosRecibirTexto('SMS | 3001234567 | DaviPlata: recibiste $9.000', 'and-r26b');
+      delete A.pagoNotificar; delete A.alFrente; window.ventoAvisoOn = on0;
+      return { pn: window.__pn.slice(), notifs: window.__and.notifs.length };
+    });
+    chk('26. Nequi que entiende la página: por el camino de la app Android (notificación + ventana) con «$1.500» y «Nequi»', r26.pn.some(x => x.t === '💜 Recibiste $1.500 por Nequi' && x.v === '$1.500' && x.b === 'Nequi' && x.tipo === 'ok' && /MARIBE ARIAS te envió 1500/.test(x.o)) && r26.notifs === 0, r26);
+    chk('26. Un SMS falso también abre su ventana roja («🚨 Mensaje de pago FALSO»)', r26.pn.some(x => /FALSO/.test(x.t) && x.tipo === 'falso' && x.v === '$9.000'), r26);
 
     // 11. Navegador (sin la app): la voz sale con el volumen elegido (hasta 100 %)
     const ctx2 = await b.newContext({ viewport: { width: 1200, height: 900 } });
