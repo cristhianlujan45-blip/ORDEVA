@@ -25438,7 +25438,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-15 · v1.40.0';
+const MESORA_VERSION = '2026-10-16 · v1.40.1';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'Vento · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 // Si el navegador (o el celular, con la app agregada a la pantalla de inicio) se quedó con
@@ -28659,9 +28659,13 @@ let fotosListas = false;
     if(!t) return null;
     // Nequi habla de «tú» («Te llegó plata»); DaviPlata y varios bancos de «usted» («Le llegó plata», «Le pasaron»,
     // «Recibió», «Ha recibido»). Antes solo se entendía la forma de «tú» y los avisos de DaviPlata no salían.
-    const recibido = /(recibiste|has recibido|ha recibido|(?:te|le) lleg(?:[oó]|aron)|(?:te|le) pas(?:[oó]|aron)|pasaron plata|(?:te|le) envi(?:[oó]|aron)|(?:te|le) transfiri(?:[oó]|eron)|(?:te|le) pag(?:[oó]|aron)|(?:te|le) consign|(?:te|le) abon|consignaron|abonaron|entr[oó] plata|lleg[oó] plata|ingres[oó]|recibi[oó]|recepci[oó]n|pago recibido|dinero recibido|transferencia recibida|abono a (?:tu|su) cuenta|(?:te|le) mand(?:o|ó|aron)|(?:te|le) gir(?:o|ó|aron)|(?:te|le) deposit|dep[oó]sito recibido|(?:te|le|se) acredit|acredit\w*\s+(?:a|en)\s+(?:tu|su)\s+(?:cuenta|llave|nequi|daviplata)|lleg(?:o|ó|aron)\s+(?:\$|cop|plata|dinero)|a (?:tu|su) llave|(?:recib|lleg|entr|ingres)[^.]{0,40}bre-?b|bre-?b[^.]{0,40}(?:recib|lleg|entr|ingres)|entr[oó] dinero|lleg[oó] dinero)/i.test(t);
-    const salida = /(enviaste|pagaste|transferiste|retiraste|compraste|sacaste|usted (?:envi|pag|transfiri|pas)|c[oó]digo|clave din|otp|contrase)/i.test(t);
-    if(!recibido || salida && !/(recibiste|recibi[oó]|ha recibido|(?:te|le) lleg)/i.test(t)) return null;
+    const recibido = /(recibiste|has recibido|ha recibido|(?:te|le) lleg(?:[oó]|aron)|(?:te|le) pas(?:[oó]|aron)|pasaron plata|(?:te|le) envi(?:[oó]|aron)|(?:te|le) transfiri(?:[oó]|eron)|(?:te|le) pag(?:[oó]|aron)|(?:te|le) consign|(?:te|le) abon|consignaron|abonaron|entr[oó] plata|lleg[oó] plata|ingres[oó]|recibi[oó]|recepci[oó]n|pago recibido|dinero recibido|transferencia recibida|abono a (?:tu|su) cuenta|(?:te|le) mand(?:o|ó|aron)|(?:te|le) gir(?:o|ó|aron)|(?:te|le) deposit|dep[oó]sito recibido|(?:te|le|se) acredit|acredit\w*\s+(?:a|en)\s+(?:tu|su)\s+(?:cuenta|llave|nequi|daviplata)|lleg(?:o|ó|aron)\s+(?:\$|cop|plata|dinero)|a (?:tu|su) llave|(?:recib|lleg|entr|ingres)[^.]{0,40}bre-?b|bre-?b[^.]{0,40}(?:recib|lleg|entr|ingres)|entr[oó] dinero|lleg[oó] dinero|transferencia entrante|abono recibido|abono (?:por|de|bre-?b)\s|ingreso de (?:\$|cop|dinero|plata)|ingresaron|entrada de (?:dinero|plata)|recibiste un (?:pago|abono)|lleg[oó] una transferencia|(?:en|a) (?:tu|su) llave)/i.test(t);
+    // Códigos de seguridad: nunca son un pago (la misma regla de la app Android: AvisoPago.CODIGO).
+    if(/c[oó]digo (?:de )?(?:seguridad|verificaci|acceso|confirmaci)|clave din[aá]mica|\botp\b|tu c[oó]digo es|es tu c[oó]digo/i.test(t)) return null;
+    const salida = /(enviaste|pagaste|transferiste|retiraste|compraste|sacaste|usted (?:envi|pag|transfiri|pas)|c[oó]digo|clave|otp|contrase)/i.test(t);
+    const sale = /enviaste|pagaste|transferiste|retiraste|compraste|sacaste|usted (?:envi|pag|transfiri|pas)/i.test(t);
+    // Un pago de verdad puede traer «nunca compartas tu clave»: con una frase fuerte de plata recibida sigue siendo pago.
+    if(!recibido || salida && !/(recibiste|recibi[oó]|ha recibido|(?:te|le) lleg)/i.test(t) && !(PG_FUERTE.test(t) && !sale)) return null;
     // Publicidad del banco que se parece a un pago («¿Te llegó la prima?…», «Te prestamos hasta $5.000.000»): NO es plata
     // que llegó (la misma regla de la app Android: AvisoPago.PROMO).
     // Solicitudes y cobros («JUAN te pidió $20.000»), rechazados o fallidos: nunca son plata que llegó.
@@ -28679,7 +28683,7 @@ let fotosListas = false;
           || (t.match(new RegExp('\\bde\\s+(' + NOM + ')')) || [])[1] || '';
     if(/^(nequi|daviplata|bancolombia|tu|su|la|el|le|dinero|plata|recibiste|te|usted)$/i.test(de.split(' ')[0])) de = '';
     de = de.split(' ').map(x => x.charAt(0).toUpperCase() + x.slice(1).toLowerCase()).join(' ');
-    return { monto, app, de };
+    return { monto, app, de, breb: /bre-?b|\bllave\b/i.test(t) };
   }
 
   // ---------- ¿De qué mesa es? ----------
@@ -28704,7 +28708,7 @@ let fotosListas = false;
     const origen = partes[0] || '', t1 = partes[1] || '';
     const esSms = PG_APPS_SMS.test(origen) || /^sms$/i.test(t1);
     if(!esSms){
-      if(/nequi|daviplata|bancolombia|davivienda|movii|\bdale\b|bre-?b|banco|\bnu\b|lulo|rappipay|powwi|ual[aá]|bbva|scotiabank|av villas|colpatria|occidente|popular|caja social/i.test(origen)) return { nivel: 'app', txt: 'Confirmado por la app de ' + origen };
+      if(/nequi|daviplata|bancolombia|davivienda|movii|\bdale\b|bre-?b|banco|\bnu\b|lulo|rappipay|powwi|ual[aá]|bbva|scotiabank|av villas|colpatria|occidente|popular|caja social|ita[uú]|bogot[aá]|pibank|coltefinanciera|bancam[ií]a|mibanco|falabella|finandina|serfinanza|confiar|global66|ban100|coomeva|cooperativa|tpaga|transfiya|\bbold\b|agrario|gnb|sudameris/i.test(origen)) return { nivel: 'app', txt: 'Confirmado por la app de ' + origen };
       return { nivel: 'revisar', txt: 'Aviso de «' + (origen || 'otra app') + '»: confírmalo en la app del banco' };
     }
     const quien = /^sms$/i.test(t1) ? '' : t1;
@@ -28762,13 +28766,13 @@ let fotosListas = false;
       pgPintar(); return;
     }
     // Como el parlante de Bold: sonido de éxito y «Pago confirmado» en voz alta, con el valor y quién pagó.
-    const msg = '✅ Pago confirmado · ' + plata(p.monto) + ' por ' + p.app + (p.de ? ' de ' + p.de : '') + (mesa ? ' · ' + tableLabel(mesa) : '');
+    const msg = '✅ Pago confirmado · ' + plata(p.monto) + ' por ' + (p.breb ? 'Bre-B · ' : '') + p.app + (p.de ? ' de ' + p.de : '') + (mesa ? ' · ' + tableLabel(mesa) : '');
     try{ showToast(msg, 9000); }catch(e){}
     // Aviso del celular (con Vento minimizada o la pantalla apagada): «💜 Pagaron $20.000 por DaviPlata».
-    if(!op.voz) try{ if(!window.ventoAvisoOn || window.ventoAvisoOn('pagos')) window.ventoAvisoCel && window.ventoAvisoCel('💜 Pagaron ' + plata(p.monto) + ' por ' + p.app, (p.de ? 'De ' + p.de + '. ' : '') + (mesa ? tableLabel(mesa) + '. ' : '') + 'Confirmado por la app de ' + p.app + '.', 'pedidos'); }catch(e){}
+    if(!op.voz) try{ if(!window.ventoAvisoOn || window.ventoAvisoOn('pagos')) window.ventoAvisoCel && window.ventoAvisoCel('💜 Pagaron ' + plata(p.monto) + ' por ' + (p.breb ? 'Bre-B en ' : '') + p.app, (p.de ? 'De ' + p.de + '. ' : '') + (mesa ? tableLabel(mesa) + '. ' : '') + 'Confirmado por la app de ' + p.app + '.', 'pedidos'); }catch(e){}
     try{ window.ventoSonidos && window.ventoSonidos.success(); }catch(e){}
     // «Pago confirmado. 200 pesos desde DaviPlata» (o «desde Nequi»…), con quién pagó y la mesa si se sabe.
-    if(!op.voz) window.ventoDecirPago('Pago confirmado. ' + p.monto + ' pesos desde ' + p.app + (p.de ? ', de ' + p.de : '') + (mesa ? ', de la ' + tableLabel(mesa) : ''));
+    if(!op.voz) window.ventoDecirPago('Pago confirmado. ' + p.monto + ' pesos ' + (p.breb ? 'por Bre-B, en ' : 'desde ') + p.app + (p.de ? ', de ' + p.de : '') + (mesa ? ', de la ' + tableLabel(mesa) : ''));
     if(navigator.vibrate) try{ navigator.vibrate([150, 80, 150]); }catch(e){}
     try{ window.mesoraCelebrar && window.mesoraCelebrar(['💜', '💰', '✨']); }catch(e){}
     pgPintar();
@@ -29013,6 +29017,24 @@ let fotosListas = false;
     $p('pgNueva').onclick = () => { if(!confirm('¿Cambiar la dirección? Tendrás que pegar la nueva en MacroDroid.')) return; PG().topic = ''; PG(); saveData(); try{ es && es.close(); }catch(e){} es = null; pgConectar(); pgPintar(); };
     return true;
   }
+  // Avisos de apps de banco que hablaban de plata pero Vento NO tomó como pago (vienen sin nombres ni números): se ven en
+  // Ajustes → Pagos y se reportan para enseñarle a Vento ese formato.
+  const pgDiagVistos = new Set();
+  function pgDiagPintar(){
+    const A = AND(); if(!A || !A.pagosAvisosDiag) return;
+    let d = {}; try{ d = JSON.parse(A.pagosAvisosDiag() || '{}'); }catch(x){}
+    const l = Array.isArray(d.lista) ? d.lista : [];
+    l.forEach(x => { const k = x.app + '|' + x.txt; if(pgDiagVistos.has(k)) return; pgDiagVistos.add(k);
+      try{ window.ventoError && window.ventoError('pago', 'Aviso del banco que Vento no tomó (' + String(x.app || 'app').slice(0, 30) + ': ' + (x.motivo || '') + ')', { app: String(x.app || '').slice(0, 40), texto: String(x.txt || '').slice(0, 220) }, 'pago|no-tomado|' + String(x.app || '').toLowerCase().slice(0, 30) + '|' + String(x.txt || '').slice(0, 60)); }catch(e){} });
+    let box = document.getElementById('pgDiag');
+    const ancla = $p('pgAndTxt'); if(!ancla) return;
+    if(!box){ box = document.createElement('div'); box.id = 'pgDiag'; box.style.cssText = 'font-size:13px;line-height:1.45;margin-top:8px'; ancla.parentNode.insertBefore(box, ancla.nextSibling); }
+    const ult = +d.ultimo || 0;
+    box.innerHTML = (ult ? '<div style="opacity:.8">📨 Último aviso de un banco en este celular: ' + new Date(ult).toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + '</div>' : '') +
+      (l.length ? '<details style="margin-top:6px"><summary style="cursor:pointer;font-weight:700">🔎 Avisos del banco que Vento no tomó como pago (' + l.length + ')</summary>' +
+        '<div style="opacity:.85;margin:4px 0">Sin nombres ni valores. Ya los mandamos a Vento para aprender ese formato. Si uno de estos era un pago, revísalo en la app del banco.</div>' +
+        l.slice().reverse().map(x => '<div style="padding:5px 0;border-top:1px solid var(--line)"><b>' + escp(x.app) + '</b> · ' + escp(x.motivo || '') + '<br><small style="opacity:.8">' + escp(x.txt) + '</small></div>').join('') + '</details>' : '');
+  }
   function pgPintar(){
     if(!data || !pgCrearUI()) return;
     const g = PG();
@@ -29026,8 +29048,11 @@ let fotosListas = false;
     if($p('pgAndOn')){
       const e = andEstado();
       $p('pgAndOn').checked = !!e.on;
-      $p('pgAndTxt').textContent = !e.on ? 'Vento toma directo los avisos de plata recibida de DaviPlata, Nequi y tu banco que llegan a este celular. Nunca toma códigos, claves ni compras.'
-        : e.permiso ? '🟢 Leyendo los avisos de plata recibida de este celular. Ya no necesitas MacroDroid aquí.' : '🟠 Falta el permiso «Acceso a notificaciones» para Vento: apaga y prende este interruptor para abrirlo.';
+      $p('pgAndTxt').textContent = !e.on ? 'Vento toma directo los avisos de plata recibida de DaviPlata, Nequi, la llave Bre-B y tu banco que llegan a este celular. Nunca toma códigos, claves ni compras.'
+        : !e.permiso ? '🟠 Falta el permiso «Acceso a notificaciones» para Vento: apaga y prende este interruptor para abrirlo.'
+        : e.vivo === false ? '🟠 Android desconectó la lectura de avisos de Vento (ahorro de batería o una actualización). Ya le pedimos que la vuelva a conectar; si en un minuto sigue así, apaga y prende «Acceso a notificaciones» para Vento y quita el ahorro de batería de Vento.'
+        : '🟢 Leyendo los avisos de plata recibida de este celular (DaviPlata, Nequi, llave Bre-B y bancos). Ya no necesitas MacroDroid aquí.';
+      pgDiagPintar();
     }
     const sello = x => x.estado === 'falso' ? '<span style="color:#e5484d;font-weight:800">🚨 FALSO</span>' : x.estado === 'revisar' ? '<span style="color:#f5a524;font-weight:800">⚠️ Revisar</span> <button type="button" class="btn-ghost" data-pgok="' + escp(x.id) + '" style="padding:2px 8px;font-size:12px">✅ Lo vi en la app</button>' : x.estado === 'ok' ? '<span style="color:#30a46c;font-weight:800">✅ Revisado</span>' : '<span style="color:#30a46c;font-weight:800">✅ Confirmado</span>';
     $p('pgLista').innerHTML = g.lista.length ? g.lista.slice(0, 15).map(x => '<div style="display:flex;gap:8px;padding:6px 0;border-top:1px solid var(--line);font-size:14px' + (x.estado === 'falso' ? ';opacity:.8;text-decoration:line-through' : '') + '"><span style="flex:1;min-width:0">' + escp(x.app) + (x.de ? ' · ' + escp(x.de) : '') + ' ' + sello(x) + '<br><small style="opacity:.7">' + new Date(x.t).toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + (x.mesa ? ' · ' + escp(tableLabel(x.mesa)) : '') + (x.fuente && x.estado !== 'app' ? ' · ' + escp(x.fuente) : '') + '</small></span><b>' + plata(x.monto) + '</b></div>').join('') : '<div class="empty-note">Todavía no ha llegado ningún aviso.</div>';

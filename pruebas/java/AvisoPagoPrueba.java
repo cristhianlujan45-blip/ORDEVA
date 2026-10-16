@@ -103,6 +103,29 @@ public class AvisoPagoPrueba {
         chk("Voz pareja: 100 % queda al 92 % del máximo (todas las frases al mismo nivel)", Math.abs(pico - 30145) < 60, pico);
         chk("Voz pareja: 150 % suena más fuerte, sin pasarse del tope (sin chasquidos)", p150 != null && maxAbs(p150, 44 + (sil + n / 2) * 2, n / 2) <= 32767 && maxAbs(p150, 44 + sil * 2, n / 2) > maxAbs(p100, 44 + sil * 2, n / 2) * 2, p150 == null ? "null" : maxAbs(p150, 44 + sil * 2, n / 2));
         chk("Voz pareja: si no es un WAV de 16 bits, no se toca (se reproduce como siempre)", AvisoPago.vozPareja("hola".getBytes(), 100, 400) == null && AvisoPago.vozPareja(new byte[60], 100, 400) == null, "");
+        // Más formas de DaviPlata, Nequi y la llave Bre-B (antes algunas no sonaban)
+        String[][] mas = {
+            {"JUAN PEREZ le envió $30.000 a su DaviPlata. Nunca comparta su clave", "30000"},
+            {"Te llegaron $12.000 a tu llave 3001234567. No compartas tu clave con nadie", "12000"},
+            {"Transferencia entrante por $40.000 desde Banco de Bogotá", "40000"},
+            {"Abono recibido $25.000 por Bre-B", "25000"},
+            {"Recibiste un pago de $18.000 en tu llave @tienda", "18000"},
+            {"Ingreso de $70.000 a tu cuenta de ahorros", "70000"},
+            {"Llegó una transferencia de $33.000 a tu Nequi", "33000"},
+            {"DaviPlata: Recibio $5.000 de MARIA", "5000"},
+            {"Bre-B: recibiste $90.000 de CARLOS en tu llave", "90000"},
+        };
+        for (String[] r : mas) {
+            chk("Pago: «" + r[0] + "»", AvisoPago.esRecibido(r[0]), r[0]);
+            chk("  … valor " + r[1], AvisoPago.monto(r[0]) == Long.parseLong(r[1]), AvisoPago.monto(r[0]));
+        }
+        String[] noMas = { "Enviaste $20.000 a la llave @juan. Nunca compartas tu clave", "Tu código de verificación es 123456. Te llegó por Bre-B", "Usted pagó $10.000. Le enviamos el comprobante" };
+        for (String nm : noMas) chk("No es plata recibida: «" + nm + "»", !AvisoPago.esRecibido(nm), nm);
+        chk("Voz con Bre-B: «Pago confirmado. 20000 pesos por Bre-B, en Nequi.»", "Pago confirmado. 20000 pesos por Bre-B, en Nequi.".equals(AvisoPago.frase("Nequi", 20000, "Te llegaron $20.000 a tu llave")), AvisoPago.frase("Nequi", 20000, "Te llegaron $20.000 a tu llave"));
+        chk("Voz sin Bre-B igual que antes", AvisoPago.frase("DaviPlata", 200, "Le llegó plata $200").equals(AvisoPago.frase("DaviPlata", 200)), "");
+        chk("Bancos nuevos: Itaú, Banco Popular, Banco de Bogotá, Pibank, Bold", AvisoPago.esBanco("Itaú") && AvisoPago.esBanco("Banco Popular") && AvisoPago.esBanco("Bogotá App") && AvisoPago.esBanco("Pibank") && AvisoPago.esBanco("Bold"), "");
+        chk("Diagnóstico: un aviso de banco con plata que no se tomó se guarda SIN nombres ni números", AvisoPago.pareceDePlata("Movimiento: JUAN PEREZ $20.000 llave") && AvisoPago.sinDatos("Movimiento: JUAN PEREZ $20.000 @juan").equals("Movimiento: NOMBRE $# @llave"), AvisoPago.sinDatos("Movimiento: JUAN PEREZ $20.000 @juan"));
+        chk("Diagnóstico: publicidad sin plata no se guarda", !AvisoPago.pareceDePlata("Actualiza tu app de Nequi"), "");
         System.out.println("RESULTADO " + ok + " bien " + mal + " mal");
         System.exit(mal > 0 ? 1 : 0);
     }

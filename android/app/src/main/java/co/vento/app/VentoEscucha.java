@@ -28,6 +28,9 @@ public class VentoEscucha extends NotificationListenerService {
     // Las reglas (qué es plata recibida, el valor y la frase) están en AvisoPago (se prueban sin Android).
     private static final long VIGENCIA = 6 * 3600_000L;   // un aviso que la página no alcanzó a tomar en 6 h ya no sirve
     static final String PREF_VISTOS = "pagosAvisosVistos", PREF_NOTIF = "pagosNotif", PREF_SMS_OK = "pagosSmsConfiar", PREF_RECIENTES = "pagosRecientes";
+    // Avisos de apps de banco que hablan de plata pero que Vento NO tomó como pago (sin nombres ni números), para revisar
+    // y enseñarle a Vento ese formato. Y la última vez que llegó cualquier aviso de banco (¿está escuchando?).
+    static final String PREF_DIAG = "pagosAvisosDiag", PREF_ULTIMO = "pagosAvisosUltimo";
 
     @Override
     public void onListenerConnected() {
@@ -104,10 +107,27 @@ public class VentoEscucha extends NotificationListenerService {
         } catch (Throwable ignorado) { }
         boolean confiable = !sabe || AvisoPago.confiable(pkg, instalador, (info.flags & android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0);
         Bundle x = n.extras;
-        if (x == null) return false;
+        if (x == null) x = new Bundle();
         String titulo = texto(x.getCharSequence(Notification.EXTRA_TITLE));
+        if (titulo.isEmpty()) titulo = texto(x.getCharSequence(Notification.EXTRA_TITLE_BIG));
         CharSequence grande = x.getCharSequence(Notification.EXTRA_BIG_TEXT);
         String principal = texto(grande != null ? grande : x.getCharSequence(Notification.EXTRA_TEXT));
+        // Hay apps de banco que ponen el valor en otra parte del aviso (subtítulo, resumen, el texto de la barra) o que
+        // dibujan su propio aviso sin texto normal: si en el título y el texto no está el valor, se busca ahí.
+        if (AvisoPago.monto(titulo + " " + principal) <= 0) {
+            StringBuilder mas = new StringBuilder();
+            for (String k : new String[]{Notification.EXTRA_SUB_TEXT, Notification.EXTRA_INFO_TEXT, Notification.EXTRA_SUMMARY_TEXT}) {
+                String v = texto(x.getCharSequence(k)); if (!v.isEmpty() && !principal.contains(v)) mas.append(' ').append(v);
+            }
+            String tick = texto(n.tickerText); if (!tick.isEmpty() && !principal.contains(tick)) mas.append(' ').append(tick);
+            if (principal.isEmpty() && titulo.isEmpty() || AvisoPago.monto(titulo + " " + principal + mas) <= 0) {
+                String vista = textosDeVista(n);
+                if (!vista.isEmpty()) mas.append(' ').append(vista);
+            }
+            principal = (principal + mas).trim();
+        }
+        if (titulo.isEmpty() && principal.isEmpty()) return false;
+        try { sp.edit().putLong(PREF_ULTIMO, System.currentTimeMillis()).apply(); } catch (Exception ignorado) { }
         // Cuando llega otro pago con el primero todavía en la barra, la app los junta («2 mensajes nuevos»): cada
         // aviso viene en una línea (InboxStyle) o en un mensaje (MessagingStyle). Antes solo se leía el resumen.
         java.util.List<String> otros = new java.util.ArrayList<>();
@@ -133,8 +153,56 @@ public class VentoEscucha extends NotificationListenerService {
             return alguno;
         }
         if (procesar(sp, app, titulo, principal, sbn.getKey() + ":" + cuando + ":", confiable, callado)) alguno = true;
-        for (String l : otros) if (!l.isEmpty() && !l.equals(principal) && procesar(sp, app, titulo, l, "L:", confiable, callado)) alguno = true;
+        else { String t0 = titulo + " " + principal; if (!AvisoPago.esRecibido(t0) || (AvisoPago.monto(t0) <= 0 && !AvisoPago.esPlataSinValor(t0))) diagnostico(sp, app, t0); }
+        marcarContenido(sp, app, principal);
+        // Las líneas de un aviso agrupado son los pagos de antes que siguen en la barra: solo cuenta la que no se había
+        // visto (antes una línea vieja podía volver a sonar como pago nuevo).
+        for (String l : otros) if (!l.isEmpty() && !l.equals(principal) && !principal.contains(l) && !contenidoVisto(sp, app, l)) {
+            if (procesar(sp, app, titulo, l, "L:", confiable, callado)) alguno = true;
+            marcarContenido(sp, app, l);
+        }
         return alguno;
+    }
+
+    private static String claveContenido(String app, String t) { return "C:" + (app + "|" + (t == null ? "" : t.replaceAll("\\s+", " ").trim())).hashCode(); }
+    private static synchronized void marcarContenido(SharedPreferences sp, String app, String t) {
+        try { JSONObject v = new JSONObject(sp.getString(PREF_VISTOS, "{}")); v.put(claveContenido(app, t), System.currentTimeMillis()); sp.edit().putString(PREF_VISTOS, v.toString()).apply(); } catch (Exception ignorado) { }
+    }
+    private static synchronized boolean contenidoVisto(SharedPreferences sp, String app, String t) {
+        try { JSONObject v = new JSONObject(sp.getString(PREF_VISTOS, "{}")); return System.currentTimeMillis() - v.optLong(claveContenido(app, t), 0) < 12 * 3600_000L; } catch (Exception e) { return false; }
+    }
+
+    /** Aviso de una app de banco que habla de plata pero no se tomó como pago: se guarda SIN datos para revisarlo. */
+    private static synchronized void diagnostico(SharedPreferences sp, String app, String todo) {
+        try {
+            if (!AvisoPago.pareceDePlata(todo)) return;
+            String limpio = AvisoPago.sinDatos(todo);
+            JSONArray l = new JSONArray(sp.getString(PREF_DIAG, "[]")), out = new JSONArray();
+            for (int i = 0; i < l.length(); i++) { JSONObject o = l.getJSONObject(i); if (!limpio.equals(o.optString("txt"))) out.put(o); }
+            out.put(new JSONObject().put("app", app).put("txt", limpio).put("t", System.currentTimeMillis())
+                    .put("motivo", AvisoPago.esRecibido(todo) ? "sin valor" : "no parece plata recibida"));
+            while (out.length() > 15) out.remove(0);
+            sp.edit().putString(PREF_DIAG, out.toString()).apply();
+        } catch (Exception ignorado) { }
+    }
+
+    /** Texto de un aviso dibujado por la app (sin título ni texto normal): se arma la vista y se leen sus letreros. */
+    private String textosDeVista(Notification n) {
+        StringBuilder b = new StringBuilder();
+        for (android.widget.RemoteViews rv : new android.widget.RemoteViews[]{n.bigContentView, n.contentView}) {
+            if (rv == null) continue;
+            try {
+                android.view.View v = rv.apply(this, null);
+                juntarTextos(v, b);
+                if (b.length() > 0) break;
+            } catch (Throwable ignorado) { }
+        }
+        String t = b.toString().replaceAll("\\s+", " ").trim();
+        return t.length() > 400 ? t.substring(0, 400) : t;
+    }
+    private static void juntarTextos(android.view.View v, StringBuilder b) {
+        if (v instanceof android.widget.TextView) { CharSequence c = ((android.widget.TextView) v).getText(); if (c != null && c.length() > 0) b.append(c).append(' '); }
+        else if (v instanceof android.view.ViewGroup) { android.view.ViewGroup g = (android.view.ViewGroup) v; for (int i = 0; i < g.getChildCount(); i++) juntarTextos(g.getChildAt(i), b); }
     }
 
     /** Un aviso: si es plata recibida y no se había visto, se dice en voz alta YA (aunque Vento esté minimizada o la
@@ -165,7 +233,7 @@ public class VentoEscucha extends NotificationListenerService {
         // ¿Ya llegó este mismo pago por SMS (el banco avisa por los dos lados)? Entonces este aviso de la app lo confirma
         // y reemplaza al del SMS (no son dos pagos).
         String reemplaza = monto > 0 && confiable ? parear(sp, monto, false, id) : null;
-        if (confiable && !callado) { VentoApp.anunciarPago(app, monto, sp.getBoolean(PREF_NOTIF, true)); voz = true; }
+        if (confiable && !callado) { VentoApp.anunciarPago(app, monto, sp.getBoolean(PREF_NOTIF, true), todo); voz = true; }
         else if (!confiable && !callado) { VentoApp.decirPago("Ojo. Llegó un aviso de " + monto + " pesos de una aplicación que no es la oficial de " + AvisoPago.nombreApp(app) + ". Revísalo en la aplicación del banco antes de entregar."); voz = true; }
         guardar(sp, id, txt, voz, confiable ? null : "La app «" + app + "» de este celular no es la oficial (no se instaló desde la tienda): míralo en la app del banco", false, reemplaza);
         return true;
@@ -243,6 +311,12 @@ public class VentoEscucha extends NotificationListenerService {
         out.put(o);
         while (out.length() > 30) out.remove(0);
         sp.edit().putString(PREF_COLA, out.toString()).apply();
+    }
+
+    /** Para la página: los avisos de banco que no se tomaron (y cuándo llegó el último aviso de banco). */
+    static String diag(SharedPreferences sp) {
+        try { return new JSONObject().put("lista", new JSONArray(sp.getString(PREF_DIAG, "[]"))).put("ultimo", sp.getLong(PREF_ULTIMO, 0)).put("vivo", activa != null).toString(); }
+        catch (Exception e) { return "{}"; }
     }
 
     /** La página toma los avisos pendientes (y quedan vistos). */

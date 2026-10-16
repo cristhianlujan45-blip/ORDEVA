@@ -150,11 +150,14 @@ public class VentoApp extends Application {
     /** Llegó plata (aviso de DaviPlata, Nequi…): se dice en voz alta YA desde Android —también con Vento minimizada o la
      *  pantalla apagada— «Pago confirmado. 200 pesos desde DaviPlata.» y, si Vento no se está viendo, sale el aviso del
      *  celular «💜 Pagaron $200 por DaviPlata». La página lo registra después (sin volver a decirlo). */
-    static void anunciarPago(String appBanco, long monto, boolean notif) {
+    static void anunciarPago(String appBanco, long monto, boolean notif) { anunciarPago(appBanco, monto, notif, null); }
+
+    /** Con el texto del aviso: si llegó por la llave Bre-B, la voz y el aviso lo dicen. */
+    static void anunciarPago(String appBanco, long monto, boolean notif, String texto) {
         if (app == null || monto <= 0) return;
-        decirPago(AvisoPago.frase(appBanco, monto));
+        decirPago(AvisoPago.frase(appBanco, monto, texto));
         try {
-            if (notif) app.new Puente().notificar("💜 Pagaron " + AvisoPago.plata(monto) + " por " + AvisoPago.nombreApp(appBanco),
+            if (notif) app.new Puente().notificar("💜 Pagaron " + AvisoPago.plata(monto) + (AvisoPago.esBreB(texto) ? " por Bre-B en " : " por ") + AvisoPago.nombreApp(appBanco),
                     "Pago confirmado por la app de " + AvisoPago.nombreApp(appBanco) + ".", "pagos", false);
         } catch (Exception ignorado) { }
     }
@@ -263,7 +266,12 @@ public class VentoApp extends Application {
                 java.io.File f = new java.io.File(app.getCacheDir(), "pago" + System.nanoTime() + ".wav");
                 String id = "arch" + System.nanoTime();
                 archivosPago.put(id, new Object[]{f, frase});
-                if (ttsPago.synthesizeToFile(frase, null, f, id) == TextToSpeech.SUCCESS) return;
+                if (ttsPago.synthesizeToFile(frase, null, f, id) == TextToSpeech.SUCCESS) {
+                    // Hay motores de voz que graban pero nunca avisan que terminaron: el pago se quedaba sin sonar.
+                    // Si en 6 s no avisó, se dice directo (sin esperar más).
+                    ui.postDelayed(() -> { if (archivosPago.remove(id) != null) decirDirecto(frase); }, 6000);
+                    return;
+                }
                 archivosPago.remove(id);
             }
             decirDirecto(frase);
@@ -873,14 +881,22 @@ public class VentoApp extends Application {
         @JavascriptInterface
         public String pagosAvisosEstado() {
             try {
+                boolean permiso = escuchaPermitida();
+                // Con permiso pero sin estar escuchando (Android la desconectó): se le pide que vuelva a conectarla.
+                if (permiso && VentoEscucha.activa == null && android.os.Build.VERSION.SDK_INT >= 24)
+                    try { android.service.notification.NotificationListenerService.requestRebind(new android.content.ComponentName(VentoApp.this, VentoEscucha.class)); } catch (Throwable ignorado) { }
                 return new JSONObject().put("on", getSharedPreferences("vento", MODE_PRIVATE).getBoolean(VentoEscucha.PREF_ON, false))
-                        .put("permiso", escuchaPermitida()).toString();
+                        .put("permiso", permiso).put("vivo", VentoEscucha.activa != null).toString();
             } catch (Exception e) { return "{}"; }
         }
 
         /** Ajustes → Notificaciones → «💜 Pagos que te llegan»: si sale (o no) el aviso del celular de cada pago. */
         @JavascriptInterface
         public void pagosNotif(boolean si) { getSharedPreferences("vento", MODE_PRIVATE).edit().putBoolean(VentoEscucha.PREF_NOTIF, si).apply(); }
+
+        /** Avisos de banco que hablaban de plata pero no se tomaron como pago (sin datos), para revisarlos. */
+        @JavascriptInterface
+        public String pagosAvisosDiag() { return VentoEscucha.diag(getSharedPreferences("vento", MODE_PRIVATE)); }
 
         /** Los avisos que llegaron y la página todavía no ha tomado: [{id, txt, t, voz}]. */
         @JavascriptInterface

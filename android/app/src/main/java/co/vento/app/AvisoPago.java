@@ -14,13 +14,16 @@ import java.util.regex.Pattern;
 public final class AvisoPago {
     private AvisoPago() { }
 
-    static final Pattern BANCO = Pattern.compile("daviplata|nequi|bancolombia|davivienda|movii|\\bdale\\b|bre-?b|banco|\\bnu\\b|lulo|rappipay|powwi|ual[aá]|bbva|scotiabank|av villas|colpatria|occidente|caja social", Pattern.CASE_INSENSITIVE);
+    static final Pattern BANCO = Pattern.compile("daviplata|nequi|bancolombia|davivienda|movii|\\bdale\\b|bre-?b|banco|\\bnu\\b|lulo|rappipay|powwi|ual[aá]|bbva|scotiabank|av villas|colpatria|occidente|caja social"
+            + "|ita[uú]|popular|bogot[aá]|pibank|coltefinanciera|bancam[ií]a|mibanco|falabella|finandina|serfinanza|confiar|global66|ban100|coomeva|cooperativa|tpaga|transfiya|\\bbold\\b|agrario|gnb|sudameris", Pattern.CASE_INSENSITIVE);
     // DaviPlata escribe de «usted»: «Le llegó plata», «Le pasaron»; Nequi de «tú»: «Te llegó plata».
     // También las transferencias de OTROS bancos por la llave Bre-B («Llegaron $50.000 a tu llave», «Recibiste $X por Bre-B»,
     // «Te mandaron», «Te giraron», «Se acreditó en tu cuenta»).
     static final Pattern RECIBIDO = Pattern.compile("recibiste|has recibido|ha recibido|(te|le) lleg[oó]|(te|le) llegaron|(te|le) pas[oó]|(te|le) pasaron|pasaron plata|(te|le) envi[oó]|(te|le) enviaron|(te|le) transfiri|(te|le) pag[oó]|(te|le) pagaron|(te|le) consign|(te|le) abon|consignaron|abonaron|entr[oó] (plata|dinero)|lleg[oó] (plata|dinero)|ingres[oó]|recibi[oó]|recepci[oó]n|pago recibido|dinero recibido|transferencia recibida|abono a (tu|su) cuenta"
             + "|(te|le) mand(o|ó|aron)|(te|le) gir(o|ó|aron)|(te|le) deposit|dep[oó]sito recibido|(te|le|se) acredit|acredit\\w*\\s+(a|en)\\s+(tu|su)\\s+(cuenta|llave|nequi|daviplata)"
-            + "|lleg(o|ó|aron)\\s+(\\$|cop|plata|dinero)|a (tu|su) llave|(recib|lleg|entr|ingres)[^.]{0,40}bre-?b|bre-?b[^.]{0,40}(recib|lleg|entr|ingres)", Pattern.CASE_INSENSITIVE);
+            + "|lleg(o|ó|aron)\\s+(\\$|cop|plata|dinero)|a (tu|su) llave|(recib|lleg|entr|ingres)[^.]{0,40}bre-?b|bre-?b[^.]{0,40}(recib|lleg|entr|ingres)"
+            // Más formas de los bancos para la plata que entra (transferencias por llave Bre-B y de otros bancos)
+            + "|transferencia entrante|abono recibido|abono (por|de|bre-?b)\\s|ingreso de (\\$|cop|dinero|plata)|ingresaron|entrada de (dinero|plata)|recibiste un (pago|abono)|lleg[oó] una transferencia|(en|a) (tu|su) llave", Pattern.CASE_INSENSITIVE);
     static final Pattern PRIVADO = Pattern.compile("c[oó]digo|clave|otp|contrase|token|enviaste|pagaste|transferiste|retiraste|compraste|sacaste|usted (envi|pag|transfiri|pas)", Pattern.CASE_INSENSITIVE);
     static final Pattern SEGURO = Pattern.compile("recibiste|recibi[oó]|ha recibido|(te|le) lleg", Pattern.CASE_INSENSITIVE);
     // Nunca es plata que llegó, diga lo que diga: solicitudes y cobros («JUAN te pidió $20.000», «Recibiste una solicitud»),
@@ -28,7 +31,7 @@ public final class AvisoPago {
     static final Pattern NUNCA = Pattern.compile("solicitud|(te|le) pide|(te|le) pidi[oó]|(te|le) cobr|cobro pendiente|rechazad|fall[oó]|no se pudo|reversad|programad", Pattern.CASE_INSENSITIVE);
     // Frases que solo trae un pago de verdad: con ellas un «¿…?» o un «bolsillo» en el mismo aviso no lo vuelven publicidad
     // (antes un «¿La guardas en un bolsillo?» en el aviso de Nequi hacía que el pago no sonara).
-    static final Pattern FUERTE = Pattern.compile("(te|le) (envi[oó]|enviaron|pas[oó]|pasaron|transfiri[oó]|transfirieron|consign[oó]|consignaron|mand[oó]|mandaron|gir[oó]|giraron|pag[oó]|pagaron)\\b|(recibiste|recibi[oó]|ha recibido|has recibido)\\s+(\\$|cop|\\d|una transferencia|un pago|dinero|plata)|transferencia recibida|pago recibido|a (tu|su) llave|(te|le) lleg[oó]\\s+(\\$|cop|\\d|plata|dinero)", Pattern.CASE_INSENSITIVE);
+    static final Pattern FUERTE = Pattern.compile("(te|le) (envi[oó]|enviaron|pas[oó]|pasaron|transfiri[oó]|transfirieron|consign[oó]|consignaron|mand[oó]|mandaron|gir[oó]|giraron|pag[oó]|pagaron)(?![a-záéíóúñ])|(recibiste|recibi[oó]|ha recibido|has recibido)\\s+(\\$|cop|\\d|una transferencia|un pago|dinero|plata)|transferencia recibida|pago recibido|a (tu|su) llave|(te|le) lleg[oó]\\s+(\\$|cop|\\d|plata|dinero)", Pattern.CASE_INSENSITIVE);
     // Publicidad del banco que se parece a un pago («¿Te llegó la prima? Guárdala en un colchón», «Te prestamos hasta
     // $5.000.000»): NO es plata que llegó. Los avisos de pago de verdad no preguntan ni ofrecen nada.
     static final Pattern PROMO = Pattern.compile("¿|pr[eé]stamo|te prestamos|le prestamos|cr[eé]dito (de libre|pre|para|f[aá]cil|aprobado|express|r[aá]pido)|tarjeta de cr[eé]dito|colch[oó]n|oferta|promo|descuento|cashback|sorteo|particip|\\bgan(a|e|ar)\\b|aprovecha|beneficio|invit|hasta \\$|\\bcupo\\b|activa tu|desc[aá]rga", Pattern.CASE_INSENSITIVE);
@@ -38,15 +41,24 @@ public final class AvisoPago {
     static boolean esBanco(String app) { return app != null && BANCO.matcher(app).find(); }
 
     static boolean esRecibido(String todo) {
-        if (todo == null || !RECIBIDO.matcher(todo).find() || NUNCA.matcher(todo).find()) return false;
+        if (todo == null || !RECIBIDO.matcher(todo).find() || NUNCA.matcher(todo).find() || CODIGO.matcher(todo).find()) return false;
         if (PROMO.matcher(todo).find() && !FUERTE.matcher(todo).find()) return false;
-        return !PRIVADO.matcher(todo).find() || SEGURO.matcher(todo).find();
+        // Un pago de verdad puede traer «nunca compartas tu clave» o «tu código de transacción»: con una frase fuerte de
+        // plata recibida («te envió $…», «a tu llave») sigue siendo pago. Antes esos avisos se descartaban.
+        return !PRIVADO.matcher(todo).find() || SEGURO.matcher(todo).find() || (FUERTE.matcher(todo).find() && !SALE.matcher(todo).find());
     }
+    // Códigos de seguridad: nunca son un pago, digan lo que digan.
+    static final Pattern CODIGO = Pattern.compile("c[oó]digo (de )?(seguridad|verificaci|acceso|confirmaci)|clave din[aá]mica|\\botp\\b|tu c[oó]digo es|es tu c[oó]digo", Pattern.CASE_INSENSITIVE);
+    // Plata que SALE (nunca es un pago recibido, aunque el aviso diga «te»).
+    static final Pattern SALE = Pattern.compile("enviaste|pagaste|transferiste|retiraste|compraste|sacaste|usted (envi|pag|transfiri|pas)|c[oó]digo (de )?(seguridad|verificaci)|clave din[aá]mica|\\botp\\b", Pattern.CASE_INSENSITIVE);
+
+    /** ¿El pago llegó por la llave Bre-B? (para decirlo: «… por Bre-B, en Nequi») */
+    static boolean esBreB(String todo) { return todo != null && Pattern.compile("bre-?b|\\bllave\\b", Pattern.CASE_INSENSITIVE).matcher(todo).find(); }
 
     /** Aviso de plata que llegó pero SIN el valor («¡Te llegó plata! Entra a Nequi para verla»): igual se avisa. */
     static boolean esPlataSinValor(String todo) {
         return todo != null && monto(todo) <= 0 && esRecibido(todo)
-                && Pattern.compile("(te|le) lleg[oó] (plata|dinero)|lleg[oó] (plata|dinero)|(te|le) (enviaron|pasaron|mandaron|transfirieron|consignaron) (plata|dinero)|recibiste (plata|dinero|una transferencia)|recibi[oó] (plata|dinero|una transferencia)|transferencia recibida|a (tu|su) llave", Pattern.CASE_INSENSITIVE).matcher(todo).find();
+                && Pattern.compile("(te|le) lleg[oó] (plata|dinero)|lleg[oó] (plata|dinero)|(lleg[oó]|recibiste|recibi[oó]) una transferencia|transferencia entrante|(te|le) (enviaron|pasaron|mandaron|transfirieron|consignaron) (plata|dinero)|recibiste (plata|dinero|una transferencia)|recibi[oó] (plata|dinero|una transferencia)|transferencia recibida|a (tu|su) llave", Pattern.CASE_INSENSITIVE).matcher(todo).find();
     }
 
     /** El valor del aviso en pesos (0 si no se entiende). «$20.000,00» → 20000; «$200,00» → 200. */
@@ -213,6 +225,24 @@ public final class AvisoPago {
     /** «Pago confirmado. 200 pesos desde DaviPlata.» */
     static String frase(String app, long monto) {
         return "Pago confirmado. " + monto + " pesos desde " + nombreApp(app) + ".";
+    }
+
+    /** Con el texto del aviso: si llegó por la llave Bre-B lo dice («Pago confirmado. 20000 pesos por Bre-B, en Nequi.»). */
+    static String frase(String app, long monto, String texto) {
+        return esBreB(texto) ? "Pago confirmado. " + monto + " pesos por Bre-B, en " + nombreApp(app) + "." : frase(app, monto);
+    }
+
+    /** ¿Vale la pena guardarlo para revisar? Aviso de una app de banco que habla de plata pero que Vento NO tomó como pago. */
+    static boolean pareceDePlata(String todo) {
+        return todo != null && Pattern.compile("\\$\\s?\\d|\\bcop\\b|\\d\\s*pesos", Pattern.CASE_INSENSITIVE).matcher(todo).find()
+                && Pattern.compile("recib|lleg|transfer|bre-?b|llave|abon|ingres|acredit|envi|pas[oó]|consign|deposit|pago", Pattern.CASE_INSENSITIVE).matcher(todo).find();
+    }
+
+    /** El aviso sin nombres ni números (para revisarlo sin datos de nadie). */
+    static String sinDatos(String t) {
+        if (t == null) return "";
+        String x = t.replaceAll("\\b[A-ZÁÉÍÓÚÑ]{2,}(\\s+[A-ZÁÉÍÓÚÑ]{2,})*\\b", "NOMBRE").replaceAll("\\d[\\d.,]*", "#").replaceAll("@\\S+", "@llave");
+        return x.length() > 220 ? x.substring(0, 220) : x;
     }
 
     /** «$20.000» para mostrar. */

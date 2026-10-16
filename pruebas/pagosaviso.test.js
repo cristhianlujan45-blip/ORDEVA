@@ -177,7 +177,30 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     chk('14. Nequi con «¿La guardas en un bolsillo?» en el aviso → SÍ es pago (antes se tomaba por publicidad)', l14[1] === 1, l14);
     chk('14. Bre-B a Nequi → registrado', l14[2] === 1, l14);
     chk('14. «JUAN te pidió $54.000» (solicitud) NO es pago', l14[3] === 0, l14);
-    chk('14. … y suenan: «Pago confirmado. 52000 pesos desde Nequi» y «… 51000 pesos desde DaviPlata»', vz14.some(t => /^Pago confirmado\. 52000 pesos desde Nequi/.test(t)) && vz14.some(t => /^Pago confirmado\. 51000 pesos desde DaviPlata/.test(t)), vz14);
+    chk('14. … y suenan: «Pago confirmado. 52000 pesos desde Nequi» y «… 51000 pesos por Bre-B, en DaviPlata»', vz14.some(t => /^Pago confirmado\. 52000 pesos desde Nequi/.test(t)) && vz14.some(t => /^Pago confirmado\. 51000 pesos por Bre-B, en DaviPlata/.test(t)), vz14);
+
+    // 16. Más formas de DaviPlata, Nequi y la llave Bre-B; avisos que no se tomaron
+    const r16 = await p.evaluate(() => {
+      const si = ['JUAN PEREZ le envió $30.000 a su DaviPlata. Nunca comparta su clave', 'Te llegaron $12.000 a tu llave 3001234567. No compartas tu clave con nadie',
+        'Transferencia entrante por $40.000 desde Banco de Bogotá', 'Abono recibido $25.000 por Bre-B', 'Recibiste un pago de $18.000 en tu llave @tienda',
+        'Llegó una transferencia de $33.000 a tu Nequi', 'DaviPlata: Recibio $5.000 de MARIA'];
+      const no = ['Enviaste $20.000 a la llave @juan. Nunca compartas tu clave', 'Tu código de verificación es 123456. Te llegó por Bre-B'];
+      return { si: si.filter(t => !window.pagosLeer(t)), no: no.filter(t => window.pagosLeer(t)), breb: window.pagosLeer('Recibiste un pago de $18.000 en tu llave @tienda').breb === true,
+        fuente: window.pagosFuente('Itaú | Itaú | Recibiste $10.000 por Bre-B').nivel };
+    });
+    chk('16. Pagos que antes no sonaban (con «nunca comparta su clave», transferencia entrante, abono Bre-B, «Recibio» sin tilde…)', !r16.si.length, r16.si);
+    chk('16. Lo que sale o los códigos NO son pago', !r16.no.length, r16.no);
+    chk('16. Se sabe que llegó por la llave Bre-B, y la app de Itaú cuenta como banco', r16.breb && r16.fuente === 'app', r16);
+    await p.evaluate(() => { window.__errs16 = []; const e0 = window.ventoError; window.ventoError = (a, b, c, d) => { window.__errs16.push({ a, b, c, d }); return e0 && e0(a, b, c, d); };
+      window.VentoAndroid.pagosAvisosDiag = () => JSON.stringify({ ultimo: Date.now() - 60000, vivo: true, lista: [{ app: 'DaviPlata', txt: 'Movimiento NOMBRE $# @llave', motivo: 'no parece plata recibida', t: Date.now() }] });
+      window.VentoAndroid.pagosAvisosEstado = () => JSON.stringify({ on: true, permiso: true, vivo: false }); });
+    await p.evaluate(() => { try{ window.ventoPagosAbrir ? window.ventoPagosAbrir() : null; }catch(e){} });
+    const d16 = await p.evaluate(() => { try{ document.querySelector('.ajustes-cat[data-cat="pagos"]') && document.querySelector('.ajustes-cat[data-cat="pagos"]').click(); }catch(e){}
+      const ev = new Event('x'); try{ window.pagosRecibirTexto('Nequi | Nequi | Te llegaron $1 a tu llave', 'z16'); }catch(e){}
+      const box = document.getElementById('pgDiag'), t = document.getElementById('pgAndTxt');
+      return { diag: box ? box.innerText : '', txt: t ? t.textContent : '', errs: window.__errs16.filter(x => x.a === 'pago').map(x => x.b) }; });
+    chk('16. Ajustes → Pagos: «🔎 Avisos del banco que Vento no tomó» (sin datos) y se reportan para aprender el formato', /Avisos del banco que Vento no tomó/.test(d16.diag) && /Último aviso de un banco/.test(d16.diag) && d16.errs.some(x => /no tomó/.test(x)), d16);
+    chk('16. Si Android desconectó la lectura, se dice y se pide reconectar', /desconectó la lectura/.test(d16.txt), d16.txt);
 
     // 15. Paso 5: que suene siempre
     await p.evaluate(() => window.ventoPagosGuia()); await p.waitForTimeout(300);
