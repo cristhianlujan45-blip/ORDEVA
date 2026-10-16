@@ -132,7 +132,13 @@
   // App Android: aviso del celular con sonido aunque Vento esté cerrada o la pantalla apagada (en el navegador
   // eso lo hace el push). Si la ventana de Vento se está viendo, no hace falta (ya sale en pantalla).
   function avisoCelular(titulo, texto){ try{ window.VentoAndroid && window.VentoAndroid.notificar && window.VentoAndroid.notificar(titulo, texto, 'pedidos', false); }catch(e){} }
+  // ¿Este aviso es para quien usa este celular? Solo el dueño, los administradores y quien está cobrando o atiende esa
+  // mesa (mesero, empleado o cajero). A los demás no les sale ni les suena (antes les llegaba a todos repetido).
+  function paraMi(p, x){
+    try{ return !window.ventoPagoParaMi || window.ventoPagoParaMi(Number(p.monto), p.mesa || p.aplicado_mesa || (x && x.mesa) || null); }catch(e){ return true; }
+  }
   function avisar(p, x){
+    if(!paraMi(p, x)) return;
     var m = (p.mesa ? ' · ' + etiquetaMesa(p.mesa) : '');
     avisoCelular(p.confianza === 'falso' ? '🚨 Pago FALSO' : p.confianza === 'revisar' ? '⚠️ Pago por revisar' : '✅ Pago confirmado',
       plata(p.monto) + ' por ' + nombreMetodo(p.metodo) + (p.pagador ? ' de ' + p.pagador : '') + m + (p.verificado ? ' · ✅ verificado' + (p.aprobacion ? ' (N.º ' + p.aprobacion + ')' : '') : ''));
@@ -181,7 +187,7 @@
     if(p.estado !== 'aprobado' || p.aplicado_en || p.confianza === 'falso' || p.confianza === 'revisar' || !puedeCaja()) return;
     var mesa = p.mesa && data.tables && data.tables[p.mesa] ? p.mesa : null;
     if(mesa) aplicarEnMesa(p, x, isNaN(+mesa) ? mesa : +mesa);
-    else if(nuevoAprobado && enVivo && !x._yaAvisado){ try{ window.pagoLlego && window.pagoLlego(x); }catch(e){} }
+    else if(nuevoAprobado && enVivo && !x._yaAvisado && paraMi(p, x)){ try{ window.pagoLlego && window.pagoLlego(x); }catch(e){} }
   }
 
   // Los avisos que llegan por MacroDroid (canal privado de Vento) también se mandan al Servidor Vento:
@@ -324,6 +330,7 @@
       var res = ov.querySelector('#vpCobroRes');
       res.innerHTML = '<div class="vp-estado"><span class="vp-gira">⏳</span> Creando el cobro…</div>';
       ov.querySelectorAll('[data-c]').forEach(function(x){ x.disabled = true; });
+      try{ if(mesa != null && window.ventoAtiende) window.ventoAtiende.marcar(mesa, 'cobro'); }catch(e){}   // quien cobra esta mesa recibe el aviso del pago
       api('cobro', { negocio: n.id, canal: canal, monto: valor, mesa: mesa != null ? String(mesa) : null, telefono: tel, clave: clave + canal })
         .then(function(j){ recibir(j.pago, false); mostrarCobro(ov, j.pago); })
         .catch(function(e){ res.innerHTML = '<div class="vp-estado vp-mal">⚠️ ' + esc(e.message) + '</div>'; ov.querySelectorAll('[data-c]').forEach(function(x){ x.disabled = false; }); });
@@ -376,6 +383,7 @@
       var num = (q('vpDnum').value || '').replace(/[\s.\-]/g, '');
       if(!/^\d{3,14}$/.test(num)) return msg('⚠️ Escribe el número de documento (solo números).', true);
       var b = q('vpDenviar'); b.disabled = true; msg('<span class="vp-gira">⏳</span> Pidiendo el código a DaviPlata…');
+      try{ if(mesa != null && window.ventoAtiende) window.ventoAtiende.marcar(mesa, 'cobro'); }catch(e){}   // quien cobra esta mesa recibe el aviso del pago
       api('cobro', { negocio: n.id, proveedor: 'daviplata', canal: 'otp', monto: valor, mesa: mesa != null ? String(mesa) : null, tipo_documento: q('vpDtipo').value, numero_documento: num, idem: base + '-' + intento })
         .then(function(j){ recibir(j.pago, false); pantallaCodigo(ov, n, j.pago, j.otp_prueba); })
         .catch(function(e){ intento++; b.disabled = false; msg('⚠️ ' + esc(e.message), true); });

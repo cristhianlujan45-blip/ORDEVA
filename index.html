@@ -28779,6 +28779,12 @@ let fotosListas = false;
       // Un aviso de PLATA RECIBIDA del banco (ya filtrado por la app Android) que Vento no supo leer: se reporta (sin
       // nombres ni valores) para enseñarle a Vento ese formato, como pasó con los avisos de DaviPlata.
       // «Recibiste Plata … usando Llaves» (sin el valor): la app Android lo junta con el SMS del banco; no es un error.
+      // Si no llega el SMS, se muestra qué mesa estaba esperando ese pago para confirmar el valor en la app del banco.
+      if(String(id || '').startsWith('and-') && /(recibiste|lleg[oó]) (plata|dinero)|usando llaves/i.test(String(txt)) && !/\d/.test(String(txt).split('|').slice(1).join(' '))){
+        try{ const ahora = Date.now(), esperan = Object.keys(data.tables || {}).filter(m => { const t = data.tables[m]; return t && (t.items || []).length && ((g.espera && g.espera[m] && ahora - g.espera[m] < 3600e3) || (t.cobrando && ahora - (t.cobrando.t || 0) < 30 * 60e3)); });
+          const app0 = (String(txt).split('|')[0] || 'el banco').trim();
+          showToast('💜 Llegó plata por ' + app0 + ' (el aviso no trae el valor)' + (esperan.length ? '. Estaba esperando el pago: ' + esperan.map(m => tableLabel(m) + ' (' + plata(tableTotal(m) - tablePaid(m)) + ')').join(', ') + '. Mira el valor en la app del banco y regístralo.' : '. Mira el valor en la app del banco.'), 12000); }catch(e){}
+      }
       if(String(id || '').startsWith('and-') && !/(recibiste|lleg[oó]) (plata|dinero)|usando llaves/i.test(String(txt))) try{ const pz = String(txt).split('|').map(x => x.trim());
         window.ventoError && window.ventoError('pago', 'Aviso de pago que Vento no entendió (' + (pz[0] || 'app') + ')', { app: (pz[0] || '').slice(0, 40), texto: pz.slice(1).join(' | ').replace(/\b[A-ZÁÉÍÓÚÑ]{2,}(?:\s+[A-ZÁÉÍÓÚÑ]{2,})*\b/g, 'NOMBRE').replace(/\d[\d.,]*/g, '#').slice(0, 200) }, 'pago|no-entendido|' + (pz[0] || '').toLowerCase().slice(0, 30)); }catch(e){}
       return;
@@ -28806,6 +28812,9 @@ let fotosListas = false;
     g.lista.unshift(reg); g.lista = g.lista.slice(0, 200);
     if(mesa && f.nivel === 'app') delete g.espera[mesa];
     saveData();
+    // Por el canal (otro celular o MacroDroid): solo le sale y le suena al dueño, al administrador y a quien cobra o atiende
+    // esa mesa. El celular que leyó el aviso del banco (via «and») siempre avisa: es el que recibe la plata.
+    if(via !== 'and' && window.ventoPagoParaMi && !window.ventoPagoParaMi(p.monto, mesa)){ pgPintar(); return; }
     if(f.nivel === 'falso'){
       try{ showToast('🚨 OJO, PAGO FALSO: un SMS dice que llegaron ' + plata(p.monto) + ', pero ' + f.txt + '. No entregues nada.', 15000); }catch(e){}
       if(!op.voz) window.ventoDecirPago('Ojo. Llegó un mensaje de pago sospechoso por ' + p.monto + ' pesos. Parece falso. No entregues nada hasta revisar la aplicación del banco.');
@@ -31713,6 +31722,46 @@ window.mesoraCelebrar = function(emojis){
 })();
 </script>
 <script>
+/* ================= ¿A quién le llega el aviso de un PAGO? =================
+   Solo al DUEÑO, a los ADMINISTRADORES y a quien está COBRANDO o ATENDIENDO esa mesa (mesero, empleado o cajero).
+   A los demás no les sale ni les suena (antes les llegaba a todos: avisos repetidos). Cada mesa guarda quién la atiende
+   (quien le anota pedidos) y quién la está cobrando (quien abre su cuenta para cobrar o le crea un cobro), con su correo:
+   así también el servidor manda el aviso del celular (push) solo a esa persona. */
+(function(){
+  'use strict';
+  const jefe = () => { try{ return !window.ventoRoles || window.ventoRoles.esJefe(); }catch(e){ return true; } };
+  const yo = () => (typeof authUser !== 'undefined' && authUser) || '';
+  const miCorreo = () => { try{ return (window.ventoNube && window.ventoNube.correo && window.ventoNube.correo()) || ''; }catch(e){ return ''; } };
+  const mesaDe = id => (typeof data !== 'undefined' && data && data.tables) ? data.tables[id] : null;
+  function marcar(id, motivo){
+    if(jefe()) return;                                   // el dueño y el administrador reciben todos los avisos igual
+    const t = mesaDe(id); if(!t) return;
+    const quien = { u: yo(), e: miCorreo(), t: Date.now() };
+    const antes = JSON.stringify([t.atiende && t.atiende.u, t.cobrando && t.cobrando.u]);
+    t.atiende = quien;
+    if(motivo === 'cobro') t.cobrando = quien;
+    if(antes !== JSON.stringify([t.atiende.u, t.cobrando && t.cobrando.u]) || motivo === 'cobro') try{ saveData(); }catch(e){}
+  }
+  const esMio = q => !!q && (q.u === yo() || (q.e && q.e === miCorreo()));
+  function meToca(id){
+    const t = mesaDe(id); if(!t) return false;
+    if(t.cobrando && esMio(t.cobrando) && Date.now() - (t.cobrando.t || 0) < 30 * 60e3) return true;
+    return !!(t.atiende && esMio(t.atiende) && (t.items || []).length);
+  }
+  // ¿El aviso de este pago es para quien usa este celular?
+  window.ventoPagoParaMi = function(monto, mesa){
+    if(jefe()) return true;
+    if(mesa != null && mesa !== '' && mesaDe(mesa)) return meToca(mesa);
+    // Sin mesa: si el valor cuadra con una mesa que atiende o cobra esta persona, es suyo.
+    try{ return Object.keys(data.tables || {}).some(id => { if(!meToca(id)) return false; const tot = tableTotal(id), sal = tot - tablePaid(id); return Number(monto) === sal || Number(monto) === tot; }); }catch(e){ return false; }
+  };
+  window.ventoAtiende = { marcar, meToca };
+  // Abrir la cuenta de una mesa para cobrarla = la está cobrando.
+  const ob = window.openBillSummary;
+  if(typeof ob === 'function'){ window.openBillSummary = function(id){ try{ marcar(id, 'cobro'); }catch(e){} return ob.apply(this, arguments); }; try{ openBillSummary = window.openBillSummary; }catch(e){} }
+})();
+</script>
+<script>
 /* ================= 🔊 Parlante de avisos (app Android) =================
    El dueño conecta un parlante por Bluetooth o por cable y elige qué avisos suenan en él (pagos, pedidos, cuenta,
    domicilios…). La app Android dice cada aviso en voz alta SOLO en ese parlante (Parlante.java), sin tocar la música.
@@ -31979,7 +32028,7 @@ window.mesoraCelebrar = function(emojis){
       const mas = [], menos = [];
       Object.keys(n).forEach(k => { const d = n[k] - (o[k] || 0); if(d > 0) mas.push(d + ' ' + k); });
       Object.keys(o).forEach(k => { const d = o[k] - (n[k] || 0); if(d > 0) menos.push(d + ' ' + k); });
-      if(mas.length) anotar('pedido', ahora.m[id].nom + ': ' + mas.join(', '));
+      if(mas.length){ anotar('pedido', ahora.m[id].nom + ': ' + mas.join(', ')); try{ window.ventoAtiende && window.ventoAtiende.marcar(id, 'pedido'); }catch(e){} }
       if(menos.length && !vendidas) anotar('quitado de la cuenta', ahora.m[id].nom + ': ' + menos.join(', ')); });
     // Lo que ya anota la auditoría de Vento (reiniciar, combinar, permisos…)
     if(ahora.aud > A.aud) (data.auditoria || []).filter(x => (+x.t || 0) > A.aud).forEach(x => anotar(x.accion, x.detalle));

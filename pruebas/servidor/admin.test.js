@@ -366,10 +366,32 @@ async function pruebas(sb) {
   r = await rest('auditoria', 'POST', { negocio_id: neg, accion: 'app:falso' }, dueno.token);
   chk('Nadie escribe directo en la actividad', r.st >= 400, r);
 
+  // ===== Aviso de PAGO (push) solo al dueño, al administrador y a quien cobra esa mesa =====
+  r = await signup('caja2@bar.co', 'clave123'); const caja2 = { id: r.j.user.id, token: r.j.access_token };
+  r = await rpc('crear_invitacion', { p_negocio: neg, p_rol: 'cajero' }, dueno.token);
+  await rpc('unirse_con_codigo', { p_codigo: r.j, p_nombre: 'Otra caja' }, caja2.token);
+  const disp = async (u, n) => (await uno("insert into dispositivos(negocio_id, usuario_id, nombre, token_hash, push) values ($1, $2, $3, md5(random()::text), '{\"endpoint\":\"https://push.example/x\"}'::jsonb) returning id", [neg, u, n])).id;
+  const dDueno = await disp(dueno.id, 'dueño'), dAdm = await disp(adm2.id, 'admin2'), dEmp = await disp(emp.id, 'laura'), dCaja = await disp(caja2.id, 'otra caja');
+  await sb.sql("insert into datos_negocio(negocio_id, datos, version) values ($1, $2::jsonb, 1) on conflict (negocio_id) do update set datos = excluded.datos",
+    [neg, JSON.stringify({ tables: { '3': { items: [{ name: 'Blusa', qty: 1, price: 85000 }], atiende: { u: 'laura@boutique.co', e: 'EMP@bar.co', t: Date.now() } }, '4': { items: [] } } })]);
+  const pagoMesa = (await uno("insert into pagos(negocio_id, referencia, proveedor, metodo, canal, monto, mesa, estado) values ($1, 'REF-mesa3', 'dispositivo', 'NEQUI', 'notificacion', 85000, '3', 'aprobado') returning id", [neg])).id;
+  const pagoSin = (await uno("insert into pagos(negocio_id, referencia, proveedor, metodo, canal, monto, estado) values ($1, 'REF-sinmesa', 'dispositivo', 'NEQUI', 'notificacion', 12000, 'aprobado') returning id", [neg])).id;
+  const dest = async pago => (await sb.sql('select id from srv_push_destinos($1, $2)', [neg, pago])).map(x => x.id).sort();
+  const dM = await dest(pagoMesa), dS = await dest(pagoSin);
+  chk('Pago de la mesa 3: le llega al dueño, al administrador y a quien atiende esa mesa (el empleado)', dM.includes(dDueno) && dM.includes(dAdm) && dM.includes(dEmp), dM);
+  chk('…y NO a la otra caja (no está cobrando esa mesa): sin avisos repetidos', !dM.includes(dCaja), dM);
+  chk('Pago sin mesa: solo dueño y administrador', dS.includes(dDueno) && dS.includes(dAdm) && !dS.includes(dEmp) && !dS.includes(dCaja), dS);
+  await sb.sql("update datos_negocio set datos = jsonb_set(datos, '{tables,3,cobrando}', jsonb_build_object('u', 'otra', 'e', 'caja2@bar.co', 't', (extract(epoch from now()) * 1000)::bigint)) where negocio_id = $1", [neg]);
+  chk('Si la otra caja la está cobrando ahora, también le llega a ella', (await dest(pagoMesa)).includes(dCaja));
+  const pagoCobro = (await uno("insert into pagos(negocio_id, referencia, proveedor, metodo, canal, monto, estado, creado_por) values ($1, 'REF-cobro', 'nequi', 'NEQUI', 'push', 30000, 'aprobado', $2) returning id", [neg, caja2.id])).id;
+  chk('Quien creó el cobro recibe su aviso', (await dest(pagoCobro)).includes(dCaja));
+  r = await rpc('srv_push_destinos', { p_negocio: neg, p_pago: pagoMesa }, dueno.token);
+  chk('Nadie de afuera puede pedir los destinos', r.st >= 400, r);
+
   // ===== La migración se puede volver a correr =====
   let errMig = null;
   try { await sb.sql(fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', '20261015000000_admin_soporte_licencias.sql'), 'utf8')); } catch (x) { errMig = x.message; }
-  for (const m of ['20261020000000_licencias_un_negocio.sql', '20261021000000_soporte_fotos_avisos.sql', '20261022000000_seguridad.sql', '20261023000000_cambio_tipo_negocio.sql', '20261024000000_equipo_actividad.sql'])
+  for (const m of ['20261020000000_licencias_un_negocio.sql', '20261021000000_soporte_fotos_avisos.sql', '20261022000000_seguridad.sql', '20261023000000_cambio_tipo_negocio.sql', '20261024000000_equipo_actividad.sql', '20261025000000_avisos_pago_a_quien_cobra.sql'])
     try { if(!errMig) await sb.sql(fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', m), 'utf8')); } catch (x) { errMig = m + ': ' + x.message; }
   r = await rpc('crear_negocio', { p_nombre: 'Otra más', p_datos: {} }, dueno.token);
   chk('Las migraciones se vuelven a correr sin errores ni perder datos (y la regla sigue)', !errMig && (await uno('select count(*) n from licencias')).n === 4 && r.st >= 400, errMig || r);

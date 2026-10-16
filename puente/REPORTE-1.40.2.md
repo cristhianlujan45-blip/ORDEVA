@@ -20,6 +20,20 @@ Ahora:
 - La voz dice **«Recibiste X pesos por DaviPlata/Nequi…»** cada vez que llega plata, también con el celular
   bloqueado o Vento en segundo plano (Android la dice directo).
 
+## ¿A quién le llega el aviso de un pago?
+- **Solo al dueño, a los administradores y a quien está cobrando o atiende ESA mesa** (mesero, empleado o cajero).
+  A los demás meseros y cajeros ya no les sale ni les suena: antes les llegaba a todos y se repetía.
+- Cada mesa guarda quién la atiende (quien le anota pedidos) y quién la está cobrando (quien abre su cuenta para
+  cobrar o le crea un cobro de Nequi o DaviPlata; vale 30 min).
+- El aviso del celular (push) del servidor también va solo a esas personas: migración
+  `20261025000000_avisos_pago_a_quien_cobra`.
+- Si un pago no es de ninguna mesa: solo el dueño y el administrador.
+- El celular que lee el aviso del banco (el que recibe la plata) siempre lo dice.
+- Si DaviPlata avisa sin el valor y no llega el SMS, sale qué mesa estaba esperando el pago y por cuánto, para
+  confirmarlo en la app del banco.
+- Se siguen leyendo SIEMPRE los avisos de la app de Nequi y de DaviPlata; el SMS solo completa el valor cuando la app
+  no lo trae.
+
 ## 🔊 Parlante de avisos (Ajustes → Notificaciones del celular)
 - Se elige un parlante **Bluetooth o por cable** (también USB) y qué avisos suenan en él: pagos, pedidos, piden la
   cuenta, domicilios, canciones pedidas (solo el aviso), soporte, Vento IA.
@@ -38,7 +52,8 @@ Ahora:
 
 ## Pruebas
 - `AvisoPagoPrueba` (Java) 126, con los avisos reales.
-- `pagosaviso` 49.
+- `pagosaviso` 53.
+- `servidor/admin` 136 (destinos del aviso de pago).
 - `parlante` 11 (nueva).
 - `recuperacion` 25.
 - `avisosandroid`, `pagosguia`, `cuentacliente`, `adminreal`, `adminsubreal`, `adminversion`, `flujocompleto`,

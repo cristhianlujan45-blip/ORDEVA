@@ -220,6 +220,32 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     chk('15. Los botones abren «Inicio automático» y el ahorro de batería en Android', await p.evaluate(() => window.__and.autoinicio === 1 && window.__and.bateria === 1));
     await p.evaluate(() => document.getElementById('pgGuiaOv').classList.remove('show'));
 
+    // 17. El aviso del pago solo le sale al dueño/administrador y a quien cobra o atiende ESA mesa (no a todos los meseros)
+    const r17 = await p.evaluate(() => {
+      document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show'));
+      const jefe0 = window.ventoRoles.esJefe; window.ventoRoles.esJefe = () => false;          // este celular es de un mesero
+      const P = id => data.products[id], m = (id, n) => { data.tables[id] = data.tables[id] || { items: [], people: [] }; data.tables[id].items = [{ productId: P(0).id, name: P(0).name, price: 7100, size: '', qty: n, personId: null, history: [] }]; data.tables[id].payments = []; delete data.tables[id].atiende; delete data.tables[id].cobrando; };
+      m(1, 1); m(2, 2);                                    // mesa 1: $7.100 (la atiende este mesero) · mesa 2: $14.200 (otro mesero)
+      window.ventoAtiende.marcar(1, 'pedido');
+      data.tables[2].atiende = { u: 'pedro', e: 'pedro@bar.co', t: Date.now() };
+      window.__and.decir = []; window.__toasts = [];
+      window.pagosRecibirTexto('Nequi | Nequi | ANA RUIZ te envió $7.100', 'mq-17a');            // por el canal: de SU mesa
+      const mia = { d: window.__and.decir.slice(), t: window.__toasts.slice() };
+      window.__and.decir = []; window.__toasts = [];
+      window.pagosRecibirTexto('Nequi | Nequi | LUIS te envió $14.200', 'mq-17b');              // por el canal: de la mesa de otro
+      const otra = { d: window.__and.decir.slice(), t: window.__toasts.slice(), reg: data.pagos.lista.some(x => x.monto === 14200) };
+      const sinMesa = window.ventoPagoParaMi(99999, null), suMesa = window.ventoPagoParaMi(7100, null), mesa2 = window.ventoPagoParaMi(14200, 2);
+      window.ventoAtiende.marcar(2, 'cobro');                                                     // ahora él cobra la mesa 2
+      const cobra2 = window.ventoPagoParaMi(14200, 2);
+      window.ventoRoles.esJefe = jefe0;
+      const dueno = window.ventoPagoParaMi(14200, 2) && window.ventoPagoParaMi(99999, null);
+      return { mia, otra, sinMesa, suMesa, mesa2, cobra2, dueno, at1: data.tables[1].atiende && data.tables[1].atiende.u };
+    });
+    chk('17. Mesero: el pago de SU mesa le suena («Recibiste 7100 pesos…»)', r17.mia.d.some(t => /^Recibiste 7100 pesos/.test(t)) && r17.at1 === 'ana', r17);
+    chk('17. Mesero: el pago de la mesa de OTRO mesero no le sale ni le suena (pero queda registrado)', !r17.otra.d.length && !r17.otra.t.some(t => /14\.200/.test(t)) && r17.otra.reg, r17.otra);
+    chk('17. Mesero: un pago que no es de ninguna mesa suya no le llega; si cobra esa mesa, sí', !r17.sinMesa && r17.suMesa && !r17.mesa2 && r17.cobra2, r17);
+    chk('17. Dueño / administrador: le llegan todos', r17.dueno, r17);
+
     // 11. Navegador (sin la app): la voz sale con el volumen elegido (hasta 100 %)
     const ctx2 = await b.newContext({ viewport: { width: 1200, height: 900 } });
     await ctx2.route('**/*', r => new URL(r.request().url()).hostname === 'localhost' ? r.continue() : r.abort());

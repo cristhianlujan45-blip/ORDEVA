@@ -79,7 +79,8 @@ export async function enviarPush(v: Vapid, sus: Suscripcion, mensaje: Record<str
 // Avisa a todos los celulares autorizados (dueño, admin y caja) que tengan las notificaciones activas.
 export async function avisarDispositivos(db: Db, sitio: string, negocio: string, mensaje: Record<string, unknown>) {
   let destinos: Array<{ id: string; push: Suscripcion }> = [];
-  try { destinos = await db.rpc("srv_push_destinos", { p_negocio: negocio }); } catch (e) { log("warn", "push_destinos", { error: String(e) }); return 0; }
+  // Con un pago: solo dueño, administradores y quien cobra esa mesa (srv_push_destinos con p_pago).
+  try { destinos = await db.rpc("srv_push_destinos", mensaje.pago ? { p_negocio: negocio, p_pago: String(mensaje.pago) } : { p_negocio: negocio }); } catch (e) { log("warn", "push_destinos", { error: String(e) }); return 0; }
   if (!destinos || !destinos.length) return 0;
   const v = await vapid(db, sitio);
   let ok = 0;
