@@ -3468,6 +3468,16 @@ html.ov-lock{ overflow:hidden; }
 .more-tile{ min-width:0; overflow-wrap:anywhere; }
 .prod-photo-side{ min-width:0; overflow-wrap:anywhere; }
 .auth-nueva{ width:100%; margin-top:10px; padding:12px; border-radius:12px; font-weight:700; }
+/* Entrar: pestañas «Iniciar sesión | Crear cuenta», entrar con un código y recuperar con código */
+.auth-tabs{ display:grid; grid-template-columns:1fr 1fr; gap:4px; padding:4px; border-radius:12px; background:color-mix(in srgb, var(--ink) 6%, transparent); border:1px solid var(--line); }
+.auth-tabs button{ border:0; background:none; color:var(--ink-soft); font:inherit; font-weight:700; font-size:14px; padding:10px 6px; border-radius:9px; cursor:pointer; min-width:0; }
+.auth-tabs button.on{ background:var(--amber); color:#fff; box-shadow:0 2px 8px color-mix(in srgb, var(--amber) 35%, transparent); }
+.auth-codigo{ width:100%; padding:12px; border-radius:12px; font-weight:700; }
+#otpPaso2:not([hidden]){ display:flex; flex-direction:column; gap:12px; }
+#otpCode, #recCode{ letter-spacing:4px; font-size:20px; font-weight:800; text-align:center; }
+#vcCelBox[hidden], #vcCelPaso[hidden], #otpPaso2[hidden]{ display:none !important; }
+.auth-otras summary{ cursor:pointer; color:var(--ink-soft); font-size:13px; padding:4px 0; }
+.auth-otras > .auth-hint, .auth-otras > div{ margin-top:8px; }
 .rc-lista{ display:grid; grid-template-columns:repeat(auto-fill,minmax(min(170px,100%),1fr)); gap:8px; margin-top:12px; }
 .rc-lista div{ display:flex; align-items:center; gap:8px; padding:10px; border:1px dashed var(--line); border-radius:10px; background:var(--surface); }
 .rc-lista small{ color:var(--ink-soft); } .rc-lista b{ font:700 15px ui-monospace,monospace; letter-spacing:.04em; user-select:all; }
@@ -5395,6 +5405,7 @@ export default {
 </div>
 <div class="auth-overlay" id="authOverlay" hidden>
   <form class="auth-card" id="authForm" autocomplete="on">
+    <div class="auth-tabs" id="authTabs" role="tablist" aria-label="Entrar o crear cuenta"><button type="button" role="tab" data-tab="entrar">🔑 Iniciar sesión</button><button type="button" role="tab" data-tab="crear">➕ Crear cuenta</button></div>
     <h2 id="authTitle">Iniciar sesión</h2>
     <div id="authSetup" hidden style="display:flex;flex-direction:column;gap:12px">
       <div class="auth-hint">Primera vez: crea el usuario administrador de este equipo.</div>
@@ -5405,6 +5416,7 @@ export default {
     <label>Contraseña<input id="authPass" type="password" autocomplete="current-password"></label>
     <div class="auth-err" id="authErr"></div>
     <button class="btn-primary" type="submit" id="authBtn">Entrar</button>
+    <button type="button" class="btn-ghost auth-codigo" id="authCodigo" hidden>📲 Entrar fácil con un código (sin contraseña)</button>
     <button type="button" class="btn-ghost auth-nueva" id="authNueva" hidden>➕ Crear cuenta nueva</button>
     <button type="button" class="auth-link" id="authForgot">¿Olvidaste tu contraseña?</button>
     <button type="button" class="auth-google" id="authGoogle" hidden><svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>Continuar con Google</button>
@@ -5413,16 +5425,34 @@ export default {
     <input type="file" id="authRestoreFile" accept="application/json,.json" hidden>
   </form>
   <form class="auth-card" id="recForm" hidden>
-    <h2>Recuperar contraseña</h2>
-    <div class="auth-hint">Usa uno de tus <b>códigos de recuperación</b> (los que imprimiste o guardaste al crearlos en Ajustes → Negocio). Cada código sirve una sola vez.<br>¿No los tienes? Si hay <b>otro administrador</b>, pídele que te ponga una contraseña nueva en Ajustes → Usuarios (🔑).</div>
-    <label>Usuario o correo<input id="recUser" autocapitalize="none" autocomplete="username"></label>
-    <div class="auth-hint" id="recMailBox">📧 <b>Con tu correo</b> (si lo guardaste en Ajustes → Negocio): <button type="button" class="btn-ghost" id="recMailBtn" style="margin-top:6px;width:100%">📧 Enviarme un enlace al correo</button><div id="recMailTxt" style="margin-top:6px"></div></div>
-    <label>Código (de recuperación o el que te llegó al correo)<input id="recCode" placeholder="XXXX-XXXX-XXXX  ó  123456" autocapitalize="characters" autocomplete="one-time-code"></label>
+    <h2>🔑 ¿Olvidaste tu contraseña?</h2>
+    <div class="auth-hint">1. Escribe tu correo y toca <b>«Enviarme un código»</b>. 2. Escribe el <b>código temporal</b> que te llega al correo y tu contraseña nueva. Entras de una.</div>
+    <label>Tu correo (o usuario)<input id="recUser" autocapitalize="none" autocomplete="username" inputmode="email"></label>
+    <div class="auth-hint" id="recMailBox"><button type="button" class="btn-primary" id="recMailBtn" style="width:100%">📧 Enviarme un código al correo</button><div id="recMailTxt" style="margin-top:6px"></div></div>
+    <label>Código temporal (llega al correo)<input id="recCode" placeholder="123456" autocapitalize="characters" autocomplete="one-time-code"></label>
     <label>Contraseña nueva<input id="recNew" type="password" autocomplete="new-password"></label>
     <label>Repite la contraseña nueva<input id="recNew2" type="password" autocomplete="new-password"></label>
     <div class="auth-err" id="recErr"></div>
-    <button class="btn-primary" type="submit">Cambiar contraseña</button>
-    <button type="button" class="auth-link" id="recBack">Volver</button>
+    <button class="btn-primary" type="submit" id="recOk">Cambiar contraseña y entrar</button>
+    <details class="auth-otras" id="recOtras"><summary>Otras formas de recuperarla</summary>
+      <div class="auth-hint">🧾 <b>Códigos de recuperación</b> (los que imprimiste o guardaste en Ajustes → Negocio): escribe uno en «Código temporal». Cada código sirve una sola vez.<br>👑 Si hay <b>otro administrador</b>, pídele que te ponga una contraseña nueva en Ajustes → Usuarios (🔑).</div>
+    </details>
+    <button type="button" class="auth-link" id="recBack">← Volver</button>
+  </form>
+  <form class="auth-card" id="otpForm" hidden autocomplete="on">
+    <h2>📲 Entrar con un código</h2>
+    <div class="auth-tabs" id="otpTabs" role="tablist" aria-label="¿A dónde te mandamos el código?"><button type="button" role="tab" data-por="correo">📧 Al correo</button><button type="button" role="tab" data-por="celular">📱 Al celular</button></div>
+    <div class="auth-hint" id="otpHint">Sin contraseña: te mandamos un código de 6 números y entras con él.</div>
+    <label id="otpDestLbl"><span id="otpDestTxt">Tu correo</span><input id="otpDest" autocapitalize="none" spellcheck="false" autocomplete="email" inputmode="email"></label>
+    <button type="button" class="btn-primary" id="otpEnviar">📨 Enviarme el código</button>
+    <div id="otpPaso2" hidden>
+      <div class="auth-hint" id="otpEnviado"></div>
+      <label>Código de 6 números<input id="otpCode" inputmode="numeric" maxlength="8" autocomplete="one-time-code" placeholder="123456"></label>
+      <button class="btn-primary" type="submit" id="otpEntrar">Entrar</button>
+      <button type="button" class="auth-link" id="otpOtro">Mandarme otro código</button>
+    </div>
+    <div class="auth-err" id="otpErr"></div>
+    <button type="button" class="auth-link" id="otpBack">← Volver a entrar con contraseña</button>
   </form>
 </div>
 <script src="nube/config.js"></script>
@@ -19158,6 +19188,12 @@ const authEnlace = (() => {
     // Vuelta de «Conectar mi cuenta de YouTube» (#access_token=…&state=vento-yt.…): es de Google para YouTube, NO un enlace
     // del correo. Antes se tomaba aquí, se borraba de la dirección y salía «El enlace no sirvió»: la cuenta nunca se conectaba.
     if(/^vento-yt\./.test(h.get('state') || '')) return null;
+    // Tocó el enlace del correo de «Entrar con un código»: se entra con esa sesión (no es para cambiar la contraseña).
+    if(q.get('nubecodigo') === '1'){
+      try{ if(tok) sessionStorage.setItem('vento-codigo', JSON.stringify({ a: tok, r: h.get('refresh_token') || '' })); }catch(e){}
+      history.replaceState(null, '', location.pathname);
+      return null;
+    }
     // Volvió de «Continuar con Google»: el permiso es para Vento Nube (no es un enlace de recuperar contraseña).
     if(q.get('nubegoogle') === '1'){
       try{ if(tok) sessionStorage.setItem('vento-google', JSON.stringify({ a: tok, r: h.get('refresh_token') || '' })); else sessionStorage.setItem('vento-google-err', err || 'Google no dejó entrar.'); }catch(e){}
@@ -19252,6 +19288,22 @@ const authMascara = e => { const m = /^(.)(.*)(@.*)$/.exec(String(e || '')); ret
 const authNube = () => window.ventoNube && window.ventoNube.configurada && window.ventoNube.configurada() && window.ventoNube.codigoCorreo ? window.ventoNube : null;
 async function authCorreoEnviar(user){
   const u = authUsers().find(x => x.user === String(user || '').trim().toLowerCase());
+  // Cuenta de Vento (se entra con el correo): código temporal de 6 números al correo. Con él se pone la contraseña
+  // nueva y se entra de una, en este celular o en uno nuevo.
+  const nc = authNubeCuentas();
+  if(authEsCorreo(user) && nc && nc.codigoEntrar && (!u || !u.email || String(u.email).toLowerCase() === u.user)){
+    const email = String(user).trim().toLowerCase();
+    try{ await nc.codigoEntrar(email, false, location.origin + location.pathname.replace(/[^/]*$/, '') + '?nubeclave=1'); }
+    catch(e){
+      // Cuenta que solo está en este celular (nunca se subió a la nube) y con su correo de recuperación: como antes.
+      if(!(u && u.email && /signups? not allowed|user not found/i.test(String((e && e.message) || e)))) return { error: nc.msgError(e) };
+      u.email = u.email || email;
+      return authCorreoEnviarLocal(u);
+    }
+    try{ sessionStorage.setItem('cm-rec-mail', JSON.stringify({ user: email, at: Date.now(), nube: true })); }catch(e){}
+    return { ok: true, mascara: authMascara(email), codigo: true };
+  }
+  if(u && u.email) return authCorreoEnviarLocal(u);
   // Cuenta de Vento con correo que no está en este celular (celular nuevo, datos borrados): enlace para poner
   // contraseña nueva a la cuenta. Después se entra con el correo y la contraseña nueva, y vuelven los datos.
   if(!u && authEsCorreo(user)){
@@ -19262,6 +19314,10 @@ async function authCorreoEnviar(user){
   }
   if(!u) return { error: 'Escribe tu usuario o tu correo (como entras a Vento).' };
   if(!u.email) return { error: 'Ese usuario no tiene correo de recuperación guardado. Usa un código de recuperación, o pídele a otro administrador que te cambie la contraseña.' };
+  return authCorreoEnviarLocal(u);
+}
+// Usuario de este celular con su correo de recuperación (Ajustes → Negocio): código al correo para cambiar la clave.
+async function authCorreoEnviarLocal(u){
   const nb = authNube(); if(!nb) return { error: 'Para mandar el código hace falta internet y el Servidor Vento conectado.' };
   const volver = location.origin + location.pathname.replace(/[^/]*$/, '') + '?recuperar=' + encodeURIComponent(u.user);
   try{ await nb.codigoCorreo(u.email, volver); }catch(e){ return { error: (window.ventoNube.msgError ? window.ventoNube.msgError(e) : (e.message || String(e))) }; }
@@ -19666,13 +19722,14 @@ async function authConectarNube(email, pass, crearSiFalta){
 }
 // Entrar con una cuenta de la nube que no está en este celular (celular nuevo) o cuya contraseña se cambió
 // en otro celular. Lanza el error de la nube (ej. contraseña incorrecta) para mostrarlo.
-async function authEntrarDesdeNube(email, pass){
+// pass = null y lista: ya se entró con un código (correo o celular), sin contraseña.
+async function authEntrarDesdeNube(email, pass, listaCodigo){
   const nb = authNubeCuentas();
-  const lista = await nb.entrarCuenta(email, pass);
+  const lista = listaCodigo || await nb.entrarCuenta(email, pass);
   const n = lista[0] || null;
   const yaEstaba = authUsers().some(x => x.user === email);
   if(yaEstaba){
-    await authPonerClaveLocal(email, pass);
+    if(pass) await authPonerClaveLocal(email, pass);
     await enterApp(email, null);
     if(n){ if(!nb.conectado(email)) await nb.vincular(n, authDatosPristinos(data)); }
     else await nb.crearNegocio((data && data.businessName) || 'Mi negocio');
@@ -19688,12 +19745,33 @@ async function authEntrarDesdeNube(email, pass){
   }else{
     const sede = rawSedesList().find(x => x.id === 'default'); localStorage.setItem(CURRENT_SEDE_KEY, 'default'); STORAGE_KEY = sede ? sede.key : 'bar-data';
   }
-  const msg = await authAddUser(email, pass, n && n.rol === 'mesero' ? 'staff' : 'admin', cuenta);
+  // Con código no hay contraseña en este celular: se guarda una al azar (sin internet se entra con la de la cuenta
+  // después de entrar una vez con ella, o con otro código).
+  const msg = await authAddUser(email, pass || authClaveAzar(), n && n.rol === 'mesero' ? 'staff' : 'admin', cuenta);
   if(msg) throw new Error(msg);
   if(n) await nb.vincular(n, true);          // se bajan los datos del negocio a este celular
   await enterApp(email, null);
   if(!n) await nb.crearNegocio((data && data.businessName) || 'Mi negocio');
   showToast(n ? '✅ Listo: estos son los datos de «' + n.nombre + '», los mismos de tus otros celulares.' : '✅ Cuenta lista en este celular.', 5000);
+}
+const authClaveAzar = () => { const a = new Uint8Array(18); crypto.getRandomValues(a); return 'cod-' + Array.from(a, x => x.toString(16).padStart(2, '0')).join(''); };
+// «¿Olvidaste tu contraseña?» con cuenta de Vento: el código temporal del correo abre la cuenta, se pone la
+// contraseña nueva (en la cuenta, para todos los celulares) y se entra de una.
+async function authRecoverNube(email, code, newPass, newPass2){
+  if((newPass || '').length < 6) return 'La contraseña nueva debe tener al menos 6 caracteres.';
+  if(newPass2 !== undefined && newPass !== newPass2) return 'Las dos contraseñas nuevas no son iguales.';
+  let lock; try{ lock = JSON.parse(localStorage.getItem('cm-rec-lock')) || { n: 0, t: 0, nivel: 0 }; }catch(e){ lock = { n: 0, t: 0, nivel: 0 }; }
+  const espera = [10, 60, 24 * 60][Math.min(lock.nivel || 0, 2)] * 60e3;
+  if(lock.n >= 5 && Date.now() - lock.t < espera) return 'Demasiados intentos. Espera ' + (espera >= 864e5 ? 'un día' : espera >= 36e5 ? 'una hora' : '10 minutos') + ' para volver a intentar.';
+  const nb = authNubeCuentas(); if(!nb || !nb.entrarConCodigo) return 'Para cambiar la contraseña hace falta internet.';
+  let r;
+  try{ r = await nb.entrarConCodigo(email, code, false); }
+  catch(e){ localStorage.setItem('cm-rec-lock', JSON.stringify({ n: (lock.n || 0) + 1, t: Date.now(), nivel: lock.nivel || 0 })); return nb.msgError(e); }
+  localStorage.removeItem('cm-rec-lock');
+  try{ await nb.nuevaClave(newPass); }catch(e){ return '⚠️ ' + nb.msgError(e); }
+  try{ sessionStorage.removeItem('cm-rec-mail'); }catch(e){}
+  await authEntrarDesdeNube(r.email, newPass, r.negocios);
+  return { ok: true, correo: true, entro: true };
 }
 function showAuth(firstRun){
   const ov = document.getElementById('authOverlay');
@@ -19708,6 +19786,8 @@ function showAuth(firstRun){
   { const hp = document.getElementById('authTypePick'); if(hp && !document.getElementById('authTipoAviso')){ const d = document.createElement('div'); d.id = 'authTipoAviso'; d.style.cssText = 'font-size:12px;color:var(--ink-soft);margin-top:4px;line-height:1.4'; d.textContent = TIPO_AVISO; hp.parentNode.insertBefore(d, hp.nextSibling); } }
   ov.hidden = false;
   const af = document.getElementById('authForm'), rf = document.getElementById('recForm'), g = i => document.getElementById(i);
+  const otpF = g('otpForm');
+  af.hidden = false; rf.hidden = true; if(otpF) otpF.hidden = true;     // siempre se vuelve a «Iniciar sesión / Crear cuenta»
   g('authForgot').hidden = firstRun;
   // «Crear cuenta nueva» en la entrada: otro negocio en este equipo, con sus propios datos y usuarios.
   // Sin ningún usuario en el celular arranca en «crear cuenta», pero se puede pasar a «iniciar sesión»
@@ -19729,12 +19809,16 @@ function showAuth(firstRun){
     g('authForgot').hidden = nueva; g('authRestoreBtn').hidden = nueva && !vacio;
     const ch = document.getElementById('authUsers'); if(ch){ ch.hidden = nueva || !authUsers().length; ch.style.display = ch.hidden ? 'none' : ''; }
     g('authNueva').textContent = nueva ? (vacio ? '¿Ya tienes cuenta? Entra con tu correo' : '← Ya tengo cuenta: iniciar sesión') : '➕ Crear cuenta nueva';
+    g('authTabs').querySelectorAll('[data-tab]').forEach(b => { const on = (b.dataset.tab === 'crear') === nueva; b.classList.toggle('on', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); });
+    g('authCodigo').hidden = nueva || !conNube();
     g('authErr').textContent = '';
     if(nueva){ g('authUser').value = ''; g('authPass').value = ''; g('authBiz').focus(); } else if(vacio) g('authUser').focus();
   };
-  g('authNueva').hidden = firstRun && !conNube();
+  // Las pestañas «🔑 Iniciar sesión | ➕ Crear cuenta» están siempre a la vista (el botón de abajo ya no hace falta).
+  g('authNueva').hidden = true;
   g('authNueva').onclick = () => ponerModo(!modoNueva);
-  if(firstRun) ponerModo(true);
+  g('authTabs').onclick = e => { const b = e.target.closest('[data-tab]'); if(b && (b.dataset.tab === 'crear') !== modoNueva) ponerModo(b.dataset.tab === 'crear'); };
+  ponerModo(!!firstRun);
   // Usuarios de este equipo: se tocan para no tener que escribir el nombre.
   let chips = document.getElementById('authUsers');
   if(!chips){ chips = document.createElement('div'); chips.id = 'authUsers'; chips.className = 'auth-users'; g('authUser').closest('label').before(chips); }
@@ -19765,17 +19849,95 @@ function showAuth(firstRun){
   g('recMailBtn').onclick = async () => {
     const b = g('recMailBtn'), t = g('recMailTxt'); b.disabled = true; b.textContent = '⏳ Enviando…'; t.textContent = '';
     try{ const r = await authCorreoEnviar(g('recUser').value);
-      t.textContent = r.ok ? '✅ Te mandé un correo a ' + r.mascara + ' (revisa también «Spam»). Toca el enlace desde ESTE celular: Vento se abre y te pide la contraseña nueva. Si en el correo viene un código de números, escríbelo abajo.' : '⚠️ ' + r.error;
+      t.textContent = r.ok ? (r.codigo ? '✅ Te mandamos un código temporal a ' + r.mascara + ' (revisa también «Spam»). Escríbelo abajo con tu contraseña nueva. Vence en 15 minutos.'
+        : '✅ Te mandé un correo a ' + r.mascara + ' (revisa también «Spam»). Toca el enlace desde ESTE celular: Vento se abre y te pide la contraseña nueva. Si en el correo viene un código de números, escríbelo abajo.') : '⚠️ ' + r.error;
       if(r.ok) g('recCode').focus(); }
-    finally{ b.disabled = false; b.textContent = '📧 Enviarme otro correo'; }
+    finally{ b.disabled = false; b.textContent = '📧 Enviarme otro código'; }
   };
+  // ---------- 📲 Entrar fácil con un código (sin contraseña): al correo o por mensaje de texto ----------
+  if(otpF){
+    let por = 'correo', espera = 0, tEspera = null;
+    const nbc = () => authNubeCuentas();
+    const ponerPor = async p => {
+      por = p;
+      g('otpTabs').querySelectorAll('[data-por]').forEach(b => { const on = b.dataset.por === p; b.classList.toggle('on', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); });
+      const cel = p === 'celular', d = g('otpDest');
+      g('otpDestTxt').textContent = cel ? 'Tu número de celular' : 'Tu correo';
+      d.type = cel ? 'tel' : 'email'; d.inputMode = cel ? 'tel' : 'email'; d.autocomplete = cel ? 'tel' : 'email';
+      d.placeholder = cel ? '300 123 4567' : 'tucorreo@gmail.com';
+      d.value = cel ? '' : (authEsCorreo(g('authUser').value.trim()) ? g('authUser').value.trim().toLowerCase() : '');
+      g('otpPaso2').hidden = true; g('otpErr').textContent = ''; g('otpCode').value = '';
+      g('otpHint').textContent = cel ? 'Te llega un mensaje de texto con un código de 6 números. Sirve si ya uniste tu celular a la cuenta (Ajustes → Negocio → 📱 Celular de la cuenta).'
+        : 'Sin contraseña: te mandamos un código de 6 números al correo de tu cuenta y entras con él.';
+      g('otpEnviar').disabled = false;
+      if(cel){
+        const nb = nbc(), ok = nb && nb.celularDisponible ? await nb.celularDisponible() : false;
+        if(por !== 'celular') return;
+        if(!ok){ g('otpHint').textContent = '📱 Entrar con un mensaje de texto todavía no está activado en Vento. Mientras tanto, toca «📧 Al correo».'; g('otpEnviar').disabled = true; }
+      }
+    };
+    const abrirOtp = () => { af.hidden = true; rf.hidden = true; otpF.hidden = false; ponerPor('correo'); setTimeout(() => { try{ g('otpDest').focus(); }catch(e){} }, 30); };
+    g('authCodigo').onclick = abrirOtp;
+    // Llegó tocando el enlace del correo del código: entra con esa sesión.
+    let enl = null; try{ enl = JSON.parse(sessionStorage.getItem('vento-codigo') || 'null'); sessionStorage.removeItem('vento-codigo'); }catch(e){}
+    if(enl && enl.a && nbc()){
+      const nb = nbc();
+      nb.entrarConEnlace(enl.a, enl.r).then(r => authEntrarDesdeNube(r.email, null, r.negocios))
+        .catch(x => { abrirOtp(); g('otpErr').textContent = 'El enlace del correo no sirvió (' + nb.msgError(x) + '). Pide un código nuevo.'; });
+    }
+    g('otpTabs').onclick = e => { const b = e.target.closest('[data-por]'); if(b && b.dataset.por !== por) ponerPor(b.dataset.por); };
+    g('otpBack').onclick = () => { otpF.hidden = true; af.hidden = false; };
+    const mandar = async () => {
+      const nb = nbc(), err = g('otpErr'), dest = g('otpDest').value.trim(), cel = por === 'celular';
+      err.textContent = '';
+      if(!nb){ err.textContent = 'Para entrar con un código hace falta internet.'; return; }
+      if(cel ? dest.replace(/\D/g, '').length < 10 : !authEsCorreo(dest)){ err.textContent = cel ? 'Escribe tu número de celular (ej. 3001234567).' : 'Escribe el correo de tu cuenta.'; return; }
+      if(Date.now() < espera){ err.textContent = 'Espera ' + Math.ceil((espera - Date.now()) / 1000) + ' s para pedir otro código.'; return; }
+      const b = g('otpEnviar'), t = b.textContent; b.disabled = true; b.textContent = '⏳ Enviando…';
+      try{ await nb.codigoEntrar(dest, cel); }
+      catch(x){ err.textContent = nb.msgError(x); return; }
+      finally{ b.disabled = false; b.textContent = t; }
+      g('otpEnviado').textContent = '✅ Te mandamos el código a ' + (cel ? '•••' + dest.replace(/\D/g, '').slice(-4) : authMascara(dest.toLowerCase()) + ' (revisa también «Spam»)') + '. Vence en 15 minutos.';
+      g('otpPaso2').hidden = false; g('otpCode').value = '';
+      espera = Date.now() + 30000; clearInterval(tEspera);
+      const o = g('otpOtro'); const pinta = () => { const q = Math.ceil((espera - Date.now()) / 1000); o.disabled = q > 0; o.textContent = q > 0 ? 'Mandarme otro código (en ' + q + ' s)' : 'Mandarme otro código'; if(q <= 0) clearInterval(tEspera); };
+      pinta(); tEspera = setInterval(pinta, 1000);
+      setTimeout(() => { try{ g('otpCode').focus(); }catch(e){} }, 30);
+    };
+    g('otpEnviar').onclick = mandar;
+    g('otpOtro').onclick = mandar;
+    g('otpDest').onkeydown = e => { if(e.key === 'Enter'){ e.preventDefault(); if(g('otpPaso2').hidden) mandar(); else g('otpCode').focus(); } };
+    g('otpCode').oninput = () => { if(g('otpCode').value.replace(/\D/g, '').length === 6) otpF.requestSubmit(); };
+    let entrando = false;
+    otpF.onsubmit = async e => {
+      e.preventDefault(); if(entrando) return;
+      const nb = nbc(), err = g('otpErr'), code = g('otpCode').value.replace(/\D/g, ''), dest = g('otpDest').value.trim();
+      err.textContent = '';
+      if(code.length < 6){ err.textContent = 'Escribe los 6 números del código.'; return; }
+      const b = g('otpEntrar'), t = b.textContent; entrando = true; b.disabled = true; b.textContent = '⏳ Entrando…';
+      try{
+        const r = await nb.entrarConCodigo(dest, code, por === 'celular');
+        await authEntrarDesdeNube(r.email, null, r.negocios);
+        authLoginClear(r.email);
+        otpF.hidden = true; af.hidden = false; g('otpCode').value = '';
+      }catch(x){ err.textContent = nb.msgError(x); }
+      finally{ entrando = false; b.disabled = false; b.textContent = t; }
+    };
+  }
   rf.onsubmit = async (e) => {
     e.preventDefault(); g('recErr').textContent = '';
     let pend = null; try{ pend = JSON.parse(sessionStorage.getItem('cm-rec-mail') || 'null'); }catch(x){}
     const esMail = /^\s*\d[\d\s]{5,9}\s*$/.test(g('recCode').value) && pend && pend.user === g('recUser').value.trim().toLowerCase() && Date.now() - pend.at < 60 * 6e4;
-    const m = esMail ? await authRecoverCorreo(g('recUser').value, g('recCode').value, g('recNew').value, g('recNew2').value)
-                     : await authRecover(g('recUser').value, g('recCode').value, g('recNew').value, g('recNew2').value);
+    const bOk = g('recOk'), tOk = bOk.textContent; bOk.disabled = true; bOk.textContent = '⏳ Comprobando…';
+    let m;
+    try{
+      m = esMail && pend.nube ? await authRecoverNube(pend.user, g('recCode').value, g('recNew').value, g('recNew2').value)
+        : esMail ? await authRecoverCorreo(g('recUser').value, g('recCode').value, g('recNew').value, g('recNew2').value)
+        : await authRecover(g('recUser').value, g('recCode').value, g('recNew').value, g('recNew2').value);
+    }catch(x){ m = '⚠️ ' + ((x && x.message) || x); }
+    finally{ bOk.disabled = false; bOk.textContent = tOk; }
     if(typeof m === 'string'){ g('recErr').textContent = m; return; }
+    if(m.entro){ ['recCode','recNew','recNew2'].forEach(i => g(i).value = ''); rf.hidden = true; af.hidden = false; showToast('✅ Contraseña cambiada. Ya entraste con tu cuenta.', 5000); return; }
     g('authUser').value = g('recUser').value.trim().toLowerCase();
     ['recCode','recNew','recNew2'].forEach(i => g(i).value = '');
     rf.hidden = true; af.hidden = false;
@@ -25520,7 +25682,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-16 · v1.42.0';
+const MESORA_VERSION = '2026-10-16 · v1.43.0';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'Vento · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 /* 🔄 La app Android se actualiza SOLA (Actualizador): revisa cada 3 h, baja la versión nueva y la instala cuando no se

@@ -72,7 +72,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){
 
     // ===== 1. Celular A crea la cuenta con su correo =====
     const A = await celular('celular A');
-    chk('1. Pantalla de primera vez: dice «Correo o usuario» y ofrece «¿Ya tienes cuenta?»', /Correo o usuario/.test(await A.p.textContent('#authForm')) && /Ya tienes cuenta/.test(await A.p.textContent('#authNueva')) && await A.p.isVisible('#authNueva'));
+    chk('1. Pantalla de primera vez: dice «Correo o usuario» y ofrece «🔑 Iniciar sesión» (pestaña)', /Correo o usuario/.test(await A.p.textContent('#authForm')) && /Iniciar sesión/.test(await A.p.textContent('#authTabs [data-tab="entrar"]')) && await A.p.isVisible('#authTabs [data-tab="entrar"]'));
     await crear(A.p, 'Bar Ana', 'Ana@Bar.co', 'clave123');
     chk('1. Celular A entra a la app', await dentro(A.p));
     await A.p.click('#onbSaltar', { timeout: 4000 }).catch(() => {}); await cerrarTodo(A.p);
@@ -98,8 +98,8 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){
 
     // ===== 3. Celular C: «¿Ya tienes cuenta?» → entra con el correo =====
     const C = await celular('celular C');
-    await C.p.click('#authNueva');
-    chk('3. «¿Ya tienes cuenta?» pasa a «Iniciar sesión»', /Iniciar sesión/.test(await C.p.textContent('#authTitle')) && !(await C.p.isVisible('#authBiz')));
+    await C.p.click('#authTabs [data-tab="entrar"]');
+    chk('3. La pestaña «🔑 Iniciar sesión» pasa a «Iniciar sesión»', /Iniciar sesión/.test(await C.p.textContent('#authTitle')) && !(await C.p.isVisible('#authBiz')));
     await entrar(C.p, 'ana@bar.co', 'malamala1');
     const e3 = await errorEntrada(C.p);
     chk('3. Contraseña mala: «Correo o contraseña incorrectos.»', /Correo o contraseña incorrectos/.test(e3), e3);
@@ -159,13 +159,13 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){
     const NEGD = (await negocio(D.p)).id;
     chk('5. Sus datos («Arroz Viejo», «Tienda Vieja») están en la nube', await esperarNube(NEGD, d => nombres(d).includes('Arroz Viejo') && d.businessName === 'Tienda Vieja'));
     const E = await celular('celular E');
-    await E.p.click('#authNueva'); await entrar(E.p, 'viejo@tienda.co', 'clave456');
+    await E.p.click('#authTabs [data-tab="entrar"]'); await entrar(E.p, 'viejo@tienda.co', 'clave456');
     chk('5. Y en otro celular se ven los mismos datos', await dentro(E.p) && await esperar(E.p, () => data.products.some(p => p.name === 'Arroz Viejo'), null, 10000));
     await cerrarTodo(E.p);
 
     // ===== 6. Dos cuentas con correo en el mismo celular =====
     await salirApp(A.p);
-    await A.p.click('#authNueva');   // «➕ Crear cuenta nueva» (otro negocio en este celular)
+    await A.p.click('#authTabs [data-tab="crear"]');   // «➕ Crear cuenta» (otro negocio en este celular)
     await crear(A.p, 'Bar Otro', 'otro@bar.co', 'clave789');
     chk('6. En A se crea otra cuenta con otro correo', await dentro(A.p));
     await A.p.click('#onbSaltar', { timeout: 4000 }).catch(() => {}); await cerrarTodo(A.p);

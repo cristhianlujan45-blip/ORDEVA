@@ -126,8 +126,7 @@ const ADMIN = 'cristhianwkh@gmail.com';
     const uid = (await uno("select id from auth.users where email = 'dueno@soporte.co'")).id;
     const temp = (await api('/admin/usuario_clave_temporal', { usuario: uid }, adm.token)).j.clave;
     const B = await equipo('otro celular');
-    await B.p.click('#authNueva').catch(() => {});
-    await B.p.evaluate(() => { const b = document.getElementById('authNueva'); if(b && /Ya tengo|Iniciar/.test(b.textContent)) b.click(); });
+    await B.p.click('#authTabs [data-tab="entrar"]');
     await B.p.fill('#authUser', 'dueno@soporte.co'); await B.p.fill('#authPass', temp); await B.p.click('#authBtn');
     chk('4. Entra en otro celular con la contraseña temporal', await dentro(B.p));
     chk('4. Le pide poner su propia contraseña', await esperar(B.p, () => !!document.getElementById('vcClaveOv'), null, 15000));
@@ -138,11 +137,11 @@ const ADMIN = 'cristhianwkh@gmail.com';
 
     // ===== 5. Recuperar por mensaje de texto (sin entrar) =====
     const C = await equipo('olvidó');
-    await C.p.click('#authNueva').catch(() => {});
-    await C.p.evaluate(() => { const b = document.getElementById('authNueva'); if(b && /Ya tengo|Iniciar/.test(b.textContent)) b.click(); });
+    await C.p.click('#authTabs [data-tab="entrar"]');
     await C.p.fill('#authUser', 'dueno@soporte.co');
     await C.p.evaluate(() => { const f = document.getElementById('authForgot'); f.hidden = false; f.click(); });
-    chk('5. «¿Olvidaste tu contraseña?» tiene «📱 Por mensaje de texto»', await esperar(C.p, () => !document.getElementById('recForm').hidden && !!document.getElementById('vcSmsBox')));
+    chk('5. «¿Olvidaste tu contraseña?» → «Otras formas» tiene «📱 Por mensaje de texto»', await esperar(C.p, () => !document.getElementById('recForm').hidden && !!document.getElementById('vcSmsBox')));
+    await C.p.evaluate(() => { document.getElementById('recOtras').open = true; });   // está en «Otras formas de recuperarla»
     await C.p.fill('#vcSmsTel', '3001112233'); await C.p.click('#vcSmsBtn');
     chk('5. Pide la contraseña por SMS: le llega al soporte de Vento', await esperar(C.p, () => /Listo/.test(document.getElementById('vcSmsTxt').textContent)) &&
       (await api('/admin/soporte', {}, adm.token)).j.casos.some(c => c.tipo === 'clave' && c.telefono === '3001112233' && c.email === 'dueno@soporte.co' && c.telefono_de_la_cuenta === '3001112233'));
@@ -152,8 +151,7 @@ const ADMIN = 'cristhianwkh@gmail.com';
     // El administrador tenía su negocio con su correo de administrador (antes de esta versión)
     const negAdm = (await rpc('crear_negocio', { p_nombre: 'Bar del Admin', p_datos: { products: [{ id: 'pa', name: 'Club Colombia Admin', price: 4000 }] } }, adm.token)).j;
     const D = await equipo('admin como cliente');
-    await D.p.click('#authNueva').catch(() => {});
-    await D.p.evaluate(() => { const b = document.getElementById('authNueva'); if(b && /Ya tengo|Iniciar/.test(b.textContent)) b.click(); });
+    await D.p.click('#authTabs [data-tab="entrar"]');
     await D.p.fill('#authUser', ADMIN); await D.p.fill('#authPass', 'Clave-Admin-99'); await D.p.click('#authBtn');
     chk('6. Con el correo de administrador no entra como cliente: explica y ofrece la cuenta de cliente', await esperar(D.p, () => document.getElementById('vcAdmOv') && document.getElementById('vcAdmOv').classList.contains('show') && /cristhianwkh\+cliente@gmail\.com/.test(document.getElementById('vcAdmOv').textContent)) &&
       !(await D.p.evaluate(() => document.getElementById('authOverlay').hidden)));

@@ -45,12 +45,12 @@ const ADMIN = 'cristhianwkh@gmail.com';
     await p.goto(BASE + '/index.html');
     await p.waitForSelector('#authOverlay:not([hidden])', { timeout: 15000 });
     await p.waitForFunction(() => window.ventoNube && window.ventoNube.enlaceClave, null, { timeout: 15000 });
-    await p.evaluate(() => { const b = document.getElementById('authNueva'); if(b && !b.hidden && /Ya tienes cuenta/.test(b.textContent)) b.click(); });
+    await p.click('#authTabs [data-tab="entrar"]');
     await p.click('#authForgot');
     await p.fill('#recUser', 'ana@tienda.co'); await p.click('#recMailBtn');
     chk('Celular nuevo: se puede pedir el correo con solo el correo de la cuenta', await esperar(p, () => /^✅/.test(document.getElementById('recMailTxt').textContent), null, 10000), await p.textContent('#recMailTxt'));
     const r1 = ultima();
-    chk('…y el enlace del correo vuelve a Vento (la carpeta de la app, con «nubeclave=1»), no a una página que no existe', r1.ruta === '/recover' && r1.email === 'ana@tienda.co' && r1.volver === BASE + '/?nubeclave=1', r1);
+    chk('…llega un código temporal y el enlace del mismo correo vuelve a Vento (la carpeta de la app, con «nubeclave=1»), no a una página que no existe', r1.ruta === '/otp' && !!r1.codigo && r1.email === 'ana@tienda.co' && r1.volver === BASE + '/?nubeclave=1', r1);
 
     // Abrir el enlace del correo (Supabase devuelve con #access_token=…&type=recovery)
     const tok = (await entrar('ana@tienda.co', 'vieja123')).j.access_token;
@@ -68,7 +68,7 @@ const ADMIN = 'cristhianwkh@gmail.com';
     // Y en la app se entra con la contraseña nueva (celular nuevo: vuelven los datos de la cuenta)
     await p.goto(BASE + '/index.html'); await p.waitForSelector('#authOverlay:not([hidden])', { timeout: 15000 });
     await p.waitForFunction(() => window.ventoNube && window.ventoNube.crearCuenta, null, { timeout: 15000 });
-    await p.evaluate(() => { const b = document.getElementById('authNueva'); if(b && !b.hidden && /Ya tienes cuenta/.test(b.textContent)) b.click(); });
+    await p.click('#authTabs [data-tab="entrar"]');
     await p.fill('#authUser', 'ana@tienda.co'); await p.fill('#authPass', 'nueva456'); await p.click('#authBtn');
     chk('En la app se entra con el correo y la contraseña nueva', await esperar(p, () => document.getElementById('authOverlay').hidden, null, 20000), await p.textContent('#authErr').catch(() => ''));
 

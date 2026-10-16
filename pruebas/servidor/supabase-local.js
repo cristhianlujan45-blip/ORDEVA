@@ -127,7 +127,9 @@ async function iniciar(opts = {}) {
   const fallos = { storage: 0 };                    // sb.fallos.storage = n → las próximas n subidas fallan (503)
   const objetos = new Map();                        // 'bucket/ruta' → { bytes, mime }
   const refrescos = new Map();                      // refresh_token → id del usuario
-  const recuperaciones = [];                        // pedidos de /otp y /recover (para revisar en las pruebas)
+  const recuperaciones = [];                        // pedidos de /otp y /recover (para revisar en las pruebas; /otp trae el código)
+  const codigos = new Map();                        // 'e:correo' | 'p:+57…' | 'c:+57…' (cambio de celular) → { codigo, hasta, uid }
+  const authCfg = { telefono: !!opts.telefono };    // sb.authCfg.telefono = true → el servidor «manda» SMS (como Twilio)
   const modulos = {};
 
   const admin = await conectar(PG_URL);
@@ -163,12 +165,12 @@ async function iniciar(opts = {}) {
   }
 
   // ----- usuarios (auth) -----
-  const usuarioPub = (u) => ({ id: u.id, aud: 'authenticated', role: 'authenticated', email: u.email, phone: '', email_confirmed_at: u.email_confirmed_at,
+  const usuarioPub = (u) => ({ id: u.id, aud: 'authenticated', role: 'authenticated', email: u.email, phone: u.phone || '', email_confirmed_at: u.email_confirmed_at,
     confirmed_at: u.email_confirmed_at, last_sign_in_at: u.last_sign_in_at, app_metadata: u.raw_app_meta_data || {}, user_metadata: u.raw_user_meta_data || {},
     identities: [{ id: u.id, user_id: u.id, provider: 'email', identity_data: { email: u.email, sub: u.id } }], created_at: u.created_at, updated_at: u.updated_at, is_anonymous: false });
   function sesionDe(u) {
     const t = Math.floor(Date.now() / 1000);
-    const access = firmarJwt({ aud: 'authenticated', exp: t + 3600, iat: t, iss: url + '/auth/v1', sub: u.id, email: u.email, phone: '',
+    const access = firmarJwt({ aud: 'authenticated', exp: t + 3600, iat: t, iss: url + '/auth/v1', sub: u.id, email: u.email, phone: u.phone || '',
       app_metadata: u.raw_app_meta_data || {}, user_metadata: u.raw_user_meta_data || {}, role: 'authenticated', aal: 'aal1',
       amr: [{ method: 'password', timestamp: t }], session_id: crypto.randomUUID(), is_anonymous: false }, secreto);
     const refresh = crypto.randomBytes(18).toString('hex'); refrescos.set(refresh, u.id);
@@ -414,10 +416,12 @@ async function iniciar(opts = {}) {
     return 500;
   }
   const errAuth = (status, codigo, msg) => Object.assign(new Error(msg), { auth: true, status, codigo });
+  const normTel = (t) => String(t || '').replace(/[^\d]/g, '');           // GoTrue guarda el celular sin «+»
+  const nuevoCodigo = () => String(crypto.randomInt(0, 1e6)).padStart(6, '0');
 
   async function auth(req, u, b) {
     const r = u.pathname.replace(/^\/auth\/v1/, '');
-    if (r === '/settings') return { external: { email: true, google: !!opts.google, phone: false }, disable_signup: false, mailer_autoconfirm: opts.autoconfirmar !== false, phone_autoconfirm: false, sms_provider: '' };
+    if (r === '/settings') return { external: { email: true, google: !!opts.google, phone: !!authCfg.telefono }, disable_signup: false, mailer_autoconfirm: opts.autoconfirmar !== false, phone_autoconfirm: false, sms_provider: '' };
     if (r === '/health') return { name: 'GoTrue (supabase-local)', version: 'local' };
     if (r === '/signup' && req.method === 'POST') {
       if (!b.email || !b.password) throw errAuth(400, 'validation_failed', 'Signup requires a valid password');
@@ -453,6 +457,12 @@ async function iniciar(opts = {}) {
       const { rol, claims } = quien(req);
       if (rol !== 'authenticated') throw errAuth(401, 'no_authorization', 'This endpoint requires a Bearer token');
       if (req.method === 'PUT') {
+        if (b.phone) {          // unir un celular: llega un SMS con el código (verify type=phone_change)
+          if (!authCfg.telefono) throw errAuth(400, 'phone_provider_disabled', 'Unsupported phone provider');
+          const tel = normTel(b.phone), cod = nuevoCodigo();
+          codigos.set('c:' + tel, { codigo: cod, hasta: Date.now() + 600e3, uid: claims.sub });
+          recuperaciones.push({ ruta: '/user', phone: tel, codigo: cod, en: Date.now() });
+        }
         if (b.password) await sql("update auth.users set encrypted_password = extensions.crypt($2, extensions.gen_salt('bf', 4)), updated_at = now() where id = $1", [claims.sub, String(b.password)]);
         if (b.data) await sql('update auth.users set raw_user_meta_data = raw_user_meta_data || $2::jsonb, updated_at = now() where id = $1', [claims.sub, JSON.stringify(b.data)]);
       }
@@ -482,7 +492,36 @@ async function iniciar(opts = {}) {
       }
       if (adm[1] && req.method === 'GET') { const usr = (await sql('select * from auth.users where id = $1', [adm[1]]))[0]; if (!usr) throw errAuth(404, 'user_not_found', 'User not found'); return usuarioPub(usr); }
     }
-    if (r === '/otp' || r === '/recover') { recuperaciones.push({ ruta: r, email: b.email || null, phone: b.phone || null, volver: u.searchParams.get('redirect_to') || (b.options && b.options.email_redirect_to) || b.email_redirect_to || null, en: Date.now() }); return {}; }
+    if (r === '/otp' && req.method === 'POST') {
+      // Como GoTrue: código de 6 números al correo o por SMS. create_user=false y la cuenta no existe → «Signups not allowed for otp».
+      const volver = u.searchParams.get('redirect_to') || (b.options && b.options.email_redirect_to) || b.email_redirect_to || null;
+      let usr = null, clave = '';
+      if (b.phone) {
+        if (!authCfg.telefono) throw errAuth(400, 'phone_provider_disabled', 'Unsupported phone provider');
+        const tel = normTel(b.phone); clave = 'p:' + tel;
+        usr = (await sql('select * from auth.users where phone = $1', [tel]))[0] || null;
+      } else if (b.email) {
+        clave = 'e:' + String(b.email).trim().toLowerCase();
+        usr = (await sql('select * from auth.users where lower(email) = lower($1)', [String(b.email).trim()]))[0] || null;
+      } else throw errAuth(400, 'validation_failed', 'You must provide either an email or phone number.');
+      if (!usr && b.create_user === false) throw errAuth(422, 'otp_disabled', 'Signups not allowed for otp');
+      const cod = nuevoCodigo();
+      if (usr) codigos.set(clave, { codigo: cod, hasta: Date.now() + 900e3, uid: usr.id });
+      recuperaciones.push({ ruta: r, email: b.email || null, phone: b.phone ? normTel(b.phone) : null, volver, codigo: usr ? cod : null, en: Date.now() });
+      return {};
+    }
+    if (r === '/verify' && req.method === 'POST') {
+      const tipo = String(b.type || ''), tok = String(b.token || '');
+      const clave = tipo === 'phone_change' ? 'c:' + normTel(b.phone) : tipo === 'sms' ? 'p:' + normTel(b.phone) : 'e:' + String(b.email || '').trim().toLowerCase();
+      const c = codigos.get(clave);
+      if (!c || c.codigo !== tok || Date.now() > c.hasta) throw errAuth(403, 'otp_expired', 'Token has expired or is invalid');
+      codigos.delete(clave);
+      if (tipo === 'phone_change') await sql('update auth.users set phone = $2, updated_at = now() where id = $1', [c.uid, normTel(b.phone)]);
+      const usr = (await sql('update auth.users set last_sign_in_at = now(), email_confirmed_at = coalesce(email_confirmed_at, now()) where id = $1 returning *', [c.uid]))[0];
+      if (!usr) throw errAuth(404, 'user_not_found', 'User not found');
+      return sesionDe(usr);
+    }
+    if (r === '/recover') { recuperaciones.push({ ruta: r, email: b.email || null, phone: b.phone || null, volver: u.searchParams.get('redirect_to') || (b.options && b.options.email_redirect_to) || b.email_redirect_to || null, en: Date.now() }); return {}; }
     throw errAuth(404, 'not_found', 'Ruta de auth no soportada en supabase-local: ' + r);
   }
 
@@ -557,7 +596,7 @@ async function iniciar(opts = {}) {
   }
 
   return {
-    url, anonKey, serviceKey, jwtSecret: secreto, cron, base: nombre, pgUrl: urlBase.toString(), migraciones: aplicadas, env, fallos, objetos, recuperaciones, sql, cerrar,
+    url, anonKey, serviceKey, jwtSecret: secreto, cron, base: nombre, pgUrl: urlBase.toString(), migraciones: aplicadas, env, fallos, objetos, recuperaciones, authCfg, sql, cerrar,
     firmarJwt: (p) => firmarJwt(p, secreto),
     // Atajos para las pruebas (no pasan por HTTP): crear/entrar usuarios y obtener su sesión.
     async usuario(email, clave = 'clave123', meta = {}, confirmado = true) {

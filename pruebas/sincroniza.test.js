@@ -63,7 +63,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){
     await CEL.p.evaluate(() => { data.products.push({ id: 'p-aguila', name: 'Águila Sync', price: 3500, stock: 40 }); saveData(); });
     await new Promise(r => setTimeout(r, 2500));
     const PC = await equipo('computador', 1280);
-    await PC.p.click('#authNueva').catch(() => {});
+    await PC.p.click('#authTabs [data-tab="entrar"]').catch(() => {});
     await PC.p.fill('#authUser', 'dueno@sync.co'); await PC.p.fill('#authPass', 'clave123'); await PC.p.click('#authBtn');
     chk('1. El computador entra con el mismo correo', await dentro(PC.p));
     await cerrarTodo(PC.p);

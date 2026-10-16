@@ -61,6 +61,10 @@
     var m = String((e && (e.message || e.error_description || e.msg)) || e || '');
     var mapa = [
       [/invalid login credentials/i, 'Correo o contraseña incorrectos.'],
+      [/signups? not allowed for (otp|phone)|user not found/i, 'Ese correo o celular no tiene cuenta de Vento. Toca «Crear cuenta», o entra con tu correo y contraseña.'],
+      [/unsupported phone provider|phone.*(provider|disabled|not enabled)|sms.*(provider|disabled)|error sending (sms|otp to phone)/i, 'Entrar con el celular todavía no está activado en Vento. Entra con el código al correo.'],
+      [/invalid phone|phone.*invalid/i, 'Ese número de celular no está bien escrito (ej. 3001234567).'],
+      [/for security purposes.*after (\d+) seconds/i, 'Espera unos segundos para pedir otro código.'],
       [/token has expired|otp.*(expired|invalid)|invalid.*(token|otp)/i, 'Ese código no sirve o ya venció. Pide uno nuevo.'],
       [/rate limit|too many|for security purposes/i, 'Ya se mandaron varios códigos: espera unos minutos y vuelve a pedirlo.'],
       [/signups? not allowed|email address.*not authorized|not authorized/i, 'El servidor no deja mandar correos a esa dirección todavía (revisa el correo de envío en Supabase).'],
@@ -365,6 +369,65 @@
     return cliente().then(function(c){ return c.auth.signInWithOtp({ email: email, options: o }); })
       .then(function(r){ if(r.error) throw r.error; return true; });
   }
+  // ---------- Entrar fácil con un código (sin contraseña): al correo o por mensaje de texto ----------
+  // Solo para cuentas que YA existen (shouldCreateUser:false): para cuentas nuevas está «Crear cuenta».
+  function celularE164(t){
+    var d = String(t || '').replace(/[^\d+]/g, '');
+    if(/^\+/.test(d)) return d;
+    d = d.replace(/\D/g, '');
+    if(/^3\d{9}$/.test(d)) return '+57' + d;            // celular de Colombia sin el 57
+    if(/^57\d{10}$/.test(d)) return '+' + d;
+    return d ? '+' + d : '';
+  }
+  // volverA: a dónde lleva el enlace que también trae el correo (por defecto entra de una: «?nubecodigo=1»).
+  function codigoEntrar(dest, porCelular, volverA){
+    if(porCelular) return cliente().then(function(c){ return c.auth.signInWithOtp({ phone: celularE164(dest), options: { shouldCreateUser: false, channel: 'sms' } }); })
+      .then(function(r){ if(r.error) throw r.error; return true; });
+    var email = String(dest || '').trim().toLowerCase();
+    return cliente().then(function(c){ return c.auth.signInWithOtp({ email: email, options: { shouldCreateUser: false, emailRedirectTo: volverA || (volverBase() + '?nubecodigo=1') } }); })
+      .then(function(r){ if(r.error) throw r.error; return true; });
+  }
+  // Comprueba el código y abre la sesión de esa cuenta. Devuelve { email, negocios } (el propio primero).
+  function entrarConCodigo(dest, codigo, porCelular){
+    var token = String(codigo || '').replace(/\D/g, ''), email = porCelular ? '' : String(dest || '').trim().toLowerCase();
+    var antes = porCelular ? (st.email ? salir() : Promise.resolve()) : soltarOtra(email);
+    return antes.then(cliente).then(function(c){
+      return c.auth.verifyOtp(porCelular ? { phone: celularE164(dest), token: token, type: 'sms' } : { email: email, token: token, type: 'email' });
+    }).then(function(r){ return sesionAbierta(r, email); });
+  }
+  // Tocó el enlace del correo del código: la sesión llega en la dirección (la página la guardó y la quitó de ahí).
+  function entrarConEnlace(acceso, refresco){
+    return (st.email ? salir() : Promise.resolve()).then(cliente).then(function(c){ return c.auth.setSession({ access_token: acceso, refresh_token: refresco || '' }); })
+      .then(function(r){ return sesionAbierta(r, ''); });
+  }
+  function sesionAbierta(r, email){
+    if(r.error) throw r.error;
+    var u = r.data && (r.data.user || (r.data.session && r.data.session.user));
+    var correo = String((u && u.email) || email || '').toLowerCase();
+    if(!correo) throw new Error('Ese celular no está unido a una cuenta con correo. Entra con tu correo y contraseña, y únelo en Ajustes → Negocio.');
+    if(st.email !== correo){ st = { email: correo }; guardarSt(); }
+    return misNegocios().then(function(l){ return { email: correo, negocios: (l || []).slice().sort(function(a, b){ return (a.rol === 'dueno' ? 0 : 1) - (b.rol === 'dueno' ? 0 : 1); }) }; });
+  }
+  // ¿El servidor manda mensajes de texto? (Supabase → Auth → Phone, lo activa el flujo «Servidor Vento» con Twilio)
+  var celOk = null;
+  function celularDisponible(){
+    if(celOk !== null) return Promise.resolve(celOk);
+    if(!configurada()) return Promise.resolve(false);
+    var c = cfg();
+    return fetch(c.url.replace(/\/+$/, '') + '/auth/v1/settings', { headers: { apikey: c.key } }).then(function(r){ return r.json(); })
+      .then(function(j){ celOk = !!(j && j.external && j.external.phone); return celOk; }).catch(function(){ return false; });
+  }
+  // Unir el celular a la cuenta (con la sesión abierta): llega un código por SMS y con él queda unido.
+  function celularUnir(tel){
+    return cliente().then(function(c){ return c.auth.updateUser({ phone: celularE164(tel) }); }).then(function(r){ if(r.error) throw r.error; return true; });
+  }
+  function celularConfirmar(tel, codigo){
+    return cliente().then(function(c){ return c.auth.verifyOtp({ phone: celularE164(tel), token: String(codigo || '').replace(/\D/g, ''), type: 'phone_change' }); })
+      .then(function(r){ if(r.error) throw r.error; return true; });
+  }
+  function celularDeCuenta(){
+    return cliente().then(function(c){ return c.auth.getUser(); }).then(function(r){ var u = r && r.data && r.data.user; return u && u.phone ? '+' + String(u.phone).replace(/^\+/, '') : ''; }).catch(function(){ return ''; });
+  }
   // Cuenta de Vento Nube: enlace para poner contraseña nueva.
   function enlaceClave(email, volverA){
     return cliente().then(function(c){ return c.auth.resetPasswordForEmail(email, { redirectTo: volverA || (volverBase() + '?nubeclave=1') }); })
@@ -593,6 +656,7 @@
     cliente: cliente, config: cfg,
     googleDisponible: googleDisponible, conGoogle: conGoogle, volvioDeGoogle: volvioDeGoogle,
     crearCuenta: crearCuenta, entrarCuenta: entrarCuenta, vincular: vincular, crearNegocio: crearNegocio, conectado: conectado, salir: salir,
+    codigoEntrar: codigoEntrar, entrarConCodigo: entrarConCodigo, entrarConEnlace: entrarConEnlace, celularDisponible: celularDisponible, celularUnir: celularUnir, celularConfirmar: celularConfirmar, celularDeCuenta: celularDeCuenta, celularE164: celularE164,
     msgError: msgError, codigoCorreo: codigoCorreo, enlaceClave: enlaceClave, correoDeEnlace: correoDeEnlace, claveConEnlace: claveConEnlace, soltarEnlace: soltarEnlace, verificarCorreo: verificarCorreo, nuevaClave: nuevaClave, soltarSesion: soltarSesion,
     _fusionar: fusionar,
     // Fotos y archivos compartidos entre los equipos de la cuenta

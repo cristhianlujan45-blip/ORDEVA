@@ -112,6 +112,25 @@ jobs:
             [ "$C" -ge 200 ] && [ "$C" -lt 300 ] || echo "::warning title=Cuentas con correo::No se pudo quitar la confirmación por correo ($C): $(head -c 300 /tmp/a3.out)"
           fi
 
+      - name: Entrar con el celular (código por mensaje de texto)
+        if: steps.listo.outputs.ok == 'true'
+        env:
+          TW_SID: ${{ secrets.VENTO_TWILIO_SID }}
+          TW_TOKEN: ${{ secrets.VENTO_TWILIO_TOKEN }}
+          TW_SERVICIO: ${{ secrets.VENTO_TWILIO_SERVICIO }}
+        run: |
+          if [ -z "$TW_SID" ] || [ -z "$TW_TOKEN" ] || [ -z "$TW_SERVICIO" ]; then
+            echo "::notice title=Entrar con el celular::Para que llegue el código por mensaje de texto agrega VENTO_TWILIO_SID, VENTO_TWILIO_TOKEN y VENTO_TWILIO_SERVICIO (Messaging Service SID o el número de Twilio) en Settings → Secrets and variables → Actions."
+            exit 0
+          fi
+          API="https://api.supabase.com/v1/projects/${PROJECT_REF}/config/auth"
+          jq -n --arg s "$TW_SID" --arg t "$TW_TOKEN" --arg m "$TW_SERVICIO" \
+            '{external_phone_enabled:true, sms_provider:"twilio", sms_twilio_account_sid:$s, sms_twilio_auth_token:$t, sms_twilio_message_service_sid:$m,
+              sms_template:"Tu código de Vento es {{ .Code }}. Vence en 10 minutos.", sms_otp_exp:600, sms_otp_length:6}' > /tmp/tw.json
+          C=$(curl -s -o /tmp/tw.out -w '%{http_code}' -X PATCH -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" -H 'Content-Type: application/json' "$API" --data @/tmp/tw.json)
+          rm -f /tmp/tw.json
+          [ "$C" -ge 200 ] && [ "$C" -lt 300 ] && echo "✅ Entrar con el celular activado (código por SMS)." || echo "::warning title=Entrar con el celular::No se pudo activar ($C): $(head -c 300 /tmp/tw.out)"
+
       - name: Entrar con Google (cuentas de Vento con Gmail)
         if: steps.listo.outputs.ok == 'true'
         env:
