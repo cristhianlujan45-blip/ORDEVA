@@ -50,6 +50,7 @@ public class VentoApp extends Application {
     static WebView web;                         // la página de Vento (una sola, para que nada se duplique)
     static MutableContextWrapper envoltura;     // la página usa la ventana cuando hay, o la app cuando no
     static volatile boolean alFrente = false;   // la ventana de Vento se está viendo ahora
+    static volatile long ultimoPago = 0;         // cuándo se dijo el último pago (la actualización automática no lo interrumpe)
     static int avisoN = 100;
     static MainActivity ventana;                // la ventana abierta (null si está cerrada)
     static final Handler ui = new Handler(Looper.getMainLooper());
@@ -255,6 +256,7 @@ public class VentoApp extends Application {
     static final String AL_PARLANTE = "\u0001";
 
     static void decirPago(final String frase) {
+        ultimoPago = System.currentTimeMillis();
         decirVoz(Parlante.usa(app, "pagos") ? AL_PARLANTE + frase : frase);
     }
 
@@ -1043,6 +1045,32 @@ public class VentoApp extends Application {
         public String ventanaPagoEstado() {
             try { return new JSONObject().put("on", VentanaPago.prendida(VentoApp.this)).put("encima", VentanaPago.puedeEncima(VentoApp.this))
                     .put("completa", VentanaPago.puedePantallaCompleta(VentoApp.this)).toString(); } catch (Exception e) { return "{}"; }
+        }
+
+        // ---------------------------------------------------------------- 🔄 Actualización automática de la app
+        /** {codigo, nombre, nueva, nuevaNombre, estado, permiso, revisado, auto, silenciosa} */
+        @JavascriptInterface
+        public String actualizacionEstado() { return Actualizador.estadoJson(VentoApp.this); }
+
+        /** Revisa ya (y si hay una nueva, la instala ahora: Vento se cierra un momento y vuelve). */
+        @JavascriptInterface
+        public void actualizarAhora() { Actualizador.revisar(VentoApp.this, true); }
+
+        @JavascriptInterface
+        public void actualizacionAuto(boolean on) { getSharedPreferences("vento", MODE_PRIVATE).edit().putBoolean(Actualizador.P_AUTO, on).apply(); }
+
+        /** Abre el permiso «Instalar apps desconocidas» para Vento (una sola vez). */
+        @JavascriptInterface
+        public void actualizacionPermiso() {
+            ui.post(() -> {
+                Context x = ventana != null ? ventana : VentoApp.this;
+                try {
+                    Intent i = Build.VERSION.SDK_INT >= 26 ? new Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName()))
+                            : new Intent(android.provider.Settings.ACTION_SECURITY_SETTINGS);
+                    if (ventana == null) i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    x.startActivity(i);
+                } catch (Exception ignorado) { }
+            });
         }
 
         /** ¿Vento se está viendo ahora? (la página de fondo sigue «visible» aunque la app esté minimizada) */

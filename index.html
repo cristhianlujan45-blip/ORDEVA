@@ -3977,6 +3977,7 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
     </div>
     <button type="button" class="btn-ghost ajustes-back" id="ajustesBackBtn" hidden>← Volver a categorías</button>
     <div class="settings-desc" id="appVersionEl" style="text-align:center;opacity:.75;margin:14px 0 4px"></div>
+    <div class="settings-desc" id="appActEl" hidden style="text-align:center;margin:0 0 8px;font-size:14px"></div>
 
     <div class="settings-group" hidden data-cat="peligro">
       <h2>Restablecer</h2>
@@ -25515,9 +25516,68 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-16 · v1.40.9';
+const MESORA_VERSION = '2026-10-16 · v1.41.0';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'Vento · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
+/* 🔄 La app Android se actualiza SOLA (Actualizador): revisa cada 3 h, baja la versión nueva y la instala cuando no se
+   está usando Vento. Aquí: el estado en Ajustes y, si falta, el permiso de Android que se da UNA vez («Instalar apps
+   desconocidas» para Vento). La página (casi todo Vento) ya se actualiza sola siempre. */
+(function(){
+  const A = () => window.VentoAndroid && window.VentoAndroid.actualizacionEstado ? window.VentoAndroid : null;
+  const est = () => { try{ return JSON.parse(A().actualizacionEstado() || '{}'); }catch(e){ return {}; } };
+  const LUEGO = 'vento-act-luego';
+  function pintar(){
+    const a = A(), el = document.getElementById('appActEl');
+    // App Android sin el actualizador (antes de la 1.0.36): una última instalación a mano (el aviso de pagos ya lo dice).
+    if(!a && window.VentoAndroid){
+      const ps = document.getElementById('pgSalud'), yaDice = ps && !ps.hidden && ps.dataset.k === 'vieja';
+      let luego = 0; try{ luego = Number(localStorage.getItem(LUEGO)) || 0; }catch(x){}
+      if(el){ el.hidden = false; el.innerHTML = '📲 Tu app Android todavía no se actualiza sola. <a href="https://github.com/cristhianlujan45-blip/cuentas/releases/latest/download/vento.apk" download="vento.apk" rel="noopener">⬇️ Instálala una última vez</a>'; }
+      banner(!yaDice && Date.now() > luego ? 'vieja' : ''); return null;
+    }
+    if(!a){ if(el) el.hidden = true; banner(''); return null; }
+    const e = est(), hay = e.nueva > e.codigo;
+    if(el){
+      el.hidden = false;
+      el.innerHTML = '📲 App Android ' + (e.nombre || '') + ' · ' + (!e.permiso ? '⚠️ falta el permiso para actualizarse sola <button type="button" class="btn-ghost" data-act="permiso" style="padding:4px 10px">🔓 Permitir</button>'
+        : hay ? '🔄 hay una nueva (' + (e.nuevaNombre || '') + '): se instala sola cuando no estés usando Vento <button type="button" class="btn-ghost" data-act="ahora" style="padding:4px 10px">Actualizar ahora</button>'
+        : '✅ se actualiza sola') + (e.estado && /error|no se pudo|confirmes/.test(e.estado) ? '<br><small>' + String(e.estado).replace(/[<>&]/g, '') + '</small>' : '');
+    }
+    let luego = 0; try{ luego = Number(localStorage.getItem(LUEGO)) || 0; }catch(x){}
+    banner(!e.permiso && Date.now() > luego ? 'permiso' : '');
+    return e;
+  }
+  // Sale UNA vez cada vez que se abre Vento y se esconde sola a los 20 s; deja pasar los toques (solo sus botones
+  // responden). En Ajustes queda siempre el estado y el botón.
+  let mostrado = '', escondeT = null;
+  function banner(k){
+    let b = document.getElementById('actBanner');
+    if(!k){ if(b) b.hidden = true; return; }
+    if(mostrado === k) return;
+    mostrado = k;
+    clearTimeout(escondeT); escondeT = setTimeout(() => { const x = document.getElementById('actBanner'); if(x) x.hidden = true; }, 20000);
+    if(!b){
+      b = document.createElement('div'); b.id = 'actBanner'; b.setAttribute('role', 'status');
+      b.style.cssText = 'position:fixed;left:8px;right:8px;bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:9997;background:#1e3a8a;color:#fff;border-radius:14px;padding:10px 12px;font-size:14px;line-height:1.4;box-shadow:0 6px 20px rgba(0,0,0,.35);pointer-events:none';
+      document.body.appendChild(b);
+    }
+    b.innerHTML = '<style>#actBanner a,#actBanner button{pointer-events:auto}</style>' + (k === 'vieja' ? '<div>📲 <b>Instala la app Vento nueva una última vez</b>: desde esa versión se actualiza sola, sin instalar a mano.</div>' : '<div>🔄 <b>Que Vento se actualice sola</b>, sin descargar ni instalar a mano: dale un permiso una sola vez.</div>') +
+      '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">' + (k === 'vieja' ? '<a href="https://github.com/cristhianlujan45-blip/cuentas/releases/latest/download/vento.apk" download="vento.apk" rel="noopener" style="background:#fff;color:#1e3a8a;border-radius:10px;padding:7px 12px;font-weight:800;text-decoration:none">⬇️ Instalar la nueva</a>' : '<button type="button" data-act="permiso" style="background:#fff;color:#1e3a8a;border:0;border-radius:10px;padding:7px 12px;font-weight:800">🔓 Dar el permiso</button>') + '<button type="button" data-act="luego" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,.6);border-radius:10px;padding:6px 10px">Luego</button></div>';
+    b.hidden = false;
+  }
+  document.addEventListener('click', ev => {
+    const x = ev.target.closest && ev.target.closest('[data-act]'); if(!x) return;
+    const k = x.dataset.act;
+    if(k === 'luego'){ try{ localStorage.setItem(LUEGO, String(Date.now() + 3 * 864e5)); }catch(e){} banner(''); return; }
+    if(!A()) return;
+    if(k === 'permiso'){ try{ A().actualizacionPermiso(); }catch(e){} showToast('En la pantalla que se abre, activa «Permitir de esta fuente» para Vento y vuelve. Desde ahí Vento se actualiza sola.', 10000); }
+    else if(k === 'ahora'){ try{ A().actualizarAhora(); }catch(e){} showToast('🔄 Bajando la versión nueva… Vento se cierra un momento al instalarla y vuelve sola. Si Android pregunta, toca «Actualizar».', 10000); }
+    else if(k === 'luego'){ try{ localStorage.setItem(LUEGO, String(Date.now() + 3 * 864e5)); }catch(e){} banner(''); }
+  });
+  window.ventoActualizacion = { pintar };
+  setTimeout(pintar, 3000); setInterval(pintar, 60000);
+  document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') setTimeout(pintar, 800); });
+})();
 // Si el navegador (o el celular, con la app agregada a la pantalla de inicio) se quedó con
 // una versión vieja guardada, antes no había forma de saberlo desde adentro — parecía que "la
 // app no carga bien" o "el diseño se ve raro", sin ningún aviso. Ahora, de vez en cuando, se
@@ -29086,7 +29146,7 @@ let fotosListas = false;
       document.body.appendChild(b);
     }
     const txt = {
-      vieja: '📲 <b>Actualiza la app Vento</b> para que los pagos de Nequi, DaviPlata y Bre-B suenen siempre.',
+      vieja: '📲 <b>Instala la app Vento nueva una última vez</b>: desde esa versión se actualiza sola, sin instalar a mano.',
       permiso: '⚠️ <b>Los pagos no van a sonar:</b> Vento no tiene el permiso «Acceso a notificaciones» en este celular.',
       desconectada: '⚠️ <b>Los pagos no van a sonar:</b> Android desconectó la lectura de avisos de Vento.',
       ventana: '🪟 <b>Para que la ventana con el valor de cada pago salga ' + (faltaVent === 'completa' ? 'con el celular bloqueado' : 'encima de otras apps') + '</b>, dale a Vento un permiso.',

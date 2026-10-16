@@ -18,6 +18,7 @@
 // 14. Bre-B (de otros bancos por la llave) y Nequi con «¿…?» en el aviso: suenan. Solicitudes («te pidió») no.
 // 15. Paso 5 «Que suene siempre»: ahorro de batería, «🚀 Inicio automático» y los pasos de la marca (Xiaomi).
 // 19. Avisos «crudos» (la app no los entendió): la página los revisa y, si son pago, los dice.
+// 25. La app Android se actualiza sola: estado en Ajustes, permiso (una vez) y «Actualizar ahora».
 // 24. Permisos de la ventana fuera de Vento (encima de otras apps / celular bloqueado): aviso con «🪟 Permitir».
 // 23. Ventana emergente de cada pago: valor, banco y texto, «Cerrar» y se cierra sola a los 15 s.
 // 22. Frases de pago del administrador: «es un pago» (con o sin valor) y «no es un pago».
@@ -307,7 +308,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     });
     chk('20. La lectura apagada (se reinstaló la app) se vuelve a prender sola, sin aviso', r20.prendio && r20.k1 === '' && !r20.b1, r20);
     chk('20. Sin el permiso «Acceso a notificaciones»: aviso fijo «Los pagos no van a sonar» con «🔓 Dar el permiso»', r20.k2 === 'permiso' && /no van a sonar/.test(r20.b2) && /Dar el permiso/.test(r20.b2), r20);
-    chk('20. App Android vieja: aviso fijo con «⬇️ Instalar la nueva» (vento.apk)', r20.k3 === 'vieja' && /Actualiza la app Vento/.test(r20.b3) && r20.apk, r20);
+    chk('20. App Android vieja: aviso fijo con «⬇️ Instalar la nueva» (vento.apk)', r20.k3 === 'vieja' && /Instala la app Vento nueva una última vez/.test(r20.b3) && r20.apk, r20);
     chk('20. Android desconectó la lectura (dos revisiones seguidas): «🔄 Reconectar»', r20.k4 === 'desconectada' && /Reconectar/.test(r20.b4), r20);
     chk('20. Si el dueño la apagó a propósito, no se prende sola', r20.k5 === '' && r20.siguioApagada, r20);
     chk('20. En el celular de un mesero no se prende sola ni sale el aviso', r20.k6 === '' && !r20.mesero.on && !r20.mesero.ban && !r20.fin, r20);
@@ -423,6 +424,30 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     });
     chk('24. Falta «encima de otras apps»: aviso «🪟 Permitir» que abre ese permiso', r24.k1 === 'ventana' && /encima de otras apps/.test(r24.b1) && r24.perm[0] === 'encima', r24);
     chk('24. Luego falta el de celular bloqueado (pantalla completa); «Luego» lo deja quieto; con los dos, no sale', r24.k2 === 'ventana' && /celular bloqueado/.test(r24.b2) && r24.k3 === '' && r24.k4 === '', r24);
+
+    // 25. 🔄 La app Android se actualiza sola: estado en Ajustes, permiso de Android (una vez) y «Actualizar ahora».
+    const r25 = await p.evaluate(() => {
+      const A = window.VentoAndroid, ban = () => { const b = document.getElementById('actBanner'); return b && !b.hidden ? b.innerText : ''; };
+      try{ localStorage.removeItem('vento-act-luego'); }catch(e){}
+      window.ventoActualizacion.pintar();
+      const vieja = document.getElementById('appActEl').innerText;   // (el aviso de abajo sale una vez al abrir y se esconde solo)
+      const E = { codigo: 36, nombre: '1.0.36', nueva: 36, nuevaNombre: '1.0.36', estado: 'al día', permiso: false };
+      window.__act = [];
+      A.actualizacionEstado = () => JSON.stringify(E); A.actualizacionPermiso = () => window.__act.push('permiso'); A.actualizarAhora = () => window.__act.push('ahora');
+      window.ventoActualizacion.pintar();
+      const sinPermiso = { ban: ban(), aj: document.getElementById('appActEl').innerText };
+      document.querySelector('#actBanner [data-act="permiso"]').click();
+      E.permiso = true; window.ventoActualizacion.pintar();
+      const alDia = { ban: ban(), aj: document.getElementById('appActEl').innerText };
+      E.nueva = 37; E.nuevaNombre = '1.0.37'; window.ventoActualizacion.pintar();
+      const hay = document.getElementById('appActEl').innerText;
+      document.querySelector('#appActEl [data-act="ahora"]').click();
+      return { vieja, sinPermiso, alDia, hay, act: window.__act.slice() };
+    });
+    chk('25. App Android sin el actualizador: Ajustes dice «todavía no se actualiza sola · Instálala una última vez»', /todavía no se actualiza sola/.test(r25.vieja) && /una última vez/.test(r25.vieja), r25);
+    chk('25. Falta el permiso de Android: aviso «Que Vento se actualice sola» y «🔓 Dar el permiso» lo abre', /se actualice sola/.test(r25.sinPermiso.ban) && /falta el permiso/.test(r25.sinPermiso.aj) && r25.act[0] === 'permiso', r25);
+    chk('25. Con el permiso: Ajustes dice «App Android 1.0.36 · ✅ se actualiza sola» y el aviso se va', !r25.alDia.ban && /1\.0\.36 · ✅ se actualiza sola/.test(r25.alDia.aj), r25);
+    chk('25. Hay una nueva: «se instala sola cuando no estés usando Vento» y «Actualizar ahora»', /hay una nueva \(1\.0\.37\)/.test(r25.hay) && r25.act[1] === 'ahora', r25);
 
     // 11. Navegador (sin la app): la voz sale con el volumen elegido (hasta 100 %)
     const ctx2 = await b.newContext({ viewport: { width: 1200, height: 900 } });

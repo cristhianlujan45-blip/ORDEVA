@@ -102,6 +102,10 @@ jobs:
           else
             gh release create android --title "Vento para Android ${VENTO_VERSION_NAME}" --notes "$NOTAS" --target "${GITHUB_SHA}" --latest
           fi
-          gh release upload android vento.apk vento-admin.apk --clobber
+          # version.json: la app lo revisa sola y, si hay una versión nueva, la baja e instala (se actualiza sola).
+          printf '{"codigo":%s,"nombre":"%s","apk":"vento.apk"}\n' "$VENTO_VERSION_CODE" "$VENTO_VERSION_NAME" > version.json
+          printf '{"codigo":%s,"nombre":"%s","apk":"vento-admin.apk"}\n' "$VENTO_VERSION_CODE" "$VENTO_VERSION_NAME" > version-admin.json
+          cat version.json version-admin.json
+          gh release upload android vento.apk vento-admin.apk version.json version-admin.json --clobber
           echo "### ✅ APK publicado: https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/vento.apk" >> "$GITHUB_STEP_SUMMARY"
           echo "### 👑 Vento Admin: https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/vento-admin.apk" >> "$GITHUB_STEP_SUMMARY"

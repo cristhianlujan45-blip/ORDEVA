@@ -20,6 +20,9 @@
     <!-- 💜 Ventana emergente de cada pago: encima de otras apps y encima de la pantalla de bloqueo -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <!-- 🔄 La app se actualiza sola (baja e instala sus propias actualizaciones, firmadas con la misma llave) -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
 
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
@@ -111,6 +114,9 @@
         </service>
 
         <!-- Al prender el celular o actualizar la app, Vento vuelve a trabajar de fondo sola -->
+        <!-- 🔄 Respuesta del instalador de Android a la actualización automática -->
+        <receiver android:name=".Actualizador$Receptor" android:exported="false" />
+
         <receiver android:name=".Arranque" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />

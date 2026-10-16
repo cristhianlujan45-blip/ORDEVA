@@ -43,9 +43,12 @@ public class AdminServicio extends Service {
             if (w != null) {
                 try { w.evaluateJavascript("try{window.ventoAdminLatido&&window.ventoAdminLatido()}catch(e){}", null); } catch (Exception ignorado) { }
             }
+            // Cada 5 min: ¿hay versión nueva de Vento Admin? (revisa cada 3 h; la instala cuando el panel no se esté viendo)
+            if (++vueltas % 30 == 15) try { Actualizador.revisar(AdminServicio.this, false); } catch (Throwable ignorado) { }
             ui.postDelayed(this, 10000);
         }
     };
+    private int vueltas = 0;
 
     static void arrancar(Context c) {
         Intent i = new Intent(c, AdminServicio.class);

@@ -36,6 +36,8 @@ public class VentoServicio extends Service {
             if (!activo) return;
             VentoApp.js("try{window.ventoLatido&&window.ventoLatido()}catch(e){}");
             if (++vueltas % 12 == 0) revisarEscucha();               // cada minuto: ¿sigue leyendo los avisos de los bancos?
+            // Cada 5 min: ¿hay una versión nueva de la app? (revisa cada 3 h; si ya hay una, la instala cuando no se use Vento)
+            if (vueltas % 60 == 30) try { Actualizador.revisar(VentoServicio.this, false); } catch (Throwable ignorado) { }
             VentoApp.ui.postDelayed(this, 5000);
         }
     };

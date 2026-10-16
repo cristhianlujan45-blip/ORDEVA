@@ -123,9 +123,33 @@ public class AdminActivity extends Activity {
         } catch (Exception ignorado) { }
     }
 
+    static volatile boolean alFrente = false;   // el panel se está viendo (la actualización automática espera)
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        alFrente = true;
+        try { Actualizador.revisar(this, false); } catch (Throwable ignorado) { }
+        pedirPermisoActualizar();
+    }
+
+    /** 🔄 Para actualizarse sola, Android pide una vez «Instalar apps desconocidas» para Vento Admin. Se explica y se abre. */
+    private void pedirPermisoActualizar() {
+        if (Build.VERSION.SDK_INT < 26 || Actualizador.permiso(this)) return;
+        android.content.SharedPreferences p = getSharedPreferences("vento_admin", MODE_PRIVATE);
+        if (System.currentTimeMillis() - p.getLong("pidio_actualizar", 0) < 3 * 86400_000L) return;
+        p.edit().putLong("pidio_actualizar", System.currentTimeMillis()).apply();
+        try {
+            new android.app.AlertDialog.Builder(this).setTitle("🔄 Que Vento Admin se actualice sola")
+                    .setMessage("Dale un permiso una sola vez y Vento Admin se actualiza sola, sin descargar ni instalar a mano.\n\nEn la pantalla que se abre, activa «Permitir de esta fuente» y vuelve.")
+                    .setPositiveButton("Dar el permiso", (d, w) -> { try { startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName()))); } catch (Exception ignorado) { } })
+                    .setNegativeButton("Luego", null).show();
+        } catch (Exception ignorado) { }
+    }
+
     // OJO: no se llama web.onPause() / pauseTimers(): con eso el panel dejaría de recibir avisos de fondo.
     @Override
-    protected void onPause() { super.onPause(); }
+    protected void onPause() { alFrente = false; super.onPause(); }
 
     @Override
     protected void onDestroy() {
