@@ -482,7 +482,7 @@ async function iniciar(opts = {}) {
       }
       if (adm[1] && req.method === 'GET') { const usr = (await sql('select * from auth.users where id = $1', [adm[1]]))[0]; if (!usr) throw errAuth(404, 'user_not_found', 'User not found'); return usuarioPub(usr); }
     }
-    if (r === '/otp' || r === '/recover') { recuperaciones.push({ ruta: r, email: b.email || null, phone: b.phone || null, en: Date.now() }); return {}; }
+    if (r === '/otp' || r === '/recover') { recuperaciones.push({ ruta: r, email: b.email || null, phone: b.phone || null, volver: u.searchParams.get('redirect_to') || (b.options && b.options.email_redirect_to) || b.email_redirect_to || null, en: Date.now() }); return {}; }
     throw errAuth(404, 'not_found', 'Ruta de auth no soportada en supabase-local: ' + r);
   }
 

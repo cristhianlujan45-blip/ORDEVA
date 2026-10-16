@@ -232,6 +232,11 @@
         <input id="lkOClave" type="password" autocomplete="new-password" placeholder="Contraseña nueva (mín. 8)" style="margin-top:8px">
         <div class="row"><button class="b p" id="lkOGo" type="button">Cambiar y entrar</button></div>
       </div>
+      <div id="lkOEnlace" hidden>
+        <p style="margin:8px 0 4px">✅ Correo comprobado con el enlace. Escribe tu contraseña nueva:</p>
+        <input id="lkOEClave" type="password" autocomplete="new-password" placeholder="Contraseña nueva (mín. 8)">
+        <div class="row"><button class="b p" id="lkOEGo" type="button">Guardar y entrar</button></div>
+      </div>
       <div class="row"><button class="b" type="button" data-lk="entrar">Volver</button></div>
     </div>
     <div class="sx-msg" id="lkMsg" role="status" style="margin-top:10px"></div>
@@ -2389,7 +2394,7 @@
       const c = await sxCliente();
       const es = await c.rpc('es_correo_admin', { p_email: correo });
       if(!es.error && es.data === false){ lkMsg('Ese correo no es de un administrador de Vento.', true); return; }
-      const r = await c.auth.signUp({ email: correo, password: clave });
+      const r = await c.auth.signUp({ email: correo, password: clave, options: { emailRedirectTo: adminVolver() } });
       if(r && r.error){ if(/already|registered/i.test(r.error.message || '')){ lkMsg('Ese correo ya tiene cuenta: entra con su contraseña o toca «¿Olvidaste la contraseña?».', true); lkVista('entrar'); $('lkCorreo').value = correo; } else throw r.error; return; }
       if(!r.data || !r.data.session){ lkMsg('📧 Te llegó un correo para confirmar la cuenta. Ábrelo y después entra aquí.'); lkVista('entrar'); $('lkCorreo').value = correo; return; }
       $('lkNClave').value = $('lkNClave2').value = '';
@@ -2401,8 +2406,8 @@
     const correo = $('lkOCorreo').value.trim().toLowerCase();
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)){ lkMsg('Escribe tu correo.', true); return; }
     $('lkOEnviar').disabled = true;
-    try{ const c = await sxCliente(); const r = await c.auth.signInWithOtp({ email: correo, options: { shouldCreateUser: false } }); if(r && r.error) throw r.error;
-      lkMsg('📧 Te mandamos el código a ' + esc(correo) + '. Revisa también «Spam».'); $('lkOPaso2').hidden = false; $('lkOCodigo').focus(); }
+    try{ const c = await sxCliente(); const r = await c.auth.signInWithOtp({ email: correo, options: { shouldCreateUser: false, emailRedirectTo: adminVolver() } }); if(r && r.error) throw r.error;
+      lkMsg('📧 Te mandamos un correo a ' + esc(correo) + ' (revisa también «Spam»): toca el enlace desde este equipo, o escribe aquí el código si trae uno.'); $('lkOPaso2').hidden = false; $('lkOCodigo').focus(); }
     catch(e){ lkMsg(esc(sxMsgError(e)), true); }
     finally{ $('lkOEnviar').disabled = false; }
   };
@@ -2419,8 +2424,30 @@
     }catch(e){ lkMsg(/token|otp|expired|invalid/i.test(String(e && e.message)) ? 'El código no sirve o ya venció. Pide otro.' : esc(sxMsgError(e)), true); }
     finally{ $('lkOGo').disabled = false; }
   };
+  // Enlace del correo (entrar / cambiar la contraseña): vuelve aquí con #access_token=…; se toma y se borra de la dirección.
+  function adminVolver(){ return location.origin + location.pathname.replace(/[^/]*$/, '') + 'admin.html?adminclave=1'; }
+  const lkEnlace = (() => { try{ const h = new URLSearchParams(location.hash.replace(/^#/, '')); const a = h.get('access_token'), e = h.get('error_description') || h.get('error');
+    if(!a && !e) return null; if(/^vento-yt\./.test(h.get('state') || '')) return null; history.replaceState(null, '', location.pathname); return { a, r: h.get('refresh_token') || '', e }; }catch(x){ return null; } })();
+  $('lkOEGo').onclick = async () => {
+    const clave = $('lkOEClave').value;
+    if(!claveOk(clave)){ lkMsg('La contraseña nueva debe tener al menos 8 caracteres.', true); return; }
+    $('lkOEGo').disabled = true;
+    try{ const c = await sxCliente(); const u = await c.auth.updateUser({ password: clave }); if(u && u.error) throw u.error;
+      $('lkOEClave').value = ''; toast('✅ Contraseña cambiada.'); await adminListo(); }
+    catch(e){ lkMsg(esc(sxMsgError(e)), true); }
+    finally{ $('lkOEGo').disabled = false; }
+  };
   (async function arranque(){
     $('lock').hidden = false; lkVista('entrar');
+    if(lkEnlace){
+      if(lkEnlace.e || !lkEnlace.a){ lkVista('olvide'); lkMsg('📧 El enlace del correo ya se usó o venció. Pide otro aquí.', true); }
+      else try{
+        const c = await sxCliente(); const r = await c.auth.setSession({ access_token: lkEnlace.a, refresh_token: lkEnlace.r });
+        if(r && r.error) throw r.error;
+        lkVista('olvide'); $('lkOCorreo').parentNode && ($('lkOPaso2').hidden = true); $('lkOEnlace').hidden = false; $('lkOEClave').focus();
+        lkMsg(''); return;
+      }catch(e){ lkVista('olvide'); lkMsg('📧 El enlace del correo ya se usó o venció. Pide otro aquí.', true); }
+    }
     try{ if(await sxSesion()){ lkMsg('<span class="spin"></span> Entrando…'); if(await adminListo()) return; } }catch(e){}
     if(!$('lkMsg').textContent) lkMsg('');
     setTimeout(() => $('lkCorreo').focus(), 100);

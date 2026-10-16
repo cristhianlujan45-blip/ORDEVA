@@ -53,6 +53,21 @@
   Ajustes tiene **👥 Mi cuenta y mi equipo** (invitar, roles, quitar, cerrar sesión). Sincronizar, respaldos y la base
   de datos quedan solo para el administrador de Vento.
 
+## 1e. Recuperar la cuenta por correo (antes el enlace abría «404»)
+- El flujo «Servidor Vento» ahora deja SIEMPRE la dirección del sitio de Supabase en Vento
+  (`https://cristhianlujan45-blip.github.io/cuentas/`) y permite volver a la app y al panel. Antes solo la ponía
+  si estaba vacía: si apuntaba a otra parte, Supabase mandaba el enlace allí y abría «404».
+- Todos los correos (recuperar, código, crear cuenta, panel) piden volver a la carpeta de Vento.
+- En un celular nuevo se puede pedir el correo con solo el correo de la cuenta; al abrir el enlace Vento pide la
+  contraseña nueva y luego se entra con ella (vuelven los datos de la cuenta).
+- El panel de administrador también recibe el enlace del correo y deja poner la contraseña nueva.
+- Enlace vencido o ya usado: «El enlace no sirvió», con la opción de pedir otro.
+- `404.html`: cualquier dirección de Vento que no exista vuelve a la app con lo que traía.
+- Sin correo propio (SMTP), Supabase manda solo el enlace (sin código de 6 números) y solo a los correos del equipo
+  del proyecto, con pocos envíos por hora. Para que les llegue a todos los clientes, agrega los secretos
+  `VENTO_SMTP_HOST`, `VENTO_SMTP_PORT`, `VENTO_SMTP_USER`, `VENTO_SMTP_PASS` y `VENTO_SMTP_FROM` (por ejemplo una cuenta de
+  Gmail con «contraseña de aplicación», o Brevo/Resend).
+
 ## 2. Plan vencido → modo gratis; cancelada → solo pagar
 - **Vencida, pago rechazado, sin pagar o pago en revisión:** la app sigue en el plan **Gratis** con sus funciones
   limitadas (vender, mesas, inventario y gastos, según el plan Gratis del panel). Las PRO piden el plan.
@@ -121,5 +136,5 @@
 - Rutas nuevas: `/soporte-adjunto`, `/soporte-avisar`, `/admin/soporte_imagen`, `/admin/push_guardar`, `/admin/push_clave`.
 
 ## Pruebas
-- `equipoactividad` 32 (nueva), `servidor/admin` 130, `servidor/suscripciones` 154, `adminsubreal` 35, `adminreal` 44, `cuentacliente` 35,
+- `equipoactividad` 32 (nueva), `recuperacion` 16 (nueva), `servidor/admin` 130, `servidor/suscripciones` 154, `adminsubreal` 35, `adminreal` 44, `cuentacliente` 35,
   `puertaytiemporeal` 34, `adminversion` 7, `seguridadqr` 6 (nueva) y el resto de la suite.

@@ -87,9 +87,12 @@ jobs:
           OWNER="${GITHUB_REPOSITORY_OWNER,,}"; REPO="${GITHUB_REPOSITORY#*/}"; SITIO="https://${OWNER}.github.io/${REPO}/"
           # 1) El enlace del correo puede volver a Vento (si no, Supabase lo manda a otra dirección).
           ACT=$(curl -s "${H[@]}" "$API")
-          LISTA=$(echo "$ACT" | jq -r --arg s "${SITIO}**" '(.uri_allow_list // "") | split(",") | map(select(length>0)) | (. + [$s]) | unique | join(",")')
-          jq -n --arg l "$LISTA" --arg s "$SITIO" --arg cur "$(echo "$ACT" | jq -r '.site_url // ""')" '{uri_allow_list:$l} + (if ($cur|length)==0 or ($cur|test("localhost")) then {site_url:$s} else {} end)' > /tmp/a1.json
-          C=$(curl -s -o /tmp/a1.out -w '%{http_code}' -X PATCH "${H[@]}" "$API" --data @/tmp/a1.json); echo "Direcciones permitidas: $C"
+          #    La «dirección del sitio» (site_url) es a donde Supabase manda un enlace cuando la vuelta pedida no está
+          #    permitida: si apunta a otra parte (localhost, la raíz de github.io…) el enlace abre «404». Siempre es Vento.
+          LISTA=$(echo "$ACT" | jq -r --arg s "$SITIO" '(.uri_allow_list // "") | split(",") | map(select(length>0)) | map(select(test("localhost") | not))
+            | (. + [$s, ($s + "**"), ($s + "index.html"), ($s + "admin.html"), ($s | rtrimstr("/"))]) | unique | join(",")')
+          jq -n --arg l "$LISTA" --arg s "$SITIO" '{uri_allow_list:$l, site_url:$s}' > /tmp/a1.json
+          C=$(curl -s -o /tmp/a1.out -w '%{http_code}' -X PATCH "${H[@]}" "$API" --data @/tmp/a1.json); echo "Direcciones permitidas: $C (sitio: $SITIO)"
           [ "$C" -ge 200 ] && [ "$C" -lt 300 ] || echo "::warning title=Correo de recuperación::No se pudo permitir la vuelta a Vento ($C): $(head -c 300 /tmp/a1.out)"
           # 2) Opcional: correo propio (SMTP). Sin él, Supabase gratis solo manda a los correos del equipo de Supabase
           #    y con su texto de siempre (enlace). Con él: a cualquier correo y con código de 6 números.

@@ -321,7 +321,7 @@
 
   // ---------- Cuentas y negocios ----------
   function registrar(email, pass, nombre){
-    return cliente().then(function(c){ return c.auth.signUp({ email: email, password: pass, options: { data: { nombre: nombre || '' } } }); })
+    return cliente().then(function(c){ return c.auth.signUp({ email: email, password: pass, options: { data: { nombre: nombre || '' }, emailRedirectTo: volverBase() } }); })
       .then(function(r){ if(r.error) throw r.error; st.email = email; st.nombre = nombre || ''; guardarSt(); return !!(r.data && r.data.session); });
   }
   function entrar(email, pass){
@@ -339,7 +339,7 @@
       .then(function(j){ googleOk = !!(j && j.external && j.external.google); return googleOk; }).catch(function(){ return false; });
   }
   function conGoogle(){
-    return cliente().then(function(c){ return c.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin + location.pathname + '?nubegoogle=1', queryParams: { prompt: 'select_account' } } }); })
+    return cliente().then(function(c){ return c.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: volverBase() + '?nubegoogle=1', queryParams: { prompt: 'select_account' } } }); })
       .then(function(r){ if(r.error) throw r.error; return true; });
   }
   // Al volver de Google: la app guardó el permiso (y lo quitó de la dirección); aquí se abre la sesión con él.
@@ -356,17 +356,19 @@
     });
   }
 
+  // Dirección de la app para los enlaces del correo (siempre la carpeta de Vento, nunca una página que no existe).
+  function volverBase(){ return location.origin + location.pathname.replace(/[^/]*$/, ''); }
   // ---------- Código por correo (recuperar contraseña) ----------
   // Supabase manda al correo un código de 6 números (plantilla «Magic Link» con {{ .Token }}, la configura el
   // flujo «Servidor Vento»). Con ese código se comprueba que la persona es dueña del correo.
   function codigoCorreo(email, volverA){
-    var o = { shouldCreateUser: true }; if(volverA) o.emailRedirectTo = volverA;
+    var o = { shouldCreateUser: true, emailRedirectTo: volverA || volverBase() };
     return cliente().then(function(c){ return c.auth.signInWithOtp({ email: email, options: o }); })
       .then(function(r){ if(r.error) throw r.error; return true; });
   }
   // Cuenta de Vento Nube: enlace para poner contraseña nueva.
   function enlaceClave(email, volverA){
-    return cliente().then(function(c){ return c.auth.resetPasswordForEmail(email, { redirectTo: volverA }); })
+    return cliente().then(function(c){ return c.auth.resetPasswordForEmail(email, { redirectTo: volverA || (volverBase() + '?nubeclave=1') }); })
       .then(function(r){ if(r.error) throw r.error; return true; });
   }
   // El enlace del correo trae un permiso (access_token). Se le pregunta al servidor de quién es (así no se
@@ -415,7 +417,7 @@
   }
   function crearCuenta(email, pass, nombre){
     email = String(email || '').trim().toLowerCase();
-    return soltarOtra(email).then(cliente).then(function(c){ return c.auth.signUp({ email: email, password: pass, options: { data: { nombre: nombre || '' } } }); })
+    return soltarOtra(email).then(cliente).then(function(c){ return c.auth.signUp({ email: email, password: pass, options: { data: { nombre: nombre || '' }, emailRedirectTo: volverBase() } }); })
       .then(function(r){
         if(r.error) throw r.error;
         var u = r.data && r.data.user;
@@ -526,7 +528,7 @@
       q('nubeOlvide').onclick = function(){
         var e = q('nubeEmail').value.trim().toLowerCase();
         if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) return msg('Escribe arriba tu correo y vuelve a tocar aquí.', true);
-        accion(this, function(){ return enlaceClave(e, location.origin + location.pathname + '?nubeclave=1').then(function(){
+        accion(this, function(){ return enlaceClave(e, volverBase() + '?nubeclave=1').then(function(){
           msg('📧 Te mandé un enlace a ' + e + ' (revisa también «Spam»). Ábrelo desde este celular: Vento te pide la contraseña nueva.');
         }); });
       };

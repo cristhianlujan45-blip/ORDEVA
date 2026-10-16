@@ -5387,7 +5387,7 @@ export default {
   <form class="auth-card" id="recForm" hidden>
     <h2>Recuperar contraseña</h2>
     <div class="auth-hint">Usa uno de tus <b>códigos de recuperación</b> (los que imprimiste o guardaste al crearlos en Ajustes → Negocio). Cada código sirve una sola vez.<br>¿No los tienes? Si hay <b>otro administrador</b>, pídele que te ponga una contraseña nueva en Ajustes → Usuarios (🔑).</div>
-    <label>Usuario<input id="recUser" autocapitalize="none" autocomplete="username"></label>
+    <label>Usuario o correo<input id="recUser" autocapitalize="none" autocomplete="username"></label>
     <div class="auth-hint" id="recMailBox">📧 <b>Con tu correo</b> (si lo guardaste en Ajustes → Negocio): <button type="button" class="btn-ghost" id="recMailBtn" style="margin-top:6px;width:100%">📧 Enviarme un enlace al correo</button><div id="recMailTxt" style="margin-top:6px"></div></div>
     <label>Código (de recuperación o el que te llegó al correo)<input id="recCode" placeholder="XXXX-XXXX-XXXX  ó  123456" autocapitalize="characters" autocomplete="one-time-code"></label>
     <label>Contraseña nueva<input id="recNew" type="password" autocomplete="new-password"></label>
@@ -19096,7 +19096,7 @@ async function authRecover(user, code, newPass, newPass2){
 const authEnlace = (() => {
   try{
     const h = new URLSearchParams(location.hash.replace(/^#/, '')), q = new URLSearchParams(location.search);
-    const tok = h.get('access_token'), tipo = h.get('type') || '', err = h.get('error_description') || h.get('error');
+    const tok = h.get('access_token'), tipo = h.get('type') || '', err = h.get('error_description') || h.get('error') || ((q.get('recuperar') != null || q.get('nubeclave') === '1') ? (q.get('error_description') || q.get('error')) : null);
     if(!tok && !err) return null;
     // Vuelta de «Conectar mi cuenta de YouTube» (#access_token=…&state=vento-yt.…): es de Google para YouTube, NO un enlace
     // del correo. Antes se tomaba aquí, se borraba de la dirección y salía «El enlace no sirvió»: la cuenta nunca se conectaba.
@@ -19170,7 +19170,15 @@ const authMascara = e => { const m = /^(.)(.*)(@.*)$/.exec(String(e || '')); ret
 const authNube = () => window.ventoNube && window.ventoNube.configurada && window.ventoNube.configurada() && window.ventoNube.codigoCorreo ? window.ventoNube : null;
 async function authCorreoEnviar(user){
   const u = authUsers().find(x => x.user === String(user || '').trim().toLowerCase());
-  if(!u) return { error: 'Escribe tu usuario (como entras a Vento).' };
+  // Cuenta de Vento con correo que no está en este celular (celular nuevo, datos borrados): enlace para poner
+  // contraseña nueva a la cuenta. Después se entra con el correo y la contraseña nueva, y vuelven los datos.
+  if(!u && authEsCorreo(user)){
+    const nb = authNube(); if(!nb || !nb.enlaceClave) return { error: 'Para mandar el correo hace falta internet.' };
+    const email = String(user).trim().toLowerCase();
+    try{ await nb.enlaceClave(email, location.origin + location.pathname.replace(/[^/]*$/, '') + '?nubeclave=1'); }catch(e){ return { error: (nb.msgError ? nb.msgError(e) : (e.message || String(e))) }; }
+    return { ok: true, mascara: authMascara(email) };
+  }
+  if(!u) return { error: 'Escribe tu usuario o tu correo (como entras a Vento).' };
   if(!u.email) return { error: 'Ese usuario no tiene correo de recuperación guardado. Usa un código de recuperación, o pídele a otro administrador que te cambie la contraseña.' };
   const nb = authNube(); if(!nb) return { error: 'Para mandar el código hace falta internet y el Servidor Vento conectado.' };
   const volver = location.origin + location.pathname.replace(/[^/]*$/, '') + '?recuperar=' + encodeURIComponent(u.user);
