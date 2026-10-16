@@ -660,7 +660,7 @@
       <li><b>Tu equipo técnico</b>: entra al código por GitHub (🧑‍💻 Equipo). No ve tus clientes ni puede crear licencias.</li>
       <li><b>Tu propio negocio</b> en Vento: actívalo con «👑 Tú como proveedor».</li></ul>
     <h3>2. El cliente (cada negocio)</h3>
-    <ul><li><b>Cuenta</b>: entra con su correo o con <b>Google</b> (Vento Nube). El dueño crea el negocio y invita a su equipo (administrador, cajero, mesero) con un código.</li>
+    <ul><li><b>Cuenta</b>: entra con su correo o con <b>Google</b> (Vento Nube). El dueño crea el negocio y invita a su equipo (segundo administrador, empleados, cajero, mesero) con un código.</li>
       <li><b>Código del negocio</b> (Ajustes → Negocio → Plan): con él lo identificas para activar, renovar o suspender.</li>
       <li><b>Prueba gratis</b> (días que defines aquí) → paga → queda activo. Si no paga, no pierde datos ni pedidos: solo no puede hacer ventas nuevas.</li></ul>
     <h3>3. Cómo se vende (embudo)</h3>
@@ -1282,7 +1282,7 @@
   const SX_TIPO = { new: 'Primer pago', renewal: 'Renovación', change: 'Cambio de plan' };
   const SX_ORIGEN = { trial: 'Prueba gratis', manual: 'Pago manual', admin: 'Cortesía', google_play: 'Google Play' };
   const SX_METODO = { NEQUI: 'NEQUI', DAVIPLATA: 'DAVIPLATA', GOOGLE_PLAY: 'GOOGLE PLAY' };
-  const SX_ROL = { dueno: 'Dueño', admin: 'Administrador', cajero: 'Caja', mesero: 'Mesero' };
+  const SX_ROL = { dueno: 'Dueño', admin: 'Administrador', cajero: 'Caja', mesero: 'Mesero', empleado: 'Empleado' };
   const SX_ENT = { pos_basic: 'Ventas (POS)', inventory: 'Inventario', tables: 'Mesas', expenses: 'Gastos', invoices: 'Facturas de compra', ocr: 'Leer facturas (OCR)',
     ai_camera: 'Cámara con IA', voice: 'Pedidos por voz', advanced_reports: 'Reportes avanzados', multi_branch: 'Varias sedes', employee_management: 'Equipo y empleados' };
   const SX_EVENTO = { subscription_reactivated: '↩️ Suscripción reactivada', trial_started: '🎁 Empezó la prueba gratis', payment_submitted: '📨 Envió un pago', duplicate_blocked: '🚫 Pago repetido bloqueado', payment_approved: '✅ Pago aprobado',

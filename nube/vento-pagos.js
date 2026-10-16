@@ -66,7 +66,7 @@
 
   // ---------- Este celular ----------
   function plataforma(){ var u = navigator.userAgent || ''; return /iPhone|iPad/.test(u) ? 'iPhone' : /Android/.test(u) ? 'Android' : /Windows/.test(u) ? 'Windows' : /Mac/.test(u) ? 'Mac' : 'Navegador'; }
-  function nombreRol(r){ return ({ dueno: 'Dueño', admin: 'Administrador', cajero: 'Caja', mesero: 'Mesero' })[r] || 'Celular'; }
+  function nombreRol(r){ return ({ dueno: 'Dueño', admin: 'Administrador', cajero: 'Caja', mesero: 'Mesero', empleado: (window.ventoRolNombre ? window.ventoRolNombre('empleado') : 'Empleado') })[r] || 'Celular'; }
   function miDispositivo(){ var n = negocio(), d = lsGet(K_DEV, null); return n && d && d.negocio === n.id ? d : null; }
   function registrarDispositivo(forzar){
     var n = negocio(); if(!n) return Promise.resolve(null);
