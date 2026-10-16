@@ -4380,6 +4380,29 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
       <div class="mz-actions" style="flex-wrap:wrap"><button class="btn-ghost" type="button" data-notif-probar="pedidos">🔔 Probar pedido</button><button class="btn-ghost" type="button" data-notif-probar="musica">🎵 Probar canción</button><button class="btn-ghost" type="button" data-notif-probar="avisos">🧠 Probar aviso</button></div>
       <div class="settings-desc" id="avTiposMsg"></div>
     </div>
+    <div class="settings-group" hidden data-cat="avisos" id="parlanteBox">
+      <h2>🔊 Parlante de avisos</h2>
+      <div class="settings-desc">Conecta un parlante por <b>Bluetooth</b> o por <b>cable</b> (también USB) y elige qué avisos suenan en él: solo los avisos, <b>nada de música</b>. Cada aviso se dice en voz alta en ese parlante («Recibiste 20000 pesos por Nequi», «Pedido nuevo, Mesa 3…»), también con el celular bloqueado. Si el parlante no está conectado, los pagos se siguen diciendo en el celular.</div>
+      <div id="parlanteSinApp" class="settings-desc" hidden>📲 Esto funciona en la <b>app Vento para Android</b> (el navegador no puede elegir el parlante).</div>
+      <div id="parlanteApp" hidden>
+        <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:8px">
+          <div class="settings-row-text"><strong>Parlante</strong><span id="parlanteEstado">…</span></div>
+          <div style="display:flex;gap:8px"><select id="parlanteSel" style="flex:1;min-width:0"></select><button type="button" class="btn-ghost" id="parlanteBuscar">🔄 Buscar</button></div>
+        </div>
+        <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:2px" id="parlanteTipos">
+          <div class="settings-row-text"><strong>Qué avisos suenan en el parlante</strong></div>
+          <label style="display:flex;gap:10px;align-items:center;padding:5px 2px"><input type="checkbox" data-parl="pagos" style="width:auto"> 💜 Pagos que te llegan (DaviPlata, Nequi, llave Bre-B…)</label>
+          <label style="display:flex;gap:10px;align-items:center;padding:5px 2px"><input type="checkbox" data-parl="pedidos" style="width:auto"> 🍺 Pedidos de las mesas</label>
+          <label style="display:flex;gap:10px;align-items:center;padding:5px 2px"><input type="checkbox" data-parl="cuenta" style="width:auto"> 🧾 Piden la cuenta o avisan que pagaron</label>
+          <label style="display:flex;gap:10px;align-items:center;padding:5px 2px"><input type="checkbox" data-parl="domicilios" style="width:auto"> 🛵 Domicilios</label>
+          <label style="display:flex;gap:10px;align-items:center;padding:5px 2px"><input type="checkbox" data-parl="musica" style="width:auto"> 🎵 Canciones pedidas (solo el aviso, no la canción)</label>
+          <label style="display:flex;gap:10px;align-items:center;padding:5px 2px"><input type="checkbox" data-parl="soporte" style="width:auto"> 🎧 Respuestas del soporte</label>
+          <label style="display:flex;gap:10px;align-items:center;padding:5px 2px"><input type="checkbox" data-parl="ia" style="width:auto"> 🧠 Avisos de Vento IA</label>
+        </div>
+        <button type="button" class="btn-primary" id="parlanteProbar" style="width:100%">▶ Probar el parlante</button>
+        <div class="settings-desc" style="margin-top:8px">💡 <b>Bluetooth:</b> si este celular está poniendo música, Android también la manda al parlante Bluetooth (eso no lo puede cambiar Vento). Pon la música en el TV o en otro equipo, o usa un parlante <b>por cable</b> para los avisos.</div>
+      </div>
+    </div>
     <div class="settings-group" hidden data-cat="pedidos">
       <h2>🛎️ Personalizar la página de pedidos</h2>
       <div class="settings-desc">Esto lo ve el cliente en pedido.html: un mensaje tuyo, datos de contacto/info extra y el horario (con reloj y aviso de abierto/cerrado en vivo). Se publica junto con el catálogo — se actualiza sola en unos segundos (o toca «📤 Publicar en QR» en Carta).</div>
@@ -15205,6 +15228,7 @@ function domisBadge(){
 /* Aviso del celular (app de Android): suena y se ve aunque Vento esté cerrada o la pantalla apagada.
    Si Vento se está viendo no hace falta (ya sale en pantalla). En el navegador no hace nada. */
 function ventoAvisoCel(titulo, texto, canal){
+  try{ window.ventoParlanteAviso && window.ventoParlanteAviso(titulo, texto); }catch(e){}
   try{ if(window.VentoAndroid && typeof window.VentoAndroid.notificar === 'function') return window.VentoAndroid.notificar(String(titulo || 'Vento').slice(0, 80), String(texto || '').slice(0, 300), canal || 'pedidos', false); }catch(e){}
   return false;
 }
@@ -31661,6 +31685,79 @@ window.mesoraCelebrar = function(emojis){
   window.ventoRolNombre = rolNombre;
   setInterval(aplicar, 2000);
   document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('nav button[data-view], .more-tile[data-go]'); if(b) setTimeout(aplicar, 50); }, true);
+})();
+</script>
+<script>
+/* ================= 🔊 Parlante de avisos (app Android) =================
+   El dueño conecta un parlante por Bluetooth o por cable y elige qué avisos suenan en él (pagos, pedidos, cuenta,
+   domicilios…). La app Android dice cada aviso en voz alta SOLO en ese parlante (Parlante.java), sin tocar la música.
+   Los pagos los dice Android directamente (también con Vento cerrada); los demás avisos pasan por ventoAvisoCel. */
+(function(){
+  'use strict';
+  const A = () => window.VentoAndroid && window.VentoAndroid.parlantes ? window.VentoAndroid : null;
+  const TIPOS0 = 'pagos,pedidos,cuenta,domicilios';
+  const est = () => { try{ return JSON.parse(A().parlanteEstado() || '{}'); }catch(e){ return {}; } };
+  const tiposDe = e => String(e.tipos == null ? TIPOS0 : e.tipos).split(',').filter(Boolean);
+  // Qué es cada aviso, por cómo empieza su título.
+  function tipoDe(t){
+    t = String(t || '');
+    if(/^💜 Pagaron/.test(t)) return 'pagos';            // ese lo dice Android directo (no se repite aquí)
+    if(/^🛵/.test(t)) return 'domicilios';
+    if(/^🧾|avisa que pagó/.test(t)) return 'cuenta';
+    if(/^🎵/.test(t)) return 'musica';
+    if(/^🎧/.test(t)) return 'soporte';
+    if(/^🧠/.test(t)) return 'ia';
+    if(/^🆕|^🍺|^🍽|pedido/i.test(t)) return 'pedidos';
+    return '';
+  }
+  const limpiar = x => String(x || '').replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu, '').replace(/\s*·\s*/g, ', ').replace(/\s+/g, ' ').trim();
+  window.ventoParlanteAviso = function(titulo, texto){
+    const a = A(); if(!a) return false;
+    const t = tipoDe(titulo); if(!t || t === 'pagos') return false;
+    const e = est(); if(!e.nombre || !e.conectado || !tiposDe(e).includes(t)) return false;
+    const frase = (limpiar(titulo) + (texto && t !== 'soporte' && t !== 'ia' ? '. ' + limpiar(texto) : '')).slice(0, 180);
+    try{ return !!a.parlanteDecir(frase); }catch(x){ return false; }
+  };
+  function pintar(){
+    const box = document.getElementById('parlanteBox'); if(!box) return;
+    const a = A();
+    document.getElementById('parlanteSinApp').hidden = !!a;
+    document.getElementById('parlanteApp').hidden = !a;
+    if(!a) return;
+    let l = []; try{ l = JSON.parse(a.parlantes() || '[]'); }catch(x){}
+    const e = est(), sel = document.getElementById('parlanteSel');
+    const ic = c => c === 'bluetooth' ? '🔵 ' : c === 'celular' ? '📱 ' : c === 'usb' ? '🔌 ' : '🎧 ';
+    const conectadoId = (l.find(d => d.nombre === e.nombre) || {}).id;
+    sel.innerHTML = '<option value="0">— Ninguno (todo suena en el celular) —</option>' + l.filter(d => d.clase !== 'celular').map(d => '<option value="' + d.id + '"' + (d.id === conectadoId ? ' selected' : '') + '>' + ic(d.clase) + String(d.nombre).replace(/[<>&"]/g, '') + '</option>').join('') +
+      (e.nombre && !conectadoId ? '<option value="-1" selected>' + String(e.nombre).replace(/[<>&"]/g, '') + ' (no conectado)</option>' : '');
+    document.getElementById('parlanteEstado').textContent = !e.nombre ? 'Ninguno: los avisos suenan en el celular como siempre. Conecta el parlante y elígelo aquí.'
+      : e.conectado ? '🟢 ' + e.nombre + ' conectado: los avisos elegidos suenan ahí.' : '🟠 ' + e.nombre + ' no está conectado ahora: conéctalo (Bluetooth o cable). Mientras tanto los pagos suenan en el celular.';
+    const tt = tiposDe(e);
+    document.querySelectorAll('#parlanteTipos [data-parl]').forEach(c => { c.checked = tt.includes(c.dataset.parl); c.disabled = !e.nombre; });
+  }
+  function armar(){
+    const box = document.getElementById('parlanteBox'); if(!box || box.dataset.listo) return; box.dataset.listo = '1';
+    document.getElementById('parlanteBuscar').onclick = () => { pintar(); showToast('🔄 Listo. Si no sale tu parlante, conéctalo (Bluetooth o cable) y vuelve a tocar «Buscar».'); };
+    document.getElementById('parlanteSel').onchange = ev => {
+      const a = A(); if(!a) return; const id = Number(ev.target.value);
+      if(id < 0) return;
+      a.parlanteElegir(id); pintar();
+      const e = est(); showToast(id ? '🔊 Los avisos elegidos suenan en ' + (e.nombre || 'el parlante') + '.' : '📱 Todo vuelve a sonar en el celular.');
+      if(id && e.conectado) try{ a.parlanteDecir('Listo. Los avisos de Vento suenan en este parlante.'); }catch(x){}
+    };
+    document.getElementById('parlanteTipos').onchange = () => {
+      const a = A(); if(!a) return;
+      a.parlanteTipos([...document.querySelectorAll('#parlanteTipos [data-parl]')].filter(c => c.checked).map(c => c.dataset.parl).join(','));
+    };
+    document.getElementById('parlanteProbar').onclick = () => {
+      const a = A(); if(!a) return; const e = est();
+      if(!e.nombre){ showToast('Primero elige el parlante.'); return; }
+      if(!e.conectado){ showToast('🟠 ' + e.nombre + ' no está conectado. Conéctalo y vuelve a probar.', 6000); return; }
+      try{ a.parlanteDecir('Prueba del parlante de avisos. Recibiste 20000 pesos por Nequi.'); }catch(x){}
+    };
+  }
+  document.addEventListener('click', ev => { if(ev.target.closest && ev.target.closest('.ajustes-cat[data-cat="avisos"]')) setTimeout(() => { armar(); pintar(); }, 60); }, true);
+  setTimeout(() => { armar(); pintar(); }, 1500);
 })();
 </script>
 <script>

@@ -217,7 +217,21 @@ public class VentoApp extends Application {
         try { if (despierto != null && despierto.isHeld()) despierto.release(); } catch (Throwable ignorado) { }
     }
 
+    // Marca de «va al parlante de avisos» (ver Parlante): la frase viaja por la misma fila de la voz de los pagos.
+    static final String AL_PARLANTE = "\u0001";
+
     static void decirPago(final String frase) {
+        decirVoz(Parlante.usa(app, "pagos") ? AL_PARLANTE + frase : frase);
+    }
+
+    /** Un aviso (pedido, piden la cuenta, domicilio…) dicho SOLO en el parlante de avisos. Sin parlante conectado no suena
+     *  (la notificación del celular ya salió). */
+    static void decirAviso(final String frase) {
+        if (app == null || frase == null || frase.isEmpty() || Parlante.elegido(app) == null) return;
+        decirVoz(AL_PARLANTE + frase);
+    }
+
+    private static void decirVoz(final String frase) {
         mantenerDespierto();
         ui.post(() -> {
             if (ttsPago != null && ttsPagoListo) { hablarPago(frase); return; }
@@ -250,13 +264,15 @@ public class VentoApp extends Application {
         });
     }
 
-    private static void hablarPago(String frase) {
+    private static void hablarPago(String frase0) {
+        final boolean alParlante = frase0 != null && frase0.startsWith(AL_PARLANTE) && Parlante.elegido(app) != null;
+        final String frase = frase0 != null && frase0.startsWith(AL_PARLANTE) ? frase0.substring(1) : frase0;
         try {
             int r = ttsPago.setLanguage(Locale.forLanguageTag("es-CO"));
             if (r == TextToSpeech.LANG_MISSING_DATA || r == TextToSpeech.LANG_NOT_SUPPORTED) ttsPago.setLanguage(new Locale("es"));
             ttsPago.setSpeechRate(1f);
-            bajarMusica();
-            ponerVolumen();
+            // En el parlante de avisos no se toca la música del celular (va por otro lado) ni el volumen de la alarma.
+            if (!alParlante) { bajarMusica(); ponerVolumen(); }
             pagosHablando++;
             // Por si el motor de voz nunca avisa que terminó: la música y el volumen vuelven solos.
             ui.postDelayed(() -> { if (pagosHablando > 0) { pagosHablando = 0; subirMusica(); } }, 25000);
@@ -265,7 +281,7 @@ public class VentoApp extends Application {
                 // corto para que la salida despierte, mismo nivel siempre y, arriba de 100 %, ganancia fija con tope suave.
                 java.io.File f = new java.io.File(app.getCacheDir(), "pago" + System.nanoTime() + ".wav");
                 String id = "arch" + System.nanoTime();
-                archivosPago.put(id, new Object[]{f, frase});
+                archivosPago.put(id, new Object[]{f, frase, alParlante});
                 if (ttsPago.synthesizeToFile(frase, null, f, id) == TextToSpeech.SUCCESS) {
                     // Hay motores de voz que graban pero nunca avisan que terminaron: el pago se quedaba sin sonar.
                     // Si en 6 s no avisó, se dice directo (sin esperar más).
@@ -317,9 +333,16 @@ public class VentoApp extends Application {
         Object[] o = porTocar.remove(0);
         final java.io.File f = (java.io.File) o[0];
         final String frase = (String) o[1];
+        final boolean alParlante = o.length > 2 && Boolean.TRUE.equals(o[2]);
         android.media.MediaPlayer mp = null;
         try {
             boolean parejo = emparejar(f);
+            if (alParlante && parejo) {
+                // Directo al parlante de avisos (Bluetooth o cable), sin pasar por donde suena la música.
+                byte[] b = new byte[(int) f.length()];
+                try (java.io.FileInputStream in = new java.io.FileInputStream(f)) { int n = 0; while (n < b.length) { int r = in.read(b, n, b.length - n); if (r < 0) break; n += r; } }
+                if (Parlante.tocar(app, b, () -> { try { f.delete(); } catch (Throwable ignorado) { } pagoTermino(); siguienteArchivo(); })) return;
+            }
             mp = new android.media.MediaPlayer();
             mp.setAudioAttributes(atributosPago());
             mp.setDataSource(f.getPath());
@@ -893,6 +916,31 @@ public class VentoApp extends Application {
         /** Ajustes → Notificaciones → «💜 Pagos que te llegan»: si sale (o no) el aviso del celular de cada pago. */
         @JavascriptInterface
         public void pagosNotif(boolean si) { getSharedPreferences("vento", MODE_PRIVATE).edit().putBoolean(VentoEscucha.PREF_NOTIF, si).apply(); }
+
+        // ---------------------------------------------------------------- Parlante de avisos (Bluetooth o cable)
+        /** Salidas de sonido conectadas: [{id, nombre, clase}] */
+        @JavascriptInterface
+        public String parlantes() { return Parlante.lista(VentoApp.this); }
+
+        /** Elige el parlante de avisos (0 = ninguno: todo suena en el celular como siempre). */
+        @JavascriptInterface
+        public void parlanteElegir(int id) { Parlante.elegir(VentoApp.this, id); }
+
+        /** {nombre, conectado, tipos, clase} */
+        @JavascriptInterface
+        public String parlanteEstado() { return Parlante.estado(VentoApp.this); }
+
+        /** Qué avisos van al parlante: «pagos,pedidos,cuenta,domicilios…» */
+        @JavascriptInterface
+        public void parlanteTipos(String csv) { Parlante.tipos(VentoApp.this, csv); }
+
+        /** Dice un aviso SOLO en el parlante (si está conectado). */
+        @JavascriptInterface
+        public boolean parlanteDecir(String frase) {
+            if (Parlante.elegido(VentoApp.this) == null) return false;
+            decirAviso(frase);
+            return true;
+        }
 
         /** Avisos de banco que hablaban de plata pero no se tomaron como pago (sin datos), para revisarlos. */
         @JavascriptInterface
