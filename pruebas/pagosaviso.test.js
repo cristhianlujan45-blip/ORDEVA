@@ -36,7 +36,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
       window.VentoAndroid = {
         pagosAvisos: v => { A.on = !!v; }, pagosAvisosEstado: () => JSON.stringify({ on: A.on, permiso: A.permiso }),
         pagosAvisosTomar: () => { const s = JSON.stringify(A.cola); A.cola = []; return s; },
-        mediosPermiso: () => {}, notificar: (t, x, c) => { A.notifs.push({ t, x, c }); return true; },
+        mediosPermiso: () => {}, notificar: (t, x, c, s) => { A.notifs.push({ t, x, c, s }); return true; },
         pagosNotif: v => { A.notifPagos.push(!!v); },
         pagosVolumen: v => { A.vol = v; }, pagosProbarVoz: () => { A.probo = (A.probo || 0) + 1; },
         pagosSmsConfiar: v => { A.smsOk = !!v; }, pagosSmsConfiarActual: () => !!A.smsOk,
@@ -65,7 +65,8 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     await llega('k1:1000:-55', false);
     let e = await estado();
     chk('3. Sin voz de Android, la página dice «Pago confirmado. 200 pesos desde DaviPlata, de Juan Perez»', e.voz.some(t => /^Recibiste 200 pesos por DaviPlata, de Juan Perez/.test(t)), e.voz);
-    chk('3. … con el sonido de éxito y el aviso del celular «💜 Pagaron $200 por DaviPlata»', e.sonidos === 1 && e.notifs.some(n => /Pagaron \$200 por DaviPlata/.test(n.t)), e);
+    chk('3. … con el sonido de éxito y la notificación «💜 Recibiste $200 por DaviPlata»', e.sonidos === 1 && e.notifs.some(n => /^💜 Recibiste \$200 por DaviPlata/.test(n.t)), e);
+    chk('3. La notificación del pago sale SIEMPRE (también con Vento abierta), en el canal de pagos, con el texto y lo que dijo el banco', e.notifs.some(n => /^💜 Recibiste \$200/.test(n.t) && n.c === 'pagos' && n.s === true && /^Recibiste 200 pesos por DaviPlata, de Juan Perez\./.test(n.x) && /le pasó \$200 a su DaviPlata/.test(n.x)), e.notifs);
     chk('5. El aviso se reenvía al servidor CON su ID', e.reenvios.length === 1 && e.reenvios[0].id === 'and-k1:1000:-55' && e.reenvios[0].txt === TXT, e.reenvios);
 
     // 1. Segundo pago IGUAL (otro aviso, otro ID) poco después

@@ -14,8 +14,11 @@ public class VentoApp {
     static void mantenerDespierto() { }
     static void decirPago(String f) { dichos.add(f); }
     static void anunciarPago(String app, long monto, boolean notif) { anunciarPago(app, monto, notif, null); }
-    static void anunciarPago(String app, long monto, boolean notif, String texto) { dichos.add(AvisoPago.frase(app, monto, texto)); if (notif) avisos.add("💜 Pagaron " + AvisoPago.plata(monto)); }
-    static void anunciarPagoAviso(String banco, long monto) { avisos.add("💜 Pagaron " + AvisoPago.plata(monto) + " (SMS)"); }
+    static void anunciarPago(String app, long monto, boolean notif, String texto) { dichos.add(AvisoPago.frase(app, monto, texto)); if (notif) notificarPago("💜 Recibiste " + AvisoPago.plata(monto) + " por " + AvisoPago.nombreApp(app), AvisoPago.frase(app, monto, texto), texto); }
+    static void anunciarPagoAviso(String banco, long monto) { anunciarPagoAviso(banco, monto, null); }
+    static void anunciarPagoAviso(String banco, long monto, String texto) { notificarPago("💜 Recibiste " + AvisoPago.plata(monto) + " por " + AvisoPago.nombreApp(banco), AvisoPago.frase(banco, monto, texto), texto); }
+    static final List<String[]> notifs = new ArrayList<>();
+    static void notificarPago(String titulo, String frase, String original) { avisos.add(titulo); notifs.add(new String[]{titulo, frase, original}); }
     class Puente { public boolean notificar(String t, String x, String c, boolean b) { avisos.add(t); return true; } }
     static final class Cola {
         final List<Runnable> despues = new ArrayList<>();

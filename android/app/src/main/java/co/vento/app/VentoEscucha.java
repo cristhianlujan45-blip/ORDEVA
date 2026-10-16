@@ -272,7 +272,7 @@ public class VentoEscucha extends NotificationListenerService {
                         try {
                             if (!tomarPendiente(sp, id0)) return;          // ya llegó el SMS y se dijo con el valor
                             VentoApp.decirPago(AvisoPago.fraseSinValor(app0));
-                            if (sp.getBoolean(PREF_NOTIF, true)) VentoApp.app.new Puente().notificar("💜 Llegó plata por " + AvisoPago.nombreApp(app0), "Ábrela para ver el valor.", "pagos", false);
+                            if (sp.getBoolean(PREF_NOTIF, true)) VentoApp.notificarPago("💜 Llegó plata por " + AvisoPago.nombreApp(app0), AvisoPago.fraseSinValor(app0), todo0);
                         } catch (Throwable ignorado) { }
                     }, ESPERA_SMS);
                     guardar(sp, id0, app + " | " + titulo + " | " + cuerpo, true, null, false, null);
@@ -281,9 +281,7 @@ public class VentoEscucha extends NotificationListenerService {
             }
             if (!callado) {
                 VentoApp.decirPago(AvisoPago.fraseSinValor(app));
-                if (sp.getBoolean(PREF_NOTIF, true)) try {
-                    VentoApp.app.new Puente().notificar("💜 Llegó plata por " + AvisoPago.nombreApp(app), "Ábrela para ver el valor.", "pagos", false);
-                } catch (Throwable ignorado) { }
+                if (sp.getBoolean(PREF_NOTIF, true)) VentoApp.notificarPago("💜 Llegó plata por " + AvisoPago.nombreApp(app), AvisoPago.fraseSinValor(app), todo);
             }
             guardar(sp, id0, app + " | " + titulo + " | " + cuerpo, !callado, null, false, null);
             return true;
@@ -298,7 +296,11 @@ public class VentoEscucha extends NotificationListenerService {
         // y reemplaza al del SMS (no son dos pagos).
         String reemplaza = monto > 0 && confiable ? parear(sp, monto, false, id) : null;
         if (confiable && !callado) { VentoApp.anunciarPago(app, monto, sp.getBoolean(PREF_NOTIF, true), todo); voz = true; }
-        else if (!confiable && !callado) { VentoApp.decirPago("Ojo. Llegó un aviso de " + monto + " pesos de una aplicación que no es la oficial de " + AvisoPago.nombreApp(app) + ". Revísalo en la aplicación del banco antes de entregar."); voz = true; }
+        else if (!confiable && !callado) {
+            String f = "Ojo. Llegó un aviso de " + monto + " pesos de una aplicación que no es la oficial de " + AvisoPago.nombreApp(app) + ". Revísalo en la aplicación del banco antes de entregar.";
+            VentoApp.decirPago(f); voz = true;
+            if (sp.getBoolean(PREF_NOTIF, true)) VentoApp.notificarPago("⚠️ Aviso de " + AvisoPago.plata(monto) + ": revísalo", f, todo);
+        }
         traza(sp, app, todo, monto <= 0 ? "❓ no se entendió el valor" : callado ? "🔕 llegó con Vento desconectada (sin voz)" : confiable ? "🔊 " + AvisoPago.frase(app, monto, todo) : "⚠️ app no oficial: «revísalo»");
         guardar(sp, id, txt, voz, confiable ? null : "La app «" + app + "» de este celular no es la oficial (no se instaló desde la tienda): míralo en la app del banco", false, reemplaza);
         return true;
@@ -349,8 +351,12 @@ public class VentoEscucha extends NotificationListenerService {
                 VentoApp.ui.postDelayed(() -> {
                     try {
                         if (!smsSigue(sp, id)) return;
-                        VentoApp.decirPago(b != null ? AvisoPago.frase(b, m, cu) : AvisoPago.fraseSms(rem, cu, m, ti, confiar));
-                        if (confiar && sp.getBoolean(PREF_NOTIF, true)) VentoApp.anunciarPagoAviso(b != null ? b : AvisoPago.bancoDe(cu), m);
+                        String f = b != null ? AvisoPago.frase(b, m, cu) : AvisoPago.fraseSms(rem, cu, m, ti, confiar);
+                        VentoApp.decirPago(f);
+                        if (sp.getBoolean(PREF_NOTIF, true)) {
+                            if (confiar) VentoApp.anunciarPagoAviso(b != null ? b : AvisoPago.bancoDe(cu), m, cu);
+                            else VentoApp.notificarPago("⚠️ Aviso de " + AvisoPago.plata(m) + " por SMS: revísalo", f, cu);
+                        }
                     } catch (Throwable ignorado) { }
                 }, ESPERA_APP);
             }
@@ -359,7 +365,10 @@ public class VentoEscucha extends NotificationListenerService {
         }
         boolean confiar = false;
         boolean voz = false;
-        if (!callado) { VentoApp.decirPago(AvisoPago.fraseSms(remitente, cuerpo, monto, tipo, confiar)); voz = true; }
+        if (!callado) {
+            VentoApp.decirPago(AvisoPago.fraseSms(remitente, cuerpo, monto, tipo, confiar)); voz = true;
+            if (sp.getBoolean(PREF_NOTIF, true)) VentoApp.notificarPago("🚨 Mensaje de pago FALSO: " + AvisoPago.plata(monto), AvisoPago.fraseSms(remitente, cuerpo, monto, tipo, confiar), cuerpo);
+        }
         if (!callado && confiar && sp.getBoolean(PREF_NOTIF, true)) try { VentoApp.anunciarPagoAviso(banco != null ? banco : AvisoPago.bancoDe(cuerpo), monto); } catch (Throwable ignorado) { }
         guardar(sp, id, txt, voz, null, confiar, null);
         return true;
@@ -368,7 +377,8 @@ public class VentoEscucha extends NotificationListenerService {
     // ---------- Aviso de la app SIN valor + SMS del banco CON el valor (DaviPlata por la llave Bre-B) ----------
     // JUNTAR: el SMS del banco puede llegar hasta 2 min después del aviso de la app. JUNTAR_SMS: un aviso de la app solo se
     // junta con un SMS de hace menos de 1 min (antes 3 min: se juntaba con un SMS viejo de OTRO pago).
-    static final long ESPERA_SMS = 8_000L, ESPERA_APP = 4_000L, JUNTAR = 2 * 60_000L, JUNTAR_SMS = 60_000L;
+    // Más rápido (1.40.8): el SMS del banco se dice 1,5 s después (antes 4 s) y la llave sin valor espera el SMS 5 s (antes 8 s).
+    static final long ESPERA_SMS = 5_000L, ESPERA_APP = 1_500L, JUNTAR = 2 * 60_000L, JUNTAR_SMS = 60_000L;
     static final String PREF_PEND = "pagosSinValor", PREF_SMSV = "pagosSmsValor";
 
     private static synchronized void pendiente(SharedPreferences sp, String id, String app, String todo) {

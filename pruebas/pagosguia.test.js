@@ -2,7 +2,7 @@
 // El puente nativo (VentoAndroid: VentoEscucha + notificar + permisos) se simula; lo demás es la app de verdad.
 //  1. DaviPlata escribe de «usted» («¡Le llegó plata!», «MARIA LOPEZ le pasó $30.000», «Recibió $15.000»): ahora sí se entiende.
 //     Lo que SALE («Usted pasó $10.000 a…») y los códigos no se toman.
-//  2. Aviso del celular «💜 Pagaron $30.000 por DaviPlata» (se puede apagar en Notificaciones).
+//  2. Notificación del celular «💜 Recibiste $30.000 por DaviPlata» (se puede apagar en Notificaciones).
 //  3. Una sola vez: el mismo aviso que llega por la app y por MacroDroid no se repite; dos clientes que pagan lo mismo sí son dos pagos.
 //  4. Paso a paso (Ajustes → 💜 Pagos, panel de pagos y asistente): cada paso con su estado y botones que hacen el paso.
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
@@ -20,7 +20,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
       window.VentoAndroid = {
         pagosAvisos: v => { A.on = !!v; }, pagosAvisosEstado: () => JSON.stringify({ on: A.on, permiso: A.permiso }),
         pagosAvisosTomar: () => { const s = JSON.stringify(A.cola); A.cola = []; return s; },
-        mediosPermiso: () => { A.permisoAbierto++; }, notificar: (t, x, c) => { A.notifs.push({ t, x, c }); return true; },
+        mediosPermiso: () => { A.permisoAbierto++; }, notificar: (t, x, c, s) => { A.notifs.push({ t, x, c, s }); return true; },
         permisos: () => JSON.stringify({ microfono: true, camara: true, avisos: true, bateria: A.bateria, fondo: true }),
         ajustesBateria: () => { A.bateriaAbierta++; },
       };
@@ -52,7 +52,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     await p.evaluate(() => { window.__and.cola.push({ id: 'k1:1', txt: 'DaviPlata | ¡Le llegó plata! | MARIA LOPEZ le pasó $30.000 a su DaviPlata', t: Date.now() }); window.ventoAvisosNativos(); });
     let l = await lista(), n = await notifs();
     chk('2. El pago de DaviPlata queda confirmado', l.length === 1 && l[0].monto === 30000 && l[0].estado === 'app' && l[0].de === 'Maria Lopez', l);
-    chk('2. Aviso del celular: «💜 Pagaron $30.000 por DaviPlata» (de Maria Lopez)', n.length === 1 && n[0].t === '💜 Pagaron $30.000 por DaviPlata' && /Maria Lopez/.test(n[0].x), n);
+    chk('2. Notificación del celular: «💜 Recibiste $30.000 por DaviPlata» (de Maria Lopez)', n.length === 1 && n[0].t === '💜 Recibiste $30.000 por DaviPlata' && /Maria Lopez/.test(n[0].x), n);
     await p.evaluate(() => window.pagosRecibirTexto('DaviPlata | ¡Le llegó plata! | MARIA LOPEZ le pasó $30.000 a su DaviPlata', 'canal-77'));
     l = await lista(); n = await notifs();
     chk('3. El mismo aviso por MacroDroid (otro camino) no se repite', l.length === 1 && n.length === 1, { l, n });

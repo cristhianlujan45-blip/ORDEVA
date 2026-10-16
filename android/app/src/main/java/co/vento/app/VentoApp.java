@@ -155,20 +155,42 @@ public class VentoApp extends Application {
     /** Con el texto del aviso: si llegó por la llave Bre-B, la voz y el aviso lo dicen. */
     static void anunciarPago(String appBanco, long monto, boolean notif, String texto) {
         if (app == null || monto <= 0) return;
-        decirPago(AvisoPago.frase(appBanco, monto, texto));
+        String frase = AvisoPago.frase(appBanco, monto, texto);
+        decirPago(frase);
+        if (notif) notificarPago("💜 Recibiste " + AvisoPago.plata(monto) + (AvisoPago.esBreB(texto) ? " por Bre-B en " : " por ") + AvisoPago.nombreApp(appBanco), frase, texto);
+    }
+
+    /**
+     * Notificación de cada pago: sale SIEMPRE, con Vento abierta, cerrada o el celular bloqueado (antes, con Vento abierta
+     * no salía). Título con el valor («💜 Recibiste $20.000 por Nequi») y el texto: la frase y lo que dijo el banco. Se ve
+     * completa en la pantalla de bloqueo, y prende la pantalla unos segundos para que se vea sin tocar el celular.
+     */
+    static void notificarPago(String titulo, String frase, String original) {
+        if (app == null) return;
+        String o = original == null ? "" : original.replaceAll("\\s+", " ").trim();
+        if (o.length() > 220) o = o.substring(0, 220) + "…";
+        String txt = (frase == null ? "" : frase) + (o.isEmpty() ? "" : "\n«" + o + "»");
+        try { app.new Puente().notificar(titulo, txt, "pagos", true); } catch (Exception ignorado) { }
+        prenderPantalla();
+    }
+
+    /** Prende la pantalla unos segundos (si estaba apagada) para que se vea la notificación del pago. */
+    @SuppressWarnings("deprecation")
+    static void prenderPantalla() {
         try {
-            if (notif) app.new Puente().notificar("💜 Pagaron " + AvisoPago.plata(monto) + (AvisoPago.esBreB(texto) ? " por Bre-B en " : " por ") + AvisoPago.nombreApp(appBanco),
-                    "Pago confirmado por la app de " + AvisoPago.nombreApp(appBanco) + ".", "pagos", false);
-        } catch (Exception ignorado) { }
+            android.os.PowerManager pm = (android.os.PowerManager) app.getSystemService(Context.POWER_SERVICE);
+            if (pm == null || pm.isInteractive()) return;
+            android.os.PowerManager.WakeLock w = pm.newWakeLock(android.os.PowerManager.SCREEN_BRIGHT_WAKE_LOCK
+                    | android.os.PowerManager.ACQUIRE_CAUSES_WAKEUP | android.os.PowerManager.ON_AFTER_RELEASE, "vento:pantalla");
+            w.acquire(6000L);
+        } catch (Throwable ignorado) { }
     }
 
     /** Aviso del celular de un pago confirmado (sin la voz, que ya se dijo). */
-    static void anunciarPagoAviso(String banco, long monto) {
+    static void anunciarPagoAviso(String banco, long monto) { anunciarPagoAviso(banco, monto, null); }
+    static void anunciarPagoAviso(String banco, long monto, String texto) {
         if (app == null || monto <= 0) return;
-        try {
-            app.new Puente().notificar("💜 Pagaron " + AvisoPago.plata(monto) + " por " + AvisoPago.nombreApp(banco),
-                    "Pago confirmado por SMS de " + AvisoPago.nombreApp(banco) + ".", "pagos", false);
-        } catch (Exception ignorado) { }
+        notificarPago("💜 Recibiste " + AvisoPago.plata(monto) + " por " + AvisoPago.nombreApp(banco), AvisoPago.frase(banco, monto, texto), texto);
     }
 
     // ---------------------------------------------------------------- Voz de los pagos
@@ -301,7 +323,7 @@ public class VentoApp extends Application {
 
     private static void decirDirecto(String frase) {
         // Silencio corto antes: la salida de audio ya está despierta en la primera palabra (no empieza bajito).
-        try { if (ttsPago != null && Build.VERSION.SDK_INT >= 21) ttsPago.playSilentUtterance(400, TextToSpeech.QUEUE_ADD, "sil" + System.nanoTime()); } catch (Exception ignorado) { }
+        try { if (ttsPago != null && Build.VERSION.SDK_INT >= 21) ttsPago.playSilentUtterance(200, TextToSpeech.QUEUE_ADD, "sil" + System.nanoTime()); } catch (Exception ignorado) { }
         if (ttsPago == null || ttsPago.speak(frase, TextToSpeech.QUEUE_ADD, null, "pago" + System.nanoTime()) != TextToSpeech.SUCCESS) pagoTermino();
     }
 
@@ -826,7 +848,16 @@ public class VentoApp extends Application {
                         .setWhen(System.currentTimeMillis()).setShowWhen(true);
                 if (Build.VERSION.SDK_INT < 26) b.setDefaults(android.app.Notification.DEFAULT_ALL).setPriority(android.app.Notification.PRIORITY_HIGH);
                 if (Build.VERSION.SDK_INT >= 21) b.setCategory("musica".equals(canal) ? android.app.Notification.CATEGORY_EVENT : android.app.Notification.CATEGORY_MESSAGE);
-                if ("pagos".equals(canal)) b.setVisibility(android.app.Notification.VISIBILITY_PUBLIC);
+                if ("pagos".equals(canal)) {
+                    // En la pantalla de bloqueo se ve completa (el valor y el texto), aunque el celular oculte el contenido.
+                    b.setVisibility(android.app.Notification.VISIBILITY_PUBLIC);
+                    if (Build.VERSION.SDK_INT >= 21) {
+                        android.app.Notification.Builder pub = Build.VERSION.SDK_INT >= 26 ? new android.app.Notification.Builder(VentoApp.this, id) : new android.app.Notification.Builder(VentoApp.this);
+                        pub.setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle(titulo == null ? "Vento" : titulo).setContentText(texto == null ? "" : texto)
+                                .setStyle(new android.app.Notification.BigTextStyle().bigText(texto == null ? "" : texto)).setColor(0xFF8B5CF6);
+                        b.setPublicVersion(pub.build()).setColor(0xFF8B5CF6);
+                    }
+                }
                 nm.notify(avisoN++, b.build());
                 return true;
             } catch (Exception e) {

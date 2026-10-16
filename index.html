@@ -15256,7 +15256,8 @@ function domisBadge(){
    Si Vento se está viendo no hace falta (ya sale en pantalla). En el navegador no hace nada. */
 function ventoAvisoCel(titulo, texto, canal){
   try{ window.ventoParlanteAviso && window.ventoParlanteAviso(titulo, texto); }catch(e){}
-  try{ if(window.VentoAndroid && typeof window.VentoAndroid.notificar === 'function') return window.VentoAndroid.notificar(String(titulo || 'Vento').slice(0, 80), String(texto || '').slice(0, 300), canal || 'pedidos', false); }catch(e){}
+  // Los pagos salen SIEMPRE (también con Vento abierta), en su canal: se ven con el celular bloqueado.
+  try{ if(window.VentoAndroid && typeof window.VentoAndroid.notificar === 'function') return window.VentoAndroid.notificar(String(titulo || 'Vento').slice(0, 80), String(texto || '').slice(0, 400), canal || 'pedidos', canal === 'pagos'); }catch(e){}
   return false;
 }
 window.ventoAvisoCel = ventoAvisoCel;
@@ -25514,7 +25515,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-16 · v1.40.7';
+const MESORA_VERSION = '2026-10-16 · v1.40.8';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'Vento · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 // Si el navegador (o el celular, con la app agregada a la pantalla de inicio) se quedó con
@@ -28912,8 +28913,10 @@ let fotosListas = false;
     // Como el parlante de Bold: sonido de éxito y «Pago confirmado» en voz alta, con el valor y quién pagó.
     const msg = '✅ Pago confirmado · ' + plata(p.monto) + ' por ' + (p.breb ? 'Bre-B · ' : '') + p.app + (p.de ? ' de ' + p.de : '') + (mesa ? ' · ' + tableLabel(mesa) : '');
     try{ showToast(msg, 9000); }catch(e){}
-    // Aviso del celular (con Vento minimizada o la pantalla apagada): «💜 Pagaron $20.000 por DaviPlata».
-    if(!op.voz) try{ if(!window.ventoAvisoOn || window.ventoAvisoOn('pagos')) window.ventoAvisoCel && window.ventoAvisoCel('💜 Pagaron ' + plata(p.monto) + ' por ' + (p.breb ? 'Bre-B en ' : '') + p.app, (p.de ? 'De ' + p.de + '. ' : '') + (mesa ? tableLabel(mesa) + '. ' : '') + 'Confirmado por la app de ' + p.app + '.', 'pedidos'); }catch(e){}
+    // Notificación del celular SIEMPRE (con Vento abierta, cerrada o el celular bloqueado): el valor y el texto.
+    // «💜 Recibiste $20.000 por Nequi» · «Recibiste 20000 pesos por Nequi, de Ana Ruiz. Mesa 3.» + lo que dijo el banco.
+    if(!op.voz) try{ if(!window.ventoAvisoOn || window.ventoAvisoOn('pagos')){ const orig = String(txt).split('|').slice(1).join(' · ').replace(/\s+/g, ' ').trim().slice(0, 220);
+      window.ventoAvisoCel && window.ventoAvisoCel('💜 Recibiste ' + plata(p.monto) + ' por ' + (p.breb ? 'Bre-B en ' : '') + p.app, 'Recibiste ' + p.monto + ' pesos por ' + p.app + (p.de ? ', de ' + p.de : '') + '.' + (mesa ? ' ' + tableLabel(mesa) + '.' : '') + (orig ? '\n«' + orig + '»' : ''), 'pagos'); } }catch(e){}
     try{ window.ventoSonidos && window.ventoSonidos.success(); }catch(e){}
     // «Pago confirmado. 200 pesos desde DaviPlata» (o «desde Nequi»…), con quién pagó y la mesa si se sabe.
     if(!op.voz) window.ventoDecirPago('Recibiste ' + p.monto + ' pesos ' + (p.breb ? 'por Bre-B, en ' : 'por ') + p.app + (p.de ? ', de ' + p.de : '') + (mesa ? ', de la ' + tableLabel(mesa) : ''));
@@ -32004,7 +32007,7 @@ window.mesoraCelebrar = function(emojis){
   // Qué es cada aviso, por cómo empieza su título.
   function tipoDe(t){
     t = String(t || '');
-    if(/^💜 Pagaron/.test(t)) return 'pagos';            // ese lo dice Android directo (no se repite aquí)
+    if(/^(💜 (Pagaron|Recibiste|Llegó plata)|⚠️ Aviso de|🚨 Mensaje de pago)/.test(t)) return 'pagos';   // ese lo dice Android directo (no se repite aquí)
     if(/^🛵/.test(t)) return 'domicilios';
     if(/^🧾|avisa que pagó/.test(t)) return 'cuenta';
     if(/^🎵/.test(t)) return 'musica';
