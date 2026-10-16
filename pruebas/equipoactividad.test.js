@@ -79,20 +79,61 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
       return { equipo: document.body.classList.contains('rol-equipo'), est: v('.more-tile[data-go="estadisticas"]') || v('nav button[data-view="estadisticas"]'), cont: v('.more-tile[data-go="contabilidad"]') || v('nav button[data-view="contabilidad"]'),
         hist: v('.more-tile[data-go="historial"]') || v('nav button[data-view="historial"]'), aj: v('.more-tile[data-go="ajustes"]') || v('nav button[data-view="ajustes"]'),
         prod: v('nav button[data-view="productos"]') || v('.more-tile[data-go="productos"]'), mesas: v('nav button[data-view="mesas"]'), chip: (document.getElementById('meseroChip') || {}).innerText || '' }; });
-    chk('Empleado: NO ve estadísticas, contabilidad, historial, productos ni ajustes', vista.equipo && !vista.est && !vista.cont && !vista.hist && !vista.aj && !vista.prod, vista);
+    chk('Empleado: NO ve estadísticas, contabilidad, productos ni ajustes', vista.equipo && !vista.est && !vista.cont && !vista.aj && !vista.prod, vista);
+    chk('…sí ve el historial, pero solo las ventas de HOY', vista.hist && await pB.evaluate(() => document.body.classList.contains('hist-hoy')), vista);
     chk('…pero sí vende (mesas / caja) y se ve su rol «Asesor de ventas»', vista.mesas && /Asesor de ventas/.test(vista.chip), vista);
 
-    // El dueño le permite ver el historial
+    // ===== Ventas del día y correcciones con la clave del dueño =====
+    await pB.evaluate(() => {
+      const p = data.products[0]; p.stock = 10;
+      const ayer = new Date(Date.now() - 7 * 864e5).toISOString(), hoy = new Date().toISOString();
+      data.history.unshift({ id: 'v-vieja', table: null, tableName: 'Mostrador', total: 99000, payments: [{ method: 'efectivo', amount: 99000 }], items: [{ name: 'Chaqueta vieja', qty: 1, price: 99000 }], date: ayer });
+      data.history.unshift({ id: 'v-hoy-1', table: null, tableName: 'Mostrador', total: p.price * 2, payments: [{ method: 'efectivo', amount: p.price * 2 }], items: [{ name: p.name, qty: 2, price: p.price }], date: hoy });
+      data.history.unshift({ id: 'v-hoy-2', table: 1, total: p.price, payments: [{ method: 'efectivo', amount: p.price }], items: [{ name: p.name, qty: 1, price: p.price }], date: hoy });
+      saveData();
+    });
+    await pB.evaluate(() => { const n = document.querySelector('nav button[data-view="historial"]'); if(n && getComputedStyle(n).display !== 'none') n.click(); else document.querySelector('.more-tile[data-go="historial"]').click(); });
+    await pB.waitForTimeout(400); await pB.evaluate(() => { document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')); renderHistorial(); });
+    const hv = await pB.evaluate(() => ({ filas: [...document.querySelectorAll('#histList .hist-row')].map(r => r.innerText), resumen: getComputedStyle(document.getElementById('histSummary')).display, cierre: document.getElementById('closeDayBtn').offsetParent === null ? 'none' : 'visible', graf: getComputedStyle(document.getElementById('chartsToggle')).display }));
+    chk('Empleado: en el historial ve las ventas de hoy y NO la de la semana pasada', hv.filas.length === 2 && !hv.filas.some(t => /99\.000|Chaqueta vieja/.test(t)), hv);
+    chk('…sin totales, gráficas ni cierre de caja', hv.resumen === 'none' && hv.cierre === 'none' && hv.graf === 'none', hv);
+    await pB.evaluate(() => window.ventoVentaFix('borrar', 'v-hoy-1'));
+    chk('Sin clave del dueño puesta, el empleado no puede borrar una venta', await pB.evaluate(() => !!data.history.find(h => h.id === 'v-hoy-1') && !document.querySelector('#vfOv.show')));
+    // El dueño pone la clave de autorización
     await pA.click('#navMoreBtn'); await pA.click('.more-tile[data-go="ajustes"]');
     if(await pA.isVisible('#ajustesBackBtn')) await pA.click('#ajustesBackBtn');
     await pA.click('.ajustes-cat[data-cat="negocio"]');
+    await pA.waitForSelector('#claveAutIn', { timeout: 6000 });
+    await pA.fill('#claveAutIn', '4321'); await pA.click('#claveAutGo');
+    chk('El dueño pone su clave de autorización (guardada cifrada, no en claro)', await esperar(pA, () => { const c = data.permisosEquipo.clave; return c && /^[0-9a-f]{64}$/.test(c.h) && !JSON.stringify(data).includes('"4321"'); }, null, 8000));
+    await pA.evaluate(() => window.ventoNube.subir && window.ventoNube.subir());
+    chk('La clave llega al celular del empleado', await esperar(pB, () => !!(data.permisosEquipo && data.permisosEquipo.clave && data.permisosEquipo.clave.h), null, 25000));
+    // Clave equivocada
+    pB.evaluate(() => window.ventoVentaFix('borrar', 'v-hoy-1')).catch(() => {});
+    await pB.waitForSelector('#vfOv.show #vfClave');
+    await pB.fill('#vfClave', '1111'); await pB.click('#vfSi');
+    chk('Clave equivocada: no borra y avisa', await esperar(pB, () => /Clave equivocada/.test(document.getElementById('vfErr').textContent), null, 5000) && await pB.evaluate(() => !!data.history.find(h => h.id === 'v-hoy-1')));
+    await pB.fill('#vfClave', '4321'); await pB.click('#vfSi');
+    await esperar(pB, () => [...document.querySelectorAll('.overlay.show button')].some(x => /Sí, borrar/.test(x.textContent)), null, 6000);
+    await pB.evaluate(() => { const b = [...document.querySelectorAll('.overlay.show button')].find(x => /Sí, borrar/.test(x.textContent)); if(b) b.click(); });
+    chk('Con la clave del dueño: borra la venta y lo vendido vuelve al inventario', await esperar(pB, () => !data.history.find(h => h.id === 'v-hoy-1') && data.products[0].stock === 12, null, 6000), await pB.evaluate(() => [data.history.map(h => h.id), data.products[0].stock]));
+    // Corregir: de 1 a 3 unidades
+    pB.evaluate(() => window.ventoVentaFix('corregir', 'v-hoy-2')).catch(() => {});
+    await pB.waitForSelector('#vfOv.show #vfClave'); await pB.fill('#vfClave', '4321'); await pB.click('#vfSi');
+    await pB.waitForSelector('#vfOv.show [data-q="0"]');
+    await pB.fill('#vfOv [data-q="0"]', '3'); await pB.click('#vfOv #vfSi');
+    chk('Corregir con la clave: cantidad 1 → 3, total, pago e inventario ajustados y marcada «corregida»', await esperar(pB, () => { const h = data.history.find(x => x.id === 'v-hoy-2'), p = data.products[0];
+      return h && h.items[0].qty === 3 && h.total === p.price * 3 && h.payments[0].amount === h.total && h.corregida && p.stock === 10; }, null, 6000), await pB.evaluate(() => [data.history.find(x => x.id === 'v-hoy-2'), data.products[0].stock]));
+    await pB.evaluate(() => window.ventoActividad.enviar()); await pB.waitForTimeout(1200); await pB.evaluate(() => window.ventoActividad.enviar());
+    chk('Borrar y corregir quedan en la actividad, «autorizado con la clave del dueño»', await (async () => { for(let i = 0; i < 30; i++){ const r = await uno("select count(*)::int n from auditoria a join auth.users u on u.id = a.usuario_id where a.negocio_id = $1 and u.email = 'laura@boutique.co' and a.accion in ('app:venta borrada a mano','app:venta corregida') and a.detalle->>'d' like '%autorizado con la clave%'", [NEG]); if(r.n >= 2) return true; await pB.waitForTimeout(500); } return false; })());
+
+    // El dueño le permite ver el historial completo
     await pA.waitForSelector('#permisosEquipo [data-perm="empleado.historial"]', { timeout: 6000 });
     chk('Dueño: «👥 Permisos del equipo» y «📜 Actividad del equipo» en Ajustes → Negocio', await visible(pA, '#permisosEquipo') && await esperar(pA, () => !!document.getElementById('actividadEquipo'), null, 5000));
     await pA.check('#permisosEquipo [data-perm="empleado.historial"]');
     await pA.waitForTimeout(400);
     await pA.evaluate(() => window.ventoNube.subir && window.ventoNube.subir());
-    chk('El permiso llega al celular del empleado y ya ve el historial (lo demás sigue oculto)', await esperar(pB, () => { const v = s => { const x = document.querySelector(s); return !!x && getComputedStyle(x).display !== 'none'; };
-      return !document.body.classList.contains('no-historial') && (v('.more-tile[data-go="historial"]') || v('nav button[data-view="historial"]')) && document.body.classList.contains('no-estadisticas'); }, null, 25000));
+    chk('El permiso llega al celular del empleado y ya ve el historial completo (lo demás sigue oculto)', await esperar(pB, () => !document.body.classList.contains('hist-hoy') && document.body.classList.contains('no-estadisticas'), null, 25000));
 
     // ===== Actividad: venta, venta borrada, precio cambiado =====
     await pB.evaluate(() => { window.__nubeAplicando = false; data.history.unshift({ id: 'v-prueba-1', table: 1, total: 85000, payments: [{ method: 'efectivo', amount: 85000 }], items: [{ name: 'Blusa', qty: 1, price: 85000 }], date: new Date().toISOString(), by: authUser }); saveData(); });

@@ -32,6 +32,14 @@
 - **El equipo (empleado, cajero, mesero) no ve lo del negocio:** estadísticas, contabilidad, historial, productos,
   inventario ni ajustes. Vende y atiende. El dueño (o el segundo administrador) decide qué más puede hacer cada rol
   en **Ajustes → Negocio → 👥 Permisos del equipo**, y le llega al instante a sus celulares.
+- **Ventas del día para el equipo:** en el Historial el empleado ve solo las ventas de HOY (para revisar si se
+  equivocó), sin totales, gráficas, cierres de caja ni lo de la semana. El historial completo es un permiso aparte.
+- **Corregir, liberar o borrar una venta** (botones en cada venta del Historial): el dueño y el administrador lo hacen
+  directo; el equipo solo con la **🔑 clave de autorización** que el dueño pone en «Permisos del equipo» y que se
+  escribe en el celular del empleado en ese momento (se guarda cifrada; 5 claves malas = 5 minutos de espera).
+  Corregir cambia cantidades o el medio de pago (total e inventario se ajustan); liberar devuelve la venta a su
+  mesa para cobrarla bien; borrar la saca y devuelve lo vendido al inventario. Todo queda en la actividad, con
+  «autorizado con la clave del dueño».
 - **Segundo administrador:** solo lo nombra el dueño. Maneja el negocio, pero no puede nombrar a otro administrador.
 - **📜 Actividad del equipo** (Ajustes → Negocio, SOLO el dueño): cada venta, venta borrada o cambiada, producto
   creado o borrado, cambio de precio, costo, nombre o inventario, lo que se pide o se quita de una cuenta, permisos,
@@ -113,5 +121,5 @@
 - Rutas nuevas: `/soporte-adjunto`, `/soporte-avisar`, `/admin/soporte_imagen`, `/admin/push_guardar`, `/admin/push_clave`.
 
 ## Pruebas
-- `equipoactividad` 22 (nueva), `servidor/admin` 130, `servidor/suscripciones` 154, `adminsubreal` 35, `adminreal` 44, `cuentacliente` 35,
+- `equipoactividad` 32 (nueva), `servidor/admin` 130, `servidor/suscripciones` 154, `adminsubreal` 35, `adminreal` 44, `cuentacliente` 35,
   `puertaytiemporeal` 34, `adminversion` 7, `seguridadqr` 6 (nueva) y el resto de la suite.
