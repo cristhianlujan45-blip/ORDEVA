@@ -182,7 +182,9 @@ public class VentoApp extends Application {
         if (ventana && !bloqueado) VentanaPago.mostrarEncima(app, valor, banco, frase, o, tipo);
         // Bloqueado y con permiso de «encima de otras apps»: se abre también directo (algunos celulares no abren la
         // pantalla completa de la notificación).
-        if (pc != null && VentanaPago.puedeEncima(app)) try { app.startActivity(pc); } catch (Throwable ignorado) { }
+        // Bloqueado: además de la notificación de pantalla completa, se abre la ventana directo (algunos celulares, como
+        // Xiaomi, no abren la pantalla completa de la notificación). Antes solo con el permiso de encima de otras apps.
+        if (pc != null) VentanaPago.abrirPantalla(app, pc);
         prenderPantalla();
     }
 
@@ -1043,8 +1045,14 @@ public class VentoApp extends Application {
         /** {on, encima, completa}: si está prendida, si puede salir encima de otras apps y encima de la pantalla de bloqueo. */
         @JavascriptInterface
         public String ventanaPagoEstado() {
-            try { return new JSONObject().put("on", VentanaPago.prendida(VentoApp.this)).put("encima", VentanaPago.puedeEncima(VentoApp.this))
-                    .put("completa", VentanaPago.puedePantallaCompleta(VentoApp.this)).toString(); } catch (Exception e) { return "{}"; }
+            try {
+                JSONObject o = new JSONObject().put("on", VentanaPago.prendida(VentoApp.this)).put("encima", VentanaPago.puedeEncima(VentoApp.this))
+                        .put("completa", VentanaPago.puedePantallaCompleta(VentoApp.this)).put("xiaomi", VentanaPago.esXiaomi());
+                Boolean fondo = VentanaPago.xiaomiPermiso(VentoApp.this, 10021), bloqueo = VentanaPago.xiaomiPermiso(VentoApp.this, 10020);
+                if (fondo != null) o.put("segundoPlano", fondo);
+                if (bloqueo != null) o.put("bloqueo", bloqueo);
+                return o.toString();
+            } catch (Exception e) { return "{}"; }
         }
 
         // ---------------------------------------------------------------- 🔄 Actualización automática de la app
@@ -1087,6 +1095,7 @@ public class VentoApp extends Application {
                 Context x = ventana != null ? ventana : VentoApp.this;
                 try {
                     Intent i;
+                    if ("xiaomi".equals(cual)) { VentanaPago.abrirPermisosXiaomi(x); return; }
                     if ("completa".equals(cual) && Build.VERSION.SDK_INT >= 34) i = new Intent(android.provider.Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, Uri.parse("package:" + getPackageName()));
                     else i = new Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName()));
                     if (ventana == null) i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);

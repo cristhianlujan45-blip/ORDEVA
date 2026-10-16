@@ -63,7 +63,10 @@ final class VentanaPago {
     static void mostrarEncima(Context c, String valor, String banco, String frase, String texto, String tipo) {
         H.post(() -> {
             try {
-                if (VentoApp.alFrente || !puedeEncima(c)) return;
+                if (VentoApp.alFrente) return;
+                // Sin el permiso «encima de otras apps»: se intenta abrir la ventana como pantalla (en Xiaomi sale si está
+                // «Mostrar ventanas emergentes en segundo plano»). Antes, sin ese permiso, no salía nada.
+                if (!puedeEncima(c)) { abrirPantalla(c, intent(c, valor, banco, frase, texto, tipo)); return; }
                 cerrar();
                 WindowManager wm = (WindowManager) c.getSystemService(Context.WINDOW_SERVICE);
                 final View[] v = {null};
@@ -79,6 +82,41 @@ final class VentanaPago {
                 H.postDelayed(() -> { if (vista == v[0]) fin.run(); }, DURA);
             } catch (Throwable ignorado) { }
         });
+    }
+
+    /** Abre la ventana del pago como pantalla (PagoActivity), sobre la pantalla de bloqueo si está bloqueado. */
+    static void abrirPantalla(Context c, Intent i) { try { c.startActivity(i); } catch (Throwable ignorado) { } }
+
+    // ---------- Xiaomi / Redmi / POCO (MIUI, HyperOS): sus permisos propios ----------
+    // Xiaomi bloquea por su cuenta que una app abra ventanas sola: «Mostrar ventanas emergentes mientras se ejecuta en
+    // segundo plano» (10021) y «Mostrar en pantalla de bloqueo» (10020). Vienen apagados; sin ellos la ventana del pago no
+    // sale aunque Android tenga los otros permisos. Se leen con AppOpsManager (si el celular deja saberlo).
+    static boolean esXiaomi() {
+        String m = (Build.MANUFACTURER + " " + Build.BRAND).toLowerCase(java.util.Locale.ROOT);
+        return m.contains("xiaomi") || m.contains("redmi") || m.contains("poco");
+    }
+    /** true/false, o null si no se sabe (no es Xiaomi o el celular no lo deja ver). */
+    static Boolean xiaomiPermiso(Context c, int op) {
+        if (!esXiaomi()) return null;
+        try {
+            android.app.AppOpsManager ao = (android.app.AppOpsManager) c.getSystemService(Context.APP_OPS_SERVICE);
+            java.lang.reflect.Method m = android.app.AppOpsManager.class.getMethod("checkOpNoThrow", int.class, int.class, String.class);
+            int r = (Integer) m.invoke(ao, op, android.os.Process.myUid(), c.getPackageName());
+            return r == android.app.AppOpsManager.MODE_ALLOWED;
+        } catch (Throwable e) { return null; }
+    }
+    /** Abre «Otros permisos» de Vento en Xiaomi (donde están esos dos). */
+    static boolean abrirPermisosXiaomi(Context c) {
+        String[][] pantallas = {
+                {"com.miui.securitycenter", "com.miui.permcenter.permissions.PermissionsEditorActivity"},
+                {"com.miui.securitycenter", "com.miui.permcenter.permissions.AppPermissionsEditorActivity"}};
+        for (String[] p : pantallas) {
+            try {
+                Intent i = new Intent("miui.intent.action.APP_PERM_EDITOR").setClassName(p[0], p[1]).putExtra("extra_pkgname", c.getPackageName()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                if (c.getPackageManager().resolveActivity(i, 0) != null) { c.startActivity(i); return true; }
+            } catch (Throwable ignorado) { }
+        }
+        try { c.startActivity(new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:" + c.getPackageName())).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); return true; } catch (Throwable e) { return false; }
     }
 
     static void cerrar() { Runnable r = cerrarVista; if (r != null) try { r.run(); } catch (Throwable ignorado) { } }

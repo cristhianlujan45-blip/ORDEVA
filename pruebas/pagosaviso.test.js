@@ -428,6 +428,19 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     });
     chk('24. Falta «encima de otras apps»: aviso «🪟 Permitir» que abre ese permiso', r24.k1 === 'ventana' && /encima de otras apps/.test(r24.b1) && r24.perm[0] === 'encima', r24);
     chk('24. Luego falta el de celular bloqueado (pantalla completa); «Luego» lo deja quieto; con los dos, no sale', r24.k2 === 'ventana' && /celular bloqueado/.test(r24.b2) && r24.k3 === '' && r24.k4 === '', r24);
+    const r24x = await p.evaluate(() => {
+      const A = window.VentoAndroid, ban = () => { const b = document.getElementById('pgSalud'); return b && !b.hidden ? b.innerText : ''; };
+      try{ localStorage.removeItem('vento-ventana-luego'); }catch(e){}
+      window.__vPerm = [];
+      A.ventanaPagoEstado = () => JSON.stringify({ on: true, encima: true, completa: true, xiaomi: true, segundoPlano: false, bloqueo: false });
+      const k = window.ventoPagosSalud(), b = ban();
+      document.querySelector('#pgSalud [data-pgs="vent-xiaomi"]').click();
+      A.ventanaPagoEstado = () => JSON.stringify({ on: true, encima: true, completa: true, xiaomi: true, segundoPlano: true, bloqueo: true });
+      try{ localStorage.removeItem('vento-ventana-luego'); }catch(e){}
+      const k2 = window.ventoPagosSalud();
+      return { k, b, perm: window.__vPerm.slice(), k2 };
+    });
+    chk('24. Xiaomi sin «ventanas en segundo plano» ni «pantalla de bloqueo»: aviso «📱 Abrir permisos» que abre «Otros permisos»; con los dos, no sale', r24x.k === 'ventana' && /Xiaomi/.test(r24x.b) && /segundo plano/.test(r24x.b) && r24x.perm[0] === 'xiaomi' && r24x.k2 === '', r24x);
 
     // 25. 🔄 La app Android se actualiza sola: estado en Ajustes, permiso de Android (una vez) y «Actualizar ahora».
     const r25 = await p.evaluate(() => {

@@ -25516,7 +25516,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-16 · v1.41.3';
+const MESORA_VERSION = '2026-10-16 · v1.41.4';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'Vento · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 /* 🔄 La app Android se actualiza SOLA (Actualizador): revisa cada 3 h, baja la versión nueva y la instala cuando no se
@@ -28874,7 +28874,10 @@ let fotosListas = false;
     const A = window.VentoAndroid; let e = null; try{ e = A && A.ventanaPagoEstado ? JSON.parse(A.ventanaPagoEstado() || '{}') : null; }catch(x){}
     if(!e || !pgVentanaOn()){ box.innerHTML = A && !A.ventanaPagoEstado ? '📲 Para que salga también fuera de Vento y con el celular bloqueado, <a href="' + APK + '" download="vento.apk" rel="noopener">instala la app nueva</a>.' : ''; return; }
     box.innerHTML = (e.encima ? '✅ Sale encima de otras apps.' : '⚠️ Para que salga encima de otras apps: <button type="button" class="btn-ghost" data-vperm="encima" style="padding:4px 10px">🪟 Permitir</button>') + '<br>' +
-      (e.completa ? '✅ Sale con el celular bloqueado.' : '⚠️ Para que salga con el celular bloqueado: <button type="button" class="btn-ghost" data-vperm="completa" style="padding:4px 10px">🔒 Permitir</button>');
+      (e.completa ? '✅ Sale con el celular bloqueado.' : '⚠️ Para que salga con el celular bloqueado: <button type="button" class="btn-ghost" data-vperm="completa" style="padding:4px 10px">🔒 Permitir</button>') +
+      // Xiaomi / Redmi / POCO: dos permisos propios que vienen apagados (sin ellos la ventana no sale).
+      (e.xiaomi ? '<br>' + (e.segundoPlano === true && e.bloqueo === true ? '✅ Xiaomi: ventanas en segundo plano y en la pantalla de bloqueo.' :
+        '⚠️ En Xiaomi activa también <b>«Mostrar ventanas emergentes mientras se ejecuta en segundo plano»</b> y <b>«Mostrar en pantalla de bloqueo»</b>: <button type="button" class="btn-ghost" data-vperm="xiaomi" style="padding:4px 10px">📱 Abrir permisos</button>') : '');
   }
   try{ const A = window.VentoAndroid; if(A && A.ventanaPagoOn) A.ventanaPagoOn(pgVentanaOn()); }catch(e){}
   let pgVentT = null, pgVentTic = null, pgVentN = 0;
@@ -29123,7 +29126,7 @@ let fotosListas = false;
     let faltaVent = '';
     if(!k && e.on && A.ventanaPagoEstado && pgVentanaOn()){
       let v = {}; try{ v = JSON.parse(A.ventanaPagoEstado() || '{}'); }catch(x){}
-      faltaVent = v.encima === false ? 'encima' : v.completa === false ? 'completa' : '';
+      faltaVent = v.encima === false ? 'encima' : v.completa === false ? 'completa' : v.xiaomi && (v.segundoPlano === false || v.bloqueo === false) ? 'xiaomi' : '';
       let luego = 0; try{ luego = Number(localStorage.getItem('vento-ventana-luego')) || 0; }catch(x){}
       if(faltaVent && Date.now() > luego) k = 'ventana';
     }
@@ -29140,7 +29143,7 @@ let fotosListas = false;
         const x = ev.target.closest('[data-pgs]'); if(!x) return;
         const A = AND(), a = x.dataset.pgs;
         if(a === 'cerrar'){ if(b.dataset.k === 'bancos' || b.dataset.k === 'ventana'){ try{ localStorage.setItem(b.dataset.k === 'bancos' ? PG_BAT_LUEGO : 'vento-ventana-luego', String(Date.now() + 3 * 864e5)); }catch(e){} } else pgSaludOculto = Date.now() + 3600e3; b.hidden = true; return; }
-        if(a === 'vent-encima' || a === 'vent-completa'){ try{ A && A.ventanaPagoPermiso(a === 'vent-completa' ? 'completa' : 'encima'); }catch(e){} showToast(a === 'vent-completa' ? 'Activa «Vento» en «Notificaciones de pantalla completa» y vuelve.' : 'Activa «Vento» en «Aparecer encima de otras apps» y vuelve.', 10000); return; }
+        if(a === 'vent-encima' || a === 'vent-completa' || a === 'vent-xiaomi'){ const c = a.slice(5); try{ A && A.ventanaPagoPermiso(c); }catch(e){} showToast(c === 'xiaomi' ? 'En «Otros permisos» activa «Mostrar ventanas emergentes mientras se ejecuta en segundo plano» y «Mostrar en pantalla de bloqueo», y vuelve.' : c === 'completa' ? 'Activa «Vento» en «Notificaciones de pantalla completa» y vuelve.' : 'Activa «Vento» en «Aparecer encima de otras apps» y vuelve.', 12000); return; }
         if(a === 'permiso' || a === 'reconectar'){ try{ A && A.mediosPermiso(); }catch(e){} if(a === 'reconectar') showToast('En la pantalla que se abre, APAGA «Vento» y vuélvelo a PRENDER. Luego regresa.', 10000); }
       });
       document.body.appendChild(b);
@@ -29149,10 +29152,11 @@ let fotosListas = false;
       vieja: '📲 <b>Instala la app Vento nueva una última vez</b>: desde esa versión se actualiza sola, sin instalar a mano.',
       permiso: '⚠️ <b>Los pagos no van a sonar:</b> Vento no tiene el permiso «Acceso a notificaciones» en este celular.',
       desconectada: '⚠️ <b>Los pagos no van a sonar:</b> Android desconectó la lectura de avisos de Vento.',
-      ventana: '🪟 <b>Para que la ventana con el valor de cada pago salga ' + (faltaVent === 'completa' ? 'con el celular bloqueado' : 'encima de otras apps') + '</b>, dale a Vento un permiso.',
+      ventana: faltaVent === 'xiaomi' ? '🪟 <b>Para que la ventana con el valor de cada pago se abra sola</b>, en Xiaomi activa «Mostrar ventanas emergentes mientras se ejecuta en segundo plano» y «Mostrar en pantalla de bloqueo».'
+        : '🪟 <b>Para que la ventana con el valor de cada pago salga ' + (faltaVent === 'completa' ? 'con el celular bloqueado' : 'encima de otras apps') + '</b>, dale a Vento un permiso.',
       bancos: '🔋 <b>' + (lentos || []).map(b => escp(b.nombre)).join(' y ') + '</b> ' + ((lentos || []).length > 1 ? 'tienen' : 'tiene') + ' ahorro de batería: Android puede retrasar sus avisos de pago. Elige <b>Sin restricciones</b>.'
     }[k];
-    const btn = k === 'ventana' ? '<button type="button" data-pgs="vent-' + (faltaVent || 'encima') + '" style="background:#fff;color:#7a1f1f;border:0;border-radius:10px;padding:7px 12px;font-weight:800">🪟 Permitir</button>'
+    const btn = k === 'ventana' ? '<button type="button" data-pgs="vent-' + (faltaVent || 'encima') + '" style="background:#fff;color:#7a1f1f;border:0;border-radius:10px;padding:7px 12px;font-weight:800">' + (faltaVent === 'xiaomi' ? '📱 Abrir permisos' : '🪟 Permitir') + '</button>'
       : k === 'bancos' ? '<button type="button" data-banco="' + escp((lentos || [])[0] ? lentos[0].pkg : '') + '" style="background:#fff;color:#7a1f1f;border:0;border-radius:10px;padding:7px 12px;font-weight:800">🔋 Arreglar ' + escp((lentos || [])[0] ? lentos[0].nombre : '') + '</button>'
       : k === 'vieja' ? '<a href="' + PG_APK + '" download="vento.apk" rel="noopener" style="background:#fff;color:#7a1f1f;border-radius:10px;padding:7px 12px;font-weight:800;text-decoration:none">⬇️ Instalar la nueva</a>'
       : '<button type="button" data-pgs="' + (k === 'permiso' ? 'permiso' : 'reconectar') + '" style="background:#fff;color:#7a1f1f;border:0;border-radius:10px;padding:7px 12px;font-weight:800">' + (k === 'permiso' ? '🔓 Dar el permiso' : '🔄 Reconectar') + '</button>';
@@ -29385,7 +29389,7 @@ let fotosListas = false;
       pgVentana({ monto: 20000, app: 'Nequi', de: 'Ana Ruiz', txt: 'Prueba de Vento', nivel: 'app' });
       const A = window.VentoAndroid; if(A && A.ventanaPagoProbar){ try{ A.ventanaPagoProbar(); showToast('▶ En 3 s sale también fuera de Vento: sal a la pantalla de inicio o bloquea el celular para verla.', 7000); }catch(e){} }
     };
-    $p('pgVentPerm').addEventListener('click', e => { const b = e.target.closest('[data-vperm]'); if(!b) return; try{ window.VentoAndroid.ventanaPagoPermiso(b.dataset.vperm); }catch(x){} showToast(b.dataset.vperm === 'completa' ? 'Activa «Vento» (Permitir notificaciones de pantalla completa) y vuelve.' : 'Activa «Vento» (Permitir aparecer encima de otras apps) y vuelve.', 9000); });
+    $p('pgVentPerm').addEventListener('click', e => { const b = e.target.closest('[data-vperm]'); if(!b) return; try{ window.VentoAndroid.ventanaPagoPermiso(b.dataset.vperm); }catch(x){} showToast(b.dataset.vperm === 'xiaomi' ? 'En «Otros permisos» activa «Mostrar ventanas emergentes mientras se ejecuta en segundo plano» y «Mostrar en pantalla de bloqueo», y vuelve.' : b.dataset.vperm === 'completa' ? 'Activa «Vento» (Permitir notificaciones de pantalla completa) y vuelve.' : 'Activa «Vento» (Permitir aparecer encima de otras apps) y vuelve.', 9000); });
     const on = $p('pgOn');
     on.onchange = () => {
       PG().on = on.checked; saveData();
