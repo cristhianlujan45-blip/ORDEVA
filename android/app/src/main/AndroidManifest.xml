@@ -22,6 +22,11 @@
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
     <queries>
+        <!-- Las apps de los bancos: para ver si tienen ahorro de batería (retrasa sus avisos de pago) y abrir su ajuste -->
+        <package android:name="com.davivienda.daviplataapp" />
+        <package android:name="com.nequi.MobileApp" />
+        <package android:name="com.todo1.mobile" />
+        <package android:name="com.davivienda.daviviendaapp" />
         <intent><action android:name="android.speech.RecognitionService" /></intent>
         <intent><action android:name="android.intent.action.TTS_SERVICE" /></intent>
         <intent><action android:name="android.media.action.IMAGE_CAPTURE" /></intent>

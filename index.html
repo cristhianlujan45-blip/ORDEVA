@@ -25514,7 +25514,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-16 · v1.40.5';
+const MESORA_VERSION = '2026-10-16 · v1.40.6';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'Vento · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 // Si el navegador (o el celular, con la app agregada a la pantalla de inicio) se quedó con
@@ -28895,6 +28895,23 @@ let fotosListas = false;
   //  • si falta el permiso, Android desconectó la lectura o la app es vieja, sale un aviso fijo con el botón para arreglarlo.
   // (En el celular de un mesero o empleado no se prende sola: leería los avisos de su banco personal.)
   const PG_APK = 'https://github.com/cristhianlujan45-blip/cuentas/releases/latest/download/vento.apk';
+  // 🔋 DaviPlata y Nequi con ahorro de batería («Optimizada»): Android retrasa SUS avisos de pago (llegan tarde o al
+  // prender la pantalla) y Vento los dice tarde. Vento revisa cada app del banco instalada y abre su ajuste para elegir
+  // «Sin restricciones». (Ninguna app puede cambiar eso por otra: lo elige el dueño con un toque.)
+  const PG_BAT_LUEGO = 'vento-bancos-bat-luego';
+  function pgBancosBat(){ const A = AND(); if(!A || !A.bancosBateria) return []; try{ const l = JSON.parse(A.bancosBateria() || '[]'); return Array.isArray(l) ? l : []; }catch(e){ return []; } }
+  function pgBancoArreglar(pkg){
+    const A = AND(), b = pgBancosBat().find(x => x.pkg === pkg); if(!A || !A.bancoAjustes || !b) return;
+    A.bancoAjustes(pkg);
+    showToast('En los ajustes de ' + b.nombre + ': toca «Batería» (o «Uso de batería» / «Ahorro de batería») y elige «Sin restricciones». Revisa también que «Notificaciones» esté prendido. Luego vuelve con atrás.', 14000);
+  }
+  window.ventoBancoArreglar = pgBancoArreglar;
+  function pgBancosHtml(){
+    const l = pgBancosBat(); if(!l.length) return '';
+    return '<div class="pg-bancos-bat" style="margin-top:8px"><b>🔋 Que DaviPlata y Nequi avisen al instante</b><div style="opacity:.85;margin:2px 0 4px">Con ahorro de batería, Android retrasa los avisos de pago de esas apps. Elige <b>Sin restricciones</b> en cada una.</div>' +
+      l.map(b => '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:4px 0">' + (b.sinRestriccion ? '✅ <b>' + escp(b.nombre) + '</b>: sin restricciones' : '⚠️ <b>' + escp(b.nombre) + '</b>: con ahorro de batería <button type="button" class="btn-ghost" data-banco="' + escp(b.pkg) + '" style="padding:5px 10px">🔋 Arreglar ' + escp(b.nombre) + '</button>') + '</div>').join('') + '</div>';
+  }
+  document.addEventListener('click', ev => { const x = ev.target.closest && ev.target.closest('[data-banco]'); if(x) pgBancoArreglar(x.dataset.banco); });
   let pgSinVivo = 0, pgSaludOculto = 0;
   const pgSaludRep = {};
   function pgSaludReportar(k, msg){
@@ -28917,10 +28934,17 @@ let fotosListas = false;
     if(k === 'permiso') pgSaludReportar('permiso', 'La app no tiene el permiso «Acceso a notificaciones»: los pagos no suenan');
     if(k === 'desconectada') pgSaludReportar('desconectada', 'Android desconectó la lectura de avisos de pago');
     if(k === 'vieja') pgSaludReportar('vieja', 'App Android vieja: no pasa a la página los avisos que no entiende');
-    pgSaludPintar(Date.now() < pgSaludOculto ? '' : k);
+    // Lo último: apps de banco con ahorro de batería (se puede dejar para «Luego»: 3 días).
+    let lentos = [];
+    if(!k && e.on){
+      lentos = pgBancosBat().filter(b => !b.sinRestriccion);
+      let luego = 0; try{ luego = Number(localStorage.getItem(PG_BAT_LUEGO)) || 0; }catch(x){}
+      if(lentos.length){ pgSaludReportar('bateria-banco', 'Apps de banco con ahorro de batería (avisos de pago retrasados): ' + lentos.map(b => b.nombre).join(', ')); if(Date.now() > luego) k = 'bancos'; }
+    }
+    pgSaludPintar(Date.now() < pgSaludOculto ? '' : k, lentos);
     return k;
   }
-  function pgSaludPintar(k){
+  function pgSaludPintar(k, lentos){
     let b = document.getElementById('pgSalud');
     if(!k){ if(b) b.hidden = true; return; }
     if(!b){
@@ -28929,7 +28953,7 @@ let fotosListas = false;
       b.addEventListener('click', ev => {
         const x = ev.target.closest('[data-pgs]'); if(!x) return;
         const A = AND(), a = x.dataset.pgs;
-        if(a === 'cerrar'){ pgSaludOculto = Date.now() + 3600e3; b.hidden = true; return; }
+        if(a === 'cerrar'){ if(b.dataset.k === 'bancos'){ try{ localStorage.setItem(PG_BAT_LUEGO, String(Date.now() + 3 * 864e5)); }catch(e){} } else pgSaludOculto = Date.now() + 3600e3; b.hidden = true; return; }
         if(a === 'permiso' || a === 'reconectar'){ try{ A && A.mediosPermiso(); }catch(e){} if(a === 'reconectar') showToast('En la pantalla que se abre, APAGA «Vento» y vuélvelo a PRENDER. Luego regresa.', 10000); }
       });
       document.body.appendChild(b);
@@ -28937,9 +28961,11 @@ let fotosListas = false;
     const txt = {
       vieja: '📲 <b>Actualiza la app Vento</b> para que los pagos de Nequi, DaviPlata y Bre-B suenen siempre.',
       permiso: '⚠️ <b>Los pagos no van a sonar:</b> Vento no tiene el permiso «Acceso a notificaciones» en este celular.',
-      desconectada: '⚠️ <b>Los pagos no van a sonar:</b> Android desconectó la lectura de avisos de Vento.'
+      desconectada: '⚠️ <b>Los pagos no van a sonar:</b> Android desconectó la lectura de avisos de Vento.',
+      bancos: '🔋 <b>' + (lentos || []).map(b => escp(b.nombre)).join(' y ') + '</b> ' + ((lentos || []).length > 1 ? 'tienen' : 'tiene') + ' ahorro de batería: Android puede retrasar sus avisos de pago. Elige <b>Sin restricciones</b>.'
     }[k];
-    const btn = k === 'vieja' ? '<a href="' + PG_APK + '" download="vento.apk" rel="noopener" style="background:#fff;color:#7a1f1f;border-radius:10px;padding:7px 12px;font-weight:800;text-decoration:none">⬇️ Instalar la nueva</a>'
+    const btn = k === 'bancos' ? '<button type="button" data-banco="' + escp((lentos || [])[0] ? lentos[0].pkg : '') + '" style="background:#fff;color:#7a1f1f;border:0;border-radius:10px;padding:7px 12px;font-weight:800">🔋 Arreglar ' + escp((lentos || [])[0] ? lentos[0].nombre : '') + '</button>'
+      : k === 'vieja' ? '<a href="' + PG_APK + '" download="vento.apk" rel="noopener" style="background:#fff;color:#7a1f1f;border-radius:10px;padding:7px 12px;font-weight:800;text-decoration:none">⬇️ Instalar la nueva</a>'
       : '<button type="button" data-pgs="' + (k === 'permiso' ? 'permiso' : 'reconectar') + '" style="background:#fff;color:#7a1f1f;border:0;border-radius:10px;padding:7px 12px;font-weight:800">' + (k === 'permiso' ? '🔓 Dar el permiso' : '🔄 Reconectar') + '</button>';
     b.innerHTML = '<div>' + txt + '</div><div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">' + btn + '<button type="button" data-pgs="cerrar" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,.6);border-radius:10px;padding:6px 10px">Luego</button></div>';
     b.dataset.k = k; b.hidden = false;
@@ -29061,7 +29087,7 @@ let fotosListas = false;
           ok(!!A, A ? 'Listo' : window.ventoAppVieja && window.ventoAppVieja() ? 'App vieja: actualízala' : window.ventoAppSinPuente && window.ventoAppSinPuente() ? 'Ábrela de nuevo' : android ? 'Estás en Vento Web' : 'Hazlo en el Android')) +
         paso(2, 'Prende «Recibir avisos de pagos»', 'Vento empieza a escuchar los avisos de plata que te llegan.' + (g.on && (!A || e.on) ? '' : '<br><button type="button" class="btn-primary gp-btn" data-gp="prender">Prender ahora</button>'), ok(g.on && (!A || e.on), g.on && (!A || e.on) ? 'Prendido' : 'Apagado')) +
         paso(3, 'Dale a Vento el permiso «Acceso a notificaciones»', 'Se abre una pantalla del celular: busca <b>Vento</b> en la lista, actívalo y toca <b>Permitir</b>. Luego vuelve con el botón de atrás. Vento solo toma los avisos de <b>plata recibida</b>: nunca códigos, claves ni compras.' + (A && !e.permiso ? '<br><button type="button" class="btn-primary gp-btn" data-gp="permiso">Abrir el permiso</button>' : ''), A ? ok(!!e.permiso, e.permiso ? 'Permiso dado' : 'Falta el permiso') : '') +
-        paso(4, 'Deja prendidas las notificaciones de DaviPlata', 'En el celular: <b>Ajustes → Aplicaciones → DaviPlata → Notificaciones → Permitir</b> (todas). Abre DaviPlata una vez y entra con tu clave para que quede activa. Haz lo mismo con <b>Nequi</b> si también la usas. <b>¿Tu banco te avisa por SMS?</b> La app también lee esos mensajes de texto (con el mismo permiso): mira «📩 Confirmar también los SMS del banco» en Ajustes → 💜 Pagos.', '') +
+        paso(4, 'Deja prendidas las notificaciones de DaviPlata (y sin ahorro de batería)', 'En el celular: <b>Ajustes → Aplicaciones → DaviPlata → Notificaciones → Permitir</b> (todas). Abre DaviPlata una vez y entra con tu clave para que quede activa. Haz lo mismo con <b>Nequi</b> si también la usas.' + (A ? pgBancosHtml() : '') + ' <b>¿Tu banco te avisa por SMS?</b> La app también lee esos mensajes de texto (con el mismo permiso): mira «📩 Confirmar también los SMS del banco» en Ajustes → 💜 Pagos.', '') +
         paso(5, 'Que suene siempre: con la pantalla bloqueada o Vento cerrada', 'Así «Pago confirmado» suena aunque el celular esté bloqueado o no hayas abierto Vento.' +
           (A && perm.bateria === false ? '<br><b>1.</b> <button type="button" class="btn-primary gp-btn" data-gp="bateria">⚡ Quitar el ahorro de batería</button> (elige <b>Sin restricciones</b> / <b>Permitir</b>)' : A ? '<br>✅ Sin ahorro de batería.' : '') +
           (A && A.abrirInicioAutomatico ? '<br><b>' + (perm.bateria === false ? '2.' : '') + '</b> <button type="button" class="btn-ghost gp-btn" data-gp="autoinicio">🚀 Permitir «Inicio automático»</button>' + (pgMarca() ? ' <small>(' + escp(pgMarca()) + ')</small>' : '') : '') +
@@ -29209,7 +29235,7 @@ let fotosListas = false;
     const traza = tr.length ? '<details style="margin-top:6px"><summary style="cursor:pointer;font-weight:700">📋 Últimos avisos del banco y qué hizo Vento (' + tr.length + ')</summary>' +
       tr.slice().reverse().map(x => '<div style="padding:5px 0;border-top:1px solid var(--line)"><b>' + escp(x.r) + '</b><br><small style="opacity:.8">' + escp(x.app) + ' · ' + new Date(+x.t).toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' · ' + escp(x.txt) + '</small></div>').join('') + '</details>' : '';
     const abiertos = [...box.querySelectorAll('details')].map(d => d.open);   // lo que estaba abierto sigue abierto
-    box.innerHTML = prueba + traza + (ult ? '<div style="opacity:.8">📨 Último aviso de un banco en este celular: ' + new Date(ult).toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + '</div>' : '') +
+    box.innerHTML = pgBancosHtml() + prueba + traza + (ult ? '<div style="opacity:.8">📨 Último aviso de un banco en este celular: ' + new Date(ult).toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + '</div>' : '') +
       (l.length ? '<details style="margin-top:6px"><summary style="cursor:pointer;font-weight:700">🔎 Avisos del banco que Vento no tomó como pago (' + l.length + ')</summary>' +
         '<div style="opacity:.85;margin:4px 0">Sin nombres ni valores. Ya los mandamos a Vento para aprender ese formato. Si uno de estos era un pago, revísalo en la app del banco.</div>' +
         l.slice().reverse().map(x => '<div style="padding:5px 0;border-top:1px solid var(--line)"><b>' + escp(x.app) + '</b> · ' + escp(x.motivo || '') + '<br><small style="opacity:.8">' + escp(x.txt) + '</small></div>').join('') + '</details>' : '');

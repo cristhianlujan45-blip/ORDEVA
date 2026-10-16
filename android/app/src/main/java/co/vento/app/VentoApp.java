@@ -955,6 +955,37 @@ public class VentoApp extends Application {
         @JavascriptInterface
         public int pagosLectura() { return 2; }
 
+        /** Las apps de bancos instaladas y si tienen ahorro de batería: [{pkg, nombre, sinRestriccion}]. Con ahorro de
+         *  batería («Optimizada»), Android retrasa sus avisos de pago y Vento los dice tarde (o cuando se prende la pantalla). */
+        @JavascriptInterface
+        public String bancosBateria() {
+            JSONArray l = new JSONArray();
+            try {
+                android.os.PowerManager pw = (android.os.PowerManager) getSystemService(POWER_SERVICE);
+                for (String[] o : AvisoPago.OFICIALES) {
+                    try { getPackageManager().getApplicationInfo(o[0], 0); } catch (Exception noEsta) { continue; }
+                    boolean libre = Build.VERSION.SDK_INT < 23 || (pw != null && pw.isIgnoringBatteryOptimizations(o[0]));
+                    l.put(new JSONObject().put("pkg", o[0]).put("nombre", o[1]).put("sinRestriccion", libre));
+                }
+            } catch (Exception ignorado) { }
+            return l.toString();
+        }
+
+        /** Abre los ajustes de la app de ese banco (solo las de la lista oficial): ahí se elige Batería → Sin restricciones. */
+        @JavascriptInterface
+        public boolean bancoAjustes(String pkg) {
+            if (!AvisoPago.paqueteOficial(pkg)) return false;
+            ui.post(() -> {
+                Context x = ventana != null ? ventana : VentoApp.this;
+                try {
+                    Intent i = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + pkg));
+                    if (ventana == null) i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    x.startActivity(i);
+                } catch (Exception ignorado) { }
+            });
+            return true;
+        }
+
         /** Avisos de banco que hablaban de plata pero no se tomaron como pago (sin datos), para revisarlos. */
         @JavascriptInterface
         public String pagosAvisosDiag() { return VentoEscucha.diag(getSharedPreferences("vento", MODE_PRIVATE)); }

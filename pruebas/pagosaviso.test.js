@@ -18,6 +18,7 @@
 // 14. Bre-B (de otros bancos por la llave) y Nequi con «¿…?» en el aviso: suenan. Solicitudes («te pidió») no.
 // 15. Paso 5 «Que suene siempre»: ahorro de batería, «🚀 Inicio automático» y los pasos de la marca (Xiaomi).
 // 19. Avisos «crudos» (la app no los entendió): la página los revisa y, si son pago, los dice.
+// 21. DaviPlata y Nequi con ahorro de batería → aviso fijo y botón que abre su ajuste («Sin restricciones»).
 // 20. Lectura apagada al reinstalar → se prende sola; sin permiso / desconectada / app vieja → aviso fijo para arreglarlo.
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
@@ -304,6 +305,43 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     chk('20. Android desconectó la lectura (dos revisiones seguidas): «🔄 Reconectar»', r20.k4 === 'desconectada' && /Reconectar/.test(r20.b4), r20);
     chk('20. Si el dueño la apagó a propósito, no se prende sola', r20.k5 === '' && r20.siguioApagada, r20);
     chk('20. En el celular de un mesero no se prende sola ni sale el aviso', r20.k6 === '' && !r20.mesero.on && !r20.mesero.ban && !r20.fin, r20);
+
+    // 21. 🔋 DaviPlata y Nequi con ahorro de batería: Android retrasa sus avisos de pago. Vento lo detecta, lo dice con un
+    //     aviso fijo y abre el ajuste de esa app para elegir «Sin restricciones».
+    const r21 = await p.evaluate(async () => {
+      const A = window.VentoAndroid, S = window.__and, ban = () => { const b = document.getElementById('pgSalud'); return b && !b.hidden ? b.innerText : ''; };
+      try{ localStorage.removeItem('vento-bancos-bat-luego'); }catch(e){}
+      S.on = true; S.permiso = true; S.vivo = true; A.pagosLectura = () => 2;
+      A.pagosAvisosEstado = () => JSON.stringify({ on: S.on, permiso: S.permiso, vivo: S.vivo });
+      S.bancos = [{ pkg: 'com.davivienda.daviplataapp', nombre: 'DaviPlata', sinRestriccion: false }, { pkg: 'com.nequi.MobileApp', nombre: 'Nequi', sinRestriccion: false }];
+      S.abiertos = [];
+      A.bancosBateria = () => JSON.stringify(S.bancos);
+      A.bancoAjustes = pkg => { S.abiertos.push(pkg); return true; };
+      window.__toasts = [];
+      const k1 = window.ventoPagosSalud(), b1 = ban();
+      document.querySelector('#pgSalud [data-banco]').click();
+      const abrio = S.abiertos.slice(), toast = window.__toasts.find(t => /Sin restricciones/.test(t)) || '';
+      // Volvió de los ajustes: DaviPlata ya quedó sin restricciones → el aviso ahora pide arreglar Nequi
+      S.bancos[0].sinRestriccion = true;
+      const k2 = window.ventoPagosSalud(), b2 = ban();
+      // «Luego»: no vuelve a salir (3 días)
+      document.querySelector('#pgSalud [data-pgs="cerrar"]').click();
+      const k3 = window.ventoPagosSalud(), b3 = ban();
+      // Ajustes → Pagos y el paso a paso muestran cada app con su estado y el botón
+      window.ventoPagosDiag();
+      const diag = (document.getElementById('pgDiag') || {}).innerText || '';
+      await window.ventoPagosGuia(); await new Promise(r => setTimeout(r, 300));
+      const guia = document.getElementById('pgGuiaOv').innerText;
+      document.getElementById('pgGuiaOv').classList.remove('show');
+      S.bancos[1].sinRestriccion = true; window.ventoPagosSalud();
+      try{ localStorage.removeItem('vento-bancos-bat-luego'); }catch(e){}
+      return { k1, b1, abrio, toast, k2, b2, k3, b3, diag, guia, fin: ban() };
+    });
+    chk('21. DaviPlata y Nequi con ahorro de batería: aviso fijo «tienen ahorro de batería… Sin restricciones»', r21.k1 === 'bancos' && /DaviPlata y Nequi/.test(r21.b1) && /ahorro de batería/.test(r21.b1) && /Arreglar DaviPlata/.test(r21.b1), r21);
+    chk('21. «🔋 Arreglar DaviPlata» abre el ajuste de DaviPlata y explica Batería → Sin restricciones', r21.abrio[0] === 'com.davivienda.daviplataapp' && /Batería/.test(r21.toast), r21);
+    chk('21. Al volver con DaviPlata arreglada, el aviso pasa a Nequi', r21.k2 === 'bancos' && /Nequi/.test(r21.b2) && !/DaviPlata/.test(r21.b2), r21);
+    chk('21. «Luego» lo deja quieto (no vuelve a salir enseguida)', r21.k3 === '' && !r21.b3, r21);
+    chk('21. Ajustes → Pagos y el paso a paso muestran cada app: ✅ sin restricciones / ⚠️ con ahorro', /DaviPlata: sin restricciones/.test(r21.diag) && /Nequi: con ahorro de batería/.test(r21.diag) && /Que DaviPlata y Nequi avisen al instante/.test(r21.guia), r21);
 
     // 11. Navegador (sin la app): la voz sale con el volumen elegido (hasta 100 %)
     const ctx2 = await b.newContext({ viewport: { width: 1200, height: 900 } });
