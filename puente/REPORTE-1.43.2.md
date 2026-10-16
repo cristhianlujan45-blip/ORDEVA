@@ -53,13 +53,33 @@ Redmi y otros) lo bloquean. El error quedaba escondido en Ajustes y el aviso seg
   instala, se baja `vento.apk` una vez desde la página de descargas. Desde ahí, las siguientes ya abren la pantalla
   «¿Actualizar?».
 
+## 4. 🍺 Los pedidos de la gente, en la campanita
+El dueño: «En el panel de notificaciones, donde dice pedidos, ahí tienen que mostrarme los pedidos que va montando la
+gente por la aplicación».
+
+**Por qué no salían:** la campanita armaba su lista con una copia guardada solo en el celular que recibió cada pedido.
+En los otros celulares, o si el pedido entraba por otro camino, decía «Todavía no hay pedidos».
+
+**Ahora** lee la lista de pedidos del negocio, que es la misma en todos los equipos: la llena la app de los clientes,
+el QR de la mesa, los meseros y WhatsApp. Muestra:
+- **Por enviar:** los que esperan que los aceptes, con «✅ Enviar pedido» y «❌ Rechazar».
+- **En curso:** recibidos, en preparación y listos. Cada uno con la mesa, lo que pidió, la nota y de dónde llegó (📱 App,
+  💬 WhatsApp, 🧑‍🍳 Mesero).
+- **Pedidos de hoy:** entregados y cancelados.
+
+Al tocar un pedido se abre la cuenta de esa mesa. El número de la campanita cuenta los pedidos por enviar y en curso,
+además de los avisos de Vento.
+
 ## Pruebas
-- `herramientas` (nueva): 17 comprobaciones.
+- `herramientas` (nueva): 24 comprobaciones.
   - Herramientas por tipo: bar, arepería, barbería, hotel, tienda, minimercado.
   - Las de «Tienda Vito» sin tipo, y las de una cervecería sin tipo.
   - «Fiados» abre la libreta.
   - «Mostrar todas las funciones».
   - Avisos en la campanita: prueba gratis y aviso de pagos de primero; el número sube y baja; tocar un botón la cierra.
+  - Pedidos en la campanita: sin pedidos lo dice; un pedido de la app sale en curso con mesa, productos, nota y
+    «📱 App» y se cuenta; uno que llegó a otro celular sale «Por enviar»; «Enviar pedido» lo suma a la cuenta; el
+    entregado queda en «Pedidos de hoy»; tocarlo abre la cuenta.
 - `subbarra` (16), `suscripnube` (67) y `flujocompleto` ahora abren la campanita para ver el aviso del plan.
 - Compila todo el código Android (con `android-all`).
 - Suite completa.

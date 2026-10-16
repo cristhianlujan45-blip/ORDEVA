@@ -20584,7 +20584,18 @@ bootApp();
   const CKEY='vito_cola';
   const NKEY='vito_notif_cfg';
   const LKEY='vito_notif_log';
-  const getPendList=()=>{try{return JSON.parse(localStorage.getItem(PKEY))||[]}catch(e){return[]}};
+  // Los pedidos por aceptar salen de la lista de pedidos del negocio (la misma en todos los equipos: la que llena la app
+  // de los clientes, el QR, los meseros y WhatsApp). Antes salían de una copia de ESTE celular: en los otros no se veían.
+  const getPendList=()=>{
+    try{ const P=window.vitoPedidos; if(P) return P.lista().filter(x=>x.estado==='nuevo').map(x=>({id:x.id,mesa:x.mesa,ts:x.at||x.recibidoEn,items:(x.items||[]).map(i=>({productText:i.name,qty:i.qty}))})); }catch(e){}
+    try{return JSON.parse(localStorage.getItem(PKEY))||[]}catch(e){return[]}
+  };
+  // Pedidos de hoy y los que siguen en curso (más nuevos primero).
+  const pedidosPanel=()=>{
+    try{ const P=window.vitoPedidos; if(!P) return null;
+      const d0=new Date(); d0.setHours(0,0,0,0);
+      return P.lista().filter(x=>['nuevo','recibido','preparacion','listo'].includes(x.estado)||(x.recibidoEn||x.at||0)>=d0.getTime()).slice(-80).reverse(); }catch(e){ return null; }
+  };
   const setPendList=l=>{try{localStorage.setItem(PKEY,JSON.stringify(l));}catch(e){}};
   const getSongList=()=>{try{return (JSON.parse(localStorage.getItem(CKEY))||[]).filter(x=>!x.done&&!x.fondo)}catch(e){return[]}};   // la música de fondo (tu playlist) no es un pedido: no suena la campana
   const getCfg=()=>{try{return Object.assign({voz:true,volumen:1},JSON.parse(localStorage.getItem(NKEY))||{})}catch(e){return{voz:true,volumen:1}}};
@@ -20866,7 +20877,7 @@ bootApp();
     return d.toDateString()===hoy.toDateString()?h:d.toLocaleDateString('es-CO',{day:'numeric',month:'short'})+' '+h;
   }
   function leerLog(){ try{ return window.vitoLeerLog?window.vitoLeerLog():[]; }catch(e){ return []; } }
-  function firmaPanel(){ const l=leerLog(); return getPendList().map(x=>x.id).join(',')+'|'+(l[0]?l[0].id:'')+'|'+l.length; }
+  function firmaPanel(){ const l=leerLog(), pd=pedidosPanel(); return getPendList().map(x=>x.id).join(',')+'|'+(l[0]?l[0].id:'')+'|'+l.length+'|'+(pd?pd.map(x=>x.id+':'+x.estado).join(','):''); }
   function refrescarPanel(){
     if(!menu || menu.style.display!=='flex') return;
     if(firmaPanel()===panelSig) return;
@@ -20909,6 +20920,30 @@ bootApp();
         acts.append(bOk,bNo); (f.querySelector('.vito-np-cont')||f).appendChild(acts);
         panelBody.appendChild(f);
       });
+    }
+    // 🍺 Los pedidos que hace la gente (app de los clientes, QR, meseros, WhatsApp): en curso y los de hoy, con su estado.
+    const pd=pedidosPanel();
+    if(pd){
+      const ORI={qr:'📱 App',whatsapp:'💬 WhatsApp',mesero:'🧑‍🍳 Mesero',voz:'🎙️ Voz'};
+      const curso=pd.filter(x=>['recibido','preparacion','listo'].includes(x.estado)), hechos=pd.filter(x=>['entregado','cancelado'].includes(x.estado));
+      const filaPed=x=>{
+        const est=(window.vitoPedidos.EST||{})[x.estado]||x.estado;
+        const f=fila(x.estado==='cancelado'?'rechazado':'enviado',(x.estado==='listo'?'✅ ':x.estado==='cancelado'?'❌ ':x.estado==='entregado'?'🍽️ ':'🍺 ')+'Pedido '+est.toLowerCase()+' · '+(x.mesaNombre||('Mesa '+x.mesa)),
+          fmtHora(x.recibidoEn||x.at), (x.items||[]).map(i=>i.qty+' '+i.name+(i.ok===false?' ⚠️':'')).join(', ')+(x.nota?' · 📝 '+x.nota:'')+(ORI[x.origen]?' · '+ORI[x.origen]:''));
+        f.dataset.pedido=x.id; f.style.cursor='pointer'; f.title='Abrir la cuenta';
+        f.onclick=ev=>{ if(ev.target.closest('button')) return; menu.style.display='none'; try{ openTableModal(x.mesa); }catch(e){} };
+        return f;
+      };
+      if(curso.length){ panelBody.appendChild(sec('En curso ('+curso.length+')')); curso.forEach(x=>panelBody.appendChild(filaPed(x))); }
+      panelBody.appendChild(sec('Pedidos de hoy'));
+      if(!hechos.length && !curso.length && !pend.length){
+        const v=document.createElement('div'); v.className='vito-np-vacio'; v.textContent='Todavía no hay pedidos. Aquí salen los que hace la gente desde la app, el QR de la mesa o los meseros.';
+        panelBody.appendChild(v);
+      } else if(!hechos.length){
+        const v=document.createElement('div'); v.className='vito-np-vacio'; v.textContent='Todavía no se ha entregado ningún pedido hoy.';
+        panelBody.appendChild(v);
+      } else hechos.forEach(x=>panelBody.appendChild(filaPed(x)));
+      return;
     }
     panelBody.appendChild(sec('Historial'));
     if(!log.length){
@@ -20956,7 +20991,8 @@ bootApp();
   function check(){
     const pendList=getPendList(), songList=getSongList();
     const nAv=avisosVento(); avisosN=nAv;
-    const total=pendList.length+songList.length+nAv;
+    let nCurso=0; try{ const pd=pedidosPanel(); if(pd) nCurso=pd.filter(x=>['recibido','preparacion'].includes(x.estado)).length; }catch(e){}
+    const total=pendList.length+nCurso+songList.length+nAv;
     sincronizarTarjetas(pendList);
     refrescarPanel();
     if(total>0){

@@ -59,5 +59,28 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
  await p.evaluate(()=>{ document.getElementById('pgSalud').hidden=true; }); await p.waitForTimeout(1300);
  chk('Cuando el aviso se resuelve, sale de la cuenta de la campanita', (await p.textContent('.vito-campana-badge'))==='1');
 
+ // ---------- Los pedidos de la gente en la campanita ----------
+ await p.evaluate(()=>{ document.querySelector('.vito-campana-menu').style.display='none'; data.products=[{id:'ag',name:'Águila',price:4000},{id:'pa',name:'Papas',price:3000}]; data.tables={1:{items:[],people:[],payments:[]},2:{items:[],people:[],payments:[]}}; data.tableCount=2; data.pedidos=[]; localStorage.removeItem('vito_notif_log'); saveData(); renderAll(); });
+ await p.click('.vito-campana'); await p.waitForTimeout(300);
+ chk('Sin pedidos: la campanita lo dice («Aquí salen los que hace la gente desde la app…»)', /Aquí salen los que hace la gente desde la app/.test(await p.textContent('.vito-campana-menu')));
+ await p.evaluate(()=>{ document.querySelector('.vito-campana-menu').style.display='none'; window.vitoPedidos.entrante({ id:'pq1', mesa:1, items:[{n:'Águila',q:2},{n:'Papas',q:1}], nota:'sin hielo' }, 'qr'); });
+ await p.waitForTimeout(400); await p.click('.vito-campana'); await p.waitForTimeout(400);
+ r=await p.evaluate(()=>{ const f=document.querySelector('.vito-campana-menu [data-pedido="pq1"]'); return { t: f?f.textContent:'', curso: /En curso \(1\)/.test(document.querySelector('.vito-campana-menu').textContent), badge: document.querySelector('.vito-campana-badge').textContent }; });
+ chk('Pedido desde la app: sale «En curso» con la mesa, lo que pidió, la nota y «📱 App»', r.curso && /Mesa 1/.test(r.t) && /2 Águila/.test(r.t) && /1 Papas/.test(r.t) && /sin hielo/.test(r.t) && /📱 App/.test(r.t), r);
+ chk('La campanita cuenta el pedido en curso (prueba gratis + 1 pedido = 2)', r.badge==='2', r.badge);
+ // Pedido que llegó a OTRO celular del negocio: aquí solo llega en los datos (sin la copia local de este celular)
+ await p.evaluate(()=>{ document.querySelector('.vito-campana-menu').style.display='none'; localStorage.removeItem('vito_notif_log'); localStorage.removeItem('vito_pedidos_pend');
+   data.pedidos.push({ id:'pq2', mesa:2, mesaNombre:'Mesa 2', items:[{name:'Papas',qty:3,price:3000,ok:true}], total:9000, at:Date.now(), recibidoEn:Date.now(), estado:'nuevo', origen:'qr', hist:[] }); saveData(); });
+ await p.waitForTimeout(3300); await p.click('.vito-campana'); await p.waitForTimeout(400);
+ r=await p.evaluate(()=>({ t:(document.querySelector('.vito-campana-menu')||{}).textContent||'', aceptar: !!document.querySelector('.vito-campana-menu .vito-ok') }));
+ chk('Pedido que llegó a otro celular: también sale aquí «Por enviar» con «✅ Enviar pedido»', /Por enviar \(1\)/.test(r.t) && /Mesa 2/.test(r.t) && r.aceptar, r.t.slice(0,300));
+ await p.click('.vito-campana-menu .vito-ok'); await p.waitForTimeout(400);
+ chk('«Enviar pedido» lo pasa a la cuenta de la mesa', await p.evaluate(()=>data.pedidos.find(x=>x.id==='pq2').estado==='recibido' && (data.tables[2].items||[]).some(i=>i.name==='Papas' && i.qty===3)));
+ await p.evaluate(()=>{ window.vitoPedidos.cambiar('pq1','entregado'); document.querySelector('.vito-campana-menu').style.display='none'; });
+ await p.click('.vito-campana'); await p.waitForTimeout(400);
+ chk('Pedido entregado: queda en «Pedidos de hoy»', await p.evaluate(()=>{ const t=document.querySelector('.vito-campana-menu').textContent; const f=document.querySelector('.vito-campana-menu [data-pedido="pq1"]'); return /Pedidos de hoy/.test(t) && !!f && /Pedido entregado/.test(f.textContent) && /Mesa 1/.test(f.textContent); }));
+ await p.click('.vito-campana-menu [data-pedido="pq1"]'); await p.waitForTimeout(400);
+ chk('Tocar un pedido abre la cuenta de esa mesa', await p.evaluate(()=>document.querySelector('.vito-campana-menu').style.display==='none' && typeof currentTable!=='undefined' && Number(currentTable)===1));
+
  chk('Sin errores de página', !errs.length, errs);
  console.log('RESULTADO',ok,'bien',mal,'mal'); await b.close(); process.exit(mal?1:0); })();
