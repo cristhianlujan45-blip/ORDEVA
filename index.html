@@ -19136,17 +19136,32 @@ const authEnlace = (() => {
     return r;
   }catch(e){ return null; }
 })();
+// 👁 Ver u ocultar la contraseña que se escribe (entrar, crear cuenta, recuperar, clave de autorización).
+window.ventoOjoClave = function(inp){
+  if(!inp || inp.dataset.ojo) return; inp.dataset.ojo = '1';
+  const w = document.createElement('span'); w.style.cssText = 'position:relative;display:block;width:100%';
+  inp.parentNode.insertBefore(w, inp); w.appendChild(inp);
+  inp.style.paddingRight = '46px'; inp.style.width = '100%'; inp.style.boxSizing = 'border-box';
+  const b = document.createElement('button'); b.type = 'button'; b.className = 'ojo-clave'; b.textContent = '👁'; b.setAttribute('aria-label', 'Ver la contraseña'); b.tabIndex = -1;
+  b.style.cssText = 'position:absolute;right:4px;top:50%;transform:translateY(-50%);border:0;background:transparent;font-size:19px;cursor:pointer;padding:6px 8px;line-height:1;color:inherit';
+  b.onclick = ev => { ev.preventDefault(); const ver = inp.type === 'password'; inp.type = ver ? 'text' : 'password'; b.textContent = ver ? '🙈' : '👁'; b.setAttribute('aria-label', ver ? 'Ocultar la contraseña' : 'Ver la contraseña'); inp.focus(); };
+  w.appendChild(b);
+};
+document.addEventListener('DOMContentLoaded', () => { ['authPass', 'recNew', 'recNew2'].forEach(id => window.ventoOjoClave(document.getElementById(id))); });
+try{ ['authPass', 'recNew', 'recNew2'].forEach(id => { const x = document.getElementById(id); if(x) window.ventoOjoClave(x); }); }catch(e){}
 function authEnlaceDialogo(titulo, texto, conClave){
   return new Promise(res => {
     const ov = document.createElement('div');
     ov.style.cssText = 'position:fixed;inset:0;z-index:2147483100;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:16px';
     ov.innerHTML = '<form style="width:100%;max-width:360px;display:flex;flex-direction:column;gap:10px;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:16px;padding:18px">' +
       '<b style="font-size:18px"></b><div class="auth-hint" style="white-space:pre-line"></div>' +
-      (conClave ? '<label>Contraseña nueva<input type="password" name="a" autocomplete="new-password"></label><label>Repite la contraseña nueva<input type="password" name="b" autocomplete="new-password"></label><div class="auth-err"></div><button class="btn-primary" type="submit">Guardar contraseña</button>' : '') +
+      (conClave ? '<label>Contraseña nueva<input type="password" name="a" autocomplete="new-password"></label><label>Repite la contraseña nueva<input type="password" name="b" autocomplete="new-password"></label><div class="auth-hint" style="margin-top:-4px">Toca 👁 para ver lo que escribes.</div><div class="auth-err"></div><button class="btn-primary" type="submit">Guardar contraseña</button>' : '') +
       '<div class="ex" style="display:flex;flex-direction:column;gap:8px"></div><button class="btn-ghost" type="button" data-x>Cerrar</button></form>';
     ov.querySelector('b').textContent = titulo; ov.querySelector('.auth-hint').textContent = texto;
     document.body.appendChild(ov);
     const f = ov.querySelector('form');
+    ov.querySelectorAll('input[type="password"]').forEach(i => window.ventoOjoClave && window.ventoOjoClave(i));
+    if(conClave) setTimeout(() => { try{ f.a.focus(); }catch(e){} }, 50);
     ov.querySelector('[data-x]').onclick = () => { ov.remove(); res(null); };
     if(conClave) f.onsubmit = e => { e.preventDefault(); const a = f.a.value, b = f.b.value, er = f.querySelector('.auth-err');
       if(a.length < 6) return er.textContent = 'Debe tener al menos 6 caracteres.'; if(a !== b) return er.textContent = 'Las dos no son iguales.'; ov.remove(); res(a); };
@@ -19169,6 +19184,16 @@ async function authEnlaceProcesar(){
     return nb.soltarEnlace(L.tok);
   }
   const users = authUsers(), u = users.find(x => x.user === String(L.user || '').toLowerCase());
+  // Cuenta con correo que no está en este celular (o el enlace se abrió en el navegador): el correo ya quedó comprobado
+  // con el enlace, así que solo se pide la contraseña nueva (dos veces) y se cambia en la cuenta. Luego se entra con ella.
+  if(!u && (!L.user || authEsCorreo(L.user)) && (!L.user || String(L.user).toLowerCase() === correo)){
+    const p = await authEnlaceDialogo('🔑 Contraseña nueva', 'Correo comprobado: ' + correo + '.\nEscribe tu contraseña nueva dos veces.', true);
+    if(!p) return nb.soltarEnlace(L.tok);
+    try{ await nb.claveConEnlace(L.tok, p); showToast('✅ Contraseña cambiada. Entra con ' + correo + ' y la contraseña nueva.', 9000);
+      try{ document.getElementById('authUser').value = correo; const er = document.getElementById('authErr'); if(er) er.textContent = '✅ Contraseña cambiada. Escribe la nueva para entrar.'; document.getElementById('authPass').focus(); }catch(e){} }
+    catch(e){ showToast('⚠️ ' + (nb.msgError ? nb.msgError(e) : e.message), 8000); }
+    return nb.soltarEnlace(L.tok);
+  }
   if(!u){
     // El enlace se abrió en el navegador, pero la cuenta está en la app Vento (o en otro navegador).
     const enApp = !window.VentoAndroid;
@@ -25462,7 +25487,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-16 · v1.40.1';
+const MESORA_VERSION = '2026-10-16 · v1.40.2';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'Vento · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 // Si el navegador (o el celular, con la app agregada a la pantalla de inicio) se quedó con

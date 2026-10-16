@@ -232,12 +232,13 @@
         <input id="lkOClave" type="password" autocomplete="new-password" placeholder="Contraseña nueva (mín. 8)" style="margin-top:8px">
         <div class="row"><button class="b p" id="lkOGo" type="button">Cambiar y entrar</button></div>
       </div>
-      <div id="lkOEnlace" hidden>
-        <p style="margin:8px 0 4px">✅ Correo comprobado con el enlace. Escribe tu contraseña nueva:</p>
-        <input id="lkOEClave" type="password" autocomplete="new-password" placeholder="Contraseña nueva (mín. 8)">
-        <div class="row"><button class="b p" id="lkOEGo" type="button">Guardar y entrar</button></div>
-      </div>
       <div class="row"><button class="b" type="button" data-lk="entrar">Volver</button></div>
+    </div>
+    <div id="lkOEnlace" hidden>
+      <p style="margin:0 0 6px">✅ <b>Correo comprobado.</b> Escribe tu contraseña nueva dos veces (toca 👁 para verla):</p>
+      <input id="lkOEClave" type="password" autocomplete="new-password" placeholder="Contraseña nueva (mín. 8)">
+      <input id="lkOEClave2" type="password" autocomplete="new-password" placeholder="Repite la contraseña nueva" style="margin-top:8px">
+      <div class="row"><button class="b p" id="lkOEGo" type="button">Guardar y entrar</button></div>
     </div>
     <div class="sx-msg" id="lkMsg" role="status" style="margin-top:10px"></div>
   </div>
@@ -900,7 +901,7 @@
    Si después de recargar el servidor todavía entrega la versión vieja, no se queda recargando: deja el aviso. */
 (function(){
   'use strict';
-  var ADMIN_VERSION = '2026-10-16 · v1.40.1';
+  var ADMIN_VERSION = '2026-10-16 · v1.40.2';
   var ultima = 0, oculto = 0, inicio = Date.now();
   function corta(v){ return String(v).split('·').pop().trim(); }
   function libre(){
@@ -2345,7 +2346,8 @@
   });
 
   // ---------------- Entrar: correo y contraseña del administrador (Vento Nube) ----------------
-  function lkVista(v){ $('lkEntrar').hidden = v !== 'entrar'; $('lkCrearBox').hidden = v !== 'crear'; $('lkOlvBox').hidden = v !== 'olvide'; $('lkMsg').textContent = ''; }
+  function lkVista(v){ $('lkEntrar').hidden = v !== 'entrar'; $('lkCrearBox').hidden = v !== 'crear'; $('lkOlvBox').hidden = v !== 'olvide'; $('lkOEnlace').hidden = v !== 'enlace'; $('lkMsg').textContent = '';
+    $('lockTxt').textContent = v === 'enlace' ? 'Cambiar la contraseña del administrador.' : 'Solo para el administrador de Vento. Entra con tu correo y tu contraseña de administrador.'; }
   document.querySelectorAll('[data-lk]').forEach(b => b.onclick = () => lkVista(b.dataset.lk));
   $('lkCrear').onclick = () => { lkVista('crear'); $('lkNCorreo').value = $('lkCorreo').value; $('lkNCorreo').focus(); };
   $('lkOlvide').onclick = () => { lkVista('olvide'); $('lkOCorreo').value = $('lkCorreo').value; $('lkOPaso2').hidden = true; $('lkOCorreo').focus(); };
@@ -2431,12 +2433,25 @@
   $('lkOEGo').onclick = async () => {
     const clave = $('lkOEClave').value;
     if(!claveOk(clave)){ lkMsg('La contraseña nueva debe tener al menos 8 caracteres.', true); return; }
+    if(clave !== $('lkOEClave2').value){ lkMsg('Las dos contraseñas no son iguales.', true); $('lkOEClave2').focus(); return; }
     $('lkOEGo').disabled = true;
     try{ const c = await sxCliente(); const u = await c.auth.updateUser({ password: clave }); if(u && u.error) throw u.error;
-      $('lkOEClave').value = ''; toast('✅ Contraseña cambiada.'); await adminListo(); }
+      $('lkOEClave').value = $('lkOEClave2').value = ''; toast('✅ Contraseña cambiada.'); await adminListo(); }
     catch(e){ lkMsg(esc(sxMsgError(e)), true); }
     finally{ $('lkOEGo').disabled = false; }
   };
+  // 👁 Ver u ocultar la contraseña que se escribe (en todos los campos de contraseña del panel).
+  function conOjo(inp){
+    if(!inp || inp.dataset.ojo) return; inp.dataset.ojo = '1';
+    const w = document.createElement('div'); w.style.cssText = 'position:relative;' + (inp.style.marginTop ? 'margin-top:' + inp.style.marginTop : '');
+    inp.style.marginTop = '0'; inp.parentNode.insertBefore(w, inp); w.appendChild(inp);
+    inp.style.paddingRight = '44px'; inp.style.width = '100%'; inp.style.boxSizing = 'border-box';
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'ojo'; b.textContent = '👁'; b.setAttribute('aria-label', 'Ver la contraseña');
+    b.style.cssText = 'position:absolute;right:4px;top:50%;transform:translateY(-50%);border:0;background:transparent;font-size:18px;cursor:pointer;padding:6px 8px;line-height:1';
+    b.onclick = () => { const ver = inp.type === 'password'; inp.type = ver ? 'text' : 'password'; b.textContent = ver ? '🙈' : '👁'; b.setAttribute('aria-label', ver ? 'Ocultar la contraseña' : 'Ver la contraseña'); inp.focus(); };
+    w.appendChild(b);
+  }
+  document.querySelectorAll('#lock input[type="password"]').forEach(conOjo);
   (async function arranque(){
     $('lock').hidden = false; lkVista('entrar');
     if(lkEnlace){
@@ -2444,8 +2459,8 @@
       else try{
         const c = await sxCliente(); const r = await c.auth.setSession({ access_token: lkEnlace.a, refresh_token: lkEnlace.r });
         if(r && r.error) throw r.error;
-        lkVista('olvide'); $('lkOCorreo').parentNode && ($('lkOPaso2').hidden = true); $('lkOEnlace').hidden = false; $('lkOEClave').focus();
-        lkMsg(''); return;
+        lkVista('enlace'); $('lkOEClave').focus();
+        return;
       }catch(e){ lkVista('olvide'); lkMsg('📧 El enlace del correo ya se usó o venció. Pide otro aquí.', true); }
     }
     try{ if(await sxSesion()){ lkMsg('<span class="spin"></span> Entrando…'); if(await adminListo()) return; } }catch(e){}

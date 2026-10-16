@@ -57,6 +57,12 @@ const ADMIN = 'cristhianwkh@gmail.com';
     await p.goto(BASE + '/?nubeclave=1#access_token=' + tok + '&refresh_token=x&expires_in=3600&token_type=bearer&type=recovery');
     chk('Al abrir el enlace, Vento pide la contraseña nueva (con el correo comprobado)', await esperar(p, () => [...document.querySelectorAll('form b')].some(b => /Contraseña nueva/.test(b.textContent)) && /ana@tienda\.co/.test(document.body.innerText), null, 15000));
     chk('…y el permiso del enlace se borra de la dirección', !/access_token/.test(p.url()), p.url());
+    chk('…sin volver a pedir el correo: solo la contraseña dos veces, cada una con 👁 para verla', await p.evaluate(() => { const f = [...document.querySelectorAll('form')].find(f => f.a && f.b);
+      return !!f && !f.querySelector('input[type="email"]') && f.querySelectorAll('.ojo-clave').length === 2; }));
+    await p.evaluate(() => { const f = [...document.querySelectorAll('form')].find(f => f.a && f.b); f.a.value = 'nueva456'; f.querySelector('.ojo-clave').click(); });
+    chk('…y el 👁 deja ver lo que se escribe (y 🙈 lo vuelve a tapar)', await p.evaluate(() => { const f = [...document.querySelectorAll('form')].find(f => f.a && f.b); const ok1 = f.a.type === 'text'; f.querySelector('.ojo-clave').click(); return ok1 && f.a.type === 'password'; }));
+    await p.evaluate(() => { const f = [...document.querySelectorAll('form')].find(f => f.a && f.b); f.a.value = 'nueva456'; f.b.value = 'otra999'; f.requestSubmit(); });
+    chk('…si las dos no son iguales, lo dice y no cambia nada', await esperar(p, () => [...document.querySelectorAll('form .auth-err')].some(e => /no son iguales/.test(e.textContent)), null, 5000));
     await p.evaluate(() => { const f = [...document.querySelectorAll('form')].find(f => f.a && f.b); f.a.value = 'nueva456'; f.b.value = 'nueva456'; f.requestSubmit(); });
     chk('La contraseña nueva queda en la cuenta (se entra con ella y no con la vieja)', await (async () => { for(let i = 0; i < 20; i++){ if((await entrar('ana@tienda.co', 'nueva456')).st === 200) return (await entrar('ana@tienda.co', 'vieja123')).st >= 400; await p.waitForTimeout(400); } return false; })());
     // Y en la app se entra con la contraseña nueva (celular nuevo: vuelven los datos de la cuenta)
@@ -65,6 +71,16 @@ const ADMIN = 'cristhianwkh@gmail.com';
     await p.evaluate(() => { const b = document.getElementById('authNueva'); if(b && !b.hidden && /Ya tienes cuenta/.test(b.textContent)) b.click(); });
     await p.fill('#authUser', 'ana@tienda.co'); await p.fill('#authPass', 'nueva456'); await p.click('#authBtn');
     chk('En la app se entra con el correo y la contraseña nueva', await esperar(p, () => document.getElementById('authOverlay').hidden, null, 20000), await p.textContent('#authErr').catch(() => ''));
+
+    // Enlace del código (?recuperar=correo) abierto en un celular sin esa cuenta: igual solo pide la contraseña
+    const E = await celular(), e2 = E.p;
+    const tokE = (await entrar('ana@tienda.co', 'nueva456')).j.access_token;
+    await e2.goto(BASE + '/?recuperar=' + encodeURIComponent('ana@tienda.co') + '#access_token=' + tokE + '&refresh_token=x&expires_in=3600&token_type=bearer&type=magiclink');
+    chk('Enlace «?recuperar=correo» en un celular sin la cuenta: pide solo la contraseña nueva (no «Abrir en la app»)', await esperar(e2, () => [...document.querySelectorAll('form b')].some(b => /Contraseña nueva/.test(b.textContent)) && !/Abrir en la app/.test(document.body.innerText), null, 15000));
+    await e2.evaluate(() => { const f = [...document.querySelectorAll('form')].find(f => f.a && f.b); f.a.value = 'tercera789'; f.b.value = 'tercera789'; f.requestSubmit(); });
+    chk('…la cambia en la cuenta y deja el correo listo para entrar', await (async () => { for(let i = 0; i < 20; i++){ if((await entrar('ana@tienda.co', 'tercera789')).st === 200) return true; await e2.waitForTimeout(400); } return false; })() && await e2.evaluate(() => document.getElementById('authUser').value === 'ana@tienda.co'));
+    await E.ctx.close();
+    chk('La pantalla de entrada y la de recuperar también tienen 👁', await p.evaluate(() => ['authPass', 'recNew', 'recNew2'].every(id => { const x = document.getElementById(id); return x && x.parentNode.querySelector('.ojo-clave'); })));
 
     // Enlace vencido o ya usado
     const B = await celular(), q = B.p;
@@ -87,7 +103,13 @@ const ADMIN = 'cristhianwkh@gmail.com';
     const t2 = (await entrar(ADMIN, 'Clave-Admin-99')).j;
     await a.goto(BASE + '/admin.html?adminclave=1#access_token=' + t2.access_token + '&refresh_token=' + t2.refresh_token + '&expires_in=3600&token_type=bearer&type=magiclink');
     chk('Al abrir el enlace, el panel pide la contraseña nueva', await esperar(a, () => { const x = document.getElementById('lkOEnlace'); return x && !x.hidden; }, null, 15000) && !/access_token/.test(a.url()));
-    await a.fill('#lkOEClave', 'Admin-Nueva-2026'); await a.click('#lkOEGo');
+    chk('…sin volver a pedir el correo del administrador: solo la contraseña dos veces, con 👁', await a.evaluate(() => document.getElementById('lkOlvBox').hidden && document.getElementById('lkEntrar').hidden &&
+      !document.getElementById('lkOEClave2').closest('[hidden]') && document.querySelectorAll('#lkOEnlace .ojo').length === 2));
+    await a.fill('#lkOEClave', 'Admin-Nueva-2026'); await a.fill('#lkOEClave2', 'Admin-Otra-2026'); await a.click('#lkOEGo');
+    chk('…si no son iguales, lo dice', await esperar(a, () => /no son iguales/.test(document.getElementById('lkMsg').textContent), null, 5000));
+    await a.click('#lkOEnlace .ojo');
+    chk('…el 👁 deja ver la contraseña', await a.evaluate(() => document.getElementById('lkOEClave').type === 'text'));
+    await a.fill('#lkOEClave2', 'Admin-Nueva-2026'); await a.click('#lkOEGo');
     chk('…la guarda y entra al panel', await esperar(a, () => document.getElementById('lock').hidden, null, 15000) && (await entrar(ADMIN, 'Admin-Nueva-2026')).st === 200);
     await a.goto(BASE + '/admin.html?adminclave=1#error=access_denied&error_code=otp_expired');
     await a.evaluate(() => { try{ localStorage.clear(); }catch(e){} }); await a.reload();
