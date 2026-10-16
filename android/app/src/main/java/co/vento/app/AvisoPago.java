@@ -253,6 +253,26 @@ public final class AvisoPago {
                 && Pattern.compile("recib|lleg|transfer|bre-?b|llave|abon|ingres|acredit|envi|pas[oó]|consign|deposit|pago", Pattern.CASE_INSENSITIVE).matcher(todo).find();
     }
 
+    /**
+     * ¿Se le pasa a la página un aviso de banco que estas reglas NO tomaron como pago? Sí, si habla de plata o de plata
+     * recibida (la página siempre está al día y puede entender un formato nuevo sin reinstalar la app). Nunca los códigos
+     * de seguridad ni la plata que sale.
+     */
+    static boolean sirveCrudo(String todo) {
+        if (todo == null || todo.trim().isEmpty() || CODIGO.matcher(todo).find() || SALE.matcher(todo).find()) return false;
+        if (Pattern.compile("c[oó]digo|clave|contrase|token", Pattern.CASE_INSENSITIVE).matcher(todo).find() && !FUERTE.matcher(todo).find()) return false;
+        return pareceDePlata(todo) || RECIBIDO.matcher(todo).find()
+                // «8,000» sin signo (como escriben los SMS de DaviPlata) junto a una palabra de plata
+                || Pattern.compile("\\d{1,3}(?:[.,]\\d{3})+", Pattern.CASE_INSENSITIVE).matcher(todo).find()
+                   && Pattern.compile("recib|lleg|abon|transfer|ingres|acredit|plata|dinero|bre-?b|llave", Pattern.CASE_INSENSITIVE).matcher(todo).find();
+    }
+
+    /** ¿El remitente del SMS es un banco? (código corto de 3 a 6 cifras, o el nombre de un banco). Nunca un contacto. */
+    static boolean remitenteBanco(String remitente) {
+        String r = remitente == null ? "" : remitente.trim();
+        return r.matches("\\+?\\d{3,6}") || BANCO.matcher(r).find();
+    }
+
     /** Por qué un aviso NO se tomó como plata recibida (para el registro de Ajustes → Pagos). */
     static String porQueNo(String t) {
         if (t == null || t.trim().isEmpty()) return "aviso vacío";

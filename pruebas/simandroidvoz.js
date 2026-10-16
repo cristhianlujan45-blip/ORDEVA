@@ -21,7 +21,8 @@ module.exports = function(){
       const txt = typeof c === 'string' ? c : c.t, tarde = (typeof c === 'object' && c.tarde) || 0;
       const parcial = (typeof c === 'object' && c.parcial) || txt;
       at(400 + tarde, () => { hablo = true; actual = txt; V('result', { alts: [{ t: parcial, c: 0.9 }], final: false }); });
-      at(900 + tarde, () => { S.vivo = false; S.sesion++; S.finalEn = Date.now(); V('result', { alts: [{ t: txt, c: 0.9 }], final: true }); V('end'); });
+      // { trabado: true }: el reconocedor del celular se traba (nunca da la frase final ni avisa que terminó)
+      if(!(typeof c === 'object' && c.trabado)) at(900 + tarde, () => { S.vivo = false; S.sesion++; S.finalEn = Date.now(); V('result', { alts: [{ t: txt, c: 0.9 }], final: true }); V('end'); });
     } else {
       if(S.ruido){ const r = S.ruido; at(2500, () => { hablo = true; actual = r; V('result', { alts: [{ t: r, c: 0.8 }], final: false }); }); at(3000, () => { S.vivo = false; S.sesion++; V('result', { alts: [{ t: r, c: 0.8 }], final: true }); V('end'); }); }
       else at(5000, () => error('timeout'));      // Android: nadie habló
@@ -37,10 +38,10 @@ module.exports = function(){
     avisosEstado: () => '{"prendidos":true}', buscarTVs(){}, lounge(){}, pararTV(){}, vozPreparar(){},
     vozSilencio(si){ S.mudo = !!si; },
     vozIniciar(){ reint = 0; detenida = false; abrir(); },
-    vozParar(){ S.paradas++; detenida = true; if(!S.vivo) return;
+    vozParar(){ S.paradas++; detenida = true; if(!S.vivo || S.trabado) return;
       if(actual){ const txt = actual; limpiar(); setTimeout(() => { S.vivo = false; S.sesion++; V('result', { alts: [{ t: txt, c: 0.9 }], final: true }); V('end'); }, 60); }
       else { limpiar(); setTimeout(() => error('nomatch'), 80); } },
-    vozCancelar(){ S.cancelaciones++; limpiar(); S.sesion++; S.vivo = false; setTimeout(() => V('end'), 20); }
+    vozCancelar(){ S.cancelaciones++; limpiar(); S.sesion++; S.vivo = false; if(!S.trabado) setTimeout(() => V('end'), 20); }
   };
   try{ localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento-hola', '0'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '' })); }catch(e){}
 };

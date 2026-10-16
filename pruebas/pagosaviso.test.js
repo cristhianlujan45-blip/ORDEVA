@@ -17,6 +17,8 @@
 // 13. «🔎 Este equipo: App Vento para Android» al final del paso a paso.
 // 14. Bre-B (de otros bancos por la llave) y Nequi con «¿…?» en el aviso: suenan. Solicitudes («te pidió») no.
 // 15. Paso 5 «Que suene siempre»: ahorro de batería, «🚀 Inicio automático» y los pasos de la marca (Xiaomi).
+// 19. Avisos «crudos» (la app no los entendió): la página los revisa y, si son pago, los dice.
+// 20. Lectura apagada al reinstalar → se prende sola; sin permiso / desconectada / app vieja → aviso fijo para arreglarlo.
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 
@@ -265,6 +267,43 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     chk('18. Ajustes → Pagos: «📋 Últimos avisos del banco y qué hizo Vento» (con el porqué)', r18.tieneTraza, r18);
     chk('18. «🧪 Prueba piloto»: pasa un aviso de DaviPlata por el mismo camino y muestra lo que dijo', r18.piloto.length === 1 && /JUAN PEREZ le pasó \$1\.000/.test(r18.piloto[0][2]) && /Recibiste 1000 pesos por DaviPlata/.test(r18.res1), r18);
     chk('18. La prueba piloto NO se registra como pago (solo avisa «🧪 Prueba piloto»)', r18.registro === 0 && /Prueba piloto: Vento entendió \$1\.000 por DaviPlata/.test(r18.toast), r18);
+
+    // 19. Avisos «crudos»: la app Android no entendió el aviso del banco y se lo pasa a la página, que lo revisa con sus
+    //     reglas (siempre al día) y, si es plata recibida, lo dice. Si tampoco lo entiende, lo reporta (sin datos).
+    const r19 = await p.evaluate(() => {
+      window.__and.decir = []; window.__errs19 = []; const e0 = window.ventoError; window.ventoError = (a, b, c, d) => { window.__errs19.push({ a, b, c, d }); };
+      window.__and.cola.push({ id: 'k19:R:1', txt: 'Bancolombia | Bancolombia | Te llegaron $9.900 a tu llave', t: Date.now(), voz: false, crudo: true });
+      window.__and.cola.push({ id: 'k19:R:2', txt: 'Bancolombia | Bancolombia | Movimiento en tu cuenta por $4.000', t: Date.now(), voz: false, crudo: true });
+      window.ventoAvisosNativos();
+      window.ventoError = e0;
+      return { voz: window.__and.decir.slice(), reg: data.pagos.lista.some(x => x.monto === 9900), noReg: data.pagos.lista.some(x => x.monto === 4000), errs: window.__errs19.map(x => x.b) };
+    });
+    chk('19. Aviso crudo que la página sí entiende: se registra y suena «Recibiste 9900 pesos por Bre-B…»', r19.reg && r19.voz.some(t => /^Recibiste 9900 pesos por Bre-B/.test(t)), r19);
+    chk('19. Aviso crudo que tampoco entiende: no suena ni se registra, y se reporta para aprender el formato', !r19.noReg && !r19.voz.some(t => /4000/.test(t)) && r19.errs.some(x => /no entendió/.test(x)), r19);
+
+    // 20. ¿Este celular sí lee los avisos de pago? Al reinstalar la app la lectura quedaba apagada y los pagos no sonaban.
+    const r20 = await p.evaluate(() => {
+      const A = window.VentoAndroid, S = window.__and, ban = () => { const b = document.getElementById('pgSalud'); return b && !b.hidden ? b.innerText : ''; };
+      A.pagosLectura = () => 2; S.on = false; S.permiso = true; S.vivo = true;
+      A.pagosAvisosEstado = () => JSON.stringify({ on: S.on, permiso: S.permiso, vivo: S.vivo });
+      delete data.pagos.andOff;
+      const k1 = window.ventoPagosSalud(), prendio = S.on, b1 = ban();
+      S.permiso = false; const k2 = window.ventoPagosSalud(), b2 = ban();
+      S.permiso = true; delete A.pagosLectura; const k3 = window.ventoPagosSalud(), b3 = ban(), apk = !!document.querySelector('#pgSalud a[href$="vento.apk"]');
+      A.pagosLectura = () => 2; S.vivo = false; window.ventoPagosSalud(); const k4 = window.ventoPagosSalud(), b4 = ban();
+      S.vivo = true; data.pagos.andOff = true; S.on = false; const k5 = window.ventoPagosSalud(), siguioApagada = !S.on;
+      delete data.pagos.andOff;
+      const j0 = window.ventoRoles.esJefe; window.ventoRoles.esJefe = () => false; S.on = false;
+      const k6 = window.ventoPagosSalud(), mesero = { on: S.on, ban: ban() };
+      window.ventoRoles.esJefe = j0; S.on = true; window.ventoPagosSalud();
+      return { k1, prendio, b1, k2, b2, k3, b3, apk, k4, b4, k5, siguioApagada, k6, mesero, fin: ban() };
+    });
+    chk('20. La lectura apagada (se reinstaló la app) se vuelve a prender sola, sin aviso', r20.prendio && r20.k1 === '' && !r20.b1, r20);
+    chk('20. Sin el permiso «Acceso a notificaciones»: aviso fijo «Los pagos no van a sonar» con «🔓 Dar el permiso»', r20.k2 === 'permiso' && /no van a sonar/.test(r20.b2) && /Dar el permiso/.test(r20.b2), r20);
+    chk('20. App Android vieja: aviso fijo con «⬇️ Instalar la nueva» (vento.apk)', r20.k3 === 'vieja' && /Actualiza la app Vento/.test(r20.b3) && r20.apk, r20);
+    chk('20. Android desconectó la lectura (dos revisiones seguidas): «🔄 Reconectar»', r20.k4 === 'desconectada' && /Reconectar/.test(r20.b4), r20);
+    chk('20. Si el dueño la apagó a propósito, no se prende sola', r20.k5 === '' && r20.siguioApagada, r20);
+    chk('20. En el celular de un mesero no se prende sola ni sale el aviso', r20.k6 === '' && !r20.mesero.on && !r20.mesero.ban && !r20.fin, r20);
 
     // 11. Navegador (sin la app): la voz sale con el volumen elegido (hasta 100 %)
     const ctx2 = await b.newContext({ viewport: { width: 1200, height: 900 } });

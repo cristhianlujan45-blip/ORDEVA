@@ -62,6 +62,35 @@ const VUELTAS = Number(process.env.VUELTAS || 3);
       r = await vuelta([]);
       chk('Vuelta ' + v + ' · sin hablar: «No escuché nada» y se cierra sin reabrirse', r.beeps === 1 && r.reintentos === 0 && !r.vivo && !r.escuchando && r.toasts.some(t => /No escuché nada/.test(t)) && !r.procesados.length, r);
     }
+    // F. El reconocedor del celular se TRABA (nunca avisa que terminó): antes el botón se quedaba «escuchando» para siempre
+    //    y tocarlo otra vez no hacía nada. Ahora se cierra solo y anota lo que ya se oyó.
+    await limpiar();
+    const f = await p.evaluate(async () => {
+      Object.assign(__sim, { guion: [{ t: 'mesa 1 dos águilas', trabado: true }], trabado: true, procesados: [] }); __toasts.length = 0;
+      const t0 = Date.now(); startVoiceCommand(false);
+      while(voiceListening && Date.now() - t0 < 12000) await new Promise(r => setTimeout(r, 100));
+      const cerro = Date.now() - t0, sigue = voiceListening, icono = document.getElementById('voiceFab').classList.contains('listening');
+      __sim.trabado = false;
+      // Y el botón vuelve a funcionar enseguida
+      Object.assign(__sim, { guion: ['mesa 2 tres póker'] }); startVoiceCommand(false);
+      const t1 = Date.now(); while(voiceListening && Date.now() - t1 < 10000) await new Promise(r => setTimeout(r, 100));
+      return { cerro, sigue, icono, despues: voiceListening };
+    });
+    chk('F. Micrófono trabado: se cierra solo (sin quedarse «escuchando») en menos de 7 s', !f.sigue && !f.icono && f.cerro < 7000, f);
+    chk('F. … y anota lo que ya se oyó («mesa 1 dos águilas»)', await mesa(1) === '2×Águila', await mesa(1));
+    chk('F. … y el botón vuelve a funcionar enseguida («mesa 2 tres póker»)', !f.despues && await mesa(2) === '3×Póker', await mesa(2));
+    // G. Tocar dos veces para terminar con el reconocedor trabado: se cierra al segundo toque
+    await limpiar();
+    const g = await p.evaluate(async () => {
+      Object.assign(__sim, { guion: [{ t: 'mesa 3 dos póker', trabado: true }], trabado: true });
+      startVoiceCommand(false); await new Promise(r => setTimeout(r, 700));
+      document.getElementById('voiceFab').click(); await new Promise(r => setTimeout(r, 800));
+      const tras1 = voiceListening;
+      document.getElementById('voiceFab').click(); await new Promise(r => setTimeout(r, 200));
+      __sim.trabado = false;
+      return { tras1, tras2: voiceListening };
+    });
+    chk('G. Trabado: el segundo toque lo cierra al instante', g.tras1 && !g.tras2, g);
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.stack || e)); }
   chk('Sin errores de página', !errs.length, errs);
   await b.close();

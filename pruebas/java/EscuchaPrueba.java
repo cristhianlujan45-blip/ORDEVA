@@ -14,7 +14,7 @@ public class EscuchaPrueba {
     static void chk(String n, boolean c, Object x) { if (c) { ok++; System.out.println("✅ " + n); } else { mal++; System.out.println("❌ " + n + " → " + x); } }
     static Method procesar, procesarSms;
     static boolean app(Preferencias sp, String app, String titulo, String cuerpo, String pref) throws Exception {
-        return (Boolean) procesar.invoke(null, sp, app, titulo, cuerpo, pref, true, false);
+        return VentoEscucha.procesarApp(sp, app, titulo, cuerpo, pref, true, false);
     }
     static List<Object[]> conv(Object[]... m) { List<Object[]> l = new ArrayList<>(); for (Object[] x : m) l.add(x); return l; }
     static void limpiar() { VentoApp.dichos.clear(); VentoApp.avisos.clear(); VentoApp.ui.despues.clear(); }
@@ -109,6 +109,43 @@ public class EscuchaPrueba {
         // 10) Lo que hizo Vento queda en el registro de Ajustes → Pagos
         String d = VentoEscucha.diag(sp0) + VentoEscucha.diag(sp);
         chk("Registro (Ajustes → Pagos): cada aviso con lo que hizo Vento", d.contains("Recibiste 200 pesos por DaviPlata") && d.contains("plata que SALE"), d.length() > 300 ? d.substring(0, 300) : d);
+
+        // 10b) El 85888 manda el SMS con RETRASO (la hora del mensaje es de hace 20 min): igual suena, porque es el más nuevo
+        //      de la conversación. En la 1.40.4 se ignoraba (solo se leían los de los últimos 3 min).
+        sp = nuevo();
+        r = VentoEscucha.leerSms(sp, "85888", "", conv(new Object[]{"Recibiste  9,000. Para saber mas, consulta tus movimientos.", ahora - 50 * min},
+                                                      new Object[]{"Recibiste  12,000. Para saber mas, consulta tus movimientos.", ahora - 20 * min}), "k10b:", false);
+        VentoApp.ui.correr();
+        chk("SMS con retraso (hora de hace 20 min) pero es el más nuevo: suena «Recibiste 12000 pesos por DaviPlata.» (el viejo no)", r && VentoApp.dichos.size() == 1 && VentoApp.dichos.get(0).equals("Recibiste 12000 pesos por DaviPlata."), VentoApp.dichos);
+
+        // 11) Un aviso del banco con un formato que la app NO entiende («Abono en cuenta $15.000»): no suena aquí, pero se le
+        //     pasa a la página «crudo» (ella lo revisa con sus reglas, que se actualizan solas)
+        sp = nuevo();
+        r = app(sp, "Bancolombia", "Bancolombia", "Abono en cuenta por $15.000 desde otra entidad", "k11:");
+        String cola = VentoEscucha.tomar(sp);
+        chk("Formato que la app no entiende: va a la página «crudo» (sin decir nada aquí)", r && VentoApp.dichos.isEmpty() && cola.contains("\"crudo\":true") && cola.contains("15.000"), cola);
+        r = app(sp, "Bancolombia", "Bancolombia", "Abono en cuenta por $15.000 desde otra entidad", "k11:");
+        chk("…el mismo aviso publicado otra vez no se pasa dos veces", !r && VentoEscucha.tomar(sp).equals("[]"), r);
+
+        // 12) Lo que NO se le pasa a la página: plata que sale, códigos, SMS de un contacto
+        sp = nuevo();
+        app(sp, "DaviPlata", "DaviPlata", "Pasaste $100 a otro DaviPlata. Para saber mas, consulta tus movimientos.", "k12:");
+        VentoEscucha.leerSms(sp, "85888", "", conv(new Object[]{"DaviPlata: Tu codigo de verificacion es 482913. No lo compartas.", ahora - 1000}), "k12b:", false);
+        VentoEscucha.leerSms(sp, "Mamá", "", conv(new Object[]{"Te paso la plata del mercado mañana", ahora - 1000}), "k12c:", false);
+        cola = VentoEscucha.tomar(sp);
+        chk("Plata que sale, códigos y SMS de un contacto NO van a la página", cola.equals("[]") && VentoApp.dichos.isEmpty(), cola);
+
+        // 13) SMS del 85888 con un formato nuevo: va a la página «crudo», marcado como del banco (DaviPlata)
+        sp = nuevo();
+        r = VentoEscucha.leerSms(sp, "85888", "", conv(new Object[]{"Abono a tu DaviPlata por transferencia: 8,000", ahora - 1000}), "k13:", false);
+        cola = VentoEscucha.tomar(sp);
+        chk("SMS del 85888 que la app no entiende: va a la página como del banco", r && cola.contains("\"crudo\":true") && cola.contains("\"smsOk\":true") && cola.contains("85888"), cola);
+
+        // 14) Lo que sí entiende NO va crudo (va normal, ya dicho)
+        sp = nuevo();
+        app(sp, "Nequi", "Nequi", "¡Te llegó plata! ANA RUIZ te envió $2.500", "k14:");
+        cola = VentoEscucha.tomar(sp);
+        chk("Un pago que la app entiende va normal (ya dicho), no crudo", !cola.contains("crudo") && cola.contains("\"voz\":true"), cola);
 
         System.out.println("RESULTADO " + ok + " bien " + mal + " mal");
         System.exit(mal > 0 ? 1 : 0);

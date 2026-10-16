@@ -120,7 +120,8 @@ public class VentoEscucha extends NotificationListenerService {
                 String v = texto(x.getCharSequence(k)); if (!v.isEmpty() && !principal.contains(v)) mas.append(' ').append(v);
             }
             String tick = texto(n.tickerText); if (!tick.isEmpty() && !principal.contains(tick)) mas.append(' ').append(tick);
-            if (principal.isEmpty() && titulo.isEmpty() || AvisoPago.monto(titulo + " " + principal + mas) <= 0) {
+            // El aviso dibujado por la app solo se arma si no trae ningún texto (armarlo es lento y antes no hacía falta).
+            if (principal.isEmpty() && titulo.isEmpty() && mas.length() == 0) {
                 String vista = textosDeVista(n);
                 if (!vista.isEmpty()) mas.append(' ').append(vista);
             }
@@ -152,8 +153,7 @@ public class VentoEscucha extends NotificationListenerService {
         boolean callado = atrasada && edad > 3 * 60_000L;
         boolean alguno = false;
         if (sms) return leerSms(sp, titulo, principal, mensajes, sbn.getKey() + ":" + cuando + ":", callado);
-        if (procesar(sp, app, titulo, principal, sbn.getKey() + ":" + cuando + ":", confiable, callado)) alguno = true;
-        else { String t0 = titulo + " " + principal; if (!AvisoPago.esRecibido(t0) || (AvisoPago.monto(t0) <= 0 && !AvisoPago.esPlataSinValor(t0))) diagnostico(sp, app, t0); }
+        if (procesarApp(sp, app, titulo, principal, sbn.getKey() + ":" + cuando + ":", confiable, callado)) alguno = true;
         marcarContenido(sp, app, principal);
         // Las líneas de un aviso agrupado son los pagos de antes que siguen en la barra: solo cuenta la que no se había
         // visto (antes una línea vieja podía volver a sonar como pago nuevo).
@@ -164,20 +164,37 @@ public class VentoEscucha extends NotificationListenerService {
         return alguno;
     }
 
+    /** El aviso de una app de banco: si es pago, se dice; si no se entendió (y no es un repetido), igual se le pasa a la
+     *  página, que siempre está al día y puede entender un formato nuevo del banco sin reinstalar la app (si lo entiende,
+     *  ella lo dice en voz alta). */
+    static boolean procesarApp(SharedPreferences sp, String app, String titulo, String principal, String pref, boolean confiable, boolean callado) throws Exception {
+        if (procesar(sp, app, titulo, principal, pref, confiable, callado)) return true;
+        String t0 = titulo + " " + principal;
+        if (!AvisoPago.esRecibido(t0) || (AvisoPago.monto(t0) <= 0 && !AvisoPago.esPlataSinValor(t0))) diagnostico(sp, app, t0);
+        return !AvisoPago.esRecibido(t0) && AvisoPago.sirveCrudo(t0)
+                && crudo(sp, app, app + " | " + titulo + " | " + principal, pref, confiable ? null : "La app «" + app + "» de este celular no es la oficial: míralo en la app del banco", false, callado);
+    }
+
     /** SMS: la app de mensajes muestra la CONVERSACIÓN entera (los mensajes de antes también). Solo cuentan los mensajes
      *  nuevos (de los últimos 3 min, cada uno con su hora): antes, al llegar un SMS se podían volver a decir los viejos. */
     static boolean leerSms(SharedPreferences sp, String remitente, String principal, java.util.List<Object[]> mensajes, String prefijo, boolean callado) throws Exception {
         boolean alguno = false;
         long ahora = System.currentTimeMillis();
-        boolean conHora = false;
-        for (Object[] m : mensajes) {
+        // El mensaje MÁS NUEVO de la conversación es el que hizo sonar el aviso: se lee SIEMPRE, sin importar la hora que
+        // traiga. En la 1.40.4 solo se leían los de los últimos 3 min, y el 85888 a veces manda el SMS con retraso o con la
+        // hora de la red corrida: ese pago se ignoraba. (Hasta la 1.39 siempre se leía el último y sí sonaba.)
+        int nuevo = -1; long horaNuevo = Long.MIN_VALUE;
+        for (int i = 0; i < mensajes.size(); i++) { long h = (Long) mensajes.get(i)[1]; if (h > 0 && h >= horaNuevo) { horaNuevo = h; nuevo = i; } }
+        for (int i = 0; i < mensajes.size(); i++) {
+            Object[] m = mensajes.get(i);
             long hora = (Long) m[1];
             if (hora <= 0) continue;
-            conHora = true;
-            if (ahora - hora > 3 * 60_000L) continue;                    // de antes: ya se dijo (o es viejo)
+            // Los de antes: solo los de los últimos 10 min (los más viejos ya se dijeron o no son de ahora). Cada mensaje se
+            // reconoce por su hora y su texto: el mismo nunca suena dos veces.
+            if (i != nuevo && ahora - hora > 10 * 60_000L) continue;
             if (procesarSms(sp, remitente, (String) m[0], "M:" + hora + ":", callado)) alguno = true;
         }
-        if (!conHora && procesarSms(sp, remitente, principal, prefijo, callado)) alguno = true;
+        if (nuevo < 0 && procesarSms(sp, remitente, principal, prefijo, callado)) alguno = true;
         return alguno;
     }
 
@@ -290,7 +307,16 @@ public class VentoEscucha extends NotificationListenerService {
     /** SMS del banco: solo plata recibida que nombra un banco. Desde un celular común = falso; desde el código corto del
      *  banco = «revísalo» (o «Pago confirmado» si el dueño eligió confirmar los SMS del banco). */
     private static boolean procesarSms(SharedPreferences sp, String remitente, String cuerpo, String prefijo, boolean callado) throws Exception {
-        if (!AvisoPago.esSmsDePago(remitente, cuerpo)) { if (AvisoPago.pareceDePlata(cuerpo)) traza(sp, "SMS " + remitente, cuerpo, "🚫 " + AvisoPago.porQueNo(remitente + " " + cuerpo)); return false; }
+        if (!AvisoPago.esSmsDePago(remitente, cuerpo)) {
+            if (AvisoPago.pareceDePlata(cuerpo)) traza(sp, "SMS " + remitente, cuerpo, "🚫 " + AvisoPago.porQueNo(remitente + " " + cuerpo));
+            // SMS de un código corto del banco que estas reglas no entendieron: a la página (ver crudo). Nunca de un contacto.
+            if (AvisoPago.remitenteBanco(remitente) && !"celular".equals(AvisoPago.tipoRemitente(remitente)) && AvisoPago.sirveCrudo(cuerpo)) {
+                String b = AvisoPago.bancoDeCodigo(remitente);
+                return crudo(sp, "SMS " + remitente, "SMS | " + remitente + " | " + (b != null && !cuerpo.toLowerCase().contains(b.toLowerCase()) ? b + ": " : "") + cuerpo,
+                        prefijo, null, b != null || sp.getBoolean(PREF_SMS_OK, false), callado);
+            }
+            return false;
+        }
         long monto = AvisoPago.monto(cuerpo);
         if (monto <= 0) monto = AvisoPago.monto(remitente + " " + cuerpo);
         String banco = AvisoPago.bancoDeCodigo(remitente);
@@ -438,8 +464,24 @@ public class VentoEscucha extends NotificationListenerService {
 
     private static String texto(CharSequence c) { return c == null ? "" : c.toString().replaceAll("\\s+", " ").trim(); }
 
+    /** Aviso del banco que estas reglas no entendieron: va a la página «crudo» (ella decide con sus reglas, que se
+     *  actualizan solas, y si es un pago lo dice en voz alta). Una vez por aviso. */
+    private static boolean crudo(SharedPreferences sp, String app, String txt, String prefijo, String revisar, boolean smsOk, boolean callado) {
+        try {
+            String id = prefijo + "R:" + txt.hashCode();
+            if (!marcarVisto(sp, id)) return false;
+            traza(sp, app, txt, "📤 no lo entendí: se lo paso a la página para que lo revise");
+            guardar(sp, id, txt, callado, revisar, smsOk, null, true);
+            return true;
+        } catch (Exception e) { return false; }
+    }
+
+    private static void guardar(SharedPreferences sp, String id, String txt, boolean voz, String revisar, boolean smsOk, String reemplaza) throws Exception {
+        guardar(sp, id, txt, voz, revisar, smsOk, reemplaza, false);
+    }
+
     /** Cola de avisos para la página (sobrevive si la página todavía no ha cargado). */
-    private static synchronized void guardar(SharedPreferences sp, String id, String txt, boolean voz, String revisar, boolean smsOk, String reemplaza) throws Exception {
+    private static synchronized void guardar(SharedPreferences sp, String id, String txt, boolean voz, String revisar, boolean smsOk, String reemplaza, boolean crudo) throws Exception {
         JSONArray l = new JSONArray(sp.getString(PREF_COLA, "[]")), out = new JSONArray();
         long ahora = System.currentTimeMillis();
         for (int i = 0; i < l.length(); i++) {
@@ -451,6 +493,7 @@ public class VentoEscucha extends NotificationListenerService {
         if (revisar != null) o.put("revisar", revisar);                  // no es la app oficial: «⚠️ Revisar», no «confirmado»
         if (smsOk) o.put("smsOk", true);                                  // SMS del banco y el dueño eligió confirmarlos
         if (reemplaza != null) o.put("reemplaza", reemplaza);             // confirma el SMS de este mismo pago
+        if (crudo) o.put("crudo", true);                                  // la app no lo entendió: la página decide
         out.put(o);
         while (out.length() > 30) out.remove(0);
         sp.edit().putString(PREF_COLA, out.toString()).apply();

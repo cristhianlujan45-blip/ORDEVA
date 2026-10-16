@@ -950,6 +950,11 @@ public class VentoApp extends Application {
             return VentoEscucha.probar(getSharedPreferences("vento", MODE_PRIVATE), app, titulo, texto, sms);
         }
 
+        /** Versión de la lectura de avisos de pagos: 2 = también pasa a la página los avisos del banco que no entendió
+         *  (la página los revisa con sus reglas, que se actualizan solas). La página avisa si la app es más vieja. */
+        @JavascriptInterface
+        public int pagosLectura() { return 2; }
+
         /** Avisos de banco que hablaban de plata pero no se tomaron como pago (sin datos), para revisarlos. */
         @JavascriptInterface
         public String pagosAvisosDiag() { return VentoEscucha.diag(getSharedPreferences("vento", MODE_PRIVATE)); }

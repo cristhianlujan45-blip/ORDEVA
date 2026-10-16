@@ -8216,7 +8216,7 @@ function voiceComandoCompleto(raw){
 function scheduleVoiceSilenceStop(ms){
   if(voiceSilenceTimer) clearTimeout(voiceSilenceTimer);
   voiceSilenceTimer = setTimeout(() => {
-    try{ if(voiceRecognizer && voiceListening) voiceRecognizer.stop(); }catch(e){}
+    try{ if(voiceRecognizer && voiceListening) stopVoiceCommand(); }catch(e){}
   }, ms);
 }
 
@@ -8284,8 +8284,9 @@ function ensureVoiceRecognizer(){
     }
   };
   voiceRecognizer.onend = () => {
-    clearTimeout(voiceAbriendoT);
+    clearTimeout(voiceAbriendoT); clearTimeout(voiceGuardiaT);
     if(voiceSilenceTimer) clearTimeout(voiceSilenceTimer);
+    if(!voiceListening && !voiceFinalBuffer && !voiceInterim){ updateVoiceFabUI(); return; }   // ya se cerró (vigilante)
     voiceListening = false;
     updateVoiceFabUI();
     const transcript = (voiceFinalBuffer.trim() || voiceInterim).trim();
@@ -8307,8 +8308,11 @@ function startVoiceCommand(conIA){
     showToast('Tu navegador no soporta comandos por voz. Prueba con Chrome en Android.');
     return;
   }
+  // Otra escucha que quedó trabada (más de 30 s) no bloquea el botón: se suelta.
+  if(voiceProductListening && Date.now() - (window.__vozProductoDesde || 0) > 30000) voiceProductListening = false;
+  if(voiceListening && voiceTocado && Date.now() - voiceTocado > 35000) voiceForzarFin();
   if(voiceListening || voiceProductListening) return;
-  rec.mantener = true;
+  rec.mantener = true; voiceParandoDesde = 0;
   // Si Vento está hablando se calla: el micrófono abre YA, sin esperar a que termine (y no se oye a sí misma).
   try{ if(window.speechSynthesis && (speechSynthesis.speaking || speechSynthesis.pending)) speechSynthesis.cancel(); }catch(e){}
   // «Hola Vento» le pasa el micrófono que ya tiene abierto (en la APK no se cierra y se vuelve a abrir).
@@ -8325,6 +8329,8 @@ function startVoiceCommand(conIA){
     } else showToast(conIA ? '🤖 Escuchando con IA… di tu pedido con tus palabras. Toca de nuevo para terminar.' : '🎤 Escuchando… ej: "mesa 1, 5 águilas", "agrega una mesa a nombre de Juan con dos póker", "deshacer". Di "comandos" para ver todos. Toca 🎤 de nuevo para terminar.');
     rec.start();
     scheduleVoiceSilenceStop(VOICE_INITIAL_TIMEOUT_MS);
+    clearTimeout(voiceGuardiaT);
+    voiceGuardiaT = setTimeout(() => { if(voiceListening) stopVoiceCommand(); }, 35000);   // tope de escucha
   }catch(e){
     clearTimeout(voiceAbriendoT);
     voiceListening = false;
@@ -8332,9 +8338,27 @@ function startVoiceCommand(conIA){
   }
 }
 
-function stopVoiceCommand(){
-  try{ if(voiceRecognizer && voiceListening) voiceRecognizer.stop(); }catch(e){}
+/* Vigilante del micrófono: al parar, Vento espera que Android avise «terminé». Si ese aviso no llega (el reconocedor del
+   celular se trabó), el botón se quedaba en «escuchando» para siempre y tocarlo otra vez no hacía nada. Ahora, si en
+   2,5 s no terminó (o se toca otra vez), se cierra a la fuerza y se anota lo que ya se oyó. Y nunca escucha más de 35 s. */
+let voiceGuardiaT = null, voiceParandoDesde = 0;
+function voiceForzarFin(){
+  clearTimeout(voiceGuardiaT); voiceParandoDesde = 0;
+  if(!voiceListening) return;
+  try{ voiceRecognizer && voiceRecognizer.abort && voiceRecognizer.abort(); }catch(e){}
+  if(!voiceListening) return;                         // abort ya avisó «terminé» y se anotó
+  try{ voiceRecognizer && voiceRecognizer.onend && voiceRecognizer.onend({}); }catch(e){ voiceListening = false; updateVoiceFabUI(); }
 }
+function stopVoiceCommand(){
+  if(!voiceListening) return;
+  // Segundo toque mientras se está cerrando: se cierra ya.
+  if(voiceParandoDesde && Date.now() - voiceParandoDesde > 600){ voiceForzarFin(); return; }
+  voiceParandoDesde = Date.now();
+  try{ if(voiceRecognizer) voiceRecognizer.stop(); }catch(e){}
+  clearTimeout(voiceGuardiaT);
+  voiceGuardiaT = setTimeout(voiceForzarFin, 2500);
+}
+window.ventoMicForzarFin = voiceForzarFin;
 
 /* ---------- Manos libres: «Hola Vento» ----------
    Con la app abierta, Vento escucha sola: al oír «Hola Vento» (u «Oye Vento», «Vento, …») hace lo que se le
@@ -10622,7 +10646,7 @@ function startVoiceProductCreation(){
   // Igual que el botón 🎤: Vento se calla y «Hola Vento» le pasa el micrófono (antes quedaban los dos peleándolo).
   try{ if(window.speechSynthesis && (speechSynthesis.speaking || speechSynthesis.pending)) speechSynthesis.cancel(); }catch(e){}
   try{ window.ventoHola && window.ventoHola.soltar(true); }catch(e){}
-  voiceProductListening = true;
+  voiceProductListening = true; window.__vozProductoDesde = Date.now();
   // Producto por voz es una sola frase («Póker, precio cinco mil»): termina al primer silencio (sin la escucha
   // «mantenida» del botón 🎤, que se reabre en cada pausa para los pedidos largos).
   rec.mantener = false;
@@ -25490,7 +25514,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-16 · v1.40.4';
+const MESORA_VERSION = '2026-10-16 · v1.40.5';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'Vento · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 // Si el navegador (o el celular, con la app agregada a la pantalla de inicio) se quedó con
@@ -28857,10 +28881,73 @@ let fotosListas = false;
     l.forEach(a => { try{
       // Prueba piloto (Ajustes → Pagos): pasó por el mismo camino que un aviso de verdad, pero no se registra como pago.
       if(a && /^PRUEBA/.test(String(a.id || ''))){ const pp = pgLeer(a.txt); showToast('🧪 Prueba piloto: ' + (pp ? 'Vento entendió ' + plata(pp.monto) + ' por ' + (pp.breb ? 'Bre-B · ' : '') + pp.app : 'aviso sin valor (espera el SMS)') + '. No se registró como pago.', 7000); return; }
-      if(a && a.txt) pgRecibir(a.txt, 'and-' + a.id, { voz: !!a.voz, revisar: a.revisar || '', smsOk: !!a.smsOk, reemplaza: a.reemplaza || '' }); }catch(e){} });
+      // a.crudo: la app Android no lo entendió y lo pasa tal cual; aquí se revisa con las reglas de la página (que siempre
+      // están al día) y, si es plata recibida, se dice en voz alta («Recibiste … pesos por …»).
+      if(a && a.txt) pgRecibir(a.txt, 'and-' + a.id, { voz: !!a.voz, revisar: a.revisar || '', smsOk: !!a.smsOk, reemplaza: a.reemplaza || '', crudo: !!a.crudo }); }catch(e){} });
     if(l.length) try{ pgPintar(); }catch(e){}
   };
   setInterval(() => window.ventoAvisosNativos(), 5000);
+
+  // ---------- ¿Este celular sí está leyendo los avisos de pago? ----------
+  // Al reinstalar la app Android se borran sus ajustes: la lectura quedaba APAGADA (o sin el permiso) y los pagos dejaban
+  // de sonar sin que nadie lo notara. Con los pagos prendidos en Vento, en el celular del dueño o del administrador:
+  //  • la lectura se vuelve a prender sola (salvo que el dueño la haya apagado a propósito en Ajustes → Pagos);
+  //  • si falta el permiso, Android desconectó la lectura o la app es vieja, sale un aviso fijo con el botón para arreglarlo.
+  // (En el celular de un mesero o empleado no se prende sola: leería los avisos de su banco personal.)
+  const PG_APK = 'https://github.com/cristhianlujan45-blip/cuentas/releases/latest/download/vento.apk';
+  let pgSinVivo = 0, pgSaludOculto = 0;
+  const pgSaludRep = {};
+  function pgSaludReportar(k, msg){
+    const hoy = new Date().toDateString(); if(pgSaludRep[k] === hoy) return; pgSaludRep[k] = hoy;
+    try{ window.ventoError && window.ventoError('pago', msg, { app: window.ventoAppVersion ? window.ventoAppVersion() : '' }, 'pago|lectura|' + k); }catch(e){}
+  }
+  function pgSalud(){
+    const A = AND();
+    let jefe = true; try{ jefe = !window.ventoRoles || window.ventoRoles.esJefe(); }catch(e){}
+    if(!A || !jefe || typeof authUser === 'undefined' || !authUser || typeof data === 'undefined' || !data || !data.pagos || !data.pagos.on){ pgSaludPintar(''); return ''; }
+    const g = PG();
+    let e = andEstado();
+    if(!e.on && !g.andOff){ try{ A.pagosAvisos(true); }catch(x){} e = andEstado(); pgSaludReportar('apagada', 'La lectura de avisos de pago estaba apagada en la app (se prendió sola)'); }
+    pgSinVivo = e.permiso && e.vivo === false ? pgSinVivo + 1 : 0;
+    let k = '';
+    if(!e.on) k = '';
+    else if(!A.pagosLectura) k = 'vieja';
+    else if(e.permiso === false) k = 'permiso';
+    else if(pgSinVivo >= 2) k = 'desconectada';
+    if(k === 'permiso') pgSaludReportar('permiso', 'La app no tiene el permiso «Acceso a notificaciones»: los pagos no suenan');
+    if(k === 'desconectada') pgSaludReportar('desconectada', 'Android desconectó la lectura de avisos de pago');
+    if(k === 'vieja') pgSaludReportar('vieja', 'App Android vieja: no pasa a la página los avisos que no entiende');
+    pgSaludPintar(Date.now() < pgSaludOculto ? '' : k);
+    return k;
+  }
+  function pgSaludPintar(k){
+    let b = document.getElementById('pgSalud');
+    if(!k){ if(b) b.hidden = true; return; }
+    if(!b){
+      b = document.createElement('div'); b.id = 'pgSalud'; b.setAttribute('role', 'alert');
+      b.style.cssText = 'position:fixed;left:8px;right:8px;top:calc(8px + env(safe-area-inset-top,0px));z-index:9998;background:#7a1f1f;color:#fff;border-radius:14px;padding:10px 12px;font-size:14px;line-height:1.4;box-shadow:0 6px 20px rgba(0,0,0,.35)';
+      b.addEventListener('click', ev => {
+        const x = ev.target.closest('[data-pgs]'); if(!x) return;
+        const A = AND(), a = x.dataset.pgs;
+        if(a === 'cerrar'){ pgSaludOculto = Date.now() + 3600e3; b.hidden = true; return; }
+        if(a === 'permiso' || a === 'reconectar'){ try{ A && A.mediosPermiso(); }catch(e){} if(a === 'reconectar') showToast('En la pantalla que se abre, APAGA «Vento» y vuélvelo a PRENDER. Luego regresa.', 10000); }
+      });
+      document.body.appendChild(b);
+    }
+    const txt = {
+      vieja: '📲 <b>Actualiza la app Vento</b> para que los pagos de Nequi, DaviPlata y Bre-B suenen siempre.',
+      permiso: '⚠️ <b>Los pagos no van a sonar:</b> Vento no tiene el permiso «Acceso a notificaciones» en este celular.',
+      desconectada: '⚠️ <b>Los pagos no van a sonar:</b> Android desconectó la lectura de avisos de Vento.'
+    }[k];
+    const btn = k === 'vieja' ? '<a href="' + PG_APK + '" download="vento.apk" rel="noopener" style="background:#fff;color:#7a1f1f;border-radius:10px;padding:7px 12px;font-weight:800;text-decoration:none">⬇️ Instalar la nueva</a>'
+      : '<button type="button" data-pgs="' + (k === 'permiso' ? 'permiso' : 'reconectar') + '" style="background:#fff;color:#7a1f1f;border:0;border-radius:10px;padding:7px 12px;font-weight:800">' + (k === 'permiso' ? '🔓 Dar el permiso' : '🔄 Reconectar') + '</button>';
+    b.innerHTML = '<div>' + txt + '</div><div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">' + btn + '<button type="button" data-pgs="cerrar" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,.6);border-radius:10px;padding:6px 10px">Luego</button></div>';
+    b.dataset.k = k; b.hidden = false;
+  }
+  window.ventoPagosSalud = pgSalud;
+  setTimeout(() => { try{ pgSalud(); }catch(e){} }, 4000);
+  setInterval(() => { try{ pgSalud(); }catch(e){} }, 30000);
+  document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') try{ pgSalud(); }catch(e){} });
   window.pagosLeer = pgLeer;
 
   // La mesa avisó «Ya pagué por Nequi»: ¿ya llegó la plata?
@@ -28943,7 +29030,7 @@ let fotosListas = false;
         const a = e.target.closest('[data-gp]'); if(!a) return;
         const k = a.dataset.gp, A = AND();
         if(k === 'abrirapp'){ try{ window.ventoAbrirApp(); }catch(x){} return; }
-        if(k === 'prender'){ PG().on = true; saveData(); try{ pgConectar(); }catch(x){} if(A && !andEstado().on){ A.pagosAvisos(true); if(!andEstado().permiso) try{ A.mediosPermiso(); }catch(x){} } try{ pgPintar(); }catch(x){} }
+        if(k === 'prender'){ PG().on = true; PG().andOff = false; saveData(); try{ pgConectar(); }catch(x){} if(A && !andEstado().on){ A.pagosAvisos(true); if(!andEstado().permiso) try{ A.mediosPermiso(); }catch(x){} } try{ pgPintar(); }catch(x){} }
         if(k === 'permiso' && A) try{ A.mediosPermiso(); }catch(x){}
         if(k === 'bateria' && A) try{ A.ajustesBateria(); }catch(x){}
         if(k === 'autoinicio' && A) try{ A.abrirInicioAutomatico(); showToast('Busca «Vento» en la lista y actívalo. Luego vuelve con el botón de atrás.', 8000); }catch(x){}
@@ -29071,6 +29158,8 @@ let fotosListas = false;
     const andOn = $p('pgAndOn');
     if(andOn) andOn.onchange = () => {
       AND().pagosAvisos(andOn.checked);
+      PG().andOff = !andOn.checked; saveData();   // apagada a propósito: no se vuelve a prender sola (ver pgSalud)
+      try{ pgSalud(); }catch(e){}
       if(andOn.checked && !andEstado().permiso){
         showToast('Falta un permiso: en la pantalla que se abre, activa «Vento» en «Acceso a notificaciones» y vuelve.', 9000);
         try{ AND().mediosPermiso(); }catch(e){}
@@ -29088,12 +29177,25 @@ let fotosListas = false;
   // Avisos de apps de banco que hablaban de plata pero Vento NO tomó como pago (vienen sin nombres ni números): se ven en
   // Ajustes → Pagos y se reportan para enseñarle a Vento ese formato.
   const pgDiagVistos = new Set();
+  // Cada aviso del banco que Vento NO tomó como pago (o que no entendió) llega solo a 🐞 Errores del panel de
+  // administrador, sin nombres ni valores, aunque nadie abra Ajustes → Pagos: así se ve qué llegó y por qué no sonó.
+  function pgDiagReportar(){
+    const A = AND(); if(!A || !A.pagosAvisosDiag) return null;
+    let d = {}; try{ d = JSON.parse(A.pagosAvisosDiag() || '{}'); }catch(x){ return null; }
+    const rep = (motivo, app, txt) => { const k = app + '|' + txt; if(pgDiagVistos.has(k)) return; pgDiagVistos.add(k);
+      try{ window.ventoError && window.ventoError('pago', 'Aviso del banco que Vento no tomó (' + String(app || 'app').slice(0, 30) + ': ' + motivo + ')', { app: String(app || '').slice(0, 40), texto: String(txt || '').slice(0, 220), motivo: String(motivo).slice(0, 80) }, 'pago|no-tomado|' + String(app || '').toLowerCase().slice(0, 30) + '|' + String(txt || '').slice(0, 60)); }catch(e){} };
+    (Array.isArray(d.lista) ? d.lista : []).forEach(x => rep(x.motivo || '', x.app, x.txt));
+    // Del registro: lo que se descartó (🚫), lo que no se entendió (❓) o se pasó crudo a la página (📤). Los de plata que
+    // SALE y los códigos no se mandan (no son pagos).
+    (Array.isArray(d.traza) ? d.traza : []).forEach(x => { const r = String(x.r || '');
+      if(/^(🚫|❓|📤)/.test(r) && !/SALE|código de seguridad/.test(r)) rep(r.replace(/^\S+\s*/, ''), x.app, x.txt); });
+    return d;
+  }
+  setInterval(() => { try{ pgDiagReportar(); }catch(e){} }, 60000);
   function pgDiagPintar(){
     const A = AND(); if(!A || !A.pagosAvisosDiag) return;
-    let d = {}; try{ d = JSON.parse(A.pagosAvisosDiag() || '{}'); }catch(x){}
+    const d = pgDiagReportar() || {};
     const l = Array.isArray(d.lista) ? d.lista : [];
-    l.forEach(x => { const k = x.app + '|' + x.txt; if(pgDiagVistos.has(k)) return; pgDiagVistos.add(k);
-      try{ window.ventoError && window.ventoError('pago', 'Aviso del banco que Vento no tomó (' + String(x.app || 'app').slice(0, 30) + ': ' + (x.motivo || '') + ')', { app: String(x.app || '').slice(0, 40), texto: String(x.txt || '').slice(0, 220) }, 'pago|no-tomado|' + String(x.app || '').toLowerCase().slice(0, 30) + '|' + String(x.txt || '').slice(0, 60)); }catch(e){} });
     let box = document.getElementById('pgDiag');
     const ancla = $p('pgAndTxt'); if(!ancla) return;
     if(!box){ box = document.createElement('div'); box.id = 'pgDiag'; box.style.cssText = 'font-size:13px;line-height:1.45;margin-top:8px'; ancla.parentNode.insertBefore(box, ancla.nextSibling); }
