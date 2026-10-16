@@ -4,6 +4,8 @@
 //  2. Vigía de la música: canciones esperando sin reproductor, y reproductor prendido que no arranca → reporte.
 //  3. Página del QR (celular del cliente): el local no confirmó el pedido en 3 min → reporte.
 //  4. Vento Admin → 🐞 Errores: los ve agrupados, con el globito; el detalle dice dónde pasó; «✅ Ya lo arreglé».
+//  5. 💜 Frases de pago: un aviso que Vento no entiende → «Enseñar esta frase» en el panel → el siguiente aviso igual ya es
+//     un pago en la app del negocio (sin reinstalar).
 'use strict';
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const fs = require('fs');
@@ -108,5 +110,33 @@ const ADMIN = 'cristhianwkh@gmail.com', CLAVE_ADMIN = 'Clave-de-prueba-77';
     await D.p.click('#erResolver');
     chk('4. «✅ Ya lo arreglé» lo quita de los sin resolver', await D.p.waitForFunction(() => !document.querySelector('#erLista [data-error="musica|no-arranca"]'), null, { timeout: 8000 }).then(() => true, () => false));
     chk('4. … y en el servidor quedó resuelto', (await filas("select bool_and(resuelto) r from app_errores where huella = 'musica|no-arranca'"))[0].r === true);
+    await D.p.evaluate(() => document.getElementById('dlgEr').open && document.getElementById('dlgEr').close());
+
+    // ===== 5. 💜 Frases de pago: el banco escribe el aviso distinto → el administrador lo enseña y le llega al instante =====
+    const N = await pagina('negocio-frases', BASE + '/index.html');
+    await N.p.waitForSelector('#authOverlay:not([hidden])');
+    await N.p.fill('#authBiz', 'Bar Frases'); await N.p.fill('#authUser', 'leo'); await N.p.fill('#authPass', 'clave123'); await N.p.click('#authBtn');
+    await N.p.waitForFunction(() => document.getElementById('authOverlay').hidden, null, { timeout: 15000 });
+    await N.p.click('#onbSaltar', { timeout: 4000 }).catch(() => {});
+    await N.p.evaluate(() => document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')));
+    const avisar = id => N.p.evaluate(id => { window.pagosRecibirTexto('Bancolombia | Bancolombia | Movimiento en tu cuenta por $4.000 de JUAN PEREZ', id); }, id);
+    await avisar('and-frase-1');
+    chk('5. Un aviso que Vento no entiende («Movimiento en tu cuenta por $4.000») no se toma como pago…', await N.p.waitForTimeout(1500).then(() => N.p.evaluate(() => !(data.pagos.lista || []).some(x => x.monto === 4000))));
+    chk('5. … y le llega al administrador (sin nombres ni valores)', await hasta(async () => (await filas("select 1 from app_errores where tipo = 'pago' and negocio = 'Bar Frases' and detalle->>'texto' like '%Movimiento en tu cuenta por $# de NOMBRE%'")).length > 0),
+      await filas("select mensaje, detalle from app_errores where tipo = 'pago'"));
+    await D.p.selectOption('#erTipo', 'pago'); await D.p.click('#erRef');
+    await D.p.waitForSelector('#erLista [data-error] .t');
+    await D.p.click('#erLista [data-error] .t');
+    await D.p.waitForSelector('#dlgEr[open]');
+    chk('5. En el aviso: «💜 Enseñar esta frase»', await D.p.isVisible('#erEnsenar'));
+    await D.p.click('#erEnsenar');
+    chk('5. … llena la frase con el texto fijo del aviso («Movimiento en tu cuenta por») y el banco', await D.p.inputValue('#frTexto') === 'Movimiento en tu cuenta por' && await D.p.inputValue('#frBanco') === 'Bancolombia', [await D.p.inputValue('#frTexto'), await D.p.inputValue('#frBanco')]);
+    await D.p.click('#frAgregar');
+    chk('5. Queda en «💜 Frases de pago» del panel', await D.p.waitForFunction(() => /Movimiento en tu cuenta por/.test(document.getElementById('frLista').textContent), null, { timeout: 8000 }).then(() => true, () => false));
+    await N.p.waitForTimeout(10500);   // la app pide las frases otra vez cuando le llega un aviso que no entiende (cada 10 s como mucho)
+    await N.p.evaluate(() => { window.__voz5 = []; const d = window.ventoDecirPago; window.ventoDecirPago = f => { window.__voz5.push(String(f)); }; });
+    await avisar('and-frase-2');
+    chk('5. El siguiente aviso igual ya es un pago en la app del negocio, sin reinstalar: $4.000 por Bancolombia', await N.p.waitForFunction(() => (data.pagos.lista || []).some(x => x.monto === 4000 && x.app === 'Bancolombia'), null, { timeout: 8000 }).then(() => true, () => false));
+    chk('5. … y lo dice en voz alta («Recibiste 4000 pesos por Bancolombia»)', await N.p.evaluate(() => window.__voz5.some(x => /^Recibiste 4000 pesos por Bancolombia/.test(x))), await N.p.evaluate(() => window.__voz5));
   }
 })();

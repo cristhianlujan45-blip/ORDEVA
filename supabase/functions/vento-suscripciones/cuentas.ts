@@ -32,6 +32,7 @@ export const MENSAJES_EXTRA: Record<string, [number, string]> = {
   demasiados: [429, "Demasiados mensajes seguidos. Espera un rato."],
   telefono_invalido: [400, "Escribe el celular con su indicativo, solo números (ej. 573001234567)."],
   equipo_invalido: [400, "Equipo inválido."],
+  frase_invalida: [400, "La frase debe tener entre 3 y 120 letras."],
 };
 
 const uuid = (v: unknown, que = "usuario") => {
@@ -131,6 +132,15 @@ export async function accionAdmin(env: Env, db: Db, adminId: string, accion: str
     case "error_resolver":
       if (!b.huella) throw new ErrorVento("falta_huella", "Falta el error.", 400);
       return { ok: true, r: await db.rpc("srv_admin_error_resolver", { p_huella: String(b.huella).slice(0, 200), p_resuelto: b.resuelto !== false }) };
+    case "frases_pago":
+      return { ok: true, frases: await db.rpc("srv_admin_frases_pago") };
+    case "frase_pago_guardar":
+      return { ok: true, frase: await db.rpc("srv_admin_frase_pago_guardar", { p: b.frase && typeof b.frase === "object" ? b.frase : {} }) };
+    case "frase_pago_borrar": {
+      const id = Number(b.id);
+      if (!Number.isInteger(id) || id <= 0) throw new ErrorVento("falta_frase", "Falta la frase.", 400);
+      return { ok: true, r: await db.rpc("srv_admin_frase_pago_borrar", { p_id: id }) };
+    }
     case "licencia_revocar":
       return { ok: true, licencia: await db.rpc("srv_lic_revocar", { p_id: uuid(b.licencia, "licencia"), p_quitar_acceso: !!b.quitar_acceso, p_admin: adminId }) };
   }

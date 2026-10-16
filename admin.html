@@ -350,6 +350,17 @@
       <input id="erBuscar" type="search" placeholder="🔎 Código (E-XXXX), negocio, mensaje o versión">
       <button class="b" id="erRef" type="button" title="Actualizar">🔄</button>
     </div>
+    <details class="card" id="frBox" style="margin-bottom:12px">
+      <summary style="cursor:pointer;font-weight:800">💜 Frases de pago <span class="soft" id="frCuenta"></span></summary>
+      <p class="soft" style="margin:8px 0">Si un banco cambia cómo escribe el aviso de un pago, agrega aquí la frase: le llega <b>al instante</b> a la app de todos los negocios, sin reinstalar nada. <b>Es un pago</b>: Vento lo toma y dice el valor que traiga el aviso. <b>No es un pago</b>: Vento lo ignora (publicidad, saldo…). Solo frases: nunca nombres ni valores.</p>
+      <div class="bar">
+        <input id="frTexto" type="text" maxlength="120" placeholder="Frase del aviso, ej. Abono a tu DaviPlata" aria-label="Frase del aviso">
+        <select id="frTipo" aria-label="Qué es"><option value="pago">💜 Es un pago</option><option value="ignorar">🚫 No es un pago</option></select>
+        <input id="frBanco" type="text" maxlength="40" placeholder="Banco (opcional)" aria-label="Banco" style="max-width:160px">
+        <button class="b p" id="frAgregar" type="button">➕ Agregar</button>
+      </div>
+      <div class="list" id="frLista"><div class="empty">Cargando…</div></div>
+    </details>
     <div class="list" id="erLista"><div class="empty">Cargando…</div></div>
   </section>
 
@@ -853,6 +864,7 @@
     <div class="row">
       <button class="b p" id="erResolver" type="button">✅ Ya lo arreglé</button>
       <button class="b" id="erReabrir" type="button" hidden>↩️ Volver a abrir</button>
+      <button class="b" id="erEnsenar" type="button" hidden>💜 Enseñar esta frase</button>
     </div>
   </div>
 </dialog>
@@ -901,7 +913,7 @@
    Si después de recargar el servidor todavía entrega la versión vieja, no se queda recargando: deja el aviso. */
 (function(){
   'use strict';
-  var ADMIN_VERSION = '2026-10-16 · v1.40.6';
+  var ADMIN_VERSION = '2026-10-16 · v1.40.7';
   var ultima = 0, oculto = 0, inicio = Date.now();
   function corta(v){ return String(v).split('·').pop().trim(); }
   function libre(){
@@ -1933,7 +1945,7 @@
     if(b.dataset.t === 'resumen') rsCargar();
     if(b.dataset.t === 'usuarios') usCargar();
     if(b.dataset.t === 'soporte') spCargar();
-    if(b.dataset.t === 'errores') erCargar();
+    if(b.dataset.t === 'errores'){ erCargar(); frCargar(); }
     if(b.dataset.t === 'licencias') lsCargar();
   });
   async function intentar(fn, caja){
@@ -2113,8 +2125,50 @@
         esc(c.negocio || 'Sin nombre de negocio') + '</b><small>' + esc([c.usuario || '', c.plataforma || '', c.version ? 'v' + c.version : '', c.veces + (c.veces === 1 ? ' vez' : ' veces'), hace(c.ultimo)].filter(Boolean).join(' · ')) +
         (c.detalle ? '<br><code style="white-space:pre-wrap;word-break:break-word;font-size:12px">' + esc(JSON.stringify(c.detalle, null, 1).slice(0, 1200)) + '</code>' : '') + '</small></div>' + (c.resuelto ? '<span class="pill ok">✅</span>' : '') + '</div>').join('') : '<div class="empty">Sin detalle.</div>') + '</div>';
     $('erResolver').hidden = !!e.resuelto; $('erReabrir').hidden = !e.resuelto;
+    $('erEnsenar').hidden = !(e.tipo === 'pago' && frSugerir(e));
     if(!$('dlgEr').open) $('dlgEr').showModal();
   }
+  // ---------- 💜 Frases de pago (le llegan al instante a la app de todos) ----------
+  async function frCargar(){
+    const j = await intentar(() => sxApi('frases_pago'), $('frLista')); if(!j) return;
+    ad.frases = j.frases || []; frPintar();
+  }
+  function frPintar(){
+    const l = ad.frases || [];
+    $('frCuenta').textContent = l.length ? '(' + l.length + ')' : '';
+    $('frLista').innerHTML = l.length ? l.map(f => '<div class="item" style="cursor:default"><div class="av">' + (f.tipo === 'ignorar' ? '🚫' : '💜') + '</div><div class="t"><b>«' + esc(f.texto) + '»</b><small>' +
+      esc([f.tipo === 'ignorar' ? 'No es un pago' : 'Es un pago', f.banco || '', f.activo ? '' : 'pausada', hace(f.actualizado)].filter(Boolean).join(' · ')) + '</small></div>' +
+      '<button class="b no" type="button" data-fr-borrar="' + esc(f.id) + '" title="Borrar">🗑</button></div>').join('') : '<div class="empty">Todavía no hay frases. Vento usa sus reglas de siempre.</div>';
+  }
+  // Del aviso que no se tomó (viene sin nombres ni valores: NOMBRE, #) se sugiere el pedazo de texto fijo más largo.
+  function frSugerir(e){
+    const d = ((e.casos || []).map(c => c.detalle).find(x => x && x.texto) || {});
+    const partes = String(d.texto || '').split(/NOMBRE|#|@llave|\$|\||[.:;!¡¿?]/).map(x => x.replace(/\s+/g, ' ').trim()).filter(x => x.length >= 6);
+    partes.sort((a, b) => b.length - a.length);
+    return partes[0] ? { texto: partes[0].slice(0, 120), banco: String(d.app || '').slice(0, 40) } : null;
+  }
+  $('erEnsenar').onclick = () => {
+    const sg = ad.error && frSugerir(ad.error); if(!sg) return;
+    $('dlgEr').close();
+    $('frBox').open = true; $('frTexto').value = sg.texto; $('frBanco').value = /^sms /i.test(sg.banco) ? '' : sg.banco; $('frTipo').value = 'pago';
+    $('frTexto').focus(); $('frBox').scrollIntoView({ block: 'start', behavior: 'smooth' });
+    toast('Revisa la frase (deja solo la parte que siempre dice el banco) y toca «➕ Agregar».');
+  };
+  $('frAgregar').onclick = async () => {
+    const texto = $('frTexto').value.replace(/\s+/g, ' ').trim();
+    if(texto.length < 3){ toast('Escribe la frase del aviso (mínimo 3 letras).'); $('frTexto').focus(); return; }
+    const j = await intentar(() => sxApi('frase_pago_guardar', { frase: { texto, tipo: $('frTipo').value, banco: $('frBanco').value.trim() } })); if(!j) return;
+    $('frTexto').value = ''; $('frBanco').value = '';
+    toast('✅ Frase guardada: ya le llega a la app de todos los negocios.');
+    frCargar();
+  };
+  $('frLista').addEventListener('click', async e => {
+    const b = e.target.closest('[data-fr-borrar]'); if(!b) return;
+    const f = (ad.frases || []).find(x => String(x.id) === b.dataset.frBorrar);
+    if(!confirm('¿Borrar la frase «' + (f ? f.texto : '') + '»?')) return;
+    const j = await intentar(() => sxApi('frase_pago_borrar', { id: Number(b.dataset.frBorrar) })); if(!j) return;
+    toast('🗑 Frase borrada.'); frCargar();
+  });
   async function erMarcar(resuelto){
     const e = ad.error; if(!e) return;
     const j = await intentar(() => sxApi('error_resolver', { huella: e.huella, resuelto })); if(!j) return;
@@ -2384,7 +2438,7 @@
     sx.yo = j; $('sxQuien').textContent = j.email || '';
     $('lock').hidden = true;
     const t = document.querySelector('#tabs button.on'); const tab = t ? t.dataset.t : 'resumen';
-    if(tab === 'resumen') rsCargar(); else if(tab === 'usuarios') usCargar(); else if(tab === 'soporte') spCargar(); else if(tab === 'errores') erCargar(); else if(tab === 'licencias') lsCargar();
+    if(tab === 'resumen') rsCargar(); else if(tab === 'usuarios') usCargar(); else if(tab === 'soporte') spCargar(); else if(tab === 'errores'){ erCargar(); frCargar(); } else if(tab === 'licencias') lsCargar();
     if(tab !== 'resumen') rsCargar();
     sxEscuchar(); spRevisarNuevos(true); adminPushActivar(false); tpCargar();
     const ancla = (location.hash || '').replace('#', '');

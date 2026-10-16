@@ -2405,7 +2405,7 @@ body.mod-v #quickSaleBtn{ order:-1; background:var(--amber); color:#fff; border-
   .yp-head{ display:flex; align-items:center; gap:10px; padding:10px 14px; border-bottom:1px solid var(--line); flex:0 0 auto; padding-top:max(10px, env(safe-area-inset-top)); }
   .yp-logo{ display:flex; align-items:center; gap:6px; font-weight:800; font-size:18px; letter-spacing:-.02em; flex:0 0 auto; }
   .yp-logo i{ font-style:normal; display:grid; place-items:center; width:30px; height:21px; border-radius:6px; background:#ff0033; color:#fff; font-size:11px; }
-  .yp-hbuscar{ flex:1 1 auto; max-width:640px; margin:0 auto !important; }
+  .yp-hbuscar{ flex:1 1 auto; min-width:0; max-width:640px; margin:0 auto !important; }   /* min-width:0: en el celular se encoge y el ✕ no se sale de la pantalla */
   .yp-hbuscar{ gap:0 !important; }
   .yp-hbuscar input{ flex:1 1 auto; border-radius:999px 0 0 999px !important; }
   .yp-hbuscar button{ flex:0 0 auto; width:auto; border-radius:0 999px 999px 0; padding:0 18px; }
@@ -25514,7 +25514,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-16 · v1.40.6';
+const MESORA_VERSION = '2026-10-16 · v1.40.7';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'Vento · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 // Si el navegador (o el celular, con la app agregada a la pantalla de inicio) se quedó con
@@ -28797,11 +28797,66 @@ let fotosListas = false;
   }
   const pgConfirmado = x => !x.estado || x.estado === 'app' || x.estado === 'ok';
   // op.voz: la app Android ya dijo «Pago confirmado…» y sacó el aviso del celular (aquí no se repite).
+  // ---------- 💜 Frases de pago del administrador (Vento Admin) ----------
+  // Cuando un banco cambia cómo escribe el aviso, el administrador agrega la frase en Vento Admin («Abono a tu DaviPlata»
+  // = es un pago; «Tu saldo es» = no es un pago) y le llega al instante a todos: la app la consulta justo cuando le llega
+  // un aviso que no entiende (si la que tiene es de hace más de 10 s). Se guarda para usarla también sin internet.
+  const PG_FR_KEY = 'vento-frases-pago';
+  let pgFr = (() => { try{ const x = JSON.parse(localStorage.getItem(PG_FR_KEY) || 'null'); return x && Array.isArray(x.l) ? x : { v: 0, l: [], t: 0 }; }catch(e){ return { v: 0, l: [], t: 0 }; } })();
+  let pgFrPidiendo = null;
+  const pgNorm = t => { let x = String(t || '').toLowerCase(); try{ x = x.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }catch(e){} return x.replace(/\s+/g, ' ').trim(); };
+  function pgFrasesCfg(){ try{ return window.ventoServidorCfg ? window.ventoServidorCfg() : null; }catch(e){ return null; } }
+  function pgFrasesCargar(){
+    const c = pgFrasesCfg(); if(!c) return Promise.resolve(pgFr);
+    if(pgFrPidiendo) return pgFrPidiendo;
+    pgFrPidiendo = fetch(c.url + '/rest/v1/rpc/frases_pago_lista', { method: 'POST', headers: { apikey: c.key, Authorization: 'Bearer ' + c.key, 'Content-Type': 'application/json' }, body: '{}', cache: 'no-store' })
+      .then(r => r.ok ? r.json() : null).then(j => {
+        if(j && Array.isArray(j.l)){ pgFr = { v: j.v || 0, l: j.l.filter(x => x && x.t), t: Date.now() }; try{ localStorage.setItem(PG_FR_KEY, JSON.stringify(pgFr)); }catch(e){} }
+        else pgFr.t = Date.now();
+        return pgFr;
+      }).catch(() => { pgFr.t = Date.now(); return pgFr; }).then(x => { pgFrPidiendo = null; return x; });
+    return pgFrPidiendo;
+  }
+  window.ventoFrasesPago = { cargar: pgFrasesCargar, lista: () => pgFr.l.slice(), poner: l => { pgFr = { v: Date.now(), l: (l || []).filter(x => x && x.t), t: Date.now() }; } };
+  setTimeout(() => { if(pgFrasesCfg()) pgFrasesCargar(); }, 6000);
+  setInterval(() => { if(pgFrasesCfg() && document.visibilityState === 'visible') pgFrasesCargar(); }, 10 * 60e3);
+  /** ¿El aviso trae una frase del administrador? {ignorar} o {monto, app, de, breb, frase} (monto 0 = plata sin valor). */
+  function pgFrase(txt){
+    if(!pgFr.l.length) return null;
+    const t = String(txt || ''), n = pgNorm(t);
+    const ign = pgFr.l.find(x => x.tipo === 'ignorar' && n.includes(pgNorm(x.t)));
+    if(ign) return { ignorar: true, frase: ign.t };
+    const r = pgFr.l.find(x => x.tipo !== 'ignorar' && n.includes(pgNorm(x.t)));
+    if(!r) return null;
+    const m = t.match(/(?:\$|\bCOP)\s?(\d{1,3}(?:[.,]\d{3})+|\d+)/i) || t.match(/(\d{1,3}(?:[.,]\d{3})+|\d+)\s*(?:pesos|cop)\b/i) || t.match(/(?:^|[^\d.,])(\d{1,3}(?:[.,]\d{3})+)(?![.,]?\d)/);
+    const monto = m ? Number(m[1].replace(/[.,]/g, '')) || 0 : 0;
+    const origen = (t.split('|')[0] || '').trim();
+    const app = r.banco || (APPS.find(([re]) => re.test(t)) || [])[1] || (origen && !/^sms$/i.test(origen) ? origen : '') || 'Transferencia';
+    return { monto, app, de: '', breb: /bre-?b|\bllaves?\b/i.test(t), frase: r.t };
+  }
+  window.pagosFrase = pgFrase;
+
   function pgRecibir(txt, id, op){
     op = op || {};
     const g = PG();
     if(id){ if(g.vistos.includes(id)) return; g.vistos.push(id); g.vistos = g.vistos.slice(-300); }
-    const p = pgLeer(txt);
+    const fr = pgFrase(txt);
+    if(fr && fr.ignorar){ saveData(); return; }                 // el administrador dijo que esa frase NO es un pago
+    let p = pgLeer(txt);
+    if(!p && fr && fr.monto > 0) p = fr;
+    // No se entendió: si las frases del administrador son de hace más de 10 s, se piden ya y se vuelve a revisar (así
+    // una frase que se acaba de agregar en Vento Admin sirve para este mismo aviso).
+    if(!p && !fr && !op.frasesOk && String(id || '').startsWith('and-') && pgFrasesCfg() && Date.now() - (pgFr.t || 0) > 10e3){
+      g.vistos = g.vistos.filter(x => x !== id);
+      pgFrasesCargar().then(() => pgRecibir(txt, id, Object.assign({}, op, { frasesOk: true })));
+      return;
+    }
+    if(!p && fr){
+      // Frase de pago del administrador, pero el aviso no trae el valor: se avisa sin el valor.
+      try{ showToast('💜 Llegó plata por ' + fr.app + ' (el aviso no trae el valor). Mira el valor en la app del banco.', 12000); }catch(e){}
+      if(!op.voz) window.ventoDecirPago('Llegó plata por ' + fr.app + '. Mira el valor en la aplicación.');
+      saveData(); return;
+    }
     if(!p){
       // Un aviso de PLATA RECIBIDA del banco (ya filtrado por la app Android) que Vento no supo leer: se reporta (sin
       // nombres ni valores) para enseñarle a Vento ese formato, como pasó con los avisos de DaviPlata.
@@ -29102,8 +29157,24 @@ let fotosListas = false;
       // mandaba al principio mientras uno bajaba.
       if(ov.__html === html) return;
       const sc = [ov, ov.firstElementChild].map(x => x ? x.scrollTop : 0);
+      // El paso que se está viendo queda QUIETO en la pantalla aunque cambie lo de arriba (p. ej. llega el permiso y el
+      // paso 3 se achica): antes se guardaba solo el número de desplazamiento y la pantalla se corría unos 60 px.
+      const pasos0 = [...ov.querySelectorAll('.gp-paso')], arriba = ov.getBoundingClientRect().top;
+      // Ancla: el primer paso que empieza dentro de la pantalla (el que se está leyendo); si ninguno, el que se ve a medias.
+      let ia = pasos0.findIndex(x => x.getBoundingClientRect().top >= arriba);
+      if(ia < 0) ia = pasos0.findIndex(x => x.getBoundingClientRect().bottom > arriba + 1);
+      const ya = ia >= 0 ? pasos0[ia].getBoundingClientRect().top : 0;
+      const repinta = !!ov.__html;
       ov.__html = html; ov.innerHTML = html;
-      [ov, ov.firstElementChild].forEach((x, n) => { if(x && sc[n]) x.scrollTop = sc[n]; });
+      // Al repintar, la ventana NO vuelve a hacer su animación de entrada (se movía y la pantalla se corría).
+      if(repinta && ov.firstElementChild) ov.firstElementChild.style.animation = 'none';
+      [ov, ov.firstElementChild].forEach((x, n) => { if(x){ x.style.overflowAnchor = 'none'; if(sc[n]) x.scrollTop = sc[n]; } });
+      const pa = ia >= 0 && (sc[0] || sc[1]) ? ov.querySelectorAll('.gp-paso')[ia] : null;
+      if(pa){
+        const el = sc[1] ? ov.firstElementChild : ov;
+        const ajustar = () => { const d = pa.getBoundingClientRect().top - ya; if(Math.abs(d) > 0.5) el.scrollTop += d; };
+        ajustar(); requestAnimationFrame(ajustar); setTimeout(ajustar, 150);   // y otra vez cuando termina de acomodarse
+      }
     }
     pintar(); ov.classList.add('show');
     clearInterval(ov.__t); ov.__t = setInterval(() => { if(!ov.classList.contains('show')) return clearInterval(ov.__t); if(!ov.contains(document.activeElement) || document.activeElement === document.body) pintar(); }, 3000);

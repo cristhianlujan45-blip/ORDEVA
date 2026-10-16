@@ -1,4 +1,4 @@
-// Pruebas del SERVIDOR: errores de los equipos → Vento Admin (🐞 Errores), contra PostgreSQL 16 REAL
+// Pruebas del SERVIDOR: errores de los equipos → Vento Admin (🐞 Errores) y 💜 Frases de pago, contra PostgreSQL 16 REAL
 // (pruebas/servidor/supabase-local.js) y la Edge Function vento-suscripciones.
 // Corre solo:   node pruebas/servidor/errores.test.js
 'use strict';
@@ -85,6 +85,32 @@ async function pruebas(sb) {
   r = await api('/admin/error_resolver', { huella: 'pedido|sin-confirmar', resuelto: false }, admin.access_token);
   r = await api('/admin/errores', {}, admin.access_token);
   chk('«↩️ Volver a abrir» lo devuelve a los sin resolver', (r.j.errores || []).some(x => x.huella === 'pedido|sin-confirmar' && !x.resuelto));
+
+  // ===== 💜 Frases de pago: el administrador las maneja y le llegan a la app de todos =====
+  r = await rpc('frases_pago_lista', {});
+  chk('Frases de pago: sin frases, la app recibe una lista vacía', r.st === 200 && Array.isArray(r.j.l) && !r.j.l.length && r.j.v === 0, r);
+  r = await api('/admin/frase_pago_guardar', { frase: { texto: 'Abono a tu   DaviPlata', tipo: 'pago', banco: 'DaviPlata' } }, admin.access_token);
+  chk('El administrador agrega «Abono a tu DaviPlata» = es un pago', r.st === 200 && r.j.frase && r.j.frase.texto === 'Abono a tu DaviPlata' && r.j.frase.tipo === 'pago', r);
+  await api('/admin/frase_pago_guardar', { frase: { texto: 'Tu saldo es', tipo: 'ignorar' } }, admin.access_token);
+  r = await api('/admin/frase_pago_guardar', { frase: { texto: 'abono a tu daviplata', tipo: 'pago', banco: 'DaviPlata' } }, admin.access_token);
+  f = await uno('select count(*)::int n from frases_pago');
+  chk('La misma frase (aunque cambien mayúsculas) no se repite', r.st === 200 && f.n === 2, f);
+  r = await rpc('frases_pago_lista', {});
+  chk('Cualquier equipo (sin cuenta) recibe las frases al instante, con su marca de actualización', r.st === 200 && r.j.l.length === 2 && r.j.l.some(x => x.t === 'Abono a tu DaviPlata' && x.tipo === 'pago' && x.banco === 'DaviPlata') && r.j.l.some(x => x.t === 'Tu saldo es' && x.tipo === 'ignorar') && r.j.v > 0, r);
+  r = await api('/admin/frase_pago_guardar', { frase: { texto: 'ab' } }, admin.access_token);
+  chk('Una frase de menos de 3 letras no se guarda (con su mensaje)', r.st === 400 && /3 y 120/.test(JSON.stringify(r.j)), r);
+  r = await api('/admin/frase_pago_guardar', { frase: { texto: 'Te regalamos plata', tipo: 'pago' } }, dueno.access_token);
+  chk('Un cliente no puede agregar frases', r.st === 403, r);
+  r = await rpc('srv_admin_frase_pago_guardar', { p: { texto: 'Te regalamos plata' } }, dueno.access_token);
+  chk('… ni llamando la función directo', r.st >= 400, r);
+  r = await fetch(sb.url + '/rest/v1/frases_pago', { method: 'POST', headers: { ...cab(dueno.access_token), Prefer: 'return=representation' }, body: JSON.stringify({ texto: 'Te regalamos plata' }) }).then(async x => ({ st: x.status, j: await x.json().catch(() => null) }));
+  chk('… ni escribiendo en la tabla', r.st >= 400 && !(await uno("select 1 x from frases_pago where texto = 'Te regalamos plata'")), r);
+  r = await api('/admin/frases_pago', {}, admin.access_token);
+  const saldo = (r.j.frases || []).find(x => x.texto === 'Tu saldo es');
+  chk('El administrador ve todas las frases', r.st === 200 && r.j.frases.length === 2 && !!saldo, r);
+  r = await api('/admin/frase_pago_borrar', { id: saldo.id }, admin.access_token);
+  r = await rpc('frases_pago_lista', {});
+  chk('Al borrarla, deja de llegarle a la app', r.j.l.length === 1 && !r.j.l.some(x => x.t === 'Tu saldo es'), r);
 }
 
 (async () => {

@@ -36,10 +36,13 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     const leer = () => p.evaluate(() => { const ov = document.getElementById('pgGuiaOv'); return (window.__sc ? ov.firstElementChild : ov).scrollTop; });
     await p.waitForTimeout(3600);
     chk('1. Bajé y esperé (se revisa cada 3 s): sigue donde iba, NO vuelve arriba', Math.abs((await leer()) - sc.top) < 3, await leer());
-    await p.evaluate(() => { window.__and.permiso = true; });                  // cambia el estado → se repinta
+    // Lo que se ve: el paso que se está leyendo (el primero que empieza en la pantalla) y dónde está.
+    const viendo = () => p.evaluate(() => { const ps = [...document.querySelectorAll('#pgGuiaOv .gp-paso')]; const i = ps.findIndex(x => x.getBoundingClientRect().top >= 0); return { i, y: i >= 0 ? Math.round(ps[i].getBoundingClientRect().top) : null }; });
+    const antes = await viendo();
+    await p.evaluate(() => { window.__and.permiso = true; });                  // cambia el estado → se repinta (el paso 3 se achica)
     await p.waitForTimeout(3600);
-    const txt = await p.evaluate(() => document.getElementById('pgGuiaOv').innerText);
-    chk('1. Llegó el permiso (cambió el estado): se repintó y sigue donde iba', /Permiso dado/.test(txt) && Math.abs((await leer()) - sc.top) < 3, { top: await leer(), permiso: /Permiso dado/.test(txt) });
+    const txt = await p.evaluate(() => document.getElementById('pgGuiaOv').innerText), despues = await viendo();
+    chk('1. Llegó el permiso (cambió el estado, el paso de arriba se achicó): se repintó y el paso que leía queda quieto', /Permiso dado/.test(txt) && despues.i === antes.i && Math.abs(despues.y - antes.y) < 3, { antes, despues, permiso: /Permiso dado/.test(txt) });
     await p.evaluate(() => document.getElementById('pgGuiaOv').classList.remove('show'));
 
     // ---------- 2 y 3. Cualquier bloque que se refresca solo ----------

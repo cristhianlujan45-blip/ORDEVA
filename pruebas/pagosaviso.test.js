@@ -18,6 +18,7 @@
 // 14. Bre-B (de otros bancos por la llave) y Nequi con «¿…?» en el aviso: suenan. Solicitudes («te pidió») no.
 // 15. Paso 5 «Que suene siempre»: ahorro de batería, «🚀 Inicio automático» y los pasos de la marca (Xiaomi).
 // 19. Avisos «crudos» (la app no los entendió): la página los revisa y, si son pago, los dice.
+// 22. Frases de pago del administrador: «es un pago» (con o sin valor) y «no es un pago».
 // 21. DaviPlata y Nequi con ahorro de batería → aviso fijo y botón que abre su ajuste («Sin restricciones»).
 // 20. Lectura apagada al reinstalar → se prende sola; sin permiso / desconectada / app vieja → aviso fijo para arreglarlo.
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
@@ -342,6 +343,22 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     chk('21. Al volver con DaviPlata arreglada, el aviso pasa a Nequi', r21.k2 === 'bancos' && /Nequi/.test(r21.b2) && !/DaviPlata/.test(r21.b2), r21);
     chk('21. «Luego» lo deja quieto (no vuelve a salir enseguida)', r21.k3 === '' && !r21.b3, r21);
     chk('21. Ajustes → Pagos y el paso a paso muestran cada app: ✅ sin restricciones / ⚠️ con ahorro', /DaviPlata: sin restricciones/.test(r21.diag) && /Nequi: con ahorro de batería/.test(r21.diag) && /Que DaviPlata y Nequi avisen al instante/.test(r21.guia), r21);
+
+    // 22. 💜 Frases de pago del administrador: «es un pago» (con o sin valor) y «no es un pago»
+    const r22 = await p.evaluate(() => {
+      window.ventoFrasesPago.poner([{ t: 'Abono a tu DaviPlata', tipo: 'pago', banco: 'DaviPlata' }, { t: 'tu saldo es', tipo: 'ignorar' }, { t: 'Movimiento recibido', tipo: 'pago', banco: 'Bancolombia' }]);
+      window.__and.decir = []; window.__toasts = [];
+      window.__and.cola.push({ id: 'k22:R:1', txt: 'SMS | 85888 | DaviPlata: Abono a tu DaviPlata por transferencia: 8,000', t: Date.now(), voz: false, crudo: true, smsOk: true });
+      window.__and.cola.push({ id: 'k22:R:2', txt: 'Nequi | Nequi | Te llegó plata $50.000. Tu saldo es $80.000', t: Date.now(), voz: false });
+      window.__and.cola.push({ id: 'k22:R:3', txt: 'Bancolombia | Bancolombia | Movimiento recibido en tu cuenta', t: Date.now(), voz: false, crudo: true });
+      window.ventoAvisosNativos();
+      const l = data.pagos.lista || [];
+      window.ventoFrasesPago.poner([]);
+      return { pago: l.some(x => x.monto === 8000 && x.app === 'DaviPlata'), ignorado: !l.some(x => x.monto === 50000), voz: window.__and.decir.slice(), toasts: window.__toasts.slice() };
+    });
+    chk('22. Frase «Abono a tu DaviPlata» (es un pago): el SMS con 8,000 se registra y suena «Recibiste 8000 pesos por DaviPlata»', r22.pago && r22.voz.some(x => /^Recibiste 8000 pesos por DaviPlata/.test(x)), r22);
+    chk('22. Frase «Tu saldo es» (no es un pago): el aviso no se registra ni suena', r22.ignorado && !r22.voz.some(x => /50000/.test(x)), r22);
+    chk('22. Frase de pago sin valor en el aviso: «Llegó plata por Bancolombia. Mira el valor en la aplicación.»', r22.voz.some(x => /^Llegó plata por Bancolombia/.test(x)) && r22.toasts.some(x => /Llegó plata por Bancolombia/.test(x)), r22);
 
     // 11. Navegador (sin la app): la voz sale con el volumen elegido (hasta 100 %)
     const ctx2 = await b.newContext({ viewport: { width: 1200, height: 900 } });
