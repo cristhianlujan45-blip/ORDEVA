@@ -60,7 +60,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     // 3. App vieja (sin voz de Android): la página lo dice
     await llega('k1:1000:-55', false);
     let e = await estado();
-    chk('3. Sin voz de Android, la página dice «Pago confirmado. 200 pesos desde DaviPlata, de Juan Perez»', e.voz.some(t => /^Pago confirmado\. 200 pesos desde DaviPlata, de Juan Perez/.test(t)), e.voz);
+    chk('3. Sin voz de Android, la página dice «Pago confirmado. 200 pesos desde DaviPlata, de Juan Perez»', e.voz.some(t => /^Recibiste 200 pesos por DaviPlata, de Juan Perez/.test(t)), e.voz);
     chk('3. … con el sonido de éxito y el aviso del celular «💜 Pagaron $200 por DaviPlata»', e.sonidos === 1 && e.notifs.some(n => /Pagaron \$200 por DaviPlata/.test(n.t)), e);
     chk('5. El aviso se reenvía al servidor CON su ID', e.reenvios.length === 1 && e.reenvios[0].id === 'and-k1:1000:-55' && e.reenvios[0].txt === TXT, e.reenvios);
 
@@ -69,7 +69,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     await llega('k1:2000:-55', false);
     e = await estado();
     chk('1. Segundo pago igual → OTRO pago registrado (2 de $200)', e.n === 2, e.n);
-    chk('1. … y vuelve a sonar (voz y sonido otra vez)', e.voz.filter(t => /^Pago confirmado\. 200 pesos desde DaviPlata/.test(t)).length === 2 && e.sonidos === 2, e);
+    chk('1. … y vuelve a sonar (voz y sonido otra vez)', e.voz.filter(t => /^Recibiste 200 pesos por DaviPlata/.test(t)).length === 2 && e.sonidos === 2, e);
     chk('4. Un pago propio enlazado al servidor no se come el segundo pago igual', e.reenvios.length === 2, e.reenvios);
     // El mismo aviso otra vez (mismo ID) → no se repite
     await llega('k1:2000:-55', false);
@@ -95,7 +95,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     // 6. Nequi
     await llega('k8:1:-8', false, 'Nequi | Nequi | PEDRO RUIZ te envió $15.000');
     e = await estado();
-    chk('6. Nequi: «Pago confirmado. 15000 pesos desde Nequi, de Pedro Ruiz»', e.voz.some(t => /^Pago confirmado\. 15000 pesos desde Nequi, de Pedro Ruiz/.test(t)), e.voz);
+    chk('6. Nequi: «Pago confirmado. 15000 pesos desde Nequi, de Pedro Ruiz»', e.voz.some(t => /^Recibiste 15000 pesos por Nequi, de Pedro Ruiz/.test(t)), e.voz);
 
     // 5. Interruptor del aviso de pagos → Android
     await p.evaluate(() => { window.__and.notifPagos = []; });
@@ -138,7 +138,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     await llega('k10:1:-1', false, 'Nequi | Nequi | SARA te envió $12.000');
     await p.evaluate(() => window.ventoPagos && window.ventoPagos.recibir({ id: 'p-srv-10', estado: 'aprobado', confianza: 'app', verificado: false, proveedor: 'dispositivo', metodo: 'DAVIPLATA', monto: 7000, creado_en: new Date().toISOString(), actualizado_en: new Date().toISOString() }, true));
     const d10 = await p.evaluate(() => window.__and.decir.slice());
-    chk('10. En la app, «Pago confirmado» sale por la voz de pagos de Android (con su volumen), no por la de la página', d10.some(t => /^Pago confirmado\. 12000 pesos desde Nequi/.test(t)) && d10.some(t => /^Pago confirmado\. 7000 pesos desde DaviPlata/.test(t)) && (await estado()).voz.length === v10, d10);
+    chk('10. En la app, «Pago confirmado» sale por la voz de pagos de Android (con su volumen), no por la de la página', d10.some(t => /^Recibiste 12000 pesos por Nequi/.test(t)) && d10.some(t => /^Recibiste 7000 pesos por DaviPlata/.test(t)) && (await estado()).voz.length === v10, d10);
 
     // 12. SMS del banco
     await llega('S:1', true, 'SMS | 85888 | DaviPlata: Le llegó plata. Recibió $21.000 de JUAN PEREZ');
@@ -177,7 +177,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     chk('14. Nequi con «¿La guardas en un bolsillo?» en el aviso → SÍ es pago (antes se tomaba por publicidad)', l14[1] === 1, l14);
     chk('14. Bre-B a Nequi → registrado', l14[2] === 1, l14);
     chk('14. «JUAN te pidió $54.000» (solicitud) NO es pago', l14[3] === 0, l14);
-    chk('14. … y suenan: «Pago confirmado. 52000 pesos desde Nequi» y «… 51000 pesos por Bre-B, en DaviPlata»', vz14.some(t => /^Pago confirmado\. 52000 pesos desde Nequi/.test(t)) && vz14.some(t => /^Pago confirmado\. 51000 pesos por Bre-B, en DaviPlata/.test(t)), vz14);
+    chk('14. … y suenan: «Pago confirmado. 52000 pesos desde Nequi» y «… 51000 pesos por Bre-B, en DaviPlata»', vz14.some(t => /^Recibiste 52000 pesos por Nequi/.test(t)) && vz14.some(t => /^Recibiste 51000 pesos por Bre-B, en DaviPlata/.test(t)), vz14);
 
     // 16. Más formas de DaviPlata, Nequi y la llave Bre-B; avisos que no se tomaron
     const r16 = await p.evaluate(() => {
@@ -190,6 +190,16 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     });
     chk('16. Pagos que antes no sonaban (con «nunca comparta su clave», transferencia entrante, abono Bre-B, «Recibio» sin tilde…)', !r16.si.length, r16.si);
     chk('16. Lo que sale o los códigos NO son pago', !r16.no.length, r16.no);
+    const r16b = await p.evaluate(() => ({
+      sms1: window.pagosLeer('SMS | 85888 | DaviPlata: recibiste  100,000 en tu DaviPlata. Usalos de forma segura para pagar, comprar y mucho mas!'),
+      sms2: window.pagosLeer('SMS | 85888 | DaviPlata: Recibiste  140,000. Para saber mas, consulta tus movimientos.'),
+      junto: window.pagosLeer('DaviPlata | DaviPlata | Recibiste $140.000 por Bre-B · Recibiste 140,000. Para saber mas, consulta tus movimientos.'),
+      pasaste: window.pagosLeer('DaviPlata | DaviPlata | Pasaste $100 a otro DaviPlata. Para saber mas, consulta tus movimientos.'),
+      compra: window.pagosLeer('SMS | 85888 | DaviPlata: Compra exitosa en la Tienda Virtual por  20,000. Para saber mas'),
+      llaves: window.pagosLeer('DaviPlata | DaviPlata | Transaccion exitosa: Recibiste Plata de otra entidad usando Llaves, consulta el detalle de tus movimientos desde el app DaviPlata.') }));
+    chk('16. SMS reales de DaviPlata (85888) sin $: 100,000 y 140,000', r16b.sms1 && r16b.sms1.monto === 100000 && r16b.sms1.app === 'DaviPlata' && r16b.sms2 && r16b.sms2.monto === 140000, r16b);
+    chk('16. La llave + el SMS juntos (los junta la app): $140.000 por Bre-B en DaviPlata', r16b.junto && r16b.junto.monto === 140000 && r16b.junto.breb && r16b.junto.app === 'DaviPlata', r16b.junto);
+    chk('16. «Pasaste $100 a otro DaviPlata» y «Compra exitosa» NO son pago; la llave sin valor no inventa uno', !r16b.pasaste && !r16b.compra && !r16b.llaves, r16b);
     chk('16. Se sabe que llegó por la llave Bre-B, y la app de Itaú cuenta como banco', r16.breb && r16.fuente === 'app', r16);
     await p.evaluate(() => { window.__errs16 = []; const e0 = window.ventoError; window.ventoError = (a, b, c, d) => { window.__errs16.push({ a, b, c, d }); return e0 && e0(a, b, c, d); };
       window.VentoAndroid.pagosAvisosDiag = () => JSON.stringify({ ultimo: Date.now() - 60000, vivo: true, lista: [{ app: 'DaviPlata', txt: 'Movimiento NOMBRE $# @llave', motivo: 'no parece plata recibida', t: Date.now() }] });
@@ -224,7 +234,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
       const v = document.getElementById('pgVol');
       return { voces, max: v && v.max };
     });
-    chk('11. En el navegador: «Pago confirmado. 5000 pesos desde Nequi» al 50 %', r11.voces.some(x => /^Pago confirmado\. 5000 pesos desde Nequi/.test(x.t) && x.vol === 0.5), r11);
+    chk('11. En el navegador: «Pago confirmado. 5000 pesos desde Nequi» al 50 %', r11.voces.some(x => /^Recibiste 5000 pesos por Nequi/.test(x.t) && x.vol === 0.5), r11);
     chk('11. En el navegador el volumen llega hasta 100 % (más de eso es en la app Android)', r11.max === '100', r11.max);
     await p2.evaluate(() => window.ventoPagosGuia()); await p2.waitForTimeout(300);
     chk('13. En el computador: «🔎 Este equipo: Vento Web en …»', /Este equipo: Vento Web en (Chrome|navegador)/.test(await p2.evaluate(() => document.getElementById('pgGuiaOv').innerText)));

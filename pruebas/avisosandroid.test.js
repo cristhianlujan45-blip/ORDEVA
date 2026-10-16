@@ -55,7 +55,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     });
     const x = await p.evaluate(() => (data.pagos.lista || [])[0] || null);
     const voz2 = await p.evaluate(() => window.__and.voz.slice());
-    chk('2b. Dice en voz alta «Pago confirmado» con el valor, DaviPlata y quién pagó', voz2.some(t => /^Pago confirmado\. 25000 pesos desde DaviPlata, de Juan Perez/.test(t)), voz2);
+    chk('2b. Dice en voz alta «Pago confirmado» con el valor, DaviPlata y quién pagó', voz2.some(t => /^Recibiste 25000 pesos por DaviPlata, de Juan Perez/.test(t)), voz2);
     chk('2b. Suena el sonido de éxito (como el parlante de Bold)', await p.evaluate(() => window.__and.sonidos) >= 1);
     chk('2b. En pantalla: «✅ Pago confirmado · $25.000 por DaviPlata de Juan Perez»', /Pago confirmado · \$25\.000 por DaviPlata de Juan Perez/.test(await p.evaluate(() => document.body.innerText)));
     chk('2. Aviso de DaviPlata → pago de $25.000 confirmado por la app', x && x.monto === 25000 && x.app === 'DaviPlata' && x.estado === 'app' && x.de === 'Juan Perez', x);
@@ -71,7 +71,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     await p.evaluate(() => window.ventoPagos.recibir({ id: 'srv-77', estado: 'aprobado', confianza: 'ok', verificado: true, proveedor: 'daviplata', metodo: 'DAVIPLATA', monto: 18000, aprobacion: '604107', creado_en: new Date().toISOString(), actualizado_en: new Date().toISOString() }, true));
     A = await p.evaluate(() => window.__and);
     const n = A.notifs.find(y => /Pago confirmado/.test(y.t));
-    chk('4. Dice «Pago confirmado» en voz alta en los demás celulares', A.voz.some(t => /^Pago confirmado\. 18000 pesos desde DaviPlata/.test(t)), A.voz);
+    chk('4. Dice «Pago confirmado» en voz alta en los demás celulares', A.voz.some(t => /^Recibiste 18000 pesos por DaviPlata/.test(t)), A.voz);
     chk('4. Aviso del celular «✅ Pago confirmado» con valor, DaviPlata y N.º de aprobación', n && /\$18\.000/.test(n.x) && /DaviPlata/i.test(n.x) && /604107/.test(n.x) && n.c === 'pedidos', A.notifs);
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.stack || e)); }
   chk('Sin errores de página', !errs.length, errs);

@@ -1158,7 +1158,7 @@ public class VentoApp extends Application {
 
         /** «▶ Probar»: dice un pago de prueba con el volumen elegido. */
         @JavascriptInterface
-        public void pagosProbarVoz() { decirPago("Pago confirmado. 200 pesos desde DaviPlata."); }
+        public void pagosProbarVoz() { decirPago("Recibiste 200 pesos por DaviPlata."); }
 
         @JavascriptInterface
         public void callar() { ui.post(() -> { try { if (tts != null) tts.stop(); } catch (Exception ignorado) { } }); }

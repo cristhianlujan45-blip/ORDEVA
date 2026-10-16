@@ -76,13 +76,13 @@ public class AvisoPagoPrueba {
         chk("Remitente celular (3001234567) → «celular» (falso)", AvisoPago.tipoRemitente("+57 300 123 4567").equals("celular"), AvisoPago.tipoRemitente("+57 300 123 4567"));
         chk("Remitente código corto (85888) → «corto»", AvisoPago.tipoRemitente("85888").equals("corto"), "");
         chk("Frase SMS sin confiar: «Llegó un mensaje de texto de 200 pesos desde DaviPlata. Revísalo…»", AvisoPago.fraseSms("DaviPlata: Recibió $200", 200, "corto", false).startsWith("Llegó un mensaje de texto de 200 pesos desde DaviPlata. Revísalo"), AvisoPago.fraseSms("DaviPlata: Recibió $200", 200, "corto", false));
-        chk("Frase SMS confiando: «Pago confirmado. 200 pesos desde DaviPlata, por mensaje de texto.»", AvisoPago.fraseSms("DaviPlata: Recibió $200", 200, "corto", true).equals("Pago confirmado. 200 pesos desde DaviPlata, por mensaje de texto."), AvisoPago.fraseSms("DaviPlata: Recibió $200", 200, "corto", true));
+        chk("Frase SMS confiando: «Recibiste 200 pesos por DaviPlata, por mensaje de texto.»", AvisoPago.fraseSms("DaviPlata: Recibió $200", 200, "corto", true).equals("Recibiste 200 pesos por DaviPlata, por mensaje de texto."), AvisoPago.fraseSms("DaviPlata: Recibió $200", 200, "corto", true));
         chk("Frase SMS desde celular: «Ojo… parece falso» aunque se confíe", AvisoPago.fraseSms("Nequi: te llegó $50.000", 50000, "celular", true).startsWith("Ojo."), "");
         chk("Banco: DaviPlata", AvisoPago.esBanco("DaviPlata"), "");
         chk("Banco: Nequi", AvisoPago.esBanco("Nequi"), "");
         chk("No es banco: WhatsApp", !AvisoPago.esBanco("WhatsApp"), "");
-        chk("Frase DaviPlata: «Pago confirmado. 200 pesos desde DaviPlata.»", AvisoPago.frase("DaviPlata", 200).equals("Pago confirmado. 200 pesos desde DaviPlata."), AvisoPago.frase("DaviPlata", 200));
-        chk("Frase Nequi: «Pago confirmado. 25000 pesos desde Nequi.»", AvisoPago.frase("Nequi", 25000).equals("Pago confirmado. 25000 pesos desde Nequi."), AvisoPago.frase("Nequi", 25000));
+        chk("Frase DaviPlata: «Recibiste 200 pesos por DaviPlata.»", AvisoPago.frase("DaviPlata", 200).equals("Recibiste 200 pesos por DaviPlata."), AvisoPago.frase("DaviPlata", 200));
+        chk("Frase Nequi: «Recibiste 25000 pesos por Nequi.»", AvisoPago.frase("Nequi", 25000).equals("Recibiste 25000 pesos por Nequi."), AvisoPago.frase("Nequi", 25000));
         chk("Plata: $1.500.000", AvisoPago.plata(1500000).equals("$1.500.000"), AvisoPago.plata(1500000));
         chk("Plata: $200", AvisoPago.plata(200).equals("$200"), AvisoPago.plata(200));
         // Voz de los pagos con volumen PAREJO (antes empezaba bajito y subía)
@@ -121,11 +121,25 @@ public class AvisoPagoPrueba {
         }
         String[] noMas = { "Enviaste $20.000 a la llave @juan. Nunca compartas tu clave", "Tu código de verificación es 123456. Te llegó por Bre-B", "Usted pagó $10.000. Le enviamos el comprobante" };
         for (String nm : noMas) chk("No es plata recibida: «" + nm + "»", !AvisoPago.esRecibido(nm), nm);
-        chk("Voz con Bre-B: «Pago confirmado. 20000 pesos por Bre-B, en Nequi.»", "Pago confirmado. 20000 pesos por Bre-B, en Nequi.".equals(AvisoPago.frase("Nequi", 20000, "Te llegaron $20.000 a tu llave")), AvisoPago.frase("Nequi", 20000, "Te llegaron $20.000 a tu llave"));
+        chk("Voz con Bre-B: «Recibiste 20000 pesos por Bre-B, en Nequi.»", "Recibiste 20000 pesos por Bre-B, en Nequi.".equals(AvisoPago.frase("Nequi", 20000, "Te llegaron $20.000 a tu llave")), AvisoPago.frase("Nequi", 20000, "Te llegaron $20.000 a tu llave"));
         chk("Voz sin Bre-B igual que antes", AvisoPago.frase("DaviPlata", 200, "Le llegó plata $200").equals(AvisoPago.frase("DaviPlata", 200)), "");
         chk("Bancos nuevos: Itaú, Banco Popular, Banco de Bogotá, Pibank, Bold", AvisoPago.esBanco("Itaú") && AvisoPago.esBanco("Banco Popular") && AvisoPago.esBanco("Bogotá App") && AvisoPago.esBanco("Pibank") && AvisoPago.esBanco("Bold"), "");
         chk("Diagnóstico: un aviso de banco con plata que no se tomó se guarda SIN nombres ni números", AvisoPago.pareceDePlata("Movimiento: JUAN PEREZ $20.000 llave") && AvisoPago.sinDatos("Movimiento: JUAN PEREZ $20.000 @juan").equals("Movimiento: NOMBRE $# @llave"), AvisoPago.sinDatos("Movimiento: JUAN PEREZ $20.000 @juan"));
         chk("Diagnóstico: publicidad sin plata no se guarda", !AvisoPago.pareceDePlata("Actualiza tu app de Nequi"), "");
+        // Avisos REALES de DaviPlata (capturas del dueño, 15-oct-2026)
+        String llaves = "DaviPlata | Transaccion exitosa: Recibiste Plata de otra entidad usando Llaves, consulta el detalle de tus movimientos desde el app DaviPlata.";
+        chk("DaviPlata por llave (sin valor): es plata recibida y SIN valor → se espera el SMS", AvisoPago.esRecibido(llaves) && AvisoPago.monto(llaves) == 0 && AvisoPago.esPlataSinValor(llaves) && AvisoPago.esBreB(llaves), AvisoPago.monto(llaves));
+        String sms1 = "DaviPlata: recibiste  100,000 en tu DaviPlata. Usalos de forma segura para pagar, comprar y mucho mas! Conoce todo lo que puedes hacer en www.daviplata.com";
+        chk("SMS 85888 «recibiste  100,000» (sin $): pago de 100000", AvisoPago.esSmsDePago("85888", sms1) && AvisoPago.monto(sms1) == 100000, AvisoPago.monto(sms1));
+        String sms2 = "Recibiste  140,000. Para saber mas, consulta tus movimientos.";
+        chk("SMS 85888 «Recibiste 140,000.» (sin decir DaviPlata): pago de 140000 de DaviPlata", AvisoPago.esSmsDePago("85888", sms2) && AvisoPago.monto(sms2) == 140000 && "DaviPlata".equals(AvisoPago.bancoDeCodigo("85888")), AvisoPago.monto(sms2));
+        chk("…y desde un celular el mismo texto NO es del banco", !AvisoPago.esSmsDePago("3001234567", sms2), "");
+        chk("Voz del SMS 85888: «… 140000 pesos desde DaviPlata …»", AvisoPago.fraseSms("85888", sms2, 140000, "corto", false).contains("140000 pesos desde DaviPlata"), AvisoPago.fraseSms("85888", sms2, 140000, "corto", false));
+        chk("Voz de la llave con el valor del SMS: «Recibiste 140000 pesos por Bre-B, en DaviPlata.»", "Recibiste 140000 pesos por Bre-B, en DaviPlata.".equals(AvisoPago.frase("DaviPlata", 140000, llaves)), AvisoPago.frase("DaviPlata", 140000, llaves));
+        String[] salen = { "DaviPlata | Pasaste $100 a otro DaviPlata. Para saber mas, consulta tus movimientos.", "DaviPlata: Compra exitosa en la Tienda Virtual por  20,000. Para saber mas, consulta tus movimientos" };
+        for (String x : salen) chk("Plata que SALE no es pago: «" + x + "»", !AvisoPago.esRecibido(x) && !AvisoPago.esSmsDePago("85888", x), x);
+        chk("Valores sin signo pequeños: «Recibiste 100 pesos» → 100; «recibiste 1000» → 1000", AvisoPago.monto("Recibiste 100 pesos") == 100 && AvisoPago.monto("DaviPlata: recibiste 1000 en tu DaviPlata") == 1000, AvisoPago.monto("Recibiste 100 pesos"));
+        chk("Un número de celular no es el valor («Recibiste plata de 3001234567»)", AvisoPago.monto("Recibiste plata de 3001234567") == 0, AvisoPago.monto("Recibiste plata de 3001234567"));
         System.out.println("RESULTADO " + ok + " bien " + mal + " mal");
         System.exit(mal > 0 ? 1 : 0);
     }

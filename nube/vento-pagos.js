@@ -149,7 +149,7 @@
     // Como el parlante de Bold: sonido de éxito y «Pago confirmado» en voz alta.
     toast('✅ Pago confirmado · ' + plata(p.monto) + ' por ' + nombreMetodo(p.metodo) + (p.pagador ? ' de ' + p.pagador : '') + m + (p.aprobacion ? ' · N.º ' + p.aprobacion : ''), 9000);
     try{ window.ventoSonidos && window.ventoSonidos.success(); }catch(e){}
-    hablarPago('Pago confirmado. ' + p.monto + ' pesos desde ' + nombreMetodo(p.metodo) + (p.pagador ? ', de ' + p.pagador : '') + (p.mesa ? ', de la ' + etiquetaMesa(p.mesa) : ''));
+    hablarPago('Recibiste ' + p.monto + ' pesos por ' + nombreMetodo(p.metodo) + (p.pagador ? ', de ' + p.pagador : '') + (p.mesa ? ', de la ' + etiquetaMesa(p.mesa) : ''));
     try{ navigator.vibrate && navigator.vibrate([150, 80, 150]); }catch(e){}
     try{ window.mesoraCelebrar && window.mesoraCelebrar(['💜', '💰', '✨']); }catch(e){}
   }

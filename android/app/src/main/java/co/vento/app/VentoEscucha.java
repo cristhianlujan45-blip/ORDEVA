@@ -215,6 +215,34 @@ public class VentoEscucha extends NotificationListenerService {
         if (monto <= 0 && AvisoPago.esPlataSinValor(todo)) {
             String id0 = prefijo + (app + " | " + titulo + " | " + cuerpo).hashCode();
             if (!marcarVisto(sp, id0)) return false;
+            // DaviPlata por la llave Bre-B avisa SIN el valor («Recibiste Plata de otra entidad usando Llaves») y el valor
+            // llega por SMS del 85888 («Recibiste 140,000»). Se juntan: el aviso de la app confirma y el SMS dice cuánto.
+            if (confiable) {
+                JSONObject sms = smsSinPareja(sp);
+                if (sms != null) {
+                    long m = sms.optLong("m");
+                    // Si el SMS ya se había dicho, ahora solo queda confirmado (no se repite la voz).
+                    if (!callado && !sms.optBoolean("dicho")) VentoApp.anunciarPago(app, m, sp.getBoolean(PREF_NOTIF, true), todo);
+                    else if (!callado) VentoApp.decirPago("Confirmado por " + AvisoPago.nombreApp(app) + ".");
+                    guardar(sp, id0, app + " | " + titulo + " | Recibiste $" + AvisoPago.plata(m).substring(1) + " · " + cuerpo, !callado, null, false, sms.optString("id"));
+                    return true;
+                }
+                if (!callado) {
+                    // Se espera el SMS con el valor unos segundos; si no llega, se dice sin el valor.
+                    final String app0 = app, todo0 = todo;
+                    pendiente(sp, id0, app, todo);
+                    VentoApp.mantenerDespierto();
+                    VentoApp.ui.postDelayed(() -> {
+                        try {
+                            if (!tomarPendiente(sp, id0)) return;          // ya llegó el SMS y se dijo con el valor
+                            VentoApp.decirPago(AvisoPago.fraseSinValor(app0));
+                            if (sp.getBoolean(PREF_NOTIF, true)) VentoApp.app.new Puente().notificar("💜 Llegó plata por " + AvisoPago.nombreApp(app0), "Ábrela para ver el valor.", "pagos", false);
+                        } catch (Throwable ignorado) { }
+                    }, ESPERA_SMS);
+                    guardar(sp, id0, app + " | " + titulo + " | " + cuerpo, true, null, false, null);
+                    return true;
+                }
+            }
             if (!callado) {
                 VentoApp.decirPago(AvisoPago.fraseSinValor(app));
                 if (sp.getBoolean(PREF_NOTIF, true)) try {
@@ -243,19 +271,88 @@ public class VentoEscucha extends NotificationListenerService {
      *  banco = «revísalo» (o «Pago confirmado» si el dueño eligió confirmar los SMS del banco). */
     private boolean procesarSms(SharedPreferences sp, String remitente, String cuerpo, String prefijo, boolean callado) throws Exception {
         if (!AvisoPago.esSmsDePago(remitente, cuerpo)) return false;
-        long monto = AvisoPago.monto(remitente + " " + cuerpo);
-        String txt = "SMS | " + remitente + " | " + cuerpo;
+        long monto = AvisoPago.monto(cuerpo);
+        if (monto <= 0) monto = AvisoPago.monto(remitente + " " + cuerpo);
+        String banco = AvisoPago.bancoDeCodigo(remitente);
+        String txt = "SMS | " + remitente + " | " + (banco != null && !cuerpo.toLowerCase().contains(banco.toLowerCase()) ? banco + ": " : "") + cuerpo;
         String id = prefijo + txt.hashCode();
         if (!marcarVisto(sp, id)) return false;
         String tipo = AvisoPago.tipoRemitente(remitente);
-        // El mismo pago ya llegó por la app del banco (confirmado): el SMS no se cuenta otra vez.
-        if (!"celular".equals(tipo) && parear(sp, monto, true, id) != null) return false;
-        boolean confiar = !"celular".equals(tipo) && sp.getBoolean(PREF_SMS_OK, false);
+        // ¿La app del banco ya avisó «Recibiste plata» sin el valor (hace poco)? Este SMS del banco trae el valor: es el
+        // mismo pago, confirmado por la app. Se dice «Recibiste 140000 pesos por Bre-B, en DaviPlata».
+        if (!"celular".equals(tipo)) {
+            JSONObject pend = tomarPendienteReciente(sp);
+            if (pend != null) {
+                String app = pend.optString("app");
+                if (!callado) VentoApp.anunciarPago(app, monto, sp.getBoolean(PREF_NOTIF, true), pend.optString("todo") + " " + cuerpo);
+                guardar(sp, id, app + " | " + app + " | Recibiste $" + AvisoPago.plata(monto).substring(1) + (AvisoPago.esBreB(pend.optString("todo")) ? " por Bre-B" : "") + " · " + cuerpo, !callado, null, false, null);
+                return true;
+            }
+            // El mismo pago ya llegó por la app del banco con su valor (confirmado): el SMS no se cuenta otra vez.
+            if (parear(sp, monto, true, id) != null) return false;
+            final boolean confiar = sp.getBoolean(PREF_SMS_OK, false);
+            recordarSms(sp, id, monto);
+            if (!callado) {
+                // Unos segundos por si llega el aviso de la app del banco (entonces se dice confirmado, una sola vez).
+                final long m = monto; final String rem = remitente, cu = cuerpo, b = banco, ti = tipo;
+                VentoApp.mantenerDespierto();
+                VentoApp.ui.postDelayed(() -> {
+                    try {
+                        if (!smsSigue(sp, id)) return;
+                        VentoApp.decirPago(AvisoPago.fraseSms(rem, cu, m, ti, confiar));
+                        if (confiar && sp.getBoolean(PREF_NOTIF, true)) VentoApp.anunciarPagoAviso(b != null ? b : AvisoPago.bancoDe(cu), m);
+                    } catch (Throwable ignorado) { }
+                }, ESPERA_APP);
+            }
+            guardar(sp, id, txt, !callado, null, confiar, null);
+            return true;
+        }
+        boolean confiar = false;
         boolean voz = false;
-        if (!callado) { VentoApp.decirPago(AvisoPago.fraseSms(cuerpo, monto, tipo, confiar)); voz = true; }
-        if (!callado && confiar && sp.getBoolean(PREF_NOTIF, true)) try { VentoApp.anunciarPagoAviso(AvisoPago.bancoDe(cuerpo), monto); } catch (Throwable ignorado) { }
+        if (!callado) { VentoApp.decirPago(AvisoPago.fraseSms(remitente, cuerpo, monto, tipo, confiar)); voz = true; }
+        if (!callado && confiar && sp.getBoolean(PREF_NOTIF, true)) try { VentoApp.anunciarPagoAviso(banco != null ? banco : AvisoPago.bancoDe(cuerpo), monto); } catch (Throwable ignorado) { }
         guardar(sp, id, txt, voz, null, confiar, null);
         return true;
+    }
+
+    // ---------- Aviso de la app SIN valor + SMS del banco CON el valor (DaviPlata por la llave Bre-B) ----------
+    static final long ESPERA_SMS = 20_000L, ESPERA_APP = 6_000L, JUNTAR = 3 * 60_000L;
+    static final String PREF_PEND = "pagosSinValor", PREF_SMSV = "pagosSmsValor";
+
+    private static synchronized void pendiente(SharedPreferences sp, String id, String app, String todo) {
+        try { sp.edit().putString(PREF_PEND, new JSONObject().put("id", id).put("app", app).put("todo", todo).put("t", System.currentTimeMillis()).toString()).apply(); } catch (Exception ignorado) { }
+    }
+    /** Lo toma si sigue pendiente (devuelve true y lo borra). */
+    private static synchronized boolean tomarPendiente(SharedPreferences sp, String id) {
+        // Se dice sin el valor, pero queda para juntarlo si el SMS llega después (hasta 3 min): entonces se dice el valor.
+        try { JSONObject o = new JSONObject(sp.getString(PREF_PEND, "{}")); if (!id.equals(o.optString("id")) || o.optBoolean("dicho")) return false;
+            sp.edit().putString(PREF_PEND, o.put("dicho", true).toString()).apply(); return true; } catch (Exception e) { return false; }
+    }
+    /** ¿El SMS sigue sin su aviso de la app? (se marca como ya dicho, y queda para juntarlo después) */
+    private static synchronized boolean smsSigue(SharedPreferences sp, String id) {
+        try { JSONObject o = new JSONObject(sp.getString(PREF_SMSV, "{}")); if (!id.equals(o.optString("id")) || o.optBoolean("dicho")) return false;
+            sp.edit().putString(PREF_SMSV, o.put("dicho", true).toString()).apply(); return true; } catch (Exception e) { return false; }
+    }
+    /** El aviso sin valor de hace poco (si hay), y se borra. */
+    private static synchronized JSONObject tomarPendienteReciente(SharedPreferences sp) {
+        try {
+            JSONObject o = new JSONObject(sp.getString(PREF_PEND, "{}"));
+            if (o.optString("id").isEmpty() || System.currentTimeMillis() - o.optLong("t") > JUNTAR) return null;
+            sp.edit().remove(PREF_PEND).apply();
+            return o;
+        } catch (Exception e) { return null; }
+    }
+    /** SMS del banco con valor que todavía no tiene su aviso de la app. */
+    private static synchronized void recordarSms(SharedPreferences sp, String id, long monto) {
+        try { sp.edit().putString(PREF_SMSV, new JSONObject().put("id", id).put("m", monto).put("t", System.currentTimeMillis()).toString()).apply(); } catch (Exception ignorado) { }
+    }
+    private static synchronized JSONObject smsSinPareja(SharedPreferences sp) {
+        try {
+            JSONObject o = new JSONObject(sp.getString(PREF_SMSV, "{}"));
+            if (o.optLong("m") <= 0 || System.currentTimeMillis() - o.optLong("t") > JUNTAR) return null;
+            sp.edit().remove(PREF_SMSV).apply();
+            return o;
+        } catch (Exception e) { return null; }
     }
 
     /** El mismo pago por los dos lados (app del banco y SMS, mismo valor, en 3 min): devuelve el ID del otro aviso si

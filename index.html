@@ -28662,8 +28662,8 @@ let fotosListas = false;
     const recibido = /(recibiste|has recibido|ha recibido|(?:te|le) lleg(?:[oó]|aron)|(?:te|le) pas(?:[oó]|aron)|pasaron plata|(?:te|le) envi(?:[oó]|aron)|(?:te|le) transfiri(?:[oó]|eron)|(?:te|le) pag(?:[oó]|aron)|(?:te|le) consign|(?:te|le) abon|consignaron|abonaron|entr[oó] plata|lleg[oó] plata|ingres[oó]|recibi[oó]|recepci[oó]n|pago recibido|dinero recibido|transferencia recibida|abono a (?:tu|su) cuenta|(?:te|le) mand(?:o|ó|aron)|(?:te|le) gir(?:o|ó|aron)|(?:te|le) deposit|dep[oó]sito recibido|(?:te|le|se) acredit|acredit\w*\s+(?:a|en)\s+(?:tu|su)\s+(?:cuenta|llave|nequi|daviplata)|lleg(?:o|ó|aron)\s+(?:\$|cop|plata|dinero)|a (?:tu|su) llave|(?:recib|lleg|entr|ingres)[^.]{0,40}bre-?b|bre-?b[^.]{0,40}(?:recib|lleg|entr|ingres)|entr[oó] dinero|lleg[oó] dinero|transferencia entrante|abono recibido|abono (?:por|de|bre-?b)\s|ingreso de (?:\$|cop|dinero|plata)|ingresaron|entrada de (?:dinero|plata)|recibiste un (?:pago|abono)|lleg[oó] una transferencia|(?:en|a) (?:tu|su) llave)/i.test(t);
     // Códigos de seguridad: nunca son un pago (la misma regla de la app Android: AvisoPago.CODIGO).
     if(/c[oó]digo (?:de )?(?:seguridad|verificaci|acceso|confirmaci)|clave din[aá]mica|\botp\b|tu c[oó]digo es|es tu c[oó]digo/i.test(t)) return null;
-    const salida = /(enviaste|pagaste|transferiste|retiraste|compraste|sacaste|usted (?:envi|pag|transfiri|pas)|c[oó]digo|clave|otp|contrase)/i.test(t);
-    const sale = /enviaste|pagaste|transferiste|retiraste|compraste|sacaste|usted (?:envi|pag|transfiri|pas)/i.test(t);
+    const salida = /(enviaste|pagaste|pasaste|compra exitosa|transferiste|retiraste|compraste|sacaste|usted (?:envi|pag|transfiri|pas)|c[oó]digo|clave|otp|contrase)/i.test(t);
+    const sale = /enviaste|pagaste|pasaste|compra exitosa|transferiste|retiraste|compraste|sacaste|usted (?:envi|pag|transfiri|pas)/i.test(t);
     // Un pago de verdad puede traer «nunca compartas tu clave»: con una frase fuerte de plata recibida sigue siendo pago.
     if(!recibido || salida && !/(recibiste|recibi[oó]|ha recibido|(?:te|le) lleg)/i.test(t) && !(PG_FUERTE.test(t) && !sale)) return null;
     // Publicidad del banco que se parece a un pago («¿Te llegó la prima?…», «Te prestamos hasta $5.000.000»): NO es plata
@@ -28673,7 +28673,10 @@ let fotosListas = false;
     // Un «¿…?» o «bolsillo» junto a un pago de verdad («te envió $20.000. ¿La guardas?») no lo vuelve publicidad.
     if(PG_PROMO.test(t) && !PG_FUERTE.test(t)) return null;
     // Con signo ($20.000), «COP 20.000» o sin él («Recibiste 25.000 pesos», «transferencia por 30.000»)
-    const m = t.match(/(?:\$|\bCOP)\s?(\d{1,3}(?:[.,]\d{3})+|\d+)/i) || t.match(/(\d{1,3}(?:[.,]\d{3})+|\d{4,})\s*(?:pesos|cop)\b/i) || t.match(/\b(?:recibiste|por|de)\s+(\d{1,3}(?:[.,]\d{3})+)\b/i);
+    // Con signo ($20.000), «COP 20.000», «25.000 pesos» o sin signo como el SMS de DaviPlata («recibiste  100,000»,
+    // «Recibiste 140,000.»). Un número de celular (10 cifras) no es el valor.
+    const m = t.match(/(?:\$|\bCOP)\s?(\d{1,3}(?:[.,]\d{3})+|\d+)/i) || t.match(/(\d{1,3}(?:[.,]\d{3})+|\d+)\s*(?:pesos|cop)\b/i)
+      || t.match(/\b(?:recibiste|recibi[oó]|has recibido|ha recibido|te llegaron|le llegaron|llegaron|abono de|ingreso de|por|de)\s+(\d{1,3}(?:[.,]\d{3})+(?![.,]?\d)|\d{1,7}(?!\d|[.,]\d))(?!\s*(?:%|min|seg|horas?|d[ií]as?|veces))/i);
     if(!m) return null;
     const monto = Number(m[1].replace(/[.,]/g, ''));
     if(!(monto > 0)) return null;
@@ -28726,7 +28729,8 @@ let fotosListas = false;
     if(!p){
       // Un aviso de PLATA RECIBIDA del banco (ya filtrado por la app Android) que Vento no supo leer: se reporta (sin
       // nombres ni valores) para enseñarle a Vento ese formato, como pasó con los avisos de DaviPlata.
-      if(String(id || '').startsWith('and-')) try{ const pz = String(txt).split('|').map(x => x.trim());
+      // «Recibiste Plata … usando Llaves» (sin el valor): la app Android lo junta con el SMS del banco; no es un error.
+      if(String(id || '').startsWith('and-') && !/(recibiste|lleg[oó]) (plata|dinero)|usando llaves/i.test(String(txt))) try{ const pz = String(txt).split('|').map(x => x.trim());
         window.ventoError && window.ventoError('pago', 'Aviso de pago que Vento no entendió (' + (pz[0] || 'app') + ')', { app: (pz[0] || '').slice(0, 40), texto: pz.slice(1).join(' | ').replace(/\b[A-ZÁÉÍÓÚÑ]{2,}(?:\s+[A-ZÁÉÍÓÚÑ]{2,})*\b/g, 'NOMBRE').replace(/\d[\d.,]*/g, '#').slice(0, 200) }, 'pago|no-entendido|' + (pz[0] || '').toLowerCase().slice(0, 30)); }catch(e){}
       return;
     }
@@ -28772,7 +28776,7 @@ let fotosListas = false;
     if(!op.voz) try{ if(!window.ventoAvisoOn || window.ventoAvisoOn('pagos')) window.ventoAvisoCel && window.ventoAvisoCel('💜 Pagaron ' + plata(p.monto) + ' por ' + (p.breb ? 'Bre-B en ' : '') + p.app, (p.de ? 'De ' + p.de + '. ' : '') + (mesa ? tableLabel(mesa) + '. ' : '') + 'Confirmado por la app de ' + p.app + '.', 'pedidos'); }catch(e){}
     try{ window.ventoSonidos && window.ventoSonidos.success(); }catch(e){}
     // «Pago confirmado. 200 pesos desde DaviPlata» (o «desde Nequi»…), con quién pagó y la mesa si se sabe.
-    if(!op.voz) window.ventoDecirPago('Pago confirmado. ' + p.monto + ' pesos ' + (p.breb ? 'por Bre-B, en ' : 'desde ') + p.app + (p.de ? ', de ' + p.de : '') + (mesa ? ', de la ' + tableLabel(mesa) : ''));
+    if(!op.voz) window.ventoDecirPago('Recibiste ' + p.monto + ' pesos ' + (p.breb ? 'por Bre-B, en ' : 'por ') + p.app + (p.de ? ', de ' + p.de : '') + (mesa ? ', de la ' + tableLabel(mesa) : ''));
     if(navigator.vibrate) try{ navigator.vibrate([150, 80, 150]); }catch(e){}
     try{ window.mesoraCelebrar && window.mesoraCelebrar(['💜', '💰', '✨']); }catch(e){}
     pgPintar();
@@ -28912,7 +28916,7 @@ let fotosListas = false;
           (A && A.abrirInicioAutomatico ? '<br><b>' + (perm.bateria === false ? '2.' : '') + '</b> <button type="button" class="btn-ghost gp-btn" data-gp="autoinicio">🚀 Permitir «Inicio automático»</button>' + (pgMarca() ? ' <small>(' + escp(pgMarca()) + ')</small>' : '') : '') +
           (A ? '<ul style="margin:6px 0 0;padding-left:20px;font-size:14px;line-height:1.5">' + pgPasosMarca() + '<li>En las apps recientes, deja presionada Vento y toca <b>🔒 Bloquear</b> (así el celular no la cierra al limpiar).</li><li>Deja Vento abierta una vez después de instalarla: desde ahí trabaja sola de fondo (aviso fijo «Vento está trabajando»).</li></ul>' : ''),
           A && perm.bateria !== undefined ? ok(!!perm.bateria, perm.bateria ? 'Listo' : 'Falta') : '') +
-        paso(6, 'Prueba', 'Pídele a alguien que te pase <b>$1.000</b> a tu DaviPlata. Vento dirá <i>«Pago confirmado. 1000 pesos desde DaviPlata»</i> y en el celular sale <b>«💜 Pagaron $1.000 por DaviPlata»</b>.<br><button type="button" class="btn-ghost gp-btn" data-gp="probar">▶️ Ver cómo se ve (simulado)</button>', ok(!!llego, llego ? 'Ya llegó un pago real de DaviPlata (' + plata(llego.monto) + ')' : 'Esperando el primer pago')) +
+        paso(6, 'Prueba', 'Pídele a alguien que te pase <b>$1.000</b> a tu DaviPlata. Vento dirá <i>«Recibiste 1000 pesos por DaviPlata»</i> y en el celular sale <b>«💜 Pagaron $1.000 por DaviPlata»</b>.<br><button type="button" class="btn-ghost gp-btn" data-gp="probar">▶️ Ver cómo se ve (simulado)</button>', ok(!!llego, llego ? 'Ya llegó un pago real de DaviPlata (' + plata(llego.monto) + ')' : 'Esperando el primer pago')) +
         '</ol>' +
         '<div class="settings-desc" style="margin-top:8px"><b>¿Y los demás celulares del negocio?</b> Con tu misma cuenta de Vento también ven el pago al instante. <b>¿No usas la app Vento en ese celular?</b> <button type="button" class="btn-ghost gp-btn" data-gp="macro">Usar MacroDroid</button><br><small>«Conectar DaviPlata» (API oficial) es otra cosa: sirve para <b>cobrar con código</b> y necesita convenio con Davivienda. Para que Vento te avise los pagos <b>no lo necesitas</b>.</small></div>' +
         '<div class="settings-desc" style="margin-top:6px;opacity:.75"><small>🔎 Este equipo: ' + escp(pgDondeEstoy()) + '</small></div>' +
@@ -28945,7 +28949,7 @@ let fotosListas = false;
       '<div class="settings-desc" id="pgWebAviso" hidden style="border:1px solid #f5a524;border-radius:12px;padding:10px"><b id="pgWebAvisoTit">📲 Estás en Vento Web, no en la app.</b> Para que Vento lea los avisos de DaviPlata y Nequi y diga «Pago confirmado» (también con el celular bloqueado), usa <b>la app Vento</b> (archivo vento.apk) en este celular. <a class="btn-primary" id="pgBajarApk" href="https://github.com/cristhianlujan45-blip/cuentas/releases/latest/download/vento.apk" download="vento.apk" rel="noopener" style="margin-top:8px;width:100%;display:block;text-align:center;box-sizing:border-box">⬇️ Descargar la app (vento.apk)</a><button type="button" class="btn-ghost" id="pgAbrirApp" style="margin-top:8px;width:100%">📲 Ya la tengo: abrir la app Vento</button></div>' +
       '<div class="settings-row"><div class="settings-row-text"><strong>Recibir avisos de pagos</strong><span id="pgEstado"></span></div><label class="switch"><input type="checkbox" id="pgOn"><span class="switch-slider"></span></label></div>' +
       '<div id="pgCaja" hidden>' +
-      '<div class="settings-row" id="pgVolFila" style="flex-direction:column;align-items:stretch"><div class="settings-row-text"><strong>🔊 Volumen de la voz de los pagos: <span id="pgVolTxt"></span></strong><span>Qué tan alto dice «Pago confirmado. 200 pesos desde DaviPlata». ' + (enApp ? 'Suena a este volumen aunque la música o el celular estén bajitos, y luego deja el volumen como estaba. <b>Más de 100 % = más fuerte de lo normal.</b>' : 'En el navegador llega hasta 100 %; en la app Android se puede subir hasta 150 % (más fuerte de lo normal).') + '</span></div>' +
+      '<div class="settings-row" id="pgVolFila" style="flex-direction:column;align-items:stretch"><div class="settings-row-text"><strong>🔊 Volumen de la voz de los pagos: <span id="pgVolTxt"></span></strong><span>Qué tan alto dice «Recibiste 200 pesos por DaviPlata». ' + (enApp ? 'Suena a este volumen aunque la música o el celular estén bajitos, y luego deja el volumen como estaba. <b>Más de 100 % = más fuerte de lo normal.</b>' : 'En el navegador llega hasta 100 %; en la app Android se puede subir hasta 150 % (más fuerte de lo normal).') + '</span></div>' +
       '<input type="range" id="pgVol" min="10" max="' + (enApp ? 150 : 100) + '" step="10" style="width:100%;margin:6px 0" aria-label="Volumen de la voz de los pagos"><div class="mz-actions"><button class="btn-ghost" id="pgVolMenos" type="button">🔉 Más bajo</button><button class="btn-ghost" id="pgVolMas" type="button">🔊 Más alto</button><button class="btn-primary" id="pgVolProbar" type="button">▶ Probar la voz</button></div></div>' +
       (enApp ? '<div class="settings-row" id="pgSmsFila"><div class="settings-row-text"><strong>📩 Confirmar también los SMS del banco</strong><span>Si tu banco te avisa por <b>mensaje de texto</b>, la app también lo lee (con el mismo permiso). <b>Apagado:</b> dice «Llegó un mensaje de texto de $X… revísalo en la app del banco». <b>Prendido:</b> dice «Pago confirmado» con los SMS que vienen del <b>número corto</b> del banco. Ojo: un SMS se puede falsificar; los que vienen de un número de celular siempre salen como 🚨 FALSO.</span></div><label class="switch"><input type="checkbox" id="pgSmsOk"><span class="switch-slider"></span></label></div>' : '') +
       (enApp ? '<div class="settings-row" id="pgAndFila"><div class="settings-row-text"><strong>📲 Leer los avisos de ESTE celular</strong><span id="pgAndTxt">Vento toma directo los avisos de plata recibida de DaviPlata, Nequi y tu banco que llegan a este celular. Nunca toma códigos, claves ni compras.</span></div><label class="switch"><input type="checkbox" id="pgAndOn"><span class="switch-slider"></span></label></div>' : '') +
@@ -28990,7 +28994,7 @@ let fotosListas = false;
     $p('pgVolProbar').onclick = () => {
       const A = window.VentoAndroid;
       if(A && A.pagosProbarVoz){ try{ A.pagosProbarVoz(); return; }catch(e){} }
-      window.ventoDecirPago('Pago confirmado. 200 pesos desde DaviPlata.');
+      window.ventoDecirPago('Recibiste 200 pesos por DaviPlata.');
     };
     const on = $p('pgOn');
     on.onchange = () => {

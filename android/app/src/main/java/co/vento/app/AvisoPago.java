@@ -24,7 +24,7 @@ public final class AvisoPago {
             + "|lleg(o|ó|aron)\\s+(\\$|cop|plata|dinero)|a (tu|su) llave|(recib|lleg|entr|ingres)[^.]{0,40}bre-?b|bre-?b[^.]{0,40}(recib|lleg|entr|ingres)"
             // Más formas de los bancos para la plata que entra (transferencias por llave Bre-B y de otros bancos)
             + "|transferencia entrante|abono recibido|abono (por|de|bre-?b)\\s|ingreso de (\\$|cop|dinero|plata)|ingresaron|entrada de (dinero|plata)|recibiste un (pago|abono)|lleg[oó] una transferencia|(en|a) (tu|su) llave", Pattern.CASE_INSENSITIVE);
-    static final Pattern PRIVADO = Pattern.compile("c[oó]digo|clave|otp|contrase|token|enviaste|pagaste|transferiste|retiraste|compraste|sacaste|usted (envi|pag|transfiri|pas)", Pattern.CASE_INSENSITIVE);
+    static final Pattern PRIVADO = Pattern.compile("c[oó]digo|clave|otp|contrase|token|enviaste|pagaste|pasaste|transferiste|retiraste|compraste|sacaste|compra exitosa|usted (envi|pag|transfiri|pas)", Pattern.CASE_INSENSITIVE);
     static final Pattern SEGURO = Pattern.compile("recibiste|recibi[oó]|ha recibido|(te|le) lleg", Pattern.CASE_INSENSITIVE);
     // Nunca es plata que llegó, diga lo que diga: solicitudes y cobros («JUAN te pidió $20.000», «Recibiste una solicitud»),
     // pagos rechazados, fallidos, reversados o programados.
@@ -36,7 +36,9 @@ public final class AvisoPago {
     // $5.000.000»): NO es plata que llegó. Los avisos de pago de verdad no preguntan ni ofrecen nada.
     static final Pattern PROMO = Pattern.compile("¿|pr[eé]stamo|te prestamos|le prestamos|cr[eé]dito (de libre|pre|para|f[aá]cil|aprobado|express|r[aá]pido)|tarjeta de cr[eé]dito|colch[oó]n|oferta|promo|descuento|cashback|sorteo|particip|\\bgan(a|e|ar)\\b|aprovecha|beneficio|invit|hasta \\$|\\bcupo\\b|activa tu|desc[aá]rga", Pattern.CASE_INSENSITIVE);
     private static final Pattern PESOS = Pattern.compile("(?:\\$|\\bCOP)\\s?(\\d{1,3}(?:[.,]\\d{3})+|\\d+)", Pattern.CASE_INSENSITIVE);
-    private static final Pattern PESOS2 = Pattern.compile("(\\d{1,3}(?:[.,]\\d{3})+|\\d{4,})\\s*(?:pesos|cop)\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PESOS2 = Pattern.compile("(\\d{1,3}(?:[.,]\\d{3})+|\\d+)\\s*(?:pesos|cop)\\b", Pattern.CASE_INSENSITIVE);
+    // Sin signo: el SMS de DaviPlata (85888) dice «recibiste 100,000 en tu DaviPlata» o «Recibiste 140,000. Para saber mas…».
+    private static final Pattern PESOS3 = Pattern.compile("\\b(?:recibiste|recibi[oó]|has recibido|ha recibido|te llegaron|le llegaron|llegaron|abono de|ingreso de|por|de)\\s+(\\d{1,3}(?:[.,]\\d{3})+(?![.,]?\\d)|\\d{1,7}(?!\\d|[.,]\\d))(?!\\s*(?:%|min|seg|horas?|d[ií]as?|veces))", Pattern.CASE_INSENSITIVE);
 
     static boolean esBanco(String app) { return app != null && BANCO.matcher(app).find(); }
 
@@ -50,10 +52,10 @@ public final class AvisoPago {
     // Códigos de seguridad: nunca son un pago, digan lo que digan.
     static final Pattern CODIGO = Pattern.compile("c[oó]digo (de )?(seguridad|verificaci|acceso|confirmaci)|clave din[aá]mica|\\botp\\b|tu c[oó]digo es|es tu c[oó]digo", Pattern.CASE_INSENSITIVE);
     // Plata que SALE (nunca es un pago recibido, aunque el aviso diga «te»).
-    static final Pattern SALE = Pattern.compile("enviaste|pagaste|transferiste|retiraste|compraste|sacaste|usted (envi|pag|transfiri|pas)|c[oó]digo (de )?(seguridad|verificaci)|clave din[aá]mica|\\botp\\b", Pattern.CASE_INSENSITIVE);
+    static final Pattern SALE = Pattern.compile("enviaste|pagaste|pasaste|compra exitosa|transferiste|retiraste|compraste|sacaste|usted (envi|pag|transfiri|pas)|c[oó]digo (de )?(seguridad|verificaci)|clave din[aá]mica|\\botp\\b", Pattern.CASE_INSENSITIVE);
 
     /** ¿El pago llegó por la llave Bre-B? (para decirlo: «… por Bre-B, en Nequi») */
-    static boolean esBreB(String todo) { return todo != null && Pattern.compile("bre-?b|\\bllave\\b", Pattern.CASE_INSENSITIVE).matcher(todo).find(); }
+    static boolean esBreB(String todo) { return todo != null && Pattern.compile("bre-?b|\\bllaves?\\b", Pattern.CASE_INSENSITIVE).matcher(todo).find(); }
 
     /** Aviso de plata que llegó pero SIN el valor («¡Te llegó plata! Entra a Nequi para verla»): igual se avisa. */
     static boolean esPlataSinValor(String todo) {
@@ -65,7 +67,7 @@ public final class AvisoPago {
     static long monto(String todo) {
         if (todo == null) return 0;
         Matcher m = PESOS.matcher(todo);
-        if (!m.find()) { m = PESOS2.matcher(todo); if (!m.find()) return 0; }
+        if (!m.find()) { m = PESOS2.matcher(todo); if (!m.find()) { m = PESOS3.matcher(todo); if (!m.find()) return 0; } }
         try { return Long.parseLong(m.group(1).replaceAll("[.,]", "")); } catch (Exception e) { return 0; }
     }
 
@@ -193,7 +195,16 @@ public final class AvisoPago {
     /** ¿El SMS habla de plata que llegó y nombra un banco o billetera? */
     static boolean esSmsDePago(String remitente, String cuerpo) {
         String todo = (remitente == null ? "" : remitente) + " " + (cuerpo == null ? "" : cuerpo);
-        return esRecibido(todo) && BANCO.matcher(todo).find() && monto(todo) > 0;
+        return esRecibido(todo) && (BANCO.matcher(todo).find() || bancoDeCodigo(remitente) != null) && monto(todo) > 0;
+    }
+
+    /** Códigos cortos de los bancos que avisan por SMS (el SMS a veces no dice el nombre del banco). */
+    static final String[][] CODIGOS = { {"85888", "DaviPlata"} };
+    static String bancoDeCodigo(String remitente) {
+        String d = remitente == null ? "" : remitente.replaceAll("\\D", "");
+        if (d.isEmpty() || d.length() > 6) return null;
+        for (String[] c : CODIGOS) if (c[0].equals(d)) return c[1];
+        return null;
     }
 
     /** Remitente: «celular» (7 o más dígitos: los bancos no escriben desde celulares → falso), «corto» (código del banco). */
@@ -203,10 +214,12 @@ public final class AvisoPago {
         return "corto";
     }
 
-    static String fraseSms(String cuerpo, long monto, String tipo, boolean confiar) {
-        String banco = nombreApp(bancoDe(cuerpo));
+    static String fraseSms(String cuerpo, long monto, String tipo, boolean confiar) { return fraseSms(null, cuerpo, monto, tipo, confiar); }
+    static String fraseSms(String remitente, String cuerpo, long monto, String tipo, boolean confiar) {
+        String b0 = bancoDe(cuerpo); if (b0.isEmpty() && bancoDeCodigo(remitente) != null) b0 = bancoDeCodigo(remitente);
+        String banco = nombreApp(b0);
         if ("celular".equals(tipo)) return "Ojo. Llegó un mensaje de pago sospechoso por " + monto + " pesos desde un número de celular. Parece falso. No entregues nada.";
-        if (confiar) return "Pago confirmado. " + monto + " pesos desde " + banco + ", por mensaje de texto.";
+        if (confiar) return "Recibiste " + monto + " pesos por " + banco + ", por mensaje de texto.";
         return "Llegó un mensaje de texto de " + monto + " pesos desde " + banco + ". Revísalo en la aplicación del banco antes de entregar.";
     }
 
@@ -224,12 +237,12 @@ public final class AvisoPago {
 
     /** «Pago confirmado. 200 pesos desde DaviPlata.» */
     static String frase(String app, long monto) {
-        return "Pago confirmado. " + monto + " pesos desde " + nombreApp(app) + ".";
+        return "Recibiste " + monto + " pesos por " + nombreApp(app) + ".";
     }
 
     /** Con el texto del aviso: si llegó por la llave Bre-B lo dice («Pago confirmado. 20000 pesos por Bre-B, en Nequi.»). */
     static String frase(String app, long monto, String texto) {
-        return esBreB(texto) ? "Pago confirmado. " + monto + " pesos por Bre-B, en " + nombreApp(app) + "." : frase(app, monto);
+        return esBreB(texto) ? "Recibiste " + monto + " pesos por Bre-B, en " + nombreApp(app) + "." : frase(app, monto);
     }
 
     /** ¿Vale la pena guardarlo para revisar? Aviso de una app de banco que habla de plata pero que Vento NO tomó como pago. */
