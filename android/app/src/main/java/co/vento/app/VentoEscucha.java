@@ -131,11 +131,16 @@ public class VentoEscucha extends NotificationListenerService {
         // Cuando llega otro pago con el primero todavía en la barra, la app los junta («2 mensajes nuevos»): cada
         // aviso viene en una línea (InboxStyle) o en un mensaje (MessagingStyle). Antes solo se leía el resumen.
         java.util.List<String> otros = new java.util.ArrayList<>();
+        java.util.List<Object[]> mensajes = new java.util.ArrayList<>();       // {texto, hora} de una conversación (SMS)
         CharSequence[] lineas = x.getCharSequenceArray(Notification.EXTRA_TEXT_LINES);
         if (lineas != null) for (CharSequence l : lineas) otros.add(texto(l));
         try {
             android.os.Parcelable[] msgs = x.getParcelableArray(Notification.EXTRA_MESSAGES);
-            if (msgs != null) for (android.os.Parcelable m : msgs) if (m instanceof Bundle) otros.add(texto(((Bundle) m).getCharSequence("text")));
+            if (msgs != null) for (android.os.Parcelable m : msgs) if (m instanceof Bundle) {
+                String t = texto(((Bundle) m).getCharSequence("text"));
+                otros.add(t);
+                mensajes.add(new Object[]{t, ((Bundle) m).getLong("time", 0L)});
+            }
         } catch (Exception ignorado) { }
         // La misma notificación actualizada (mismo «cuándo» y mismo texto) no se repite; dos pagos iguales (mismo valor,
         // misma persona) SÍ son dos pagos: cada uno trae su propio «cuándo». Antes se tomaban como uno solo.
@@ -146,12 +151,7 @@ public class VentoEscucha extends NotificationListenerService {
         if (atrasada && edad > 30 * 60_000L) return false;
         boolean callado = atrasada && edad > 3 * 60_000L;
         boolean alguno = false;
-        if (sms) {
-            // Mensaje de texto: el título es quien lo manda (número o nombre); cada mensaje de la conversación es un aviso.
-            if (procesarSms(sp, titulo, principal, sbn.getKey() + ":" + cuando + ":", callado)) alguno = true;
-            for (String l : otros) if (!l.isEmpty() && !l.equals(principal) && procesarSms(sp, titulo, l, "S:", callado)) alguno = true;
-            return alguno;
-        }
+        if (sms) return leerSms(sp, titulo, principal, mensajes, sbn.getKey() + ":" + cuando + ":", callado);
         if (procesar(sp, app, titulo, principal, sbn.getKey() + ":" + cuando + ":", confiable, callado)) alguno = true;
         else { String t0 = titulo + " " + principal; if (!AvisoPago.esRecibido(t0) || (AvisoPago.monto(t0) <= 0 && !AvisoPago.esPlataSinValor(t0))) diagnostico(sp, app, t0); }
         marcarContenido(sp, app, principal);
@@ -161,6 +161,23 @@ public class VentoEscucha extends NotificationListenerService {
             if (procesar(sp, app, titulo, l, "L:", confiable, callado)) alguno = true;
             marcarContenido(sp, app, l);
         }
+        return alguno;
+    }
+
+    /** SMS: la app de mensajes muestra la CONVERSACIÓN entera (los mensajes de antes también). Solo cuentan los mensajes
+     *  nuevos (de los últimos 3 min, cada uno con su hora): antes, al llegar un SMS se podían volver a decir los viejos. */
+    static boolean leerSms(SharedPreferences sp, String remitente, String principal, java.util.List<Object[]> mensajes, String prefijo, boolean callado) throws Exception {
+        boolean alguno = false;
+        long ahora = System.currentTimeMillis();
+        boolean conHora = false;
+        for (Object[] m : mensajes) {
+            long hora = (Long) m[1];
+            if (hora <= 0) continue;
+            conHora = true;
+            if (ahora - hora > 3 * 60_000L) continue;                    // de antes: ya se dijo (o es viejo)
+            if (procesarSms(sp, remitente, (String) m[0], "M:" + hora + ":", callado)) alguno = true;
+        }
+        if (!conHora && procesarSms(sp, remitente, principal, prefijo, callado)) alguno = true;
         return alguno;
     }
 
@@ -294,9 +311,11 @@ public class VentoEscucha extends NotificationListenerService {
             }
             // El mismo pago ya llegó por la app del banco con su valor (confirmado): el SMS no se cuenta otra vez.
             if (parear(sp, monto, true, id) != null) return false;
-            final boolean confiar = sp.getBoolean(PREF_SMS_OK, false);
+            // El código corto OFICIAL del banco (85888 = DaviPlata) cuenta como confirmado: el valor del pago solo llega por
+            // ahí (la app de DaviPlata no lo trae). Otros códigos cortos: «revísalo», salvo que el dueño elija confirmarlos.
+            final boolean confiar = banco != null || sp.getBoolean(PREF_SMS_OK, false);
             recordarSms(sp, id, monto);
-            traza(sp, "SMS " + remitente, cuerpo, "🔊 " + AvisoPago.fraseSms(remitente, cuerpo, monto, tipo, confiar));
+            traza(sp, "SMS " + remitente, cuerpo, "🔊 " + (banco != null ? AvisoPago.frase(banco, monto, cuerpo) : AvisoPago.fraseSms(remitente, cuerpo, monto, tipo, confiar)));
             if (!callado) {
                 // Unos segundos por si llega el aviso de la app del banco (entonces se dice confirmado, una sola vez).
                 final long m = monto; final String rem = remitente, cu = cuerpo, b = banco, ti = tipo;
@@ -304,7 +323,7 @@ public class VentoEscucha extends NotificationListenerService {
                 VentoApp.ui.postDelayed(() -> {
                     try {
                         if (!smsSigue(sp, id)) return;
-                        VentoApp.decirPago(AvisoPago.fraseSms(rem, cu, m, ti, confiar));
+                        VentoApp.decirPago(b != null ? AvisoPago.frase(b, m, cu) : AvisoPago.fraseSms(rem, cu, m, ti, confiar));
                         if (confiar && sp.getBoolean(PREF_NOTIF, true)) VentoApp.anunciarPagoAviso(b != null ? b : AvisoPago.bancoDe(cu), m);
                     } catch (Throwable ignorado) { }
                 }, ESPERA_APP);
@@ -321,7 +340,9 @@ public class VentoEscucha extends NotificationListenerService {
     }
 
     // ---------- Aviso de la app SIN valor + SMS del banco CON el valor (DaviPlata por la llave Bre-B) ----------
-    static final long ESPERA_SMS = 8_000L, ESPERA_APP = 4_000L, JUNTAR = 3 * 60_000L;
+    // JUNTAR: el SMS del banco puede llegar hasta 2 min después del aviso de la app. JUNTAR_SMS: un aviso de la app solo se
+    // junta con un SMS de hace menos de 1 min (antes 3 min: se juntaba con un SMS viejo de OTRO pago).
+    static final long ESPERA_SMS = 8_000L, ESPERA_APP = 4_000L, JUNTAR = 2 * 60_000L, JUNTAR_SMS = 60_000L;
     static final String PREF_PEND = "pagosSinValor", PREF_SMSV = "pagosSmsValor";
 
     private static synchronized void pendiente(SharedPreferences sp, String id, String app, String todo) {
@@ -335,8 +356,13 @@ public class VentoEscucha extends NotificationListenerService {
     }
     /** ¿El SMS sigue sin su aviso de la app? (se marca como ya dicho, y queda para juntarlo después) */
     private static synchronized boolean smsSigue(SharedPreferences sp, String id) {
-        try { JSONObject o = new JSONObject(sp.getString(PREF_SMSV, "{}")); if (!id.equals(o.optString("id")) || o.optBoolean("dicho")) return false;
-            sp.edit().putString(PREF_SMSV, o.put("dicho", true).toString()).apply(); return true; } catch (Exception e) { return false; }
+        try {
+            JSONArray l = smsLista(sp);
+            for (int i = 0; i < l.length(); i++) { JSONObject o = l.getJSONObject(i); if (!id.equals(o.optString("id"))) continue;
+                if (o.optBoolean("par") || o.optBoolean("dicho")) return false;
+                o.put("dicho", true); smsGuardar(sp, l); return true; }
+            return true;                                                   // ya no estaba (vencido): igual se dice
+        } catch (Exception e) { return true; }
     }
     /** El aviso sin valor de hace poco (si hay), y se borra. */
     private static synchronized JSONObject tomarPendienteReciente(SharedPreferences sp) {
@@ -347,17 +373,32 @@ public class VentoEscucha extends NotificationListenerService {
             return o;
         } catch (Exception e) { return null; }
     }
-    /** SMS del banco con valor que todavía no tiene su aviso de la app. */
-    private static synchronized void recordarSms(SharedPreferences sp, String id, long monto) {
-        try { sp.edit().putString(PREF_SMSV, new JSONObject().put("id", id).put("m", monto).put("t", System.currentTimeMillis()).toString()).apply(); } catch (Exception ignorado) { }
+    /** SMS del banco con valor que todavía no tiene su aviso de la app. Es una LISTA: antes era uno solo y, si llegaban
+     *  dos pagos seguidos por SMS, el segundo borraba al primero y el primero nunca sonaba. */
+    private static JSONArray smsLista(SharedPreferences sp) {
+        try { return new JSONArray(sp.getString(PREF_SMSV, "[]")); } catch (Exception e) { return new JSONArray(); }
     }
+    private static void smsGuardar(SharedPreferences sp, JSONArray l) {
+        JSONArray out = new JSONArray(); long ahora = System.currentTimeMillis();
+        for (int i = 0; i < l.length(); i++) { JSONObject o = l.optJSONObject(i); if (o != null && ahora - o.optLong("t") <= JUNTAR) out.put(o); }
+        while (out.length() > 30) out.remove(0);
+        sp.edit().putString(PREF_SMSV, out.toString()).apply();
+    }
+    private static synchronized void recordarSms(SharedPreferences sp, String id, long monto) {
+        try { JSONArray l = smsLista(sp); l.put(new JSONObject().put("id", id).put("m", monto).put("t", System.currentTimeMillis())); smsGuardar(sp, l); } catch (Exception ignorado) { }
+    }
+    /** El SMS más reciente (de hace menos de 1 min) que todavía no tiene su aviso de la app; queda emparejado. */
     private static synchronized JSONObject smsSinPareja(SharedPreferences sp) {
         try {
-            JSONObject o = new JSONObject(sp.getString(PREF_SMSV, "{}"));
-            if (o.optLong("m") <= 0 || System.currentTimeMillis() - o.optLong("t") > JUNTAR) return null;
-            sp.edit().remove(PREF_SMSV).apply();
-            return o;
-        } catch (Exception e) { return null; }
+            JSONArray l = smsLista(sp); long ahora = System.currentTimeMillis();
+            for (int i = l.length() - 1; i >= 0; i--) {
+                JSONObject o = l.getJSONObject(i);
+                if (o.optBoolean("par") || o.optLong("m") <= 0 || ahora - o.optLong("t") > JUNTAR_SMS) continue;
+                o.put("par", true); smsGuardar(sp, l);
+                return o;
+            }
+        } catch (Exception ignorado) { }
+        return null;
     }
 
     /** El mismo pago por los dos lados (app del banco y SMS, mismo valor, en 3 min): devuelve el ID del otro aviso si

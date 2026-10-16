@@ -35,9 +35,33 @@ public class VentoServicio extends Service {
         @Override public void run() {
             if (!activo) return;
             VentoApp.js("try{window.ventoLatido&&window.ventoLatido()}catch(e){}");
+            if (++vueltas % 12 == 0) revisarEscucha();               // cada minuto: ¿sigue leyendo los avisos de los bancos?
             VentoApp.ui.postDelayed(this, 5000);
         }
     };
+
+    private int vueltas = 0, sinEscucha = 0;
+
+    /** Android a veces desconecta la lectura de avisos (ahorro de batería, actualización) y los pagos dejan de sonar hasta
+     *  abrir Vento. Si la lectura de pagos está prendida, hay permiso y no está conectada: se le pide volver a conectarla y,
+     *  si sigue sin conectar, se apaga y se prende el componente (así Android la vuelve a conectar). */
+    private void revisarEscucha() {
+        try {
+            if (VentoEscucha.activa != null) { sinEscucha = 0; return; }
+            if (!getSharedPreferences("vento", MODE_PRIVATE).getBoolean(VentoEscucha.PREF_ON, false)) return;
+            String s = android.provider.Settings.Secure.getString(getContentResolver(), "enabled_notification_listeners");
+            if (s == null || !s.contains(getPackageName())) return;
+            android.content.ComponentName cn = new android.content.ComponentName(this, VentoEscucha.class);
+            sinEscucha++;
+            if (Build.VERSION.SDK_INT >= 24) android.service.notification.NotificationListenerService.requestRebind(cn);
+            if (sinEscucha >= 2) {
+                android.content.pm.PackageManager pm = getPackageManager();
+                pm.setComponentEnabledSetting(cn, android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED, android.content.pm.PackageManager.DONT_KILL_APP);
+                pm.setComponentEnabledSetting(cn, android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED, android.content.pm.PackageManager.DONT_KILL_APP);
+                sinEscucha = 0;
+            }
+        } catch (Throwable ignorado) { }
+    }
 
     static void arrancar(Context c) {
         Intent i = new Intent(c, VentoServicio.class);
