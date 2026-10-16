@@ -17,6 +17,9 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- 💜 Ventana emergente de cada pago: encima de otras apps y encima de la pantalla de bloqueo -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
@@ -67,6 +70,17 @@
         </activity>
 
         <!-- Entrar a YouTube con la cuenta Premium dentro de la app (para que el reproductor no ponga comerciales) -->
+        <!-- 💜 La ventana del pago encima de la pantalla de bloqueo (se cierra sola a los 15 s) -->
+        <activity
+            android:name=".PagoActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:launchMode="singleTop"
+            android:taskAffinity="co.vento.app.pago"
+            android:excludeFromRecents="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true" />
+
         <activity
             android:name=".EntrarYouTube"
             android:exported="false"

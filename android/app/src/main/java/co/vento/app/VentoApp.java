@@ -157,7 +157,8 @@ public class VentoApp extends Application {
         if (app == null || monto <= 0) return;
         String frase = AvisoPago.frase(appBanco, monto, texto);
         decirPago(frase);
-        if (notif) notificarPago("💜 Recibiste " + AvisoPago.plata(monto) + (AvisoPago.esBreB(texto) ? " por Bre-B en " : " por ") + AvisoPago.nombreApp(appBanco), frase, texto);
+        if (notif) notificarPago("💜 Recibiste " + AvisoPago.plata(monto) + (AvisoPago.esBreB(texto) ? " por Bre-B en " : " por ") + AvisoPago.nombreApp(appBanco), frase, texto,
+                AvisoPago.plata(monto), (AvisoPago.esBreB(texto) ? "Bre-B en " : "") + AvisoPago.nombreApp(appBanco), "ok");
     }
 
     /**
@@ -165,12 +166,22 @@ public class VentoApp extends Application {
      * no salía). Título con el valor («💜 Recibiste $20.000 por Nequi») y el texto: la frase y lo que dijo el banco. Se ve
      * completa en la pantalla de bloqueo, y prende la pantalla unos segundos para que se vea sin tocar el celular.
      */
-    static void notificarPago(String titulo, String frase, String original) {
+    static void notificarPago(String titulo, String frase, String original) { notificarPago(titulo, frase, original, "", "", "ok"); }
+
+    /** Además, la 💜 ventana emergente con el valor (VentanaPago): encima de la pantalla de bloqueo si está bloqueado, o
+     *  encima de la app que se esté usando. tipo: ok · sinvalor · revisar · falso. */
+    static void notificarPago(String titulo, String frase, String original, String valor, String banco, String tipo) {
         if (app == null) return;
         String o = original == null ? "" : original.replaceAll("\\s+", " ").trim();
         if (o.length() > 220) o = o.substring(0, 220) + "…";
         String txt = (frase == null ? "" : frase) + (o.isEmpty() ? "" : "\n«" + o + "»");
-        try { app.new Puente().notificar(titulo, txt, "pagos", true); } catch (Exception ignorado) { }
+        boolean ventana = VentanaPago.prendida(app), bloqueado = VentanaPago.bloqueado(app);
+        Intent pc = ventana && bloqueado ? VentanaPago.intent(app, valor, banco, frase, o, tipo) : null;
+        try { app.new Puente().publicar(titulo, txt, "pagos", true, pc); } catch (Exception ignorado) { }
+        if (ventana && !bloqueado) VentanaPago.mostrarEncima(app, valor, banco, frase, o, tipo);
+        // Bloqueado y con permiso de «encima de otras apps»: se abre también directo (algunos celulares no abren la
+        // pantalla completa de la notificación).
+        if (pc != null && VentanaPago.puedeEncima(app)) try { app.startActivity(pc); } catch (Throwable ignorado) { }
         prenderPantalla();
     }
 
@@ -190,7 +201,8 @@ public class VentoApp extends Application {
     static void anunciarPagoAviso(String banco, long monto) { anunciarPagoAviso(banco, monto, null); }
     static void anunciarPagoAviso(String banco, long monto, String texto) {
         if (app == null || monto <= 0) return;
-        notificarPago("💜 Recibiste " + AvisoPago.plata(monto) + " por " + AvisoPago.nombreApp(banco), AvisoPago.frase(banco, monto, texto), texto);
+        notificarPago("💜 Recibiste " + AvisoPago.plata(monto) + " por " + AvisoPago.nombreApp(banco), AvisoPago.frase(banco, monto, texto), texto,
+                AvisoPago.plata(monto), (AvisoPago.esBreB(texto) ? "Bre-B en " : "") + AvisoPago.nombreApp(banco), "ok");
     }
 
     // ---------------------------------------------------------------- Voz de los pagos
@@ -827,7 +839,10 @@ public class VentoApp extends Application {
          * salvo que se pida «siempre». canal: pedidos | musica | avisos.
          */
         @JavascriptInterface
-        public boolean notificar(String titulo, String texto, String canal, boolean siempre) {
+        public boolean notificar(String titulo, String texto, String canal, boolean siempre) { return publicar(titulo, texto, canal, siempre, null); }
+
+        /** «pantallaCompleta»: con el celular bloqueado, la notificación abre esa ventana encima de la pantalla de bloqueo. */
+        boolean publicar(String titulo, String texto, String canal, boolean siempre, Intent pantallaCompleta) {
             try {
                 if (alFrente && !siempre) return false;
                 android.app.NotificationManager nm = (android.app.NotificationManager) getSystemService(NOTIFICATION_SERVICE);
@@ -857,6 +872,11 @@ public class VentoApp extends Application {
                                 .setStyle(new android.app.Notification.BigTextStyle().bigText(texto == null ? "" : texto)).setColor(0xFF8B5CF6);
                         b.setPublicVersion(pub.build()).setColor(0xFF8B5CF6);
                     }
+                }
+                if (pantallaCompleta != null) {
+                    b.setFullScreenIntent(android.app.PendingIntent.getActivity(VentoApp.this, 7000 + (avisoN % 1000), pantallaCompleta,
+                            flags | android.app.PendingIntent.FLAG_UPDATE_CURRENT), true);
+                    if (Build.VERSION.SDK_INT >= 21) b.setCategory(android.app.Notification.CATEGORY_ALARM);
                 }
                 nm.notify(avisoN++, b.build());
                 return true;
@@ -1015,6 +1035,48 @@ public class VentoApp extends Application {
                 } catch (Exception ignorado) { }
             });
             return true;
+        }
+
+        // ---------------------------------------------------------------- 💜 Ventana emergente de cada pago
+        /** {on, encima, completa}: si está prendida, si puede salir encima de otras apps y encima de la pantalla de bloqueo. */
+        @JavascriptInterface
+        public String ventanaPagoEstado() {
+            try { return new JSONObject().put("on", VentanaPago.prendida(VentoApp.this)).put("encima", VentanaPago.puedeEncima(VentoApp.this))
+                    .put("completa", VentanaPago.puedePantallaCompleta(VentoApp.this)).toString(); } catch (Exception e) { return "{}"; }
+        }
+
+        /** ¿Vento se está viendo ahora? (la página de fondo sigue «visible» aunque la app esté minimizada) */
+        @JavascriptInterface
+        public boolean alFrente() { return VentoApp.alFrente; }
+
+        @JavascriptInterface
+        public void ventanaPagoOn(boolean on) { getSharedPreferences("vento", MODE_PRIVATE).edit().putBoolean(VentanaPago.PREF, on).apply(); }
+
+        /** Abre el permiso «Aparecer encima de otras apps» (o «pantalla completa» con «completa»). */
+        @JavascriptInterface
+        public void ventanaPagoPermiso(String cual) {
+            ui.post(() -> {
+                Context x = ventana != null ? ventana : VentoApp.this;
+                try {
+                    Intent i;
+                    if ("completa".equals(cual) && Build.VERSION.SDK_INT >= 34) i = new Intent(android.provider.Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT, Uri.parse("package:" + getPackageName()));
+                    else i = new Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName()));
+                    if (ventana == null) i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    x.startActivity(i);
+                } catch (Exception e) {
+                    try { Intent i = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName())); if (ventana == null) i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); x.startActivity(i); } catch (Exception ignorado) { }
+                }
+            });
+        }
+
+        /** «▶ Probar»: la ventana de un pago de prueba encima de otras apps (en 3 s, para salir de Vento y verla). */
+        @JavascriptInterface
+        public void ventanaPagoProbar() {
+            ui.postDelayed(() -> {
+                if (VentanaPago.bloqueado(VentoApp.this)) { try { startActivity(VentanaPago.intent(VentoApp.this, "$20.000", "Nequi", "Recibiste 20000 pesos por Nequi.", "Prueba de Vento", "ok")); } catch (Throwable ignorado) { } }
+                else if (VentoApp.alFrente) { /* con Vento a la vista, la ventana la muestra la página */ }
+                else VentanaPago.mostrarEncima(VentoApp.this, "$20.000", "Nequi", "Recibiste 20000 pesos por Nequi.", "Prueba de Vento", "ok");
+            }, 3000);
         }
 
         /** Avisos de banco que hablaban de plata pero no se tomaron como pago (sin datos), para revisarlos. */

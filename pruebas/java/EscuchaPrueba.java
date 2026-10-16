@@ -65,13 +65,14 @@ public class EscuchaPrueba {
         VentoEscucha.leerSms(sp, "85888", "", conv(new Object[]{"Recibiste  65,000. Para saber mas, consulta tus movimientos.", ahora - 1000}), "k5b:", false);
         VentoApp.ui.correr();
         chk("…llega el SMS: «Recibiste 65000 pesos por Bre-B, en DaviPlata.» una sola vez", VentoApp.dichos.size() == 1 && VentoApp.dichos.get(0).equals("Recibiste 65000 pesos por Bre-B, en DaviPlata."), VentoApp.dichos);
+        chk("…y la ventana dice «$65.000» por «Bre-B en DaviPlata»", VentoApp.notifs.stream().anyMatch(n -> n[3].equals("$65.000") && n[4].equals("Bre-B en DaviPlata")), VentoApp.notifs.size());
 
         // 6) Llave Bre-B sin valor y SIN SMS: a los pocos segundos avisa sin el valor
         sp = nuevo();
         app(sp, "DaviPlata", "DaviPlata", "Transaccion exitosa: Recibiste Plata de otra entidad usando Llaves, consulta el detalle de tus movimientos desde el app DaviPlata.", "k6:");
         VentoApp.ui.correr();
         chk("Llave Bre-B sin SMS: «Llegó plata por DaviPlata. Mira el valor en la aplicación.»", VentoApp.dichos.contains("Llegó plata por DaviPlata. Mira el valor en la aplicación."), VentoApp.dichos);
-        chk("…y su notificación «💜 Llegó plata por DaviPlata»", VentoApp.notifs.stream().anyMatch(n -> n[0].equals("💜 Llegó plata por DaviPlata")), VentoApp.notifs.size());
+        chk("…y su notificación y ventana «💜 Llegó plata por DaviPlata» (sin valor)", VentoApp.notifs.stream().anyMatch(n -> n[0].equals("💜 Llegó plata por DaviPlata") && n[3].isEmpty() && n[5].equals("sinvalor")), VentoApp.notifs.size());
 
         // 6b) Primero el SMS y después (segundos) el aviso de la llave: una sola voz con el valor
         sp = nuevo();
@@ -94,6 +95,7 @@ public class EscuchaPrueba {
         app(sp, "Nequi", "Nequi", "¡Te llegó plata! ANA RUIZ te envió $2.500", "k7:");
         chk("Nequi «te envió $2.500» → «Recibiste 2500 pesos por Nequi.»", VentoApp.dichos.contains("Recibiste 2500 pesos por Nequi."), VentoApp.dichos);
         chk("Nequi: notificación «💜 Recibiste $2.500 por Nequi» con el texto del banco (se ve con el celular bloqueado)", VentoApp.notifs.size() == 1 && VentoApp.notifs.get(0)[0].equals("💜 Recibiste $2.500 por Nequi") && VentoApp.notifs.get(0)[2].contains("ANA RUIZ te envió $2.500"), VentoApp.notifs.size());
+        chk("Nequi: la ventana emergente lleva el valor «$2.500», «Nequi» y es un pago confirmado", VentoApp.notifs.size() == 1 && VentoApp.notifs.get(0)[3].equals("$2.500") && VentoApp.notifs.get(0)[4].equals("Nequi") && VentoApp.notifs.get(0)[5].equals("ok"), VentoApp.notifs.isEmpty() ? "" : String.join(" | ", VentoApp.notifs.get(0)));
 
         // 8) «Pasaste $100 a otro DaviPlata» (plata que SALE): no suena
         limpiar();

@@ -18,6 +18,8 @@
 // 14. Bre-B (de otros bancos por la llave) y Nequi con «¿…?» en el aviso: suenan. Solicitudes («te pidió») no.
 // 15. Paso 5 «Que suene siempre»: ahorro de batería, «🚀 Inicio automático» y los pasos de la marca (Xiaomi).
 // 19. Avisos «crudos» (la app no los entendió): la página los revisa y, si son pago, los dice.
+// 24. Permisos de la ventana fuera de Vento (encima de otras apps / celular bloqueado): aviso con «🪟 Permitir».
+// 23. Ventana emergente de cada pago: valor, banco y texto, «Cerrar» y se cierra sola a los 15 s.
 // 22. Frases de pago del administrador: «es un pago» (con o sin valor) y «no es un pago».
 // 21. DaviPlata y Nequi con ahorro de batería → aviso fijo y botón que abre su ajuste («Sin restricciones»).
 // 20. Lectura apagada al reinstalar → se prende sola; sin permiso / desconectada / app vieja → aviso fijo para arreglarlo.
@@ -273,11 +275,13 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 
     // 19. Avisos «crudos»: la app Android no entendió el aviso del banco y se lo pasa a la página, que lo revisa con sus
     //     reglas (siempre al día) y, si es plata recibida, lo dice. Si tampoco lo entiende, lo reporta (sin datos).
-    const r19 = await p.evaluate(() => {
+    const r19 = await p.evaluate(async () => {
       window.__and.decir = []; window.__errs19 = []; const e0 = window.ventoError; window.ventoError = (a, b, c, d) => { window.__errs19.push({ a, b, c, d }); };
       window.__and.cola.push({ id: 'k19:R:1', txt: 'Bancolombia | Bancolombia | Te llegaron $9.900 a tu llave', t: Date.now(), voz: false, crudo: true });
       window.__and.cola.push({ id: 'k19:R:2', txt: 'Bancolombia | Bancolombia | Movimiento en tu cuenta por $4.000', t: Date.now(), voz: false, crudo: true });
       window.ventoAvisosNativos();
+      // (si las frases del administrador son de hace más de 10 s, primero se piden otra vez: el reporte llega un poco después)
+      const t0 = Date.now(); while(!window.__errs19.length && Date.now() - t0 < 3000) await new Promise(r => setTimeout(r, 100));
       window.ventoError = e0;
       return { voz: window.__and.decir.slice(), reg: data.pagos.lista.some(x => x.monto === 9900), noReg: data.pagos.lista.some(x => x.monto === 4000), errs: window.__errs19.map(x => x.b) };
     });
@@ -360,6 +364,65 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     chk('22. Frase «Abono a tu DaviPlata» (es un pago): el SMS con 8,000 se registra y suena «Recibiste 8000 pesos por DaviPlata»', r22.pago && r22.voz.some(x => /^Recibiste 8000 pesos por DaviPlata/.test(x)), r22);
     chk('22. Frase «Tu saldo es» (no es un pago): el aviso no se registra ni suena', r22.ignorado && !r22.voz.some(x => /50000/.test(x)), r22);
     chk('22. Frase de pago sin valor en el aviso: «Llegó plata por Bancolombia. Mira el valor en la aplicación.»', r22.voz.some(x => /^Llegó plata por Bancolombia/.test(x)) && r22.toasts.some(x => /Llegó plata por Bancolombia/.test(x)), r22);
+
+    // 23. 🪟 Ventana emergente de cada pago (con Vento a la vista): el valor grande, el banco, de quién y el texto, con
+    //     «Cerrar»; se cierra sola a los 15 s. Con Vento minimizada no sale aquí (la muestra la app Android).
+    const r23 = await p.evaluate(async () => {
+      const A = window.VentoAndroid; window.ventoPagoVentanaCerrar();
+      A.alFrente = () => true;
+      window.pagosRecibirTexto('Nequi | Nequi | ¡Te llegó plata! ANA RUIZ te envió $23.500', 'and-v23a');
+      const v = document.getElementById('pgVentana'), t1 = v ? v.innerText : '';
+      v && v.querySelector('[data-pv="cerrar"]').click();
+      const cerrada = !document.getElementById('pgVentana');
+      A.alFrente = () => false;
+      window.pagosRecibirTexto('Nequi | Nequi | ¡Te llegó plata! LUIS te envió $23.600', 'and-v23b');
+      const minimizada = !document.getElementById('pgVentana');
+      A.alFrente = () => true;
+      try{ localStorage.setItem('vento_pagos_ventana', '0'); }catch(e){}
+      window.pagosRecibirTexto('Nequi | Nequi | ¡Te llegó plata! LUIS te envió $23.700', 'and-v23c');
+      const apagada = !document.getElementById('pgVentana');
+      try{ localStorage.removeItem('vento_pagos_ventana'); }catch(e){}
+      window.pagosRecibirTexto('Nequi | Nequi | ¡Te llegó plata! MARTA te envió $23.800', 'and-v23d');
+      const t0 = Date.now(); while(document.getElementById('pgVentana') && Date.now() - t0 < 17000) await new Promise(r => setTimeout(r, 250));
+      const sola = Date.now() - t0;
+      delete A.alFrente;
+      return { t1, cerrada, minimizada, apagada, sola };
+    });
+    chk('23. Ventana emergente: «💜 Recibiste $23.500 por Nequi de Ana Ruiz» con el texto del banco y «Se cierra sola en 15 s»', /Recibiste/.test(r23.t1) && /\$23\.500/.test(r23.t1) && /por Nequi/.test(r23.t1) && /de Ana Ruiz/.test(r23.t1) && /te envió/.test(r23.t1) && /Se cierra sola en 1[45] s/.test(r23.t1) && /Cerrar/.test(r23.t1), r23.t1);
+    chk('23. «✕ Cerrar» la cierra', r23.cerrada, r23);
+    chk('23. Con Vento minimizada no sale aquí (la muestra la app Android encima de todo)', r23.minimizada, r23);
+    chk('23. Apagada en Ajustes → Pagos: no sale', r23.apagada, r23);
+    chk('23. Se cierra sola a los 15 s', r23.sola >= 14000 && r23.sola <= 16500, r23.sola);
+    const r23b = await p.evaluate(() => {
+      const A = window.VentoAndroid; A.ventanaPagoEstado = () => JSON.stringify({ on: true, encima: false, completa: false }); A.ventanaPagoOn = v => { window.__vOn = v; }; A.ventanaPagoPermiso = c => { (window.__vPerm = window.__vPerm || []).push(c); };
+      try{ window.ventoPagosAbrir && window.ventoPagosAbrir(); }catch(e){}
+      document.querySelector('.ajustes-cat[data-cat="pagos"]') && document.querySelector('.ajustes-cat[data-cat="pagos"]').click();
+      const box = document.getElementById('pgVentPerm'); if(!box) return { sinFila: true };
+      window.ventoPagosDiag && window.ventoPagosDiag();
+      const tog = document.getElementById('pgVentOn');
+      return { fila: !!document.getElementById('pgVentFila'), on: tog && tog.checked };
+    });
+    chk('23. Ajustes → Pagos: «🪟 Ventana emergente con el valor» prendida de fábrica', r23b.fila && r23b.on, r23b);
+    const r24 = await p.evaluate(() => {
+      const A = window.VentoAndroid, S = window.__and, ban = () => { const b = document.getElementById('pgSalud'); return b && !b.hidden ? b.innerText : ''; };
+      S.on = true; S.permiso = true; S.vivo = true; A.pagosLectura = () => 2; A.bancosBateria = () => '[]';
+      A.pagosAvisosEstado = () => JSON.stringify({ on: S.on, permiso: S.permiso, vivo: S.vivo });
+      try{ localStorage.removeItem('vento-ventana-luego'); }catch(e){}
+      window.__vPerm = [];
+      A.ventanaPagoEstado = () => JSON.stringify({ on: true, encima: false, completa: false });
+      const k1 = window.ventoPagosSalud(), b1 = ban();
+      document.querySelector('#pgSalud [data-pgs^="vent-"]').click();
+      A.ventanaPagoEstado = () => JSON.stringify({ on: true, encima: true, completa: false });
+      const k2 = window.ventoPagosSalud(), b2 = ban();
+      document.querySelector('#pgSalud [data-pgs="cerrar"]').click();
+      const k3 = window.ventoPagosSalud();
+      A.ventanaPagoEstado = () => JSON.stringify({ on: true, encima: true, completa: true });
+      try{ localStorage.removeItem('vento-ventana-luego'); }catch(e){}
+      const k4 = window.ventoPagosSalud();
+      return { k1, b1, perm: window.__vPerm.slice(), k2, b2, k3, k4 };
+    });
+    chk('24. Falta «encima de otras apps»: aviso «🪟 Permitir» que abre ese permiso', r24.k1 === 'ventana' && /encima de otras apps/.test(r24.b1) && r24.perm[0] === 'encima', r24);
+    chk('24. Luego falta el de celular bloqueado (pantalla completa); «Luego» lo deja quieto; con los dos, no sale', r24.k2 === 'ventana' && /celular bloqueado/.test(r24.b2) && r24.k3 === '' && r24.k4 === '', r24);
 
     // 11. Navegador (sin la app): la voz sale con el volumen elegido (hasta 100 %)
     const ctx2 = await b.newContext({ viewport: { width: 1200, height: 900 } });
