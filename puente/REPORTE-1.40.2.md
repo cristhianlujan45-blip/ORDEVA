@@ -1,5 +1,23 @@
 # Vento 1.40.2 · Pagos de DaviPlata con el valor, parlante de avisos y recuperar la cuenta más fácil
 
+## Pagos que dejaron de sonar (la causa y el arreglo)
+- En la 1.40.0, para que la voz no empezara bajito, **todas** las frases de pago se grababan en un archivo y se tocaban
+  desde ahí. En algunos celulares el motor de voz graba pero nunca avisa que terminó, y **el pago quedaba sin sonar**.
+- Ahora se vuelve a lo que funcionó hasta la 1.39: **se dice directo** con el motor de voz, con un silencio cortito
+  antes para que la salida despierte y no empiece bajito. El archivo solo se usa para un volumen por encima de 100 % o
+  el parlante de avisos, y si en 3 s no está listo se dice directo.
+- Un pago que trae «código de aprobación» o «código de confirmación» ya no se descarta: solo se descartan los mensajes
+  con un código para entrar («Tu código de verificación es 123456»).
+- Aviso de DaviPlata por llave sin el valor: se espera el SMS solo 8 s (antes 20 s).
+- **Registro** (Ajustes → 💜 Pagos → «📋 Últimos avisos del banco y qué hizo Vento»): cada aviso de un banco que llega
+  a ese celular, sin nombres ni números, y qué hizo Vento. Por ejemplo: «🔊 Recibiste 2500 pesos por Nequi»,
+  «🚫 plata que SALE», «⏳ esperando el SMS», «↩️ repetido».
+- **🧪 Prueba piloto** (Ajustes → 💜 Pagos):
+  - Botones «DaviPlata $1.000», «Nequi $2.500» y «Bre-B a DaviPlata + SMS $3.000».
+  - Pasan un aviso de prueba por el mismo camino que uno de verdad: reglas, voz y aviso del celular. No se registran
+    como pago.
+  - Muestran si está prendido «Leer los avisos», el permiso y si Android tiene conectada la lectura.
+
 ## Pagos: se dice cuánto llegó (con los avisos REALES de DaviPlata)
 Con las capturas del dueño (15-oct-2026) se vio el problema:
 - La app DaviPlata, cuando llega plata por la **llave Bre-B**, avisa **sin el valor**: «Transacción exitosa:
@@ -51,8 +69,8 @@ Ahora:
 - La pantalla de entrada y la de recuperar también tienen 👁.
 
 ## Pruebas
-- `AvisoPagoPrueba` (Java) 126, con los avisos reales.
-- `pagosaviso` 53.
+- `AvisoPagoPrueba` (Java) 130, con los avisos reales.
+- `pagosaviso` 56.
 - `servidor/admin` 136 (destinos del aviso de pago).
 - `parlante` 11 (nueva).
 - `recuperacion` 25.

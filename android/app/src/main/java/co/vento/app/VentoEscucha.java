@@ -207,14 +207,14 @@ public class VentoEscucha extends NotificationListenerService {
 
     /** Un aviso: si es plata recibida y no se había visto, se dice en voz alta YA (aunque Vento esté minimizada o la
      *  pantalla apagada), sale el aviso del celular y queda en la cola para la página (que lo registra). */
-    private boolean procesar(SharedPreferences sp, String app, String titulo, String cuerpo, String prefijo, boolean confiable, boolean callado) throws Exception {
+    private static boolean procesar(SharedPreferences sp, String app, String titulo, String cuerpo, String prefijo, boolean confiable, boolean callado) throws Exception {
         String todo = titulo + " " + cuerpo;
-        if (!AvisoPago.esRecibido(todo)) return false;
+        if (!AvisoPago.esRecibido(todo)) { traza(sp, app, todo, "🚫 " + AvisoPago.porQueNo(todo)); return false; }
         long monto = AvisoPago.monto(todo);
         // Sin valor en el aviso («¡Te llegó plata! Entra a Nequi»): igual suena, sin el valor.
         if (monto <= 0 && AvisoPago.esPlataSinValor(todo)) {
             String id0 = prefijo + (app + " | " + titulo + " | " + cuerpo).hashCode();
-            if (!marcarVisto(sp, id0)) return false;
+            if (!marcarVisto(sp, id0)) { traza(sp, app, todo, "↩️ repetido (ya se había dicho)"); return false; }
             // DaviPlata por la llave Bre-B avisa SIN el valor («Recibiste Plata de otra entidad usando Llaves») y el valor
             // llega por SMS del 85888 («Recibiste 140,000»). Se juntan: el aviso de la app confirma y el SMS dice cuánto.
             if (confiable) {
@@ -222,6 +222,7 @@ public class VentoEscucha extends NotificationListenerService {
                 if (sms != null) {
                     long m = sms.optLong("m");
                     // Si el SMS ya se había dicho, ahora solo queda confirmado (no se repite la voz).
+                    traza(sp, app, todo, "🔊 junto con el SMS: " + AvisoPago.frase(app, m, todo));
                     if (!callado && !sms.optBoolean("dicho")) VentoApp.anunciarPago(app, m, sp.getBoolean(PREF_NOTIF, true), todo);
                     else if (!callado) VentoApp.decirPago("Confirmado por " + AvisoPago.nombreApp(app) + ".");
                     guardar(sp, id0, app + " | " + titulo + " | Recibiste $" + AvisoPago.plata(m).substring(1) + " · " + cuerpo, !callado, null, false, sms.optString("id"));
@@ -231,6 +232,7 @@ public class VentoEscucha extends NotificationListenerService {
                     // Se espera el SMS con el valor unos segundos; si no llega, se dice sin el valor.
                     final String app0 = app, todo0 = todo;
                     pendiente(sp, id0, app, todo);
+                    traza(sp, app, todo, "⏳ sin el valor: esperando el SMS del banco (" + (ESPERA_SMS / 1000) + " s)");
                     VentoApp.mantenerDespierto();
                     VentoApp.ui.postDelayed(() -> {
                         try {
@@ -254,7 +256,7 @@ public class VentoEscucha extends NotificationListenerService {
         }
         String txt = app + " | " + titulo + " | " + cuerpo;
         String id = prefijo + txt.hashCode();
-        if (!marcarVisto(sp, id)) return false;
+        if (!marcarVisto(sp, id)) { traza(sp, app, todo, "↩️ repetido (ya se había dicho)"); return false; }
         // Sin valor que se entienda: no se dice nada; la página lo reporta para aprender ese formato.
         boolean voz = false;
         if (monto <= 0) callado = true;
@@ -263,14 +265,15 @@ public class VentoEscucha extends NotificationListenerService {
         String reemplaza = monto > 0 && confiable ? parear(sp, monto, false, id) : null;
         if (confiable && !callado) { VentoApp.anunciarPago(app, monto, sp.getBoolean(PREF_NOTIF, true), todo); voz = true; }
         else if (!confiable && !callado) { VentoApp.decirPago("Ojo. Llegó un aviso de " + monto + " pesos de una aplicación que no es la oficial de " + AvisoPago.nombreApp(app) + ". Revísalo en la aplicación del banco antes de entregar."); voz = true; }
+        traza(sp, app, todo, monto <= 0 ? "❓ no se entendió el valor" : callado ? "🔕 llegó con Vento desconectada (sin voz)" : confiable ? "🔊 " + AvisoPago.frase(app, monto, todo) : "⚠️ app no oficial: «revísalo»");
         guardar(sp, id, txt, voz, confiable ? null : "La app «" + app + "» de este celular no es la oficial (no se instaló desde la tienda): míralo en la app del banco", false, reemplaza);
         return true;
     }
 
     /** SMS del banco: solo plata recibida que nombra un banco. Desde un celular común = falso; desde el código corto del
      *  banco = «revísalo» (o «Pago confirmado» si el dueño eligió confirmar los SMS del banco). */
-    private boolean procesarSms(SharedPreferences sp, String remitente, String cuerpo, String prefijo, boolean callado) throws Exception {
-        if (!AvisoPago.esSmsDePago(remitente, cuerpo)) return false;
+    private static boolean procesarSms(SharedPreferences sp, String remitente, String cuerpo, String prefijo, boolean callado) throws Exception {
+        if (!AvisoPago.esSmsDePago(remitente, cuerpo)) { if (AvisoPago.pareceDePlata(cuerpo)) traza(sp, "SMS " + remitente, cuerpo, "🚫 " + AvisoPago.porQueNo(remitente + " " + cuerpo)); return false; }
         long monto = AvisoPago.monto(cuerpo);
         if (monto <= 0) monto = AvisoPago.monto(remitente + " " + cuerpo);
         String banco = AvisoPago.bancoDeCodigo(remitente);
@@ -284,6 +287,7 @@ public class VentoEscucha extends NotificationListenerService {
             JSONObject pend = tomarPendienteReciente(sp);
             if (pend != null) {
                 String app = pend.optString("app");
+                traza(sp, "SMS " + remitente, cuerpo, "🔊 junto con el aviso de " + app + ": " + AvisoPago.frase(app, monto, pend.optString("todo")));
                 if (!callado) VentoApp.anunciarPago(app, monto, sp.getBoolean(PREF_NOTIF, true), pend.optString("todo") + " " + cuerpo);
                 guardar(sp, id, app + " | " + app + " | Recibiste $" + AvisoPago.plata(monto).substring(1) + (AvisoPago.esBreB(pend.optString("todo")) ? " por Bre-B" : "") + " · " + cuerpo, !callado, null, false, null);
                 return true;
@@ -292,6 +296,7 @@ public class VentoEscucha extends NotificationListenerService {
             if (parear(sp, monto, true, id) != null) return false;
             final boolean confiar = sp.getBoolean(PREF_SMS_OK, false);
             recordarSms(sp, id, monto);
+            traza(sp, "SMS " + remitente, cuerpo, "🔊 " + AvisoPago.fraseSms(remitente, cuerpo, monto, tipo, confiar));
             if (!callado) {
                 // Unos segundos por si llega el aviso de la app del banco (entonces se dice confirmado, una sola vez).
                 final long m = monto; final String rem = remitente, cu = cuerpo, b = banco, ti = tipo;
@@ -316,7 +321,7 @@ public class VentoEscucha extends NotificationListenerService {
     }
 
     // ---------- Aviso de la app SIN valor + SMS del banco CON el valor (DaviPlata por la llave Bre-B) ----------
-    static final long ESPERA_SMS = 20_000L, ESPERA_APP = 6_000L, JUNTAR = 3 * 60_000L;
+    static final long ESPERA_SMS = 8_000L, ESPERA_APP = 4_000L, JUNTAR = 3 * 60_000L;
     static final String PREF_PEND = "pagosSinValor", PREF_SMSV = "pagosSmsValor";
 
     private static synchronized void pendiente(SharedPreferences sp, String id, String app, String todo) {
@@ -410,10 +415,35 @@ public class VentoEscucha extends NotificationListenerService {
         sp.edit().putString(PREF_COLA, out.toString()).apply();
     }
 
-    /** Para la página: los avisos de banco que no se tomaron (y cuándo llegó el último aviso de banco). */
+    /** Para la página: los avisos de banco que no se tomaron, el registro de los últimos avisos del banco y qué hizo Vento
+     *  con cada uno, y cuándo llegó el último aviso de banco. */
     static String diag(SharedPreferences sp) {
-        try { return new JSONObject().put("lista", new JSONArray(sp.getString(PREF_DIAG, "[]"))).put("ultimo", sp.getLong(PREF_ULTIMO, 0)).put("vivo", activa != null).toString(); }
+        try { return new JSONObject().put("lista", new JSONArray(sp.getString(PREF_DIAG, "[]"))).put("traza", new JSONArray(sp.getString(PREF_TRAZA, "[]")))
+                .put("ultimo", sp.getLong(PREF_ULTIMO, 0)).put("vivo", activa != null).toString(); }
         catch (Exception e) { return "{}"; }
+    }
+
+    // ---------- Registro: cada aviso del banco que llega y qué hizo Vento (sin nombres ni números) ----------
+    static final String PREF_TRAZA = "pagosAvisosTraza";
+    static synchronized void traza(SharedPreferences sp, String app, String texto, String resultado) {
+        try {
+            JSONArray l = new JSONArray(sp.getString(PREF_TRAZA, "[]"));
+            l.put(new JSONObject().put("t", System.currentTimeMillis()).put("app", app == null ? "" : app).put("txt", AvisoPago.sinDatos(texto)).put("r", resultado == null ? "" : resultado));
+            while (l.length() > 25) l.remove(0);
+            sp.edit().putString(PREF_TRAZA, l.toString()).apply();
+        } catch (Exception ignorado) { }
+    }
+
+    /** Prueba piloto: pasa un aviso de prueba por el MISMO camino que uno de verdad (reglas, voz, aviso del celular) sin
+     *  registrarlo como pago. Devuelve lo que hizo. */
+    static synchronized String probar(SharedPreferences sp, String app, String titulo, String cuerpo, boolean esSms) {
+        try {
+            String pref = "PRUEBA:" + System.nanoTime() + ":";
+            boolean ok = esSms ? procesarSms(sp, titulo, cuerpo, pref, false) : procesar(sp, app, titulo, cuerpo, pref, true, false);
+            JSONArray l = new JSONArray(sp.getString(PREF_TRAZA, "[]"));
+            String r = l.length() > 0 ? l.getJSONObject(l.length() - 1).optString("r") : "";
+            return new JSONObject().put("ok", ok).put("r", r).toString();
+        } catch (Exception e) { return "{\"ok\":false,\"r\":\"error\"}"; }
     }
 
     /** La página toma los avisos pendientes (y quedan vistos). */

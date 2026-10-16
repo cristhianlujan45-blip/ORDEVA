@@ -28851,7 +28851,10 @@ let fotosListas = false;
   window.ventoAvisosNativos = function(){
     if(!AND() || typeof authUser === 'undefined' || !authUser || typeof data === 'undefined' || !data) return;
     let l = []; try{ l = JSON.parse(AND().pagosAvisosTomar() || '[]'); }catch(e){}
-    l.forEach(a => { try{ if(a && a.txt) pgRecibir(a.txt, 'and-' + a.id, { voz: !!a.voz, revisar: a.revisar || '', smsOk: !!a.smsOk, reemplaza: a.reemplaza || '' }); }catch(e){} });
+    l.forEach(a => { try{
+      // Prueba piloto (Ajustes → Pagos): pasó por el mismo camino que un aviso de verdad, pero no se registra como pago.
+      if(a && /^PRUEBA/.test(String(a.id || ''))){ const pp = pgLeer(a.txt); showToast('🧪 Prueba piloto: ' + (pp ? 'Vento entendió ' + plata(pp.monto) + ' por ' + (pp.breb ? 'Bre-B · ' : '') + pp.app : 'aviso sin valor (espera el SMS)') + '. No se registró como pago.', 7000); return; }
+      if(a && a.txt) pgRecibir(a.txt, 'and-' + a.id, { voz: !!a.voz, revisar: a.revisar || '', smsOk: !!a.smsOk, reemplaza: a.reemplaza || '' }); }catch(e){} });
     if(l.length) try{ pgPintar(); }catch(e){}
   };
   setInterval(() => window.ventoAvisosNativos(), 5000);
@@ -29091,12 +29094,36 @@ let fotosListas = false;
     let box = document.getElementById('pgDiag');
     const ancla = $p('pgAndTxt'); if(!ancla) return;
     if(!box){ box = document.createElement('div'); box.id = 'pgDiag'; box.style.cssText = 'font-size:13px;line-height:1.45;margin-top:8px'; ancla.parentNode.insertBefore(box, ancla.nextSibling); }
-    const ult = +d.ultimo || 0;
-    box.innerHTML = (ult ? '<div style="opacity:.8">📨 Último aviso de un banco en este celular: ' + new Date(ult).toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + '</div>' : '') +
+    const ult = +d.ultimo || 0, tr = Array.isArray(d.traza) ? d.traza : [];
+    const e0 = (() => { try{ return JSON.parse(A.pagosAvisosEstado() || '{}'); }catch(x){ return {}; } })();
+    const ck = (ok, txt) => '<div>' + (ok ? '✅ ' : '❌ ') + txt + '</div>';
+    const prueba = A.pagosPrueba ? '<details style="margin-top:8px" id="pgPilotoBox"><summary style="cursor:pointer;font-weight:700">🧪 Prueba piloto (que suene un pago de prueba)</summary>' +
+      '<div style="opacity:.85;margin:4px 0">Pasa un aviso de prueba por el mismo camino que uno de verdad: debe sonar «Recibiste … pesos» y salir el aviso del celular. No se registra como pago.</div>' +
+      ck(!!e0.on, 'Leer los avisos de este celular: ' + (e0.on ? 'prendido' : 'APAGADO (préndelo arriba)')) + ck(!!e0.permiso, 'Permiso «Acceso a notificaciones»') + ck(e0.vivo !== false, 'Android tiene conectada la lectura de avisos') +
+      '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"><button type="button" class="btn-ghost" data-piloto="davi">DaviPlata $1.000</button><button type="button" class="btn-ghost" data-piloto="nequi">Nequi $2.500</button><button type="button" class="btn-ghost" data-piloto="breb">Bre-B a DaviPlata + SMS $3.000</button></div><div id="pgPilotoRes" style="margin-top:6px;font-weight:700"></div></details>' : '';
+    const traza = tr.length ? '<details style="margin-top:6px"><summary style="cursor:pointer;font-weight:700">📋 Últimos avisos del banco y qué hizo Vento (' + tr.length + ')</summary>' +
+      tr.slice().reverse().map(x => '<div style="padding:5px 0;border-top:1px solid var(--line)"><b>' + escp(x.r) + '</b><br><small style="opacity:.8">' + escp(x.app) + ' · ' + new Date(+x.t).toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' · ' + escp(x.txt) + '</small></div>').join('') + '</details>' : '';
+    const abiertos = [...box.querySelectorAll('details')].map(d => d.open);   // lo que estaba abierto sigue abierto
+    box.innerHTML = prueba + traza + (ult ? '<div style="opacity:.8">📨 Último aviso de un banco en este celular: ' + new Date(ult).toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + '</div>' : '') +
       (l.length ? '<details style="margin-top:6px"><summary style="cursor:pointer;font-weight:700">🔎 Avisos del banco que Vento no tomó como pago (' + l.length + ')</summary>' +
         '<div style="opacity:.85;margin:4px 0">Sin nombres ni valores. Ya los mandamos a Vento para aprender ese formato. Si uno de estos era un pago, revísalo en la app del banco.</div>' +
         l.slice().reverse().map(x => '<div style="padding:5px 0;border-top:1px solid var(--line)"><b>' + escp(x.app) + '</b> · ' + escp(x.motivo || '') + '<br><small style="opacity:.8">' + escp(x.txt) + '</small></div>').join('') + '</details>' : '');
+    [...box.querySelectorAll('details')].forEach((d, i) => { if(abiertos[i]) d.open = true; });
+    box.querySelectorAll('[data-piloto]').forEach(b => { b.onclick = () => {
+      const k = b.dataset.piloto, res = document.getElementById('pgPilotoRes');
+      const correr = (app, tit, txt, sms) => { try{ return JSON.parse(A.pagosPrueba(app, tit, txt, !!sms) || '{}'); }catch(x){ return { ok: false, r: 'error' }; } };
+      let r;
+      if(k === 'davi') r = correr('DaviPlata', 'DaviPlata', '¡Le llegó plata! JUAN PEREZ le pasó $1.000 a su DaviPlata');
+      else if(k === 'nequi') r = correr('Nequi', 'Nequi', '¡Te llegó plata! ANA RUIZ te envió $2.500');
+      else { r = correr('DaviPlata', 'DaviPlata', 'Transaccion exitosa: Recibiste Plata de otra entidad usando Llaves, consulta el detalle de tus movimientos desde el app DaviPlata.');
+        setTimeout(() => { const r2 = correr('', '85888', 'Recibiste  3,000. Para saber mas, consulta tus movimientos.', true); if(res) res.textContent = (r2.r || '') + ' · (si no sonó, mira el registro de abajo)'; pgDiagPintar(); }, 2500); }
+      if(res) res.textContent = (r.r || (r.ok ? '✅' : '❌ no se tomó')) + (k === 'breb' ? ' · ahora llega el SMS con el valor…' : '');
+      setTimeout(pgDiagPintar, 600);
+    }; });
   }
+  window.ventoPagosDiag = () => { try{ pgDiagPintar(); }catch(e){} };
+  // Con Ajustes → Pagos a la vista, el registro de avisos se actualiza solo (cada 4 s).
+  setInterval(() => { const b = document.getElementById('pgDiag'); if(b && b.offsetParent) try{ pgDiagPintar(); }catch(e){} }, 4000);
   function pgPintar(){
     if(!data || !pgCrearUI()) return;
     const g = PG();

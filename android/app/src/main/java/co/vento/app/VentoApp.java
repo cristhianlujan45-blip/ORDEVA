@@ -276,16 +276,18 @@ public class VentoApp extends Application {
             pagosHablando++;
             // Por si el motor de voz nunca avisa que terminó: la música y el volumen vuelven solos.
             ui.postDelayed(() -> { if (pagosHablando > 0) { pagosHablando = 0; subirMusica(); } }, 25000);
-            {
-                // Se graba la frase y se toca con el volumen PAREJO de principio a fin (AvisoPago.vozPareja): silencio
-                // corto para que la salida despierte, mismo nivel siempre y, arriba de 100 %, ganancia fija con tope suave.
+            // Lo de siempre (lo que funcionó en todas las versiones hasta la 1.39): se dice DIRECTO con el motor de voz,
+            // con un silencio corto antes para que la salida despierte y no empiece bajito. Solo se graba y se toca desde un
+            // archivo cuando hace falta: volumen por encima de 100 % (ganancia fija, AvisoPago.vozPareja) o el parlante de
+            // avisos (Parlante). En la 1.40.0 TODO pasaba por el archivo y en algunos celulares el pago no sonaba.
+            if (alParlante || AvisoPago.refuerzo(volPagos()) > 0) {
                 java.io.File f = new java.io.File(app.getCacheDir(), "pago" + System.nanoTime() + ".wav");
                 String id = "arch" + System.nanoTime();
                 archivosPago.put(id, new Object[]{f, frase, alParlante});
                 if (ttsPago.synthesizeToFile(frase, null, f, id) == TextToSpeech.SUCCESS) {
                     // Hay motores de voz que graban pero nunca avisan que terminaron: el pago se quedaba sin sonar.
                     // Si en 6 s no avisó, se dice directo (sin esperar más).
-                    ui.postDelayed(() -> { if (archivosPago.remove(id) != null) decirDirecto(frase); }, 6000);
+                    ui.postDelayed(() -> { if (archivosPago.remove(id) != null) decirDirecto(frase); }, 3000);
                     return;
                 }
                 archivosPago.remove(id);
@@ -940,6 +942,12 @@ public class VentoApp extends Application {
             if (Parlante.elegido(VentoApp.this) == null) return false;
             decirAviso(frase);
             return true;
+        }
+
+        /** Prueba piloto de un aviso de pago (como si llegara de verdad, sin registrarlo): {ok, r} */
+        @JavascriptInterface
+        public String pagosPrueba(String app, String titulo, String texto, boolean sms) {
+            return VentoEscucha.probar(getSharedPreferences("vento", MODE_PRIVATE), app, titulo, texto, sms);
         }
 
         /** Avisos de banco que hablaban de plata pero no se tomaron como pago (sin datos), para revisarlos. */

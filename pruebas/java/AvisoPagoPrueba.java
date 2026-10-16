@@ -140,6 +140,11 @@ public class AvisoPagoPrueba {
         for (String x : salen) chk("Plata que SALE no es pago: «" + x + "»", !AvisoPago.esRecibido(x) && !AvisoPago.esSmsDePago("85888", x), x);
         chk("Valores sin signo pequeños: «Recibiste 100 pesos» → 100; «recibiste 1000» → 1000", AvisoPago.monto("Recibiste 100 pesos") == 100 && AvisoPago.monto("DaviPlata: recibiste 1000 en tu DaviPlata") == 1000, AvisoPago.monto("Recibiste 100 pesos"));
         chk("Un número de celular no es el valor («Recibiste plata de 3001234567»)", AvisoPago.monto("Recibiste plata de 3001234567") == 0, AvisoPago.monto("Recibiste plata de 3001234567"));
+        // Un pago con «código de aprobación» o «código de confirmación» SÍ es pago (antes se descartaba)
+        String[] conCodigo = { "DaviPlata: Recibiste $50.000 de JUAN. Codigo de aprobacion 604107", "Te llegó plata: ANA te envió $8.000. Código de confirmación: 123987" };
+        for (String x : conCodigo) chk("Pago con código de aprobación: «" + x + "»", AvisoPago.esRecibido(x), x);
+        chk("Por qué no: «Pasaste $100…» → plata que SALE", AvisoPago.porQueNo("Pasaste $100 a otro DaviPlata").contains("SALE"), AvisoPago.porQueNo("Pasaste $100 a otro DaviPlata"));
+        chk("Por qué no: publicidad", AvisoPago.porQueNo("¿Te llegó la prima? Guárdala").contains("publicidad"), AvisoPago.porQueNo("¿Te llegó la prima? Guárdala"));
         System.out.println("RESULTADO " + ok + " bien " + mal + " mal");
         System.exit(mal > 0 ? 1 : 0);
     }

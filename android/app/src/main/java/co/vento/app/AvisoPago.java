@@ -50,7 +50,9 @@ public final class AvisoPago {
         return !PRIVADO.matcher(todo).find() || SEGURO.matcher(todo).find() || (FUERTE.matcher(todo).find() && !SALE.matcher(todo).find());
     }
     // Códigos de seguridad: nunca son un pago, digan lo que digan.
-    static final Pattern CODIGO = Pattern.compile("c[oó]digo (de )?(seguridad|verificaci|acceso|confirmaci)|clave din[aá]mica|\\botp\\b|tu c[oó]digo es|es tu c[oó]digo", Pattern.CASE_INSENSITIVE);
+    // Solo los mensajes de un código para entrar (con el número del código): «Tu código de verificación es 123456». Un
+    // pago que trae «código de aprobación 604107» o «nunca compartas tu clave» SÍ es pago.
+    static final Pattern CODIGO = Pattern.compile("(c[oó]digo|clave)( de)? (seguridad|verificaci[oó]n|acceso|ingreso|otp|din[aá]mica)( es)?\\s*:?\\s*\\d{4,8}|clave din[aá]mica|\\botp\\b[^.]{0,20}\\d{4,8}|tu c[oó]digo es \\d|es tu c[oó]digo", Pattern.CASE_INSENSITIVE);
     // Plata que SALE (nunca es un pago recibido, aunque el aviso diga «te»).
     static final Pattern SALE = Pattern.compile("enviaste|pagaste|pasaste|compra exitosa|transferiste|retiraste|compraste|sacaste|usted (envi|pag|transfiri|pas)|c[oó]digo (de )?(seguridad|verificaci)|clave din[aá]mica|\\botp\\b", Pattern.CASE_INSENSITIVE);
 
@@ -249,6 +251,19 @@ public final class AvisoPago {
     static boolean pareceDePlata(String todo) {
         return todo != null && Pattern.compile("\\$\\s?\\d|\\bcop\\b|\\d\\s*pesos", Pattern.CASE_INSENSITIVE).matcher(todo).find()
                 && Pattern.compile("recib|lleg|transfer|bre-?b|llave|abon|ingres|acredit|envi|pas[oó]|consign|deposit|pago", Pattern.CASE_INSENSITIVE).matcher(todo).find();
+    }
+
+    /** Por qué un aviso NO se tomó como plata recibida (para el registro de Ajustes → Pagos). */
+    static String porQueNo(String t) {
+        if (t == null || t.trim().isEmpty()) return "aviso vacío";
+        if (SALE.matcher(t).find()) return "plata que SALE (pasaste, enviaste, compra…)";
+        if (CODIGO.matcher(t).find()) return "código de seguridad";
+        if (NUNCA.matcher(t).find()) return "solicitud, rechazado o programado";
+        if (!RECIBIDO.matcher(t).find()) return "no dice que llegó plata";
+        if (PROMO.matcher(t).find() && !FUERTE.matcher(t).find()) return "parece publicidad del banco";
+        if (PRIVADO.matcher(t).find()) return "mensaje privado (clave o código)";
+        if (monto(t) <= 0) return "sin el valor";
+        return "no se tomó";
     }
 
     /** El aviso sin nombres ni números (para revisarlo sin datos de nadie). */

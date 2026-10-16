@@ -246,6 +246,26 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     chk('17. Mesero: un pago que no es de ninguna mesa suya no le llega; si cobra esa mesa, sí', !r17.sinMesa && r17.suMesa && !r17.mesa2 && r17.cobra2, r17);
     chk('17. Dueño / administrador: le llegan todos', r17.dueno, r17);
 
+    // 18. Prueba piloto y registro de cada aviso del banco (Ajustes → Pagos)
+    const r18 = await p.evaluate(async () => {
+      const A = window.VentoAndroid; window.__piloto = [];
+      A.pagosAvisosEstado = () => JSON.stringify({ on: true, permiso: true, vivo: true });
+      A.pagosPrueba = (app, tit, txt, sms) => { window.__piloto.push([app, tit, txt, sms]); return JSON.stringify({ ok: true, r: sms ? '🔊 junto con el aviso de DaviPlata: Recibiste 3000 pesos por Bre-B, en DaviPlata.' : '🔊 Recibiste 1000 pesos por DaviPlata.' }); };
+      A.pagosAvisosDiag = () => JSON.stringify({ ultimo: Date.now(), vivo: true, lista: [], traza: [{ t: Date.now() - 5000, app: 'DaviPlata', txt: 'Pasaste $# a otro DaviPlata', r: '🚫 plata que SALE (pasaste, enviaste, compra…)' }, { t: Date.now(), app: 'Nequi', txt: '¡Te llegó plata! NOMBRE te envió $#', r: '🔊 Recibiste 2500 pesos por Nequi.' }] });
+      window.ventoPagosDiag();
+      const box = document.getElementById('pgDiag');
+      const tieneTraza = !!box && /Últimos avisos del banco y qué hizo Vento/.test(box.innerHTML) && /plata que SALE/.test(box.innerHTML);
+      const btn = box && box.querySelector('[data-piloto="davi"]'); if(btn) btn.click();
+      const res1 = (document.getElementById('pgPilotoRes') || {}).textContent || '';
+      const antes = data.pagos.lista.length;
+      window.__and.cola.push({ id: 'PRUEBA:1:abc', txt: 'DaviPlata | DaviPlata | ¡Le llegó plata! JUAN PEREZ le pasó $1.000 a su DaviPlata', voz: true });
+      window.__toasts = []; window.ventoAvisosNativos();
+      return { tieneTraza, res1, piloto: window.__piloto.slice(), registro: data.pagos.lista.length - antes, toast: window.__toasts.find(t => /Prueba piloto/.test(t)) || '' };
+    });
+    chk('18. Ajustes → Pagos: «📋 Últimos avisos del banco y qué hizo Vento» (con el porqué)', r18.tieneTraza, r18);
+    chk('18. «🧪 Prueba piloto»: pasa un aviso de DaviPlata por el mismo camino y muestra lo que dijo', r18.piloto.length === 1 && /JUAN PEREZ le pasó \$1\.000/.test(r18.piloto[0][2]) && /Recibiste 1000 pesos por DaviPlata/.test(r18.res1), r18);
+    chk('18. La prueba piloto NO se registra como pago (solo avisa «🧪 Prueba piloto»)', r18.registro === 0 && /Prueba piloto: Vento entendió \$1\.000 por DaviPlata/.test(r18.toast), r18);
+
     // 11. Navegador (sin la app): la voz sale con el volumen elegido (hasta 100 %)
     const ctx2 = await b.newContext({ viewport: { width: 1200, height: 900 } });
     await ctx2.route('**/*', r => new URL(r.request().url()).hostname === 'localhost' ? r.continue() : r.abort());
