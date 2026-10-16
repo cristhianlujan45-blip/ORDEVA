@@ -127,6 +127,20 @@ public class AvisoPagoPrueba {
         chk("Diagnóstico: un aviso de banco con plata que no se tomó se guarda SIN nombres ni números", AvisoPago.pareceDePlata("Movimiento: JUAN PEREZ $20.000 llave") && AvisoPago.sinDatos("Movimiento: JUAN PEREZ $20.000 @juan").equals("Movimiento: NOMBRE $# @llave"), AvisoPago.sinDatos("Movimiento: JUAN PEREZ $20.000 @juan"));
         chk("Diagnóstico: publicidad sin plata no se guarda", !AvisoPago.pareceDePlata("Actualiza tu app de Nequi"), "");
         // Avisos REALES de DaviPlata (capturas del dueño, 15-oct-2026)
+        // Plata desde OTRO banco por la llave (1.41.2): se entiende en la app (sin depender de la página, que con la pantalla
+        // apagada se demora)
+        String[][] otraEntidad = {
+            {"Te enviaron $45.000 desde otra entidad a tu DaviPlata", "45000"},
+            {"Transferencia interbancaria recibida por $30.000", "30000"},
+            {"Tienes un nuevo abono de $12.500 en tu cuenta", "12500"},
+            {"Nuevo ingreso por Bre-B: $8.000", "8000"},
+            {"Recibiste dinero desde otro banco por $15.000", "15000"} };
+        for (String[] x : otraEntidad) chk("Otra entidad: «" + x[0] + "» → $" + x[1], AvisoPago.esRecibido(x[0]) && String.valueOf(AvisoPago.monto(x[0])).equals(x[1]), AvisoPago.esRecibido(x[0]) + " " + AvisoPago.monto(x[0]));
+        String[] otraSinValor = { "DaviPlata: tienes un nuevo abono de otra entidad, revisa tus movimientos", "Te llegó dinero de otra entidad por tu llave" };
+        for (String x : otraSinValor) chk("Otra entidad sin valor: «" + x + "» → suena «Llegó plata»", AvisoPago.esRecibido(x) && AvisoPago.esPlataSinValor(x), AvisoPago.esRecibido(x) + " " + AvisoPago.esPlataSinValor(x));
+        String[] otraNo = { "Enviaste $20.000 a otra entidad", "Transferencia a otro banco por $50.000 rechazada", "Pagaste $10.000 desde tu DaviPlata a otra entidad" };
+        for (String x : otraNo) chk("No es plata recibida: «" + x + "»", !AvisoPago.esRecibido(x), x);
+
         String llaves = "DaviPlata | Transaccion exitosa: Recibiste Plata de otra entidad usando Llaves, consulta el detalle de tus movimientos desde el app DaviPlata.";
         chk("DaviPlata por llave (sin valor): es plata recibida y SIN valor → se espera el SMS", AvisoPago.esRecibido(llaves) && AvisoPago.monto(llaves) == 0 && AvisoPago.esPlataSinValor(llaves) && AvisoPago.esBreB(llaves), AvisoPago.monto(llaves));
         String sms1 = "DaviPlata: recibiste  100,000 en tu DaviPlata. Usalos de forma segura para pagar, comprar y mucho mas! Conoce todo lo que puedes hacer en www.daviplata.com";

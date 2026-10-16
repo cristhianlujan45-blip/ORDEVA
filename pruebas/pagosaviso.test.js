@@ -205,6 +205,8 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
       pasaste: window.pagosLeer('DaviPlata | DaviPlata | Pasaste $100 a otro DaviPlata. Para saber mas, consulta tus movimientos.'),
       compra: window.pagosLeer('SMS | 85888 | DaviPlata: Compra exitosa en la Tienda Virtual por  20,000. Para saber mas'),
       llaves: window.pagosLeer('DaviPlata | DaviPlata | Transaccion exitosa: Recibiste Plata de otra entidad usando Llaves, consulta el detalle de tus movimientos desde el app DaviPlata.') }));
+    const r16c = await p.evaluate(() => ({ a: window.pagosLeer('DaviPlata | DaviPlata | Te enviaron $45.000 desde otra entidad a tu DaviPlata'), b: window.pagosLeer('Bancolombia | Bancolombia | Transferencia interbancaria recibida por $30.000'), c: window.pagosLeer('DaviPlata | DaviPlata | Tienes un nuevo abono de $12.500 en tu cuenta'), no: window.pagosLeer('DaviPlata | DaviPlata | Enviaste $20.000 a otra entidad') }));
+    chk('16. Plata desde OTRA entidad (otro banco por la llave): $45.000, $30.000 y $12.500; «Enviaste… a otra entidad» no', r16c.a && r16c.a.monto === 45000 && r16c.b && r16c.b.monto === 30000 && r16c.c && r16c.c.monto === 12500 && !r16c.no, r16c);
     chk('16. SMS reales de DaviPlata (85888) sin $: 100,000 y 140,000', r16b.sms1 && r16b.sms1.monto === 100000 && r16b.sms1.app === 'DaviPlata' && r16b.sms2 && r16b.sms2.monto === 140000, r16b);
     chk('16. La llave + el SMS juntos (los junta la app): $140.000 por Bre-B en DaviPlata', r16b.junto && r16b.junto.monto === 140000 && r16b.junto.breb && r16b.junto.app === 'DaviPlata', r16b.junto);
     chk('16. «Pasaste $100 a otro DaviPlata» y «Compra exitosa» NO son pago; la llave sin valor no inventa uno', !r16b.pasaste && !r16b.compra && !r16b.llaves, r16b);

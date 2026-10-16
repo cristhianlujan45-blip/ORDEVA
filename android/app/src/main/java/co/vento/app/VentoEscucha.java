@@ -146,6 +146,7 @@ public class VentoEscucha extends NotificationListenerService {
         // La misma notificación actualizada (mismo «cuándo» y mismo texto) no se repite; dos pagos iguales (mismo valor,
         // misma persona) SÍ son dos pagos: cada uno trae su propio «cuándo». Antes se tomaban como uno solo.
         long cuando = n.when != 0 ? n.when : sbn.getPostTime();
+        tiempos(n.when, sbn.getPostTime());
         // Al reconectar: lo de los últimos 30 min se toma (lo de más de 3 min, sin decirlo en voz alta); lo más viejo no
         // (podría cuadrar por casualidad con el saldo de una mesa de ahora).
         long edad = Math.abs(System.currentTimeMillis() - sbn.getPostTime());
@@ -192,6 +193,7 @@ public class VentoEscucha extends NotificationListenerService {
             // Los de antes: solo los de los últimos 10 min (los más viejos ya se dijeron o no son de ahora). Cada mensaje se
             // reconoce por su hora y su texto: el mismo nunca suena dos veces.
             if (i != nuevo && ahora - hora > 10 * 60_000L) continue;
+            tiempos(hora, ahora);
             if (procesarSms(sp, remitente, (String) m[0], "M:" + hora + ":", callado)) alguno = true;
         }
         if (nuevo < 0 && procesarSms(sp, remitente, principal, prefijo, callado)) alguno = true;
@@ -496,8 +498,21 @@ public class VentoEscucha extends NotificationListenerService {
 
     // ---------- Registro: cada aviso del banco que llega y qué hizo Vento (sin nombres ni números) ----------
     static final String PREF_TRAZA = "pagosAvisosTraza";
+    // ⏱ Cuándo dice el banco que pasó el pago (la hora del aviso o del SMS) y cuándo llegó al celular: el registro dice
+    // si el BANCO mandó el aviso tarde (Vento lo dice en el instante en que llega). Así se sabe de dónde viene una demora.
+    private static volatile long tBanco = 0, tLlego = 0;
+    static void tiempos(long banco, long llego) { tBanco = banco; tLlego = llego; }
+    static String demora() {
+        long b = tBanco, l = tLlego, ahora = System.currentTimeMillis();
+        StringBuilder x = new StringBuilder();
+        if (b > 0 && l > 0 && l - b >= 3000 && l - b < 3600_000L) x.append(" · ⏱ el banco lo mandó ").append((l - b) / 1000).append(" s tarde");
+        if (l > 0 && ahora - l >= 3000 && ahora - l < 3600_000L) x.append(" · ⏱ Vento lo leyó ").append((ahora - l) / 1000).append(" s después");
+        return x.toString();
+    }
+
     static synchronized void traza(SharedPreferences sp, String app, String texto, String resultado) {
         try {
+            resultado = (resultado == null ? "" : resultado) + demora();
             JSONArray l = new JSONArray(sp.getString(PREF_TRAZA, "[]"));
             l.put(new JSONObject().put("t", System.currentTimeMillis()).put("app", app == null ? "" : app).put("txt", AvisoPago.sinDatos(texto)).put("r", resultado == null ? "" : resultado));
             while (l.length() > 25) l.remove(0);
@@ -510,6 +525,7 @@ public class VentoEscucha extends NotificationListenerService {
     static synchronized String probar(SharedPreferences sp, String app, String titulo, String cuerpo, boolean esSms) {
         try {
             String pref = "PRUEBA:" + System.nanoTime() + ":";
+            tiempos(0, 0);
             boolean ok = esSms ? procesarSms(sp, titulo, cuerpo, pref, false) : procesar(sp, app, titulo, cuerpo, pref, true, false);
             JSONArray l = new JSONArray(sp.getString(PREF_TRAZA, "[]"));
             String r = l.length() > 0 ? l.getJSONObject(l.length() - 1).optString("r") : "";

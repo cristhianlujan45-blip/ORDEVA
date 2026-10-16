@@ -23,7 +23,10 @@ public final class AvisoPago {
             + "|(te|le) mand(o|ó|aron)|(te|le) gir(o|ó|aron)|(te|le) deposit|dep[oó]sito recibido|(te|le|se) acredit|acredit\\w*\\s+(a|en)\\s+(tu|su)\\s+(cuenta|llave|nequi|daviplata)"
             + "|lleg(o|ó|aron)\\s+(\\$|cop|plata|dinero)|a (tu|su) llave|(recib|lleg|entr|ingres)[^.]{0,40}bre-?b|bre-?b[^.]{0,40}(recib|lleg|entr|ingres)"
             // Más formas de los bancos para la plata que entra (transferencias por llave Bre-B y de otros bancos)
-            + "|transferencia entrante|abono recibido|abono (por|de|bre-?b)\\s|ingreso de (\\$|cop|dinero|plata)|ingresaron|entrada de (dinero|plata)|recibiste un (pago|abono)|lleg[oó] una transferencia|(en|a) (tu|su) llave", Pattern.CASE_INSENSITIVE);
+            + "|transferencia entrante|abono recibido|abono (por|de|bre-?b)\\s|ingreso de (\\$|cop|dinero|plata)|ingresaron|entrada de (dinero|plata)|recibiste un (pago|abono)|lleg[oó] una transferencia|(en|a) (tu|su) llave"
+            // Plata desde OTRO banco por la llave (1.41.2): «Te enviaron dinero desde otra entidad», «Transferencia
+            // interbancaria recibida», «Tienes un nuevo abono», «Nuevo ingreso por Bre-B».
+            + "|(dinero|plata|transferencia|abono|pago)\\s+(de|desde)\\s+otr[oa]s?\\s+(entidad|banco)|interbancari\\w*\\s+recibid|(tienes|tiene)\\s+(un\\s+)?(nuevo\\s+)?(abono|ingreso|dep[oó]sito)|nuevo\\s+(abono|ingreso)", Pattern.CASE_INSENSITIVE);
     static final Pattern PRIVADO = Pattern.compile("c[oó]digo|clave|otp|contrase|token|enviaste|pagaste|pasaste|transferiste|retiraste|compraste|sacaste|compra exitosa|usted (envi|pag|transfiri|pas)", Pattern.CASE_INSENSITIVE);
     static final Pattern SEGURO = Pattern.compile("recibiste|recibi[oó]|ha recibido|(te|le) lleg", Pattern.CASE_INSENSITIVE);
     // Nunca es plata que llegó, diga lo que diga: solicitudes y cobros («JUAN te pidió $20.000», «Recibiste una solicitud»),
@@ -62,7 +65,7 @@ public final class AvisoPago {
     /** Aviso de plata que llegó pero SIN el valor («¡Te llegó plata! Entra a Nequi para verla»): igual se avisa. */
     static boolean esPlataSinValor(String todo) {
         return todo != null && monto(todo) <= 0 && esRecibido(todo)
-                && Pattern.compile("(te|le) lleg[oó] (plata|dinero)|lleg[oó] (plata|dinero)|(lleg[oó]|recibiste|recibi[oó]) una transferencia|transferencia entrante|(te|le) (enviaron|pasaron|mandaron|transfirieron|consignaron) (plata|dinero)|recibiste (plata|dinero|una transferencia)|recibi[oó] (plata|dinero|una transferencia)|transferencia recibida|a (tu|su) llave", Pattern.CASE_INSENSITIVE).matcher(todo).find();
+                && Pattern.compile("(dinero|plata|transferencia|abono|pago)\\s+(de|desde)\\s+otr[oa]s?\\s+(entidad|banco)|interbancari\\w*\\s+recibid|(tienes|tiene)\\s+(un\\s+)?(nuevo\\s+)?(abono|ingreso|dep[oó]sito)|nuevo\\s+(abono|ingreso)|usando\\s+llaves?|(te|le) lleg[oó] (plata|dinero)|lleg[oó] (plata|dinero)|(lleg[oó]|recibiste|recibi[oó]) una transferencia|transferencia entrante|(te|le) (enviaron|pasaron|mandaron|transfirieron|consignaron) (plata|dinero)|recibiste (plata|dinero|una transferencia)|recibi[oó] (plata|dinero|una transferencia)|transferencia recibida|a (tu|su) llave", Pattern.CASE_INSENSITIVE).matcher(todo).find();
     }
 
     /** El valor del aviso en pesos (0 si no se entiende). «$20.000,00» → 20000; «$200,00» → 200. */

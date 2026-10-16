@@ -127,6 +127,12 @@ public class EscuchaPrueba {
         VentoApp.ui.correr();
         chk("SMS con retraso (hora de hace 20 min) pero es el más nuevo: suena «Recibiste 12000 pesos por DaviPlata.» (el viejo no)", r && VentoApp.dichos.size() == 1 && VentoApp.dichos.get(0).equals("Recibiste 12000 pesos por DaviPlata."), VentoApp.dichos);
 
+        // 10c) ⏱ El registro dice si el BANCO mandó el aviso tarde (el SMS dice que el pago fue hace 40 s)
+        sp = nuevo();
+        VentoEscucha.leerSms(sp, "85888", "", conv(new Object[]{"Recibiste  4,000. Para saber mas, consulta tus movimientos.", ahora - 40_000}), "k10c:", false);
+        String dd = VentoEscucha.diag(sp);
+        chk("Registro: «⏱ el banco lo mandó 40 s tarde» (la voz sale en el instante en que llega)", dd.contains("el banco lo mandó 40 s tarde") || dd.contains("el banco lo mandó 41 s tarde"), dd.length() > 300 ? dd.substring(0, 300) : dd);
+
         // 11) Un aviso del banco con un formato que la app NO entiende («Abono en cuenta $15.000»): no suena aquí, pero se le
         //     pasa a la página «crudo» (ella lo revisa con sus reglas, que se actualizan solas)
         sp = nuevo();
