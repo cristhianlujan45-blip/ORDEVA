@@ -595,6 +595,8 @@ body:not(.mod-k) [data-mod~="k"], body:not(.mod-p) [data-mod~="p"], body:not(.mo
 body:not(.mod-d) [data-mod~="d"], body:not(.mod-q) [data-mod~="q"], body:not(.mod-n) [data-mod~="n"],
 body:not(.mod-b) [data-mod~="b"]{ display:none !important; }
 body.mod-v #quickSaleBtn{ order:-1; background:var(--amber); color:#fff; border-color:var(--amber); font-weight:700; }
+/* Herramientas según el negocio (aplicarModulos): tienda → sin «Venta rápida», con «📒 Fiados»; servicios → sin «Caja (POS)» */
+body.neg-tienda #quickSaleBtn, body:not(.neg-tienda) #fiadosBtn, body:not(.neg-tienda) .pz-herr [data-fiados], body.neg-sin-pos #posCajaBtn{ display:none !important; }
 
 /* ---- Productos e inventario: una sola pantalla ---- */
 .pr-panel{border:1px solid var(--line);border-radius:14px;margin:10px 0;background:var(--surface,var(--cream));overflow:hidden}
@@ -3646,6 +3648,7 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
       <button class="btn-ghost view-toggle-btn" id="mesaViewMapBtn" data-mod="p">🗺️ Mapa del local</button>
       <button class="btn-ghost" id="generalBillBtn" title="Cuenta general de todas las mesas (también por voz: «cuenta general»)">🧾 Cuenta general</button>
       <button class="btn-ghost" id="quickSaleBtn" title="Vender de una vez en mostrador, sin abrir una mesa">⚡ Venta rápida</button>
+      <button class="btn-ghost" id="fiadosBtn" type="button" title="Quién me debe y cuánto: cobrar o anotar abonos">📒 Fiados</button>
       <button class="btn-ghost" id="posCajaBtn" title="Caja tipo POS: vende con el lector de código de barras, cobra en efectivo, Nequi, tarjeta o pago mixto">🧾 Caja (POS)</button>
       <button class="btn-ghost" id="domicilioBtn" title="Facturar un pedido a domicilio" hidden>🛵 Domicilio</button>
       <button class="btn-ghost" id="tableCountToggle" title="Cambiar cuántas mesas tiene tu local">🪑 Número de mesas</button>
@@ -15262,6 +15265,7 @@ async function qsClose(){
   document.getElementById('quickSaleOverlay').classList.remove('show');
 }
 document.getElementById('quickSaleBtn').addEventListener('click', () => qsOpen('mostrador'));
+document.getElementById('fiadosBtn').addEventListener('click', () => { if(window.libretaAbrir) window.libretaAbrir(); });
 document.getElementById('domicilioBtn').addEventListener('click', () => { domActual = null; if(domisPend().length) domAbrir(null); else qsOpen('domicilio'); });
 document.getElementById('qsCancelBtn').addEventListener('click', qsClose);
 document.getElementById('quickSaleOverlay').addEventListener('click', e => { if(e.target.id === 'quickSaleOverlay') qsClose(); });
@@ -18899,6 +18903,15 @@ const usaMod = c => modsNegocio().includes(c);
 function aplicarModulos(){
   const m = modsNegocio(), b = document.body;
   MOD_TODO.split('').forEach(c => b.classList.toggle('mod-' + c, m.includes(c)));
+  // Herramientas según el negocio: «🧾 Caja (POS)» en tiendas, comidas, bares y restaurantes (no en barberías,
+  // hoteles, consultorios, lavaderos y demás servicios). En las tiendas no va «⚡ Venta rápida» (la caja ya lo hace):
+  // en su lugar va «📒 Fiados». Sin tipo elegido o con «Mostrar todas las funciones» se ve todo, como siempre.
+  { const t = tipoNegocio(), completo = typeof data !== 'undefined' && data && data.modoCompleto;
+    // Negocio sin tipo elegido (de antes de los tipos, ve todo): si se llama «Tienda…», «Minimercado…», «Droguería…»
+    // se toma como tienda para estas herramientas.
+    const porNombre = !t && /\b(tienda|minimercado|supermercado|mini ?market|autoservicio|abarrotes|droguer[ií]a|farmacia|ferreter[ií]a|papeler[ií]a|miscel[aá]nea|cacharrer[ií]a)\b/i.test((typeof data !== 'undefined' && data && data.businessName) || '');
+    b.classList.toggle('neg-tienda', (!!t && t.fam === 'tienda') || porNombre);
+    b.classList.toggle('neg-sin-pos', !completo && !!t && !['tienda', 'comida', 'bar', 'otro'].includes(t.fam)); }
   const qt = document.getElementById('qrGrupoT');
   if(qt) qt.textContent = m.includes('q') ? ('QR de ' + (espacio()[0] === 'Mesa' ? 'las mesas' : ('l' + (espacio()[3] === 'm' ? 'os ' : 'as ') + espacio()[1].toLowerCase())) + ' (permanentes)') : '🌐 Catálogo y pedidos por link';
   // Si estaba parado en una sección que este negocio no usa, se devuelve a las cuentas.
@@ -20711,6 +20724,9 @@ bootApp();
       '.vito-pedido-card-acts .vito-ok{background:#3fa34d;color:#fff;}'+
       '.vito-pedido-card-acts .vito-no{background:#b0392f;color:#fff;}'+
       '.vito-campana-menu{max-height:min(72vh,calc(100dvh - 24px));box-sizing:border-box;}'+
+      '.vc-avisos{display:flex;flex-direction:column;gap:8px;}.vc-avisos[hidden]{display:none!important}'+
+      '.vc-avisos > #pgSalud,.vc-avisos > #actBanner,.vc-avisos > #subBar{position:static!important;inset:auto!important;left:auto!important;right:auto!important;top:auto!important;bottom:auto!important;z-index:auto!important;margin:0!important;width:auto!important;max-width:none!important;box-shadow:none!important;pointer-events:auto!important;border-radius:14px!important;}'+
+      '.vc-avisos > [hidden]{display:none!important}'+
       '.vito-campana-menu.vc-movil,.vito-ajustes.vc-movil{left:8px!important;right:8px!important;width:auto!important;min-width:0!important;max-width:none!important;margin:0!important;box-sizing:border-box!important;}'+
       /* Computador: los accesos rápidos son botones con su texto completo */
       '.vc-rapido .vc-corto{display:none}.vc-rapido .vc-ic{margin-right:6px}.vc-asa{display:none}.vc-fondo{display:none}'+
@@ -20916,9 +20932,31 @@ bootApp();
       if(menu.style.display==='flex') openMenuNearBell();
     });
   }
+  /* ---------- 📣 Avisos de Vento en la campanita ----------
+     Los avisos fijos de Vento (los pagos no van a sonar / falta un permiso, versión nueva de la app, prueba gratis o
+     plan por vencer) ya no salen en la pantalla principal: quedan aquí, con sus mismos botones, y la campanita los
+     cuenta en su número. Cada aviso sigue siendo el mismo (su lógica no cambia): solo cambia dónde se ve. */
+  const AVISOS=['pgSalud','actBanner','subBar'];
+  let avisosBox=null, avisosN=0;
+  const avisoVisible=e=>!!e&&!e.hidden&&!!e.innerHTML.trim();
+  function avisosVento(){
+    if(!menu||!panelBody) return 0;
+    if(!avisosBox){
+      avisosBox=document.createElement('div'); avisosBox.id='vcAvisos'; avisosBox.className='vc-avisos';
+      avisosBox.innerHTML='<div class="vito-np-sec vc-avisos-tit">📣 Avisos de Vento</div>';
+      menu.insertBefore(avisosBox,panelBody);
+      // Al tocar un botón de un aviso se cierra la campanita (así se ve lo que abre: permiso, planes…).
+      avisosBox.addEventListener('click',e=>{ if(e.target.closest('button,a,#subBar')) setTimeout(()=>{ menu.style.display='none'; },0); });
+    }
+    AVISOS.forEach(id=>{ const e=document.getElementById(id); if(e&&(e.parentNode!==avisosBox||e!==avisosBox.lastElementChild)) avisosBox.appendChild(e); });
+    const n=AVISOS.filter(id=>avisoVisible(document.getElementById(id))).length;
+    avisosBox.hidden=!n;
+    return n;
+  }
   function check(){
     const pendList=getPendList(), songList=getSongList();
-    const total=pendList.length+songList.length;
+    const nAv=avisosVento(); avisosN=nAv;
+    const total=pendList.length+songList.length+nAv;
     sincronizarTarjetas(pendList);
     refrescarPanel();
     if(total>0){
@@ -20961,6 +20999,8 @@ bootApp();
     lastPendIds=pendList.map(x=>x.id); lastSongIds=songList.map(x=>x.id);
     check();
     setInterval(check,3000);
+    // Un aviso de Vento que aparece o se va: la campanita se actualiza al momento (y se mueve si es uno nuevo).
+    setInterval(()=>{ const n=avisosVento(); if(n!==avisosN){ const mas=n>avisosN; check(); if(mas&&bell){ bell.classList.remove('sonando'); void bell.offsetWidth; bell.classList.add('sonando'); } } },1000);
     window.addEventListener('storage',e=>{if(e.key===PKEY||e.key===CKEY||e.key===LKEY)check();});
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init); else init();
@@ -25682,7 +25722,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-16 · v1.43.1';
+const MESORA_VERSION = '2026-10-16 · v1.43.2';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'Vento · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 /* 🔄 La app Android se actualiza SOLA (Actualizador): revisa cada 3 h, baja la versión nueva y la instala cuando no se
@@ -25722,7 +25762,7 @@ try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent =
     if(!k){ if(b) b.hidden = true; return; }
     if(mostrado === k) return;
     mostrado = k;
-    clearTimeout(escondeT); escondeT = setTimeout(() => { const x = document.getElementById('actBanner'); if(x) x.hidden = true; }, 20000);
+    clearTimeout(escondeT);   // (ya no se esconde sola: queda en la 🔔 campanita hasta «Actualizar» o «Luego»)
     if(!b){
       b = document.createElement('div'); b.id = 'actBanner'; b.setAttribute('role', 'status');
       b.style.cssText = 'position:fixed;left:8px;right:8px;bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:9997;background:#1e3a8a;color:#fff;border-radius:14px;padding:10px 12px;font-size:14px;line-height:1.4;box-shadow:0 6px 20px rgba(0,0,0,.35);pointer-events:none';
@@ -25742,7 +25782,7 @@ try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent =
     if(k === 'luego'){ try{ localStorage.setItem(LUEGO, String(Date.now() + 3 * 864e5)); }catch(e){} banner(''); return; }
     if(!A()) return;
     if(k === 'permiso'){ try{ A().actualizacionPermiso(); }catch(e){} showToast('En la pantalla que se abre, activa «Permitir de esta fuente» para Vento y vuelve. Desde ahí Vento se actualiza sola.', 10000); }
-    else if(k === 'ahora'){ try{ A().actualizarAhora(); }catch(e){} showToast('🔄 Bajando la versión nueva… Vento se cierra un momento al instalarla y vuelve sola. Si Android pregunta, toca «Actualizar».', 10000); }
+    else if(k === 'ahora'){ try{ A().actualizarAhora(); }catch(e){} showToast('🔄 Bajando la versión nueva… En unos segundos Android pregunta «¿Quieres actualizar esta app?»: toca «Actualizar». Vento se cierra un momento y vuelve sola.', 12000); }
     else if(k === 'luego'){ try{ localStorage.setItem(LUEGO, String(Date.now() + 3 * 864e5)); }catch(e){} banner(''); }
   });
   window.ventoActualizacion = { pintar };

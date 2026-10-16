@@ -65,4 +65,6 @@ dependencies {
     // Buscar los Chromecast / Google TV igual que la app de YouTube (Google Play Services).
     implementation 'androidx.mediarouter:mediarouter:1.7.0'
     implementation 'com.google.android.gms:play-services-cast:21.5.0'
+    // FileProvider: el APK de la actualización para el instalador de Android (ya venía con mediarouter; se deja explícito).
+    implementation 'androidx.core:core:1.12.0'
 }

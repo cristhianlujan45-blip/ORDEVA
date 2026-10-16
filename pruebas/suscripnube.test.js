@@ -2,6 +2,7 @@
 // El servidor «vento-suscripciones» se simula aquí (respuestas según el contrato) y firma con una llave
 // ECDSA P-256 creada en la prueba. No usa internet.
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
+const abrirCampana = pg => pg.evaluate(() => { const m = document.querySelector('.vito-campana-menu'), b = document.querySelector('.vito-campana'); if(b && (!m || m.style.display !== 'flex')) b.click(); });   // los avisos de Vento están en la 🔔 campanita
 const { webcrypto } = require('crypto'); const zlib = require('zlib');
 const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 const NEG = '7b0c2a51-4d3e-4f6a-9b1c-2d3e4f5a6b7c';
@@ -244,7 +245,7 @@ function jpegTam(b){ let i = 2; while(i < b.length - 9){ if(b[i] !== 0xFF){ i++;
     await refrescar(p);
     t = await barra(p);
     chk('Cerca del vencimiento: «Tu suscripción vence el dd/mm/aaaa.» + RENOVAR', t.includes('Tu suscripción vence el ' + fechaCO(vence2) + '.') && /RENOVAR/.test(t), t);
-    await p.click('#subBar [data-sub="renovar"]');
+    await abrirCampana(p); await p.click('#subBar [data-sub="renovar"]');
     chk('RENOVAR abre el mismo flujo de pago (método)', await pantalla(p) === 'metodo', await pantalla(p));
     await cerrarOv(p);
     chk('Ajustes también muestra RENOVAR', await p.evaluate(() => !!document.querySelector('#subNubePanel [data-panel="renovar"]')));

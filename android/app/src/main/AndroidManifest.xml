@@ -116,6 +116,15 @@
         <!-- Al prender el celular o actualizar la app, Vento vuelve a trabajar de fondo sola -->
         <!-- 🔄 Respuesta del instalador de Android a la actualización automática -->
         <receiver android:name=".Actualizador$Receptor" android:exported="false" />
+        <!-- El APK de la actualización para el instalador de Android («¿Actualizar esta app?»): funciona en todos los
+             celulares (Xiaomi y otros bloquean la instalación desde la app en segundo plano). -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.archivos"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/vento_archivos" />
+        </provider>
 
         <receiver android:name=".Arranque" android:exported="true">
             <intent-filter>

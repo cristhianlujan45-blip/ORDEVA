@@ -21,6 +21,7 @@
 // VENTO_DEBUG=1 muestra la pila de los primeros errores de página.
 'use strict';
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
+const abrirCampana = pg => pg.evaluate(() => { const m = document.querySelector('.vito-campana-menu'), b = document.querySelector('.vito-campana'); if(b && (!m || m.style.display !== 'flex')) b.click(); });   // los avisos de Vento están en la 🔔 campanita
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
@@ -428,7 +429,7 @@ const b64u = s => Buffer.from(s).toString('base64url');
     // =====================================================================
     // 9a. Renovar desde vencido (barra RENOVAR → DaviPlata): empieza el día de la aprobación
     // =====================================================================
-    await pA.click('#subBar [data-sub="renovar"]');
+    await abrirCampana(pA); await pA.click('#subBar [data-sub="renovar"]');
     chk('9. RENOVAR abre el mismo flujo (método de pago)', await esperar(pA, () => document.getElementById('vsOv').dataset.pantalla === 'metodo'));
     await pA.click('#vsOv [data-metodo="DAVIPLATA"]');
     t = await textoOv(pA);
@@ -454,7 +455,7 @@ const b64u = s => Buffer.from(s).toString('base64url');
     t = await barra(pA);
     chk('9. Vence en 3 días: barra «Tu suscripción vence el ' + fCo(E0.expiry_date) + '.» + RENOVAR', t.includes('Tu suscripción vence el ' + fCo(E0.expiry_date) + '.') && /RENOVAR/.test(t), t);
     await captura(pA, '9-renovar');
-    await pA.click('#subBar [data-sub="renovar"]');
+    await abrirCampana(pA); await pA.click('#subBar [data-sub="renovar"]');
     await esperar(pA, () => document.getElementById('vsOv').dataset.pantalla === 'metodo');
     await pA.click('#vsOv [data-metodo="NEQUI"]'); await pA.click('#vsYaPague');
     await llenarComprobante(pA, { name: 'renovacion.png', mimeType: 'image/png', buffer: png(700, 900, [40, 90, 200]) }, 'M-REN-0003');
@@ -500,7 +501,7 @@ const b64u = s => Buffer.from(s).toString('base64url');
     await cerrarTodo(pA); await pA.evaluate(() => subAplicar());
     t = await barra(pA);
     chk('10. Barra: «Tu pago no fue aprobado: <motivo>»', t.includes('Tu pago no fue aprobado: ' + MOTIVO), t);
-    await pA.click('#subBar');
+    await abrirCampana(pA); await pA.click('#subBar');
     t = await textoOv(pA);
     chk('10. Planes: motivo del rechazo y «📸 Enviar otro comprobante»', t.includes(MOTIVO) && /Enviar otro comprobante/.test(t), t);
     await captura(pA, '10-rechazado');

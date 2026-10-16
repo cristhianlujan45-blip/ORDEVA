@@ -35,6 +35,9 @@ final class Actualizador {
     // Cada 30 min (antes 3 h: si se publicaban varias versiones seguidas, el celular se quedaba atrás horas).
     private static final long CADA = 30 * 60_000L;
     private static volatile boolean trabajando = false;
+    // La persona tocó «Actualizar ahora» mientras ya se estaba bajando de fondo: al terminar se abre el instalador.
+    private static volatile boolean pidioAhora = false;
+    static final String ARCHIVO = "vento-nueva.apk";
 
     private static SharedPreferences sp(Context c) { return c.getSharedPreferences("vento", Context.MODE_PRIVATE); }
     static int actual() { return BuildConfig.VERSION_CODE; }
@@ -59,7 +62,7 @@ final class Actualizador {
 
     /** Revisa si hay versión nueva y, si es buen momento, la instala. «ahora»: la pidió la persona (no espera). */
     static void revisar(final Context c, final boolean ahora) {
-        if (trabajando) return;
+        if (trabajando) { if (ahora) { pidioAhora = true; estado(c, "bajando la nueva: se abre el instalador apenas termine"); } return; }
         final SharedPreferences p = sp(c);
         if (!ahora && System.currentTimeMillis() - p.getLong(P_REV, 0) < CADA && p.getInt(P_NUEVA, 0) <= actual()) return;
         trabajando = true;
@@ -80,8 +83,13 @@ final class Actualizador {
                 in = new JSONObject().put(clave, in.optInt(clave, 0) + 1);
                 p.edit().putString(P_INTENTOS, in.toString()).apply();
                 estado(c, "descargando la " + v.optString("nombre", "nueva"));
-                File f = new File(c.getCacheDir(), "vento-nueva.apk");
+                File f = new File(c.getCacheDir(), ARCHIVO);
                 bajar(BASE + v.optString("apk", "vento.apk"), f);
+                // La persona la pidió («Actualizar ahora») y Vento está a la vista: la pantalla de siempre de Android,
+                // «¿Quieres actualizar esta app?» → Actualizar. Funciona en todos los celulares (antes se instalaba de
+                // fondo y en varios celulares, como Xiaomi, Android lo bloqueaba sin decir nada: bajaba y no instalaba).
+                if ((ahora || pidioAhora) && VentoApp.alFrente) { pidioAhora = false; estado(c, "abriendo el instalador de la " + v.optString("nombre", "nueva")); abrirInstalador(c, f); return; }
+                pidioAhora = false;
                 estado(c, "instalando la " + v.optString("nombre", "nueva"));
                 instalar(c, f);
             } catch (Throwable e) {
@@ -140,6 +148,35 @@ final class Actualizador {
         }
     }
 
+    /** El instalador de Android con el APK ya bajado («¿Quieres actualizar esta app?» → Actualizar). */
+    static Intent intentInstalador(Context c, File f) {
+        android.net.Uri u = androidx.core.content.FileProvider.getUriForFile(c, c.getPackageName() + ".archivos", f);
+        return new Intent(Intent.ACTION_VIEW).setDataAndType(u, "application/vnd.android.package-archive")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+    }
+    static boolean abrirInstalador(Context c, File f) {
+        if (f == null || !f.exists() || f.length() < 100_000) return false;
+        try {
+            Intent i = intentInstalador(c, f);
+            Context x = VentoApp.ventana != null ? VentoApp.ventana : c;
+            VentoApp.ui.post(() -> { try { x.startActivity(i); } catch (Throwable e) { estado(c, "no se pudo abrir el instalador: " + e.getMessage()); } });
+            return true;
+        } catch (Throwable e) { estado(c, "no se pudo abrir el instalador: " + e.getMessage()); return false; }
+    }
+    /** Aviso del celular «Toca para actualizar» que abre el instalador (cuando Vento no se está viendo). */
+    static void avisoTocar(Context c, Intent abrir) {
+        try {
+            android.app.NotificationManager nm = (android.app.NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (Build.VERSION.SDK_INT >= 26 && nm.getNotificationChannel("vento_avisos2") == null)
+                nm.createNotificationChannel(new android.app.NotificationChannel("vento_avisos2", "Avisos de Vento (IA y soporte)", android.app.NotificationManager.IMPORTANCE_DEFAULT));
+            android.app.Notification.Builder b = Build.VERSION.SDK_INT >= 26 ? new android.app.Notification.Builder(c, "vento_avisos2") : new android.app.Notification.Builder(c);
+            b.setSmallIcon(android.R.drawable.stat_sys_download_done).setContentTitle("🔄 Vento tiene una actualización")
+                    .setContentText("Toca aquí y luego «Actualizar». Vento vuelve sola.").setAutoCancel(true)
+                    .setContentIntent(PendingIntent.getActivity(c, 4402, abrir, PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0)));
+            nm.notify(4402, b.build());
+        } catch (Throwable ignorado) { }
+    }
+
     /** Lo que responde el instalador de Android. */
     public static class Receptor extends BroadcastReceiver {
         @Override
@@ -152,21 +189,17 @@ final class Actualizador {
                 confirmar.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 estado(c, "esperando que confirmes «Actualizar»");
                 if (VentoApp.alFrente) { try { c.startActivity(confirmar); return; } catch (Throwable ignorado) { } }
-                try {
-                    android.app.NotificationManager nm = (android.app.NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
-                    if (Build.VERSION.SDK_INT >= 26 && nm.getNotificationChannel("vento_avisos2") == null)
-                        nm.createNotificationChannel(new android.app.NotificationChannel("vento_avisos2", "Avisos de Vento (IA y soporte)", android.app.NotificationManager.IMPORTANCE_DEFAULT));
-                    android.app.Notification.Builder b = Build.VERSION.SDK_INT >= 26 ? new android.app.Notification.Builder(c, "vento_avisos2") : new android.app.Notification.Builder(c);
-                    b.setSmallIcon(android.R.drawable.stat_sys_download_done).setContentTitle("🔄 Vento tiene una actualización")
-                            .setContentText("Toca «Actualizar». Después Vento se actualiza sola.").setAutoCancel(true)
-                            .setContentIntent(PendingIntent.getActivity(c, 4402, confirmar, PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0)));
-                    nm.notify(4402, b.build());
-                } catch (Throwable ignorado) { }
+                avisoTocar(c, confirmar);
             } else if (st == PackageInstaller.STATUS_SUCCESS) {
                 estado(c, "actualizada");
             } else {
+                // La instalación de fondo falló (Xiaomi y otros la bloquean): la pantalla de siempre del instalador de
+                // Android, ya (si Vento está a la vista) o con un aviso para tocar. Antes solo quedaba el error escondido.
                 String m = i.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE);
-                estado(c, "no se pudo instalar" + (m != null ? ": " + m : ""));
+                estado(c, "no se pudo instalar de fondo" + (m != null ? " (" + m + ")" : "") + ": toca «Actualizar ahora»");
+                File f = new File(c.getCacheDir(), ARCHIVO);
+                if (VentoApp.alFrente && abrirInstalador(c, f)) return;
+                try { if (f.exists()) avisoTocar(c, intentInstalador(c, f)); } catch (Throwable ignorado) { }
             }
         }
     }
