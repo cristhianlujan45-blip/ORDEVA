@@ -368,7 +368,9 @@ public class VentoApp extends Application {
             // con un silencio corto antes para que la salida despierte y no empiece bajito. Solo se graba y se toca desde un
             // archivo cuando hace falta: volumen por encima de 100 % (ganancia fija, AvisoPago.vozPareja) o el parlante de
             // avisos (Parlante). En la 1.40.0 TODO pasaba por el archivo y en algunos celulares el pago no sonaba.
-            if (alParlante || AvisoPago.refuerzo(volPagos()) > 0) {
+            // Por dónde sale (PlanVoz): grabar a archivo solo con el parlante o con motores de voz que lo hacen bien.
+            String motor = null; try { motor = ttsPago.getDefaultEngine(); } catch (Exception ignorado) { }
+            if (!"directo".equals(PlanVoz.camino(alParlante, volPagos(), motor))) {
                 java.io.File f = new java.io.File(app.getCacheDir(), "pago" + System.nanoTime() + ".wav");
                 String id = "arch" + System.nanoTime();
                 archivosPago.put(id, new Object[]{f, frase, alParlante});
@@ -443,6 +445,9 @@ public class VentoApp extends Application {
         if (u != null && u.startsWith("arch")) {
             Object[] o = archivosPago.remove(u);
             if (o == null) return;
+            // Grabado pero vacío o casi (hay motores que «terminan» sin escribir nada): se dice normal.
+            java.io.File f0 = (java.io.File) o[0];
+            if (bien && (f0 == null || !f0.exists() || f0.length() < 2000)) { try { if (f0 != null) f0.delete(); } catch (Throwable ignorado) { } bien = false; }
             if (bien) { porTocar.add(o); if (!tocando) siguienteArchivo(); }
             else decirDirecto((String) o[1]);                  // no se pudo grabar: se dice normal
             return;
@@ -491,7 +496,15 @@ public class VentoApp extends Application {
                 siguienteArchivo();
             };
             mp.setOnCompletionListener(m -> fin.run());
-            mp.setOnErrorListener((m, w, e) -> { fin.run(); return true; });
+            // Si el archivo no se pudo tocar, el pago se dice con la voz normal (antes quedaba callado).
+            mp.setOnErrorListener((m, w, e) -> {
+                try { if (refuerzo != null) refuerzo.release(); } catch (Throwable ignorado) { }
+                try { jugador.release(); } catch (Throwable ignorado) { }
+                try { f.delete(); } catch (Throwable ignorado) { }
+                decirDirecto(frase);
+                siguienteArchivo();
+                return true;
+            });
             mp.start();
         } catch (Exception e) {
             try { if (mp != null) mp.release(); } catch (Throwable ignorado) { }
