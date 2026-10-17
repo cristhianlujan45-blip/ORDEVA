@@ -18,12 +18,12 @@ import { cifrar, descifrar } from "./cifrado.ts";
 import * as W from "./wompi.ts";
 import * as N from "./nequi.ts";
 import * as D from "./daviplata.ts";
-import { leerAviso } from "./avisos.ts";
+import { conPista, leerAviso, type Pista } from "./avisos.ts";
 import { avisarDispositivos, vapid } from "./push.ts";
 import * as G from "./google.ts";
 import { type Env, ErrorVento, log, sha256 } from "./util.ts";
 
-export const VERSION = "1.18.0";
+export const VERSION = "1.19.0";
 const SITIO = "https://cristhianlujan45-blip.github.io/cuentas/";
 
 type Pago = { id: string; negocio_id?: string; referencia: string; proveedor: string; metodo: string; canal: string; monto: number;
@@ -534,16 +534,17 @@ async function aviso(req: Request, env: Env, tokenRuta: string | null) {
   const d = await db.rpc<{ id: string; negocio_id: string; rol: string; nombre: string } | null>("srv_dispositivo_por_token", { p_token: tok });
   if (!d) return json(401, { ok: false, error: "dispositivo_no_autorizado" });
   if (!["dueno", "admin", "cajero"].includes(d.rol)) return json(403, { ok: false, error: "rol_sin_permiso" });
-  let txt = await req.text(), idAviso = "";
+  let txt = await req.text(), idAviso = "", pista: Pista | null = null;
   try {
     const j = JSON.parse(txt);
     if (j && typeof j === "object") {
       txt = [j.app, j.titulo, j.texto].filter(Boolean).join(" | ") || String(j.text || "");
       if (typeof j.id === "string") idAviso = j.id.slice(0, 160);
+      if (j.pista && typeof j.pista === "object") pista = j.pista as Pista;   // lo que entendió la app Vento
     }
   } catch { /* texto plano de MacroDroid */ }
   txt = txt.slice(0, 1000);
-  const a = leerAviso(txt);
+  const a = conPista(leerAviso(txt), pista, txt);
   // La app Vento manda el ID de cada aviso: dos pagos iguales (mismo valor, misma persona, en el mismo par de minutos) son
   // DOS pagos y el mismo aviso reenviado otra vez es uno. Sin ID (MacroDroid): dos minutos, la misma notificación repetida
   // no cuenta dos veces.

@@ -1,0 +1,129 @@
+// Un pago de Nequi / DaviPlata / Bre-B que lee UN celular les llega a TODOS los equipos del negocio (otros celulares,
+// tablet, computador), de punta a punta (PostgreSQL REAL + Servidor Vento + la app de verdad):
+//  1. El celular de la caja (app Android) lee el aviso real de la llave Bre-B de Nequi → lo manda al Servidor Vento con
+//     lo que entendió (valor, banco, quién).
+//  2. La tablet (app Android): la notificación de pagos con la 🪟 ventana del valor y la voz «Recibiste 300 pesos por
+//     Nequi», aunque Vento esté de fondo (el latido de la app la despierta).
+//  3. El computador (navegador): la 🪟 ventana con el valor y «Pago confirmado».
+//  4. El celular que lo leyó no lo repite (ni otra notificación ni otra voz).
+//  5. Sin internet en el celular cuando llega el aviso: queda en espera y se manda solo al volver → les llega a los demás.
+//  6. El servidor usa el valor que entendió la app cuando su propia lectura no lo entiende.
+'use strict';
+const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
+const fs = require('fs');
+const { spawnSync } = require('child_process');
+function hayPostgres(){ if(process.env.VENTO_PG_URL || fs.existsSync('/usr/lib/postgresql')) return true; return spawnSync('bash', ['-c', 'command -v psql || command -v pg_ctl'], { stdio: 'ignore' }).status === 0; }
+if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig = console[k].bind(console); console[k] = (...a) => { if(typeof a[0] === 'string' && a[0].startsWith('{"t":"')) return; orig(...a); }; }
+
+(async () => {
+  if(!hayPostgres()){ console.log('RESULTADO 0 bien 0 mal (sin PostgreSQL: se omitió)'); process.exit(0); }
+  const { iniciar, enrutar } = require('./servidor/supabase-local');
+  const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
+  let ok = 0, mal = 0; const errs = [];
+  const chk = (n, c, x) => { if(c){ ok++; console.log('✅ ' + n); } else { mal++; console.log('❌ ' + n + (x !== undefined ? ' → ' + (typeof x === 'string' ? x : JSON.stringify(x)).slice(0, 600) : '')); } };
+  const sb = await iniciar(); const b = await chromium.launch();
+  try{ await pruebas(); } catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.stack || e)); }
+  chk('Sin errores de página en ningún equipo', !errs.length, errs.join(' | '));
+  await b.close().catch(() => {}); await sb.cerrar().catch(() => {});
+  console.log('RESULTADO', ok, 'bien', mal, 'mal'); process.exit(mal ? 1 : 0);
+
+  async function pruebas(){
+    const esperar = (p, fn, arg, ms) => p.waitForFunction(fn, arg, { timeout: ms || 10000, polling: 250 }).then(() => true, () => false);
+    async function equipo(nombre, ancho, android){
+      const ctx = await b.newContext({ viewport: { width: ancho, height: 844 } });
+      await ctx.route('**/*', rt => { const u = new URL(rt.request().url()); return (u.hostname === 'localhost' || u.hostname === '127.0.0.1') ? rt.continue() : rt.abort(); });
+      await enrutar(ctx, sb);
+      await ctx.addInitScript(android => {
+        try{ localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento-hola', '0'); }catch(e){}
+        const A = window.__and = { cola: [], notifs: [], pagos: [], decir: [] };
+        if(android) window.VentoAndroid = {
+          pagosAvisos: () => {}, pagosAvisosEstado: () => JSON.stringify({ on: true, permiso: true, vivo: true }),
+          pagosAvisosTomar: () => { const s = JSON.stringify(A.cola); A.cola = []; return s; },
+          notificar: (t, x, c, s) => { A.notifs.push({ t, x, c, s }); return true; },
+          pagoNotificar: (t, f, o, v, bco, tipo) => { A.pagos.push({ t, f, o, v, bco, tipo }); },
+          pagosDecir: t => { A.decir.push(String(t)); },
+          pagosNotif: () => {}, pagosVolumen: () => {}, ventanaPagoOn: () => {}, alFrente: () => false,
+        };
+      }, !!android);
+      const p = await ctx.newPage();
+      p.on('pageerror', e => errs.push(nombre + ': ' + e.message));
+      await p.goto(BASE + '/index.html');
+      await p.waitForSelector('#authOverlay:not([hidden])', { timeout: 15000 });
+      await p.waitForFunction(() => window.ventoNube && window.ventoNube.crearCuenta, null, { timeout: 15000 });
+      return { nombre, ctx, p };
+    }
+    const cerrarTodo = p => p.evaluate(() => document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')));
+    const dentro = p => esperar(p, () => document.getElementById('authOverlay').hidden, null, 15000);
+    async function entrar(E){
+      await E.p.click('#authTabs [data-tab="entrar"]').catch(() => {});
+      await E.p.fill('#authUser', 'dueno@equipos.co'); await E.p.fill('#authPass', 'clave123'); await E.p.click('#authBtn');
+      const d = await dentro(E.p); await E.p.click('#onbSaltar', { timeout: 3000 }).catch(() => {}); await cerrarTodo(E.p);
+      return d;
+    }
+    const and = E => E.p.evaluate(() => JSON.parse(JSON.stringify(window.__and)));
+
+    // ===== Tres equipos del mismo negocio: celular de la caja, tablet y computador =====
+    const CEL = await equipo('celular', 390, true);
+    await CEL.p.fill('#authBiz', 'Bar Equipos'); await CEL.p.fill('#authUser', 'dueno@equipos.co'); await CEL.p.fill('#authPass', 'clave123'); await CEL.p.click('#authBtn');
+    chk('El celular crea la cuenta y entra', await dentro(CEL.p));
+    await CEL.p.click('#onbSaltar', { timeout: 4000 }).catch(() => {}); await cerrarTodo(CEL.p);
+    chk('El celular queda en la nube y autorizado para mandar los avisos (solo)', await esperar(CEL.p, () => !!window.ventoNube.negocio() && !!localStorage.getItem('vento_pagos_dev'), null, 15000));
+    const NEG = (await CEL.p.evaluate(() => window.ventoNube.negocio())).id;
+    const TAB = await equipo('tablet', 800, true), PC = await equipo('computador', 1280, false);
+    chk('La tablet entra con la misma cuenta', await entrar(TAB));
+    chk('El computador entra con la misma cuenta', await entrar(PC));
+    chk('Los tres en el MISMO negocio, como administradores', (await Promise.all([TAB, PC].map(E => E.p.evaluate(() => (window.ventoNube.negocio() || {}).id + '|' + (window.ventoNube.negocio() || {}).rol)))).every(x => x === NEG + '|dueno'));
+    // Ya revisaron los pagos una vez (desde ahí, lo nuevo avisa).
+    for(const E of [TAB, PC]) await esperar(E.p, () => window.ventoPagos && window.ventoPagos.estado().ultimoSync > 0, null, 15000);
+
+    // ===== 1. El celular lee el aviso real de la llave Bre-B de Nequi (la app Android ya lo dijo en voz alta) =====
+    const BREB = 'Nequi Colombia | Te enviaron plata por Bre-B | Te enviaron $300. Entra a tu app y revisa tu saldo.';
+    await CEL.p.evaluate(t => { window.__and.cola.push({ id: 'kbreb:1:1', txt: t, t: Date.now(), voz: true }); window.ventoAvisosNativos(); }, BREB);
+    const enServidor = async m => (await sb.sql("select monto::int monto, estado, metodo, confianza from pagos where negocio_id = $1 and proveedor = 'dispositivo' and monto = $2", [NEG, m]));
+    let llego = false; for(let i = 0; i < 40 && !llego; i++){ llego = (await enServidor(300)).length === 1; if(!llego) await new Promise(r => setTimeout(r, 250)); }
+    const s1 = await enServidor(300);
+    chk('1. El aviso llegó al Servidor Vento: $300 por Nequi, aprobado y confiable', llego && s1[0].estado === 'aprobado' && s1[0].metodo === 'NEQUI' && s1[0].confianza === 'app', s1);
+
+    // ===== 2. La tablet (app Android de fondo): el latido de la app la despierta =====
+    const t0 = Date.now();
+    const latir = E => E.p.evaluate(() => window.ventoLatido && window.ventoLatido());
+    let tab = null;
+    for(let i = 0; i < 90; i++){ await latir(TAB); tab = await and(TAB); if(tab.pagos.length) break; await new Promise(r => setTimeout(r, 500)); }
+    chk('2. Tablet: notificación de pagos con la 🪟 ventana del valor «$300» por Nequi', tab.pagos.length === 1 && /^💜 Recibiste \$300 por Nequi/.test(tab.pagos[0].t) && tab.pagos[0].v === '$300' && tab.pagos[0].bco === 'Nequi' && tab.pagos[0].tipo === 'ok', tab.pagos);
+    chk('2. Tablet: la voz de los pagos dice «Recibiste 300 pesos por Nequi»', tab.decir.some(t => /^Recibiste 300 pesos por Nequi/.test(t)), tab.decir);
+    chk('2. Tablet: llegó en menos de 30 s con Vento de fondo', Date.now() - t0 < 30000, Date.now() - t0);
+    chk('2. Tablet: sale en el canal de pagos, no como un aviso cualquiera', !tab.notifs.some(n => /\$300/.test(n.t + n.x) && n.c !== 'pagos'), tab.notifs);
+
+    // ===== 3. El computador (navegador): la ventana con el valor =====
+    chk('3. Computador: sale la 🪟 ventana con «$300» y Nequi', await esperar(PC.p, () => { const v = document.getElementById('pgVentana'); return !!v && /\$300/.test(v.textContent) && /Nequi/.test(v.textContent); }, null, 35000));
+    chk('3. Computador: el pago queda en su lista de pagos', await PC.p.evaluate(() => (data.pagos.lista || []).some(x => x.monto === 300 && /nequi/i.test(x.app))));
+
+    // ===== 4. El celular que lo leyó no lo repite =====
+    await latir(CEL); await new Promise(r => setTimeout(r, 1500)); await CEL.p.evaluate(() => window.ventoPagos.sincronizar()); await new Promise(r => setTimeout(r, 1000));
+    const cel = await and(CEL);
+    chk('4. El celular que lo leyó: ni otra ventana, ni otra voz (la app Android ya lo dijo)', cel.pagos.length === 0 && !cel.decir.some(t => /300 pesos/.test(t)), cel);
+    chk('4. … y queda un solo pago de $300 en su lista', await CEL.p.evaluate(() => (data.pagos.lista || []).filter(x => x.monto === 300).length === 1));
+
+    // ===== 5. Sin internet cuando llega el aviso =====
+    const sinRed = r => r.abort('internetdisconnected');
+    await CEL.p.route(/\/functions\/v1\/vento-pagos\/aviso\//, sinRed);
+    await CEL.p.evaluate(() => { window.__and.cola.push({ id: 'kdav:2:2', txt: 'DaviPlata | ¡Le llegó plata! | MARIA LOPEZ le pasó $45.000 a su DaviPlata', t: Date.now(), voz: true }); window.ventoAvisosNativos(); });
+    await new Promise(r => setTimeout(r, 1200));
+    { const q5 = await CEL.p.evaluate(() => localStorage.getItem('vento_pagos_reenvio')); chk('5. Sin internet: el aviso queda en espera en el celular', JSON.parse(q5 || '[]').length === 1 && (await enServidor(45000)).length === 0, q5); }
+    await CEL.p.unroute(/\/functions\/v1\/vento-pagos\/aviso\//, sinRed);
+    await CEL.p.evaluate(() => window.dispatchEvent(new Event('online')));
+    llego = false; for(let i = 0; i < 40 && !llego; i++){ llego = (await enServidor(45000)).length === 1; if(!llego){ await latir(CEL); await new Promise(r => setTimeout(r, 500)); } }
+    chk('5. Vuelve el internet: se manda solo y llega al servidor ($45.000 por DaviPlata)', llego && (await enServidor(45000))[0].metodo === 'DAVIPLATA');
+    chk('5. … y la espera queda vacía', await esperar(CEL.p, () => JSON.parse(localStorage.getItem('vento_pagos_reenvio') || '[]').length === 0, null, 5000));
+    tab = null; for(let i = 0; i < 90; i++){ await latir(TAB); tab = await and(TAB); if(tab.pagos.some(x => x.v === '$45.000')) break; await new Promise(r => setTimeout(r, 500)); }
+    chk('5. La tablet recibe ese pago: «Recibiste 45000 pesos por DaviPlata, de Maria Lopez»', tab.pagos.some(x => x.v === '$45.000' && x.bco === 'DaviPlata') && tab.decir.some(t => /^Recibiste 45000 pesos por DaviPlata, de Maria Lopez/.test(t)), tab);
+
+    // ===== 6. El valor que entendió la app manda cuando el servidor no entiende el aviso =====
+    const dev = await CEL.p.evaluate(() => JSON.parse(localStorage.getItem('vento_pagos_dev')));
+    const F = sb.url + '/functions/v1/vento-pagos/aviso/' + dev.token;
+    const r6 = await (await fetch(F, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ text: 'Nequi | Nequi | Movimiento recibido por $ 18 500', id: 'and-k6:1', pista: { monto: 18500, app: 'Nequi', de: 'Luis Gil', nivel: 'app' } }) })).json();
+    chk('6. «Movimiento recibido por $ 18 500» con lo que entendió la app → $18.500 por Nequi de Luis Gil', r6.ok && r6.monto === 18500 && (await sb.sql("select pagador from pagos where id = $1", [r6.pago]))[0].pagador === 'Luis Gil', r6);
+    const r6b = await (await fetch(F, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ text: 'Nequi | Nequi | Tu saldo es $ 18 500', id: 'and-k6:2' }) })).json();
+    chk('6. Sin lo que entendió la app, lo que no es un pago sigue sin ser un pago', r6b.ok && r6b.ignorado && !r6b.pago, r6b);
+  }
+})();

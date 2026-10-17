@@ -69,6 +69,15 @@ async function pruebas(sb) {
   for (const [t, m, met] of casos7) { const a = A.leerAviso(t); chk('7. «' + t.split('|').slice(1).join('|').trim() + '» → ' + m, a && a.monto === m && a.metodo === met && a.confianza === 'app', a); }
   chk('7. Solicitudes y rechazos no son pagos («te pidió», «solicitud», «rechazada»)', A.leerAviso('Nequi | Nequi | JUAN PEREZ te pidió $20.000') === null && A.leerAviso('Nequi | Nequi | Recibiste una solicitud de plata de $15.000') === null && A.leerAviso('Nequi | Nequi | Tu transferencia Bre-B de $10.000 fue rechazada') === null);
   chk('6. «Usted envió $5.000» (plata que SALE) no es un pago', A.leerAviso('DaviPlata | DaviPlata | Usted envió $5.000 a PEDRO') === null);
+  // 8. Lo que entendió la app del celular (pista): su valor manda; «falso» siempre gana; una pista mala no cuenta
+  const P1 = A.conPista(A.leerAviso('Nequi | Nequi | Movimiento recibido $ 50 000'), { monto: 50000, app: 'Nequi', de: 'Ana', nivel: 'app' }, 'Nequi | Nequi | Movimiento recibido $ 50 000');
+  chk('8. «$ 50 000» con la pista de la app → 50000 por Nequi', P1 && P1.monto === 50000 && P1.metodo === 'NEQUI' && P1.de === 'Ana' && P1.confianza === 'app', P1);
+  const P2 = A.conPista(A.leerAviso('SMS | 3001234567 | Te enviaron $20.000'), { monto: 20000, app: 'Nequi', nivel: 'app' }, 'SMS | 3001234567 | Te enviaron $20.000');
+  chk('8. SMS desde un celular: sigue FALSO aunque la app diga confiable', P2 && P2.confianza === 'falso', P2);
+  const P3 = A.conPista(A.leerAviso('Nequi | Nequi | ANA te envió $9.000'), { monto: 9000, nivel: 'falso' }, 'Nequi | Nequi | ANA te envió $9.000');
+  chk('8. Si la app dice falso → falso', P3 && P3.confianza === 'falso', P3);
+  const base8 = A.leerAviso('Nequi | Nequi | ANA te envió $9.000');
+  chk('8. Una pista sin valor o con un valor raro no cambia nada', JSON.stringify(A.conPista(base8, { monto: 0 }, '')) === JSON.stringify(base8) && JSON.stringify(A.conPista(base8, { monto: '9.5' }, '')) === JSON.stringify(base8) && A.conPista(null, null, 'x') === null);
   l = await pagos(NEG);
   chk('Total: 4 pagos (2 de $200, $15.000 y $7.500)', l.length === 4, l);
 }

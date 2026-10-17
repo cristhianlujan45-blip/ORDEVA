@@ -37,6 +37,23 @@ export function leerAviso(txt: string): Aviso | null {
   return { monto, metodo, de, confianza: f.nivel, fuente: f.txt };
 }
 
+// Lo que entendió la app Vento del celular que leyó el aviso (su lectura se actualiza con cada versión y con las frases del
+// administrador; la del servidor puede ir atrás: «$ 50 000», «movimiento recibido», «+$20.000»). Llega de un celular
+// autorizado por el dueño. El valor de la app manda; «falso» de cualquiera de los dos gana; si no, el nivel de la app
+// (p. ej. el dueño eligió confirmar los SMS del banco).
+export type Pista = { monto?: unknown; app?: unknown; de?: unknown; nivel?: unknown };
+export function conPista(a: Aviso | null, pista: Pista | null, txt: string): Aviso | null {
+  const monto = pista ? Number(pista.monto) : 0;
+  if (!pista || !Number.isInteger(monto) || monto <= 0 || monto > 100000000) return a;
+  const nivel = String(pista.nivel || "");
+  const f = fuente(txt);
+  const metodo = (APPS.find(([re]) => re.test(String(pista.app || ""))) || APPS.find(([re]) => re.test(txt)) || [null, a ? a.metodo : "TRANSFERENCIA"])[1];
+  const confianza = (a && a.confianza === "falso") || nivel === "falso" || f.nivel === "falso" ? "falso"
+    : nivel === "app" || nivel === "revisar" ? nivel : (a ? a.confianza : f.nivel);
+  const de = String(pista.de || "").replace(/\s+/g, " ").trim().slice(0, 80) || (a ? a.de : "");
+  return { monto, metodo, de, confianza, fuente: a ? a.fuente : f.txt };
+}
+
 // Una notificación de la APP del banco solo la puede mostrar esa app → confiable.
 // Un SMS desde un celular común es falso (los bancos escriben desde códigos cortos); desde un código corto: revisar.
 export function fuente(txt: string): { nivel: "app" | "revisar" | "falso"; txt: string } {

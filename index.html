@@ -27425,6 +27425,7 @@ window.ventoLatido = () => {
   try{ if(vm().tvOn && vm().tvOn() && latidoN % 4 === 0 && typeof tvPublicar === 'function') tvPublicar(); }catch(e){}
   try{ if(latidoN % 3 === 0 && window.vitoDespertarPedidos) window.vitoDespertarPedidos(); }catch(e){}
   try{ if(window.vitoMusicaLatido) window.vitoMusicaLatido(); }catch(e){}   // música del reproductor de la app con Vento minimizada
+  try{ if(window.ventoPagosLatido) window.ventoPagosLatido(); }catch(e){}   // pagos de los otros equipos y reenvíos pendientes
 };
 // «Saltar» en Vento cuando suena en el YouTube del TV: el TV pasa a la siguiente de su cola.
 function lngSaltar(){ if(lngOn()) lngCmd('next', {}).then(() => { lng.ultimoEnvio = Date.now(); }).catch(e => lngLog('   ⚠️ saltar: ' + (e.message || e))); }
@@ -29211,6 +29212,9 @@ let fotosListas = false;
   }
   window.pagosFrase = pgFrase;
 
+  // Cada equipo tiene su marca: así se sabe qué pagos leyó ESTE equipo (la lista de pagos se copia a los demás).
+  const pgEq = (() => { try{ let v = localStorage.getItem('vento_pagos_eq'); if(!v){ v = Date.now().toString(36) + Math.random().toString(36).slice(2, 8); localStorage.setItem('vento_pagos_eq', v); } return v; }catch(e){ return 'm' + Math.random().toString(36).slice(2, 10); } })();
+  window.ventoPagosEquipo = () => pgEq;
   function pgRecibir(txt, id, op){
     op = op || {};
     const g = PG();
@@ -29258,17 +29262,18 @@ let fotosListas = false;
     // segundo pago igual al primero (mismo valor, en 3 min) se tomaba como repetido y no sonaba.
     const yaSrv = (g.lista || []).find(x => x.srv && String(x.id || '').startsWith('srv-') && Number(x.monto) === p.monto && Math.abs((x.t || 0) - Date.now()) < 3 * 60e3 && String(x.app).toLowerCase() === String(p.app).toLowerCase());
     if(yaSrv){ saveData(); return; }
-    try{ window.ventoPagosReenviarAviso && window.ventoPagosReenviarAviso(txt, id); }catch(e){}   // también al Servidor Vento
     // op.revisar: la app Android vio que la app de ese banco NO es la oficial (instalada por fuera de la tienda): podría
     // mostrar pagos falsos, así que queda «⚠️ Revisar» y nunca «Pago confirmado».
     const f0 = pgFuente(txt);
     // op.smsOk: SMS del código corto del banco y el dueño eligió confirmarlos (Ajustes → Pagos). Nunca uno «falso».
     const f = op.revisar ? { nivel: 'revisar', txt: String(op.revisar) }
       : op.smsOk && f0.nivel === 'revisar' ? { nivel: 'app', txt: 'Confirmado por SMS del banco (elegiste confirmar los SMS del banco)' } : f0;
+    // También al Servidor Vento → a los demás equipos del negocio (celulares, computador, tablet), con lo que se entendió.
+    try{ window.ventoPagosReenviarAviso && window.ventoPagosReenviarAviso(txt, id, { monto: p.monto, app: p.app, de: p.de, nivel: f.nivel }); }catch(e){}
     // op.reemplaza: este aviso de la app del banco es el MISMO pago que ya había llegado por SMS → se queda uno (confirmado).
     if(op.reemplaza){ const i = g.lista.findIndex(x => x.id === 'and-' + op.reemplaza); if(i >= 0) g.lista.splice(i, 1); }
     const mesa = f.nivel === 'falso' ? null : pgMesaPara(p.monto);
-    const reg = { id: id || Date.now().toString(36), via, t: Date.now(), monto: p.monto, app: p.app, de: p.de, mesa: mesa ? Number(mesa) : null, estado: f.nivel, fuente: f.txt, txt: String(txt).slice(0, 200) };
+    const reg = { id: id || Date.now().toString(36), via, eq: pgEq, t: Date.now(), monto: p.monto, app: p.app, de: p.de, mesa: mesa ? Number(mesa) : null, estado: f.nivel, fuente: f.txt, txt: String(txt).slice(0, 200) };
     g.lista.unshift(reg); g.lista = g.lista.slice(0, 200);
     if(mesa && f.nivel === 'app') delete g.espera[mesa];
     saveData();

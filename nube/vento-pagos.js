@@ -116,7 +116,7 @@
     if(!x && p.proveedor === 'dispositivo'){
       var tp = Date.parse(p.creado_en || p.actualizado_en) || Date.now();
       x = g.lista.find(function(y){ return !y.srv && Number(y.monto) === Number(p.monto) && Math.abs((y.t || 0) - tp) < 3 * 60e3 && String(y.app || '').toUpperCase().replace('TRANSFERENCIA', '') === String(nombreMetodo(p.metodo)).toUpperCase().replace('TRANSFERENCIA', ''); });
-      if(x){ x.srv = p.id; x._yaAvisado = true; return x; }
+      if(x){ x.srv = p.id; return x; }
     }
     var fuente = p.verificado ? 'Verificado por ' + entidad(p, true) + (p.aprobacion ? ' · N.º ' + p.aprobacion : '') : (p.detalle || 'Aviso del celular');
     if(!x){
@@ -137,9 +137,34 @@
   function paraMi(p, x){
     try{ return !window.ventoPagoParaMi || window.ventoPagoParaMi(Number(p.monto), p.mesa || p.aplicado_mesa || (x && x.mesa) || null); }catch(e){ return true; }
   }
+  // Un pago que leyó OTRO equipo del negocio (o que confirmó el banco) sale aquí igual que uno leído en este celular:
+  // en la app Android, la notificación de pagos con la 🪟 ventana del valor (también con el celular bloqueado); en el
+  // computador o la tablet, la ventana en Vento y, con Vento de fondo, la notificación del navegador.
+  function avisoPagoCompleto(p, x, nivel){
+    var tit = nivel === 'falso' ? '🚨 Mensaje de pago FALSO: ' + plata(p.monto) : nivel === 'revisar' ? '⚠️ Aviso de ' + plata(p.monto) + ': revísalo' : '💜 Recibiste ' + plata(p.monto) + ' por ' + nombreMetodo(p.metodo);
+    var fr = 'Recibiste ' + p.monto + ' pesos por ' + nombreMetodo(p.metodo) + (p.pagador ? ', de ' + p.pagador : '') + '.' + (p.mesa ? ' ' + etiquetaMesa(p.mesa) + '.' : '');
+    var orig = (p.verificado ? '✅ Verificado' + (p.aprobacion ? ' (N.º ' + p.aprobacion + ')' : '') : String(p.detalle || '')).slice(0, 200);
+    var A = window.VentoAndroid, apagado = window.ventoAvisoOn && !window.ventoAvisoOn('pagos');
+    if(A && A.pagoNotificar){
+      if(!apagado) try{ A.pagoNotificar(tit.slice(0, 80), fr, orig, plata(p.monto), nombreMetodo(p.metodo), nivel); }catch(e){}
+      return true;
+    }
+    if(A) return false;                                    // app Android vieja: el aviso de siempre
+    try{ if(document.visibilityState === 'visible' && window.ventoPagoVentana) window.ventoPagoVentana({ monto: Number(p.monto), app: nombreMetodo(p.metodo), de: p.pagador || '', mesa: p.mesa ? etiquetaMesa(p.mesa) : '', txt: orig, nivel: nivel }); }catch(e){}
+    if(!apagado && document.visibilityState !== 'visible') try{
+      if('Notification' in window && Notification.permission === 'granted'){
+        var op = { body: fr, tag: 'pago-' + p.id, renotify: true, icon: 'icons/vento-192.png', badge: 'icons/vento-64.png' };
+        if(navigator.serviceWorker && navigator.serviceWorker.getRegistration) navigator.serviceWorker.getRegistration().then(function(r){ if(r) r.showNotification(tit, op); else new Notification(tit, op); }).catch(function(){ try{ new Notification(tit, op); }catch(e){} });
+        else new Notification(tit, op);
+      }
+    }catch(e){}
+    return true;
+  }
   function avisar(p, x){
     if(!paraMi(p, x)) return;
     var m = (p.mesa ? ' · ' + etiquetaMesa(p.mesa) : '');
+    var nivel = p.confianza === 'falso' ? 'falso' : p.confianza === 'revisar' ? 'revisar' : 'ok';
+    if(!avisoPagoCompleto(p, x, nivel))
     avisoCelular(p.confianza === 'falso' ? '🚨 Pago FALSO' : p.confianza === 'revisar' ? '⚠️ Pago por revisar' : '✅ Pago confirmado',
       plata(p.monto) + ' por ' + nombreMetodo(p.metodo) + (p.pagador ? ' de ' + p.pagador : '') + m + (p.verificado ? ' · ✅ verificado' + (p.aprobacion ? ' (N.º ' + p.aprobacion + ')' : '') : ''));
     if(p.confianza === 'falso'){
@@ -150,6 +175,7 @@
     }
     if(p.confianza === 'revisar'){
       toast('⚠️ ' + nombreMetodo(p.metodo) + ': ' + plata(p.monto) + (p.pagador ? ' de ' + p.pagador : '') + m + '. ' + (p.detalle || 'Confírmalo en la app del banco.'), 12000);
+      hablarPago('Llegó un aviso de ' + p.monto + ' pesos por ' + nombreMetodo(p.metodo) + '. Revísalo en la aplicación del banco antes de entregar.');
       return;
     }
     // Como el parlante de Bold: sonido de éxito y «Pago confirmado» en voz alta.
@@ -171,6 +197,10 @@
     }).catch(function(e){ toast('No se pudo registrar el pago en la cuenta: ' + (e.message || e), 8000); return false; });
   }
 
+  // ¿Ese aviso lo leyó ESTE equipo (y ya sonó aquí)? La lista de pagos se copia a los demás equipos del negocio: antes
+  // la tablet o el computador encontraban ahí el pago que leyó el celular, creían que ya lo habían avisado ellos y no
+  // sonaba ni salía la ventana.
+  function leidoAqui(x){ try{ return !!x && !!x.eq && !!window.ventoPagosEquipo && x.eq === window.ventoPagosEquipo(); }catch(e){ return false; } }
   function recibir(p, enVivo){
     if(!p || !p.id) return;
     var antes = cache[p.id];
@@ -180,24 +210,50 @@
     if(p.estado !== 'aprobado' && !(p.estado === 'rechazado' && p.confianza === 'falso') && p.estado !== 'anulado') { pintarHistorial(); return; }
     var x = regLocal(p); if(!x){ return; }
     try{ saveData(); }catch(e){}
-    if(nuevoAprobado && enVivo && !x._yaAvisado) avisar(p, x);
+    if(nuevoAprobado && enVivo && !leidoAqui(x)) avisar(p, x);
     else if(p.estado === 'rechazado' && p.confianza === 'falso' && !antes && enVivo) avisar(p, x);
     pintarHistorial();
     try{ window.layaPintarTarjeta && window.layaPintarTarjeta(); }catch(e){}
     if(p.estado !== 'aprobado' || p.aplicado_en || p.confianza === 'falso' || p.confianza === 'revisar' || !puedeCaja()) return;
     var mesa = p.mesa && data.tables && data.tables[p.mesa] ? p.mesa : null;
     if(mesa) aplicarEnMesa(p, x, isNaN(+mesa) ? mesa : +mesa);
-    else if(nuevoAprobado && enVivo && !x._yaAvisado && paraMi(p, x)){ try{ window.pagoLlego && window.pagoLlego(x); }catch(e){} }
+    else if(nuevoAprobado && enVivo && !leidoAqui(x) && paraMi(p, x)){ try{ window.pagoLlego && window.pagoLlego(x); }catch(e){} }
   }
 
   // Los avisos que llegan por MacroDroid (canal privado de Vento) también se mandan al Servidor Vento:
   // quedan guardados en la nube, se cruzan entre celulares sin duplicarse y avisan con push aunque Vento esté cerrada.
   // Con el ID del aviso: así dos pagos iguales seguidos (mismo valor y persona) llegan como DOS a los demás celulares.
-  window.ventoPagosReenviarAviso = function(txt, id){
+  // Con lo que entendió la página (pista: valor, banco, quién y si es confiable): el servidor lo usa cuando su propia
+  // lectura no entiende el aviso, así le llega a los demás equipos igual que aquí.
+  // Si no hay internet en ese momento (o el celular todavía no está registrado), queda en espera y se vuelve a mandar
+  // apenas se pueda (hasta 30 min): antes se perdía y los demás equipos nunca se enteraban.
+  var K_REENV = 'vento_pagos_reenvio', mandando = false;
+  function cuerpoAviso(r){
+    var j = { text: String(r.txt).slice(0, 1000) };
+    if(r.id) j.id = String(r.id).slice(0, 160);
+    // En su propio objeto: un servidor de antes no lo conoce y lo deja pasar (un «app» suelto lo confundía).
+    if(r.pista && Number(r.pista.monto) > 0) j.pista = { monto: Math.round(Number(r.pista.monto)), app: String(r.pista.app || '').slice(0, 40), de: String(r.pista.de || '').slice(0, 80), nivel: String(r.pista.nivel || '').slice(0, 10) };
+    return r.id || j.pista ? JSON.stringify(j) : j.text;
+  }
+  function mandarPendientes(){
+    var l = lsGet(K_REENV, []); if(!l.length || mandando) return;
+    l = l.filter(function(r){ return Date.now() - (r.t || 0) < 30 * 60e3; });
+    if(!l.length){ lsSet(K_REENV, []); return; }
     var d = miDispositivo();
-    if(!d || !est.servidor || !puedeCaja() || !txt) return;
-    var cuerpo = id ? JSON.stringify({ text: String(txt).slice(0, 1000), id: String(id).slice(0, 160) }) : String(txt).slice(0, 1000);
-    try{ fetch(base() + '/aviso/' + d.token, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: cuerpo, keepalive: true }).catch(function(){}); }catch(e){}
+    if(!d){ if(negocio() && !est.revocado) registrarDispositivo(false).catch(function(){}); lsSet(K_REENV, l); return; }
+    mandando = true;
+    var r = l[0];
+    fetch(base() + '/aviso/' + d.token, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: cuerpoAviso(r), keepalive: true })
+      .then(function(res){ return res.status >= 500 ? Promise.reject(new Error('http ' + res.status)) : res; })
+      .then(function(){ est.servidor = true; var q = lsGet(K_REENV, []).filter(function(y){ return !(y.t === r.t && y.txt === r.txt); }); lsSet(K_REENV, q); mandando = false; if(q.length) mandarPendientes(); })
+      .catch(function(){ mandando = false; });
+  }
+  window.ventoPagosReenviarAviso = function(txt, id, pista){
+    if(!negocio() || !puedeCaja() || !txt) return;
+    var l = lsGet(K_REENV, []);
+    l.push({ txt: String(txt).slice(0, 1000), id: id ? String(id) : '', pista: pista || null, t: Date.now() });
+    lsSet(K_REENV, l.slice(-30));
+    try{ mandarPendientes(); }catch(e){}
   };
 
   // Al registrar a mano desde «Llegó un pago», el servidor también lo marca (y otro celular ya no lo repite).
@@ -246,10 +302,18 @@
   // Mientras haya cobros esperando, le pide al servidor que consulte a Wompi/Nequi (además del webhook).
   function hayPendientes(){ return Object.keys(cache).some(function(k){ var p = cache[k]; return p.estado === 'pendiente' && Date.now() - Date.parse(p.creado_en || 0) < 45 * 60e3; }); }
   function vigilar(){
-    var n = negocio(); if(!n || !est.servidor || document.hidden) return;
-    if(hayPendientes()) api('sync', { negocio: n.id }).then(function(){ return sincronizar(); }).catch(function(){});
-    else if(!est.vivo && Date.now() - est.ultimoSync > 20000) sincronizar();
+    var n = negocio(); if(!n) return;
+    try{ mandarPendientes(); }catch(e){}
+    if(est.servidor && !document.hidden && hayPendientes()){ api('sync', { negocio: n.id }).then(function(){ return sincronizar(); }).catch(function(){}); return; }
+    // También con Vento de fondo o el celular bloqueado: si el tiempo real se cayó (Android lo corta cuando duerme), se
+    // pregunta cada 20 s; y aunque diga que está vivo, cada minuto, por si quedó colgado sin avisar.
+    if(Date.now() - est.ultimoSync > (est.vivo ? 60000 : 20000)) sincronizar();
+    if(!est.canal && Date.now() - (est.intentoCanal || 0) > 30000){ est.intentoCanal = Date.now(); conectarTiempoReal(); }
   }
+  // La app Android despierta la página cada 5 s (window.ventoLatido): con Vento cerrada Android frena los relojes de la
+  // página hasta 1 vez por minuto, y los pagos de los otros equipos llegarían tarde.
+  var ultimoPulso = 0;
+  window.ventoPagosLatido = function(){ if(Date.now() - ultimoPulso < 9000) return; ultimoPulso = Date.now(); try{ vigilar(); }catch(e){} };
 
   function arrancar(){
     if(!negocio()) return;
@@ -261,7 +325,7 @@
   }
   setInterval(vigilar, 10000);
   setInterval(function(){ if(negocio()) latido(null); }, 5 * 60e3);
-  window.addEventListener('online', function(){ if(negocio()){ sincronizar(); conectarTiempoReal(); } });
+  window.addEventListener('online', function(){ if(negocio()){ mandarPendientes(); sincronizar(); conectarTiempoReal(); } });
   document.addEventListener('visibilitychange', function(){ if(!document.hidden && negocio()) sincronizar(); });
   var espera = setInterval(function(){ if(typeof data !== 'undefined' && data && nube()){ clearInterval(espera); if(negocio()) arrancar(); else setInterval(function(){ if(negocio() && !est.dev && !miDispositivo()) arrancar(); }, 20000); } }, 1500);
 
