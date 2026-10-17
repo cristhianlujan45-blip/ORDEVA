@@ -3977,6 +3977,7 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
   <section id="view-ajustes">
     <div class="aj-buscar" id="ajBuscarBox"><input id="ajBuscar" class="mz-in" type="search" placeholder="🔎 Buscar en ajustes (ej. notificaciones, QR, contraseña, IVA…)" autocomplete="off" enterkeyhint="search"><div id="ajBuscarRes" class="aj-res" hidden></div></div>
     <div class="ajustes-cats" id="ajustesCats">
+      <button type="button" class="ajustes-cat" data-cat="facil"><span class="ac-icon">🧓</span><span class="ac-label">Modo fácil</span><span class="ac-arrow">›</span></button>
       <button type="button" class="ajustes-cat" data-cat="avisos"><span class="ac-icon">🔔</span><span class="ac-label">Notificaciones del celular</span><span class="ac-arrow">›</span></button>
       <button type="button" class="ajustes-cat" data-cat="negocio"><span class="ac-icon">🏢</span><span class="ac-label">Negocio y facturación</span><span class="ac-arrow">›</span></button>
       <button type="button" class="ajustes-cat" data-cat="pedidos"><span class="ac-icon">🛎️</span><span class="ac-label">Pedidos, QR y caja</span><span class="ac-arrow">›</span></button>
@@ -4620,7 +4621,7 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
       </div>
     </div>
 
-    <div class="settings-group" hidden data-cat="apariencia">
+    <div class="settings-group" hidden data-cat="facil">
       <h2>🧓 Modo fácil</h2>
       <div class="settings-desc">Una pantalla sencilla con solo 3 botones grandes: <b>Vender</b>, <b>Hoy</b> y <b>Más</b>. Letras grandes, más contraste y sin animaciones. Ideal para una persona mayor o un empleado nuevo. No se borra nada: sales con «Más → Salir del modo fácil».</div>
       <div class="settings-row">
@@ -15977,7 +15978,8 @@ const ASIS_AJ = [
   { cat: 'pedidos', re: /\b(atencion al cliente|casos|reclamos|quejas|codigos? qr|qr|cierre automatico|domicilios?|whatsapp|meseros?|pantalla de preparacion|cocina)\b/, name: 'Pedidos, QR y caja' },
   { cat: 'sonidos', re: /\b(sonidos?|volumen de los sonidos)\b/, name: 'Sonidos' },
   { cat: 'nube', re: /\b(nube|vento nube|sincronizar|varios celulares)\b/, name: 'Nube y usuarios' },
-  { cat: 'apariencia', re: /\b(apariencia|diseno|tema|colores|tipo de letra|letra|fondo|modo facil)\b/, name: 'Apariencia' },
+  { cat: 'facil', re: /\b(modo facil|modo sencillo)\b/, name: 'Modo fácil' },
+  { cat: 'apariencia', re: /\b(apariencia|diseno|tema|colores|tipo de letra|letra|fondo)\b/, name: 'Apariencia' },
   { cat: 'voz', re: /\b(microfono|ajustes de voz)\b/, name: 'Voz' },
   { cat: 'datos', re: /\b(respaldo|copia de seguridad|transferir datos|calculadoras?)\b/, name: 'Datos y herramientas' },
   { cat: 'ayuda', re: /\b(soporte|guia de uso|guia)\b/, name: 'Guía y soporte' }
@@ -20738,6 +20740,7 @@ bootApp();
       '.vc-avisos{display:flex;flex-direction:column;gap:8px;}.vc-avisos[hidden]{display:none!important}'+
       '.vc-avisos > #pgSalud,.vc-avisos > #actBanner,.vc-avisos > #subBar{position:static!important;inset:auto!important;left:auto!important;right:auto!important;top:auto!important;bottom:auto!important;z-index:auto!important;margin:0!important;width:auto!important;max-width:none!important;box-shadow:none!important;pointer-events:auto!important;border-radius:14px!important;}'+
       '.vc-avisos > [hidden]{display:none!important}'+
+      '.vc-avisos > #layaHome{margin:0!important;}'+
       '.vito-campana-menu.vc-movil,.vito-ajustes.vc-movil{left:8px!important;right:8px!important;width:auto!important;min-width:0!important;max-width:none!important;margin:0!important;box-sizing:border-box!important;}'+
       /* Computador: los accesos rápidos son botones con su texto completo */
       '.vc-rapido .vc-corto{display:none}.vc-rapido .vc-ic{margin-right:6px}.vc-asa{display:none}.vc-fondo{display:none}'+
@@ -20971,7 +20974,9 @@ bootApp();
      Los avisos fijos de Vento (los pagos no van a sonar / falta un permiso, versión nueva de la app, prueba gratis o
      plan por vencer) ya no salen en la pantalla principal: quedan aquí, con sus mismos botones, y la campanita los
      cuenta en su número. Cada aviso sigue siendo el mismo (su lógica no cambia): solo cambia dónde se ve. */
-  const AVISOS=['pgSalud','actBanner','subBar'];
+  // layaHome: la tarjeta «🧠 Vento» del inicio (pagos que llegaron y no están en ninguna cuenta, lo que se acaba…):
+  // también va aquí y no en la pantalla principal (1.43.8). Cuenta cada aviso de la tarjeta.
+  const AVISOS=['pgSalud','actBanner','subBar','layaHome'];
   let avisosBox=null, avisosN=0;
   const avisoVisible=e=>!!e&&!e.hidden&&!!e.innerHTML.trim();
   function avisosVento(){
@@ -20981,10 +20986,10 @@ bootApp();
       avisosBox.innerHTML='<div class="vito-np-sec vc-avisos-tit">📣 Avisos de Vento</div>';
       menu.insertBefore(avisosBox,panelBody);
       // Al tocar un botón de un aviso se cierra la campanita (así se ve lo que abre: permiso, planes…).
-      avisosBox.addEventListener('click',e=>{ if(e.target.closest('button,a,#subBar')) setTimeout(()=>{ menu.style.display='none'; },0); });
+      avisosBox.addEventListener('click',e=>{ if(e.target.closest('[data-a="x"]')) return; if(e.target.closest('button,a,#subBar')) setTimeout(()=>{ menu.style.display='none'; },0); });
     }
     AVISOS.forEach(id=>{ const e=document.getElementById(id); if(e&&(e.parentNode!==avisosBox||e!==avisosBox.lastElementChild)) avisosBox.appendChild(e); });
-    const n=AVISOS.filter(id=>avisoVisible(document.getElementById(id))).length;
+    const n=AVISOS.reduce((t,id)=>{ const e=document.getElementById(id); if(!avisoVisible(e)) return t; return t+(id==='layaHome'?Math.max(1,e.querySelectorAll('.lh-it').length):1); },0);
     avisosBox.hidden=!n;
     return n;
   }
@@ -25758,7 +25763,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-17 · v1.43.7';
+const MESORA_VERSION = '2026-10-17 · v1.43.8';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'Vento · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 /* 🔄 La app Android se actualiza SOLA (Actualizador): revisa cada 3 h, baja la versión nueva y la instala cuando no se
@@ -31684,7 +31689,10 @@ window.mesoraCelebrar = function(emojis){
     const s = (auto().tarjeta && esAdmin()) ? sugerencias().slice(0, 3) : [];
     if(!s.length){ if(box) box.hidden = true; return; }
     if(!box){ box = document.createElement('div'); box.id = 'layaHome'; box.className = 'laya-home';
-      const ref = vista.querySelector('.stats-row, .stats, #statsRow') || vista.firstElementChild; ref && ref.nextSibling ? vista.insertBefore(box, ref.nextSibling) : vista.prepend(box);
+      // Va en la 🔔 campanita («📣 Avisos de Vento»), no en la pantalla principal (1.43.8).
+      const enCampana = document.getElementById('vcAvisos');
+      if(enCampana) enCampana.appendChild(box);
+      else { const ref = vista.querySelector('.stats-row, .stats, #statsRow') || vista.firstElementChild; ref && ref.nextSibling ? vista.insertBefore(box, ref.nextSibling) : vista.prepend(box); }
       box.addEventListener('click', ev => {
         const b = ev.target.closest('button[data-s]'); if(!b) return;
         const sg = sugerencias().find(x => x.id === b.dataset.s); if(!sg) return pintarTarjeta();

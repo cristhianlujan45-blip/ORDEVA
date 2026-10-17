@@ -41,7 +41,7 @@ public class VentoEscucha extends NotificationListenerService {
         try {
             StatusBarNotification[] l = getActiveNotifications();
             boolean alguno = false;
-            if (l != null) for (StatusBarNotification sbn : l) if (leer(sbn, true)) alguno = true;
+            if (l != null) for (StatusBarNotification sbn : l) { nuevaFirma(firma(sbn)); if (leer(sbn, true)) alguno = true; }
             if (alguno) avisarPagina();
         } catch (Exception ignorado) { }
     }
@@ -58,7 +58,46 @@ public class VentoEscucha extends NotificationListenerService {
 
     @Override
     public void onNotificationPosted(StatusBarNotification sbn) {
-        try { if (leer(sbn, false)) { seguirViva(); avisarPagina(); } } catch (Exception ignorado) { }
+        try { nuevaFirma(firma(sbn)); if (leer(sbn, false)) { seguirViva(); avisarPagina(); } } catch (Exception ignorado) { }
+    }
+
+    // ---------- 🧹 Revisión de la barra cada 10 s (1.43.8) ----------
+    // Con el celular en uso, Android (sobre todo Xiaomi) a veces deja de pasarle a Vento los avisos nuevos SIN decir que
+    // se desconectó: el pago de Nequi quedaba en la barra y no sonaba. Cada 10 s se miran los avisos que están en la barra;
+    // el de un banco que no había llegado se toma ya (con voz si es de hace menos de 3 min). Lo ya visto no se repite. Si
+    // Android no deja leer la barra, la conexión está caída: se pide reconectar de una.
+    private static final java.util.LinkedHashMap<String, Boolean> FIRMAS = new java.util.LinkedHashMap<String, Boolean>(256, 0.75f, false) {
+        @Override protected boolean removeEldestEntry(java.util.Map.Entry<String, Boolean> e) { return size() > 600; }
+    };
+    static synchronized boolean nuevaFirma(String f) { if (f == null || FIRMAS.containsKey(f)) return false; FIRMAS.put(f, true); return true; }
+    static String firma(StatusBarNotification sbn) {
+        try {
+            Notification n = sbn.getNotification(); Bundle x = n != null ? n.extras : null;
+            String t = x == null ? "" : texto(x.getCharSequence(Notification.EXTRA_TITLE)) + "|" + texto(x.getCharSequence(Notification.EXTRA_TEXT)) + "|" + texto(x.getCharSequence(Notification.EXTRA_BIG_TEXT));
+            return sbn.getKey() + "|" + sbn.getPostTime() + "|" + t.hashCode();
+        } catch (Throwable e) { return null; }
+    }
+    static void barrer() { VentoEscucha e = activa; if (e != null) e.barrerAhora(); }
+    private void barrerAhora() {
+        SharedPreferences sp = getSharedPreferences("vento", MODE_PRIVATE);
+        if (!sp.getBoolean(PREF_ON, false)) return;
+        StatusBarNotification[] l;
+        try { l = getActiveNotifications(); }
+        catch (SecurityException caida) {
+            if (activa == this) activa = null;
+            try { requestRebind(new android.content.ComponentName(this, VentoEscucha.class)); } catch (Exception ignorado) { }
+            return;
+        } catch (Throwable otro) { return; }
+        if (l == null) return;
+        int tomados = 0;
+        for (StatusBarNotification sbn : l) {
+            if (!nuevaFirma(firma(sbn))) continue;
+            try { if (leer(sbn, true)) tomados++; } catch (Exception ignorado) { }
+        }
+        if (tomados > 0) {
+            traza(sp, "Vento", "", "🧹 " + tomados + (tomados == 1 ? " aviso tomado" : " avisos tomados") + " de la barra: Android no se lo había pasado a Vento");
+            seguirViva(); avisarPagina();
+        }
     }
 
     /** Que Vento siga viva: si el servicio de fondo se había cerrado (la quitaron de recientes, el celular la cerró),

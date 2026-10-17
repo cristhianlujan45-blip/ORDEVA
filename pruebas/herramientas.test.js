@@ -82,5 +82,25 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
  await p.click('.vito-campana-menu [data-pedido="pq1"]'); await p.waitForTimeout(400);
  chk('Tocar un pedido abre la cuenta de esa mesa', await p.evaluate(()=>document.querySelector('.vito-campana-menu').style.display==='none' && typeof currentTable!=='undefined' && Number(currentTable)===1));
 
+ // ---------- 1.43.8: la tarjeta «🧠 Vento» (pago sin registrar) va a la campanita, no a la pantalla principal ----------
+ await p.evaluate(()=>{ document.querySelector('.vito-campana-menu').style.display='none'; document.querySelectorAll('.overlay.show').forEach(o=>o.classList.remove('show'));
+   data.pagos=Object.assign({on:true},data.pagos||{}); window.pagosRecibirTexto && window.pagosRecibirTexto('Nequi | Envío | MODESTA CARRILLO te envió 200, ¡lo mejor!', 'and-x1', {voz:true});
+   window.layaPintarTarjeta && window.layaPintarTarjeta(); });
+ await p.waitForTimeout(1500);
+ await p.evaluate(()=>document.querySelectorAll('.overlay.show').forEach(o=>o.classList.remove('show')));   // la ventana «Registrar en la mesa» del pago de prueba
+ r=await p.evaluate(()=>{ const c=document.getElementById('layaHome'); return { hay: !!c && !c.hidden, enCampana: !!(c && c.closest('#vcAvisos')), enInicio: !!(c && c.closest('#view-mesas')), txt: c ? c.textContent : '' }; });
+ if(r.hay){
+   chk('Tarjeta «🧠 Vento» (pago que no está en ninguna cuenta): está en la campanita, no en la pantalla principal', r.enCampana && !r.enInicio, r);
+   await p.click('.vito-campana'); await p.waitForTimeout(300);
+   chk('…y al abrir la campanita se ve con su botón', await vis('#vcAvisos #layaHome') && /no está registrado|Elegir|Registrar/.test(await p.textContent('#vcAvisos #layaHome')));
+   await p.evaluate(()=>{ document.querySelector('.vito-campana-menu').style.display='none'; });
+ } else chk('Tarjeta «🧠 Vento»: si no hay nada que avisar, no sale en la pantalla principal', !r.enInicio, r);
+ // ---------- 1.43.8: «🧓 Modo fácil» con su propio botón en Ajustes ----------
+ await p.evaluate(()=>{ const b=document.querySelector('nav button[data-view="ajustes"]'); if(b) b.click(); else { const m=document.querySelector('.more-tile[data-go="ajustes"]'); if(m) m.click(); } }); await p.waitForTimeout(400);
+ r=await p.evaluate(()=>{ const t=[...document.querySelectorAll('#ajustesCats .ajustes-cat')].filter(b=>b.checkVisibility()); const i=t.findIndex(b=>b.dataset.cat==='facil'); return { i, txt: i>=0 ? t[i].textContent : '' }; });
+ chk('Ajustes: «🧓 Modo fácil» tiene su propio botón, arriba (de los 2 primeros)', r.i>=0 && r.i<=1 && /Modo fácil/.test(r.txt), r);
+ await p.evaluate(()=>document.querySelector('#ajustesCats .ajustes-cat[data-cat="facil"]').click()); await p.waitForTimeout(300);
+ chk('…y abre «Activar modo fácil»', await vis('#easyModeToggle') || await p.evaluate(()=>{ const c=document.getElementById('easyModeToggle'); const g=c&&c.closest('.settings-group'); return !!g && !g.hidden; }));
+
  chk('Sin errores de página', !errs.length, errs);
  console.log('RESULTADO',ok,'bien',mal,'mal'); await b.close(); process.exit(mal?1:0); })();
