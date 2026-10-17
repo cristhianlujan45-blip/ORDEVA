@@ -181,6 +181,13 @@ public class EscuchaPrueba {
         chk("Resumen: …y solo una vez (un segundo pago igual en su aviso normal SÍ suena)", !VentoEscucha.porResumen("Nequi", "ANA te envió 2000"), "");
         chk("Resumen: lo que no vino del resumen no se salta", !VentoEscucha.porResumen("Nequi", "JUAN te envió 5000"), "");
         chk("Resumen: es por app (lo mismo en otra app no cuenta)", ((java.util.function.BooleanSupplier) () -> { VentoEscucha.marcarResumen("Nequi", "X te envió 100"); return !VentoEscucha.porResumen("DaviPlata", "X te envió 100"); }).getAsBoolean(), "");
+        // Aviso REAL de la llave Bre-B de Nequi (captura del dueño, 16-oct 8:29 p. m., app «Nequi Colombia», agrupado con los «Envío»)
+        { Preferencias spB = nuevo();
+          boolean rb = app(spB, "Nequi Colombia", "Te enviaron plata por Bre-B", "Te enviaron $300. Entra a tu app y revisa tu saldo.", "kbreb:");
+          VentoApp.ui.correr();
+          chk("Bre-B real de Nequi: suena «Recibiste 300 pesos por Bre-B, en Nequi.»", rb && VentoApp.dichos.contains("Recibiste 300 pesos por Bre-B, en Nequi."), VentoApp.dichos);
+          chk("Bre-B real de Nequi: notificación y 🪟 ventana con «$300» por «Bre-B en Nequi» (pago confirmado)", VentoApp.notifs.stream().anyMatch(n -> n[3].equals("$300") && n[4].equals("Bre-B en Nequi") && n[5].equals("ok")), VentoApp.notifs.size());
+          chk("Bre-B real de Nequi: se dice con pausas y despacio: «Recibiste, 300 pesos, por Bre-B, en Nequi.»", AvisoPago.pausado("Recibiste 300 pesos por Bre-B, en Nequi.").equals("Recibiste, 300 pesos, por Bre-B, en Nequi."), ""); }
         System.out.println("RESULTADO " + ok + " bien " + mal + " mal");
         System.exit(mal > 0 ? 1 : 0);
     }
