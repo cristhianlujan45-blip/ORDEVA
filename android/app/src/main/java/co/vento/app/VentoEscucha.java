@@ -123,10 +123,17 @@ public class VentoEscucha extends NotificationListenerService {
                 String v = texto(x.getCharSequence(k)); if (!v.isEmpty() && !principal.contains(v)) mas.append(' ').append(v);
             }
             String tick = texto(n.tickerText); if (!tick.isEmpty() && !principal.contains(tick)) mas.append(' ').append(tick);
-            // El aviso dibujado por la app solo se arma si no trae ningún texto (armarlo es lento y antes no hacía falta).
+            // El texto corto (si se usó el largo): a veces el valor está solo ahí.
+            if (grande != null) { String corto = texto(x.getCharSequence(Notification.EXTRA_TEXT)); if (!corto.isEmpty() && !principal.contains(corto)) mas.append(' ').append(corto); }
+            // El aviso dibujado por la app: si no trae ningún texto, o si dice que llegó plata pero el valor no está en el
+            // texto (1.43.7: la llave Bre-B de Nequi puede traer el valor solo en su diseño propio, y no se decía).
+            String hasta = titulo + " " + principal + mas;
             if (principal.isEmpty() && titulo.isEmpty() && mas.length() == 0) {
                 String vista = textosDeVista(n);
                 if (!vista.isEmpty()) mas.append(' ').append(vista);
+            } else if (AvisoPago.monto(hasta) <= 0 && AvisoPago.esRecibido(hasta)) {
+                String vista = textosDeVista(n);
+                if (AvisoPago.monto(vista) > 0) mas.append(' ').append(vista);
             }
             principal = (principal + mas).trim();
         }

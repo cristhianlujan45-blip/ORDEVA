@@ -111,6 +111,13 @@ public class AvisoPagoPrueba {
             if (Math.abs(v1) > 2000) { double q = (double) v2 / v1; mn = Math.min(mn, q); mx = Math.max(mx, q); } }
           chk("Voz reforzada (150 %): la parte bajita sube ×2,5 sin deformarse (la misma subida en cada punto)", mn > 2.3 && mx < 2.6, mn + " .. " + mx);
           chk("Voz reforzada: nunca pasa del tope (92 %)", maxAbs(p150, 44 + sil * 2, n) <= 30160, maxAbs(p150, 44 + sil * 2, n)); }
+        // 1.43.7: llave Bre-B de Nequi con el valor escrito de otras formas
+        chk("Bre-B: «Recibiste $ 50 000 por Bre-B» (miles con espacio) → $50.000 (antes «50»)", AvisoPago.monto("Nequi Recibiste $ 50 000 por Bre-B") == 50000 && AvisoPago.esRecibido("Nequi Recibiste $ 50 000 por Bre-B"), AvisoPago.monto("Nequi Recibiste $ 50 000 por Bre-B"));
+        chk("Bre-B: «Movimiento recibido +$15.000» es un pago de $15.000", AvisoPago.esRecibido("Nequi Movimiento recibido +$15.000 Bre-B") && AvisoPago.monto("Nequi Movimiento recibido +$15.000 Bre-B") == 15000, AvisoPago.porQueNo("Nequi Movimiento recibido +$15.000 Bre-B"));
+        chk("Bre-B: la llave (un celular) no se toma como el valor: «Recibiste $50.000 por Bre-B a tu llave 3001234567» → $50.000", AvisoPago.monto("Nequi Recibiste $50.000 por Bre-B a tu llave 3001234567") == 50000, AvisoPago.monto("Nequi Recibiste $50.000 por Bre-B a tu llave 3001234567"));
+        chk("Bre-B con valor: se dice «Recibiste 35000 pesos por Bre-B, en Nequi.»", AvisoPago.frase("Nequi", AvisoPago.monto("¡Te llegó plata por Bre-B! MARIA te envió $35.000"), "¡Te llegó plata por Bre-B! MARIA te envió $35.000").equals("Recibiste 35000 pesos por Bre-B, en Nequi."), AvisoPago.frase("Nequi", 35000, "¡Te llegó plata por Bre-B!"));
+        chk("Plata que SALE con espacios tampoco es un pago: «Pagaste $ 50 000»", !AvisoPago.esRecibido("Nequi Pagaste $ 50 000 en Tienda"), "");
+        chk("Valores de siempre siguen igual: $1.500.000 y 25,000", AvisoPago.monto("Recibiste $1.500.000") == 1500000 && AvisoPago.monto("JUAN te envió 25,000") == 25000, "");
         chk("Voz más pausada: velocidad 0,85 (antes 1)", AvisoPago.VELOCIDAD > 0.7f && AvisoPago.VELOCIDAD < 0.95f, AvisoPago.VELOCIDAD);
         chk("Pausas para que se entienda: «Recibiste, 20000 pesos, por Nequi.»", AvisoPago.pausado("Recibiste 20000 pesos por Nequi.").equals("Recibiste, 20000 pesos, por Nequi."), AvisoPago.pausado("Recibiste 20000 pesos por Nequi."));
         chk("Pausas con Bre-B: «Recibiste, 65000 pesos, por Bre-B, en DaviPlata.»", AvisoPago.pausado("Recibiste 65000 pesos por Bre-B, en DaviPlata.").equals("Recibiste, 65000 pesos, por Bre-B, en DaviPlata."), AvisoPago.pausado("Recibiste 65000 pesos por Bre-B, en DaviPlata."));

@@ -23,6 +23,7 @@ public final class AvisoPago {
             + "|(te|le) mand(o|ó|aron)|(te|le) gir(o|ó|aron)|(te|le) deposit|dep[oó]sito recibido|(te|le|se) acredit|acredit\\w*\\s+(a|en)\\s+(tu|su)\\s+(cuenta|llave|nequi|daviplata)"
             + "|lleg(o|ó|aron)\\s+(\\$|cop|plata|dinero)|a (tu|su) llave|(recib|lleg|entr|ingres)[^.]{0,40}bre-?b|bre-?b[^.]{0,40}(recib|lleg|entr|ingres)"
             // Más formas de los bancos para la plata que entra (transferencias por llave Bre-B y de otros bancos)
+            + "|movimiento recibido|\\+\\s?\\$\\s?\\d"   // «Movimiento recibido +$15.000» (1.43.7)
             + "|transferencia entrante|abono recibido|abono (por|de|bre-?b)\\s|ingreso de (\\$|cop|dinero|plata)|ingresaron|entrada de (dinero|plata)|recibiste un (pago|abono)|lleg[oó] una transferencia|(en|a) (tu|su) llave"
             // Plata desde OTRO banco por la llave (1.41.2): «Te enviaron dinero desde otra entidad», «Transferencia
             // interbancaria recibida», «Tienes un nuevo abono», «Nuevo ingreso por Bre-B».
@@ -38,7 +39,8 @@ public final class AvisoPago {
     // Publicidad del banco que se parece a un pago («¿Te llegó la prima? Guárdala en un colchón», «Te prestamos hasta
     // $5.000.000»): NO es plata que llegó. Los avisos de pago de verdad no preguntan ni ofrecen nada.
     static final Pattern PROMO = Pattern.compile("¿|pr[eé]stamo|te prestamos|le prestamos|cr[eé]dito (de libre|pre|para|f[aá]cil|aprobado|express|r[aá]pido)|tarjeta de cr[eé]dito|colch[oó]n|oferta|promo|descuento|cashback|sorteo|particip|\\bgan(a|e|ar)\\b|aprovecha|beneficio|invit|hasta \\$|\\bcupo\\b|activa tu|desc[aá]rga", Pattern.CASE_INSENSITIVE);
-    private static final Pattern PESOS = Pattern.compile("(?:\\$|\\bCOP)\\s?(\\d{1,3}(?:[.,]\\d{3})+|\\d+)", Pattern.CASE_INSENSITIVE);
+    // 1.43.7: también con espacios entre los miles («$ 50 000», como lo escriben algunas apps): antes daba «50».
+    private static final Pattern PESOS = Pattern.compile("(?:\\$|\\bCOP)\\s?(\\d{1,3}(?:[.,]\\d{3})+|\\d{1,3}(?:[ \\u00a0\\u202f]\\d{3})+(?![\\d.,])|\\d+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern PESOS2 = Pattern.compile("(\\d{1,3}(?:[.,]\\d{3})+|\\d+)\\s*(?:pesos|cop)\\b", Pattern.CASE_INSENSITIVE);
     // Sin signo: el SMS de DaviPlata (85888) dice «recibiste 100,000 en tu DaviPlata» o «Recibiste 140,000. Para saber mas…».
     private static final Pattern PESOS3 = Pattern.compile("\\b(?:recibiste|recibi[oó]|has recibido|ha recibido|te llegaron|le llegaron|llegaron|abono de|ingreso de|por|de"
@@ -75,7 +77,7 @@ public final class AvisoPago {
         if (todo == null) return 0;
         Matcher m = PESOS.matcher(todo);
         if (!m.find()) { m = PESOS2.matcher(todo); if (!m.find()) { m = PESOS3.matcher(todo); if (!m.find()) return 0; } }
-        try { return Long.parseLong(m.group(1).replaceAll("[.,]", "")); } catch (Exception e) { return 0; }
+        try { return Long.parseLong(m.group(1).replaceAll("[.,\\s\\u00a0\\u202f]", "")); } catch (Exception e) { return 0; }
     }
 
     /** Nombre de la app como se dice: «DaviPlata», «Nequi», «Bancolombia»… */
