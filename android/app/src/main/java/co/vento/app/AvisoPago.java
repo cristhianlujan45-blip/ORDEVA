@@ -149,15 +149,41 @@ public final class AvisoPago {
         int muestras = largo / 2;
         int pico = 1;
         for (int k = 0; k < muestras; k++) pico = Math.max(pico, Math.abs((short) le16(wav, ini + k * 2)));
-        // Al mismo nivel siempre (92 % del máximo); arriba de 100 % se refuerza con ganancia fija y tope suave.
-        double g = (32767.0 * 0.92 / pico) * Math.pow(10, refuerzo(volumenPct) / 2000.0);
+        // Al mismo nivel siempre (92 % del máximo).
+        final double TOPE = 0.92;
+        double g = 32767.0 * TOPE / pico;
+        double[] x = new double[muestras];
+        for (int k = 0; k < muestras; k++) x[k] = (short) le16(wav, ini + k * 2) * g / 32767.0;
+        // Arriba de 100 %: más fuerte SIN distorsión (1.43.4). Antes se multiplicaba todo hasta ×4 y se recortaban los picos:
+        // la voz quedaba rasposa y casi no se entendía. Ahora un nivelador suave: sube las sílabas bajitas (hasta ×2,5) y
+        // baja la ganancia ANTES de cada pico (mira 5 ms adelante), así nada pasa del tope y la forma de la voz se conserva.
+        double gmax = Math.min(2.5, Math.pow(10, refuerzo(volumenPct) / 2000.0));
+        if (gmax > 1.0001) {
+            int L = Math.max(1, frecuencia * canales * 5 / 1000);
+            double rel = Math.exp(-1.0 / (0.25 * frecuencia * canales)), env = 0, gs = gmax;
+            double baja = 1 - Math.exp(-1.0 / (0.001 * frecuencia * canales)), sube = 1 - Math.exp(-1.0 / (0.06 * frecuencia * canales));
+            // Máximo de los próximos 5 ms (ventana deslizante)
+            double[] adelante = new double[muestras];
+            java.util.ArrayDeque<Integer> dq = new java.util.ArrayDeque<>();
+            for (int k = muestras - 1; k >= 0; k--) {
+                while (!dq.isEmpty() && Math.abs(x[dq.peekLast()]) <= Math.abs(x[k])) dq.pollLast();
+                dq.addLast(k);
+                while (dq.peekFirst() > k + L) dq.pollFirst();
+                adelante[k] = Math.abs(x[dq.peekFirst()]);
+            }
+            for (int k = 0; k < muestras; k++) {
+                env = Math.max(adelante[k], env * rel);
+                double gd = env <= 1e-6 ? gmax : Math.min(gmax, TOPE / env);
+                gs += (gd - gs) * (gd < gs ? baja : sube);
+                double y = x[k] * gs;
+                x[k] = Math.abs(y) > TOPE ? Math.signum(y) * TOPE : y;      // seguro: nunca pasa del tope
+            }
+        }
         int sil = Math.max(0, Math.min(2000, silencioMs)) * frecuencia / 1000 * canales;
         byte[] out = new byte[44 + (sil + muestras) * 2];
         cabecera(out, canales, frecuencia, (sil + muestras) * 2);
         for (int k = 0; k < muestras; k++) {
-            double x = (short) le16(wav, ini + k * 2) * g / 32767.0;
-            double ax = Math.abs(x), y = ax <= 0.9 ? ax : 0.9 + 0.1 * Math.tanh((ax - 0.9) / 0.1);
-            int v = (int) Math.round(Math.signum(x) * Math.min(1.0, y) * 32767.0);
+            int v = (int) Math.round(Math.max(-1.0, Math.min(1.0, x[k])) * 32767.0);
             int o = 44 + (sil + k) * 2;
             out[o] = (byte) v; out[o + 1] = (byte) (v >> 8);
         }
@@ -245,6 +271,16 @@ public final class AvisoPago {
     /** «Pago confirmado. 200 pesos desde DaviPlata.» */
     static String frase(String app, long monto) {
         return "Recibiste " + monto + " pesos por " + nombreApp(app) + ".";
+    }
+
+    /** Velocidad de la voz de los pagos: más pausada que la normal (1.43.4: «que se demore más diciendo el precio»). */
+    static final float VELOCIDAD = 0.85f;
+
+    /** La frase con pausas cortas para que se entienda: «Recibiste, 20000 pesos, por Nequi.» (lo que se muestra no cambia). */
+    static String pausado(String f) {
+        if (f == null) return "";
+        return f.replaceFirst("^(Recibiste|Llegó plata|Ojo\\.)\\s+(?!,)", "$1, ")
+                .replaceAll("(\\d+ pesos)\\s+(?=(por|de|desde|en)\\b)", "$1, ");
     }
 
     /** Con el texto del aviso: si llegó por la llave Bre-B lo dice («Pago confirmado. 20000 pesos por Bre-B, en Nequi.»). */

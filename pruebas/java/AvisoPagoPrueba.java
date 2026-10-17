@@ -102,6 +102,19 @@ public class AvisoPagoPrueba {
             maxAbs(p100, 44 + sil * 2, n / 2) + " / " + maxAbs(p100, 44 + (sil + n / 2) * 2, n / 2));
         chk("Voz pareja: 100 % queda al 92 % del máximo (todas las frases al mismo nivel)", Math.abs(pico - 30145) < 60, pico);
         chk("Voz pareja: 150 % suena más fuerte, sin pasarse del tope (sin chasquidos)", p150 != null && maxAbs(p150, 44 + (sil + n / 2) * 2, n / 2) <= 32767 && maxAbs(p150, 44 + sil * 2, n / 2) > maxAbs(p100, 44 + sil * 2, n / 2) * 2, p150 == null ? "null" : maxAbs(p150, 44 + sil * 2, n / 2));
+        // 1.43.4: arriba de 100 % ya no se recorta la voz (antes ×4 y tope: sonaba rasposa y no se entendía)
+        { int a0 = 44 + (sil + n / 2 + 2000) * 2, cuantos = 2000; double maxDif = 0;   // parte fuerte (ya estable): queda IGUAL que a 100 %
+          for (int k = 0; k < cuantos; k++) maxDif = Math.max(maxDif, Math.abs((short) ((p150[a0 + k * 2] & 0xff) | (p150[a0 + k * 2 + 1] << 8)) - (short) ((p100[a0 + k * 2] & 0xff) | (p100[a0 + k * 2 + 1] << 8))));
+          chk("Voz reforzada (150 %): la parte fuerte no se recorta ni se deforma (igual que a 100 %)", maxDif < 400, maxDif);
+          int b0 = 44 + (sil + n / 4) * 2; double r1 = 0, r2 = 0, mn = 9, mx = 0;          // parte bajita: se sube parejo (×2,5), con la misma forma
+          for (int k = 0; k < 500; k++) { int v1 = (short) ((p100[b0 + k * 2] & 0xff) | (p100[b0 + k * 2 + 1] << 8)), v2 = (short) ((p150[b0 + k * 2] & 0xff) | (p150[b0 + k * 2 + 1] << 8));
+            if (Math.abs(v1) > 2000) { double q = (double) v2 / v1; mn = Math.min(mn, q); mx = Math.max(mx, q); } }
+          chk("Voz reforzada (150 %): la parte bajita sube ×2,5 sin deformarse (la misma subida en cada punto)", mn > 2.3 && mx < 2.6, mn + " .. " + mx);
+          chk("Voz reforzada: nunca pasa del tope (92 %)", maxAbs(p150, 44 + sil * 2, n) <= 30160, maxAbs(p150, 44 + sil * 2, n)); }
+        chk("Voz más pausada: velocidad 0,85 (antes 1)", AvisoPago.VELOCIDAD > 0.7f && AvisoPago.VELOCIDAD < 0.95f, AvisoPago.VELOCIDAD);
+        chk("Pausas para que se entienda: «Recibiste, 20000 pesos, por Nequi.»", AvisoPago.pausado("Recibiste 20000 pesos por Nequi.").equals("Recibiste, 20000 pesos, por Nequi."), AvisoPago.pausado("Recibiste 20000 pesos por Nequi."));
+        chk("Pausas con Bre-B: «Recibiste, 65000 pesos, por Bre-B, en DaviPlata.»", AvisoPago.pausado("Recibiste 65000 pesos por Bre-B, en DaviPlata.").equals("Recibiste, 65000 pesos, por Bre-B, en DaviPlata."), AvisoPago.pausado("Recibiste 65000 pesos por Bre-B, en DaviPlata."));
+        chk("Pausas: decirlas dos veces no agrega más comas", AvisoPago.pausado(AvisoPago.pausado("Recibiste 1500 pesos por Nequi, de Ana.")).equals(AvisoPago.pausado("Recibiste 1500 pesos por Nequi, de Ana.")), AvisoPago.pausado("Recibiste 1500 pesos por Nequi, de Ana."));
         chk("Voz pareja: si no es un WAV de 16 bits, no se toca (se reproduce como siempre)", AvisoPago.vozPareja("hola".getBytes(), 100, 400) == null && AvisoPago.vozPareja(new byte[60], 100, 400) == null, "");
         // Más formas de DaviPlata, Nequi y la llave Bre-B (antes algunas no sonaban)
         String[][] mas = {

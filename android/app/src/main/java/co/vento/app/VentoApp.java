@@ -317,20 +317,20 @@ public class VentoApp extends Application {
                     if (!ttsPagoListo) {                       // sin voz propia: la de siempre
                         try { if (ttsPago != null) ttsPago.shutdown(); } catch (Exception ignorado) { }
                         ttsPago = null;
-                        for (String f : fila) try { app.new Puente().hablar(f, "es-CO", 1f); } catch (Exception ignorado) { }
+                        for (String f : fila) try { app.new Puente().hablar(AvisoPago.pausado(f.startsWith(AL_PARLANTE) ? f.substring(1) : f), "es-CO", AvisoPago.VELOCIDAD); } catch (Exception ignorado) { }
                         return;
                     }
                     try { ttsPago.setAudioAttributes(atributosPago()); } catch (Exception ignorado) { }
                     ttsPago.setOnUtteranceProgressListener(new UtteranceProgressListener() {
                         @Override public void onStart(String u) { vozEmpezo = System.currentTimeMillis(); }
-                        @Override public void onDone(String u) { ui.post(() -> terminoVoz(u, true)); }
-                        @Override public void onError(String u) { ui.post(() -> terminoVoz(u, false)); }
+                        @Override public void onDone(String u) { vozEmpezo = System.currentTimeMillis(); ui.post(() -> terminoVoz(u, true)); }
+                        @Override public void onError(String u) { vozEmpezo = System.currentTimeMillis(); ui.post(() -> terminoVoz(u, false)); }
                     });
                     for (String f : fila) hablarPago(f);
                 }));
             } catch (Exception e) {
                 ttsPago = null;
-                for (String f : new ArrayList<>(pagosEnFila)) try { app.new Puente().hablar(f, "es-CO", 1f); } catch (Exception ignorado) { }
+                for (String f : new ArrayList<>(pagosEnFila)) try { app.new Puente().hablar(AvisoPago.pausado(f.startsWith(AL_PARLANTE) ? f.substring(1) : f), "es-CO", AvisoPago.VELOCIDAD); } catch (Exception ignorado) { }
                 pagosEnFila.clear();
             }
         });
@@ -338,11 +338,12 @@ public class VentoApp extends Application {
 
     private static void hablarPago(String frase0) {
         final boolean alParlante = frase0 != null && frase0.startsWith(AL_PARLANTE) && Parlante.elegido(app) != null;
-        final String frase = frase0 != null && frase0.startsWith(AL_PARLANTE) ? frase0.substring(1) : frase0;
+        // Con pausas cortas («Recibiste, 20000 pesos, por Nequi.») y más despacio: que se entienda el valor (1.43.4).
+        final String frase = AvisoPago.pausado(frase0 != null && frase0.startsWith(AL_PARLANTE) ? frase0.substring(1) : frase0);
         try {
             int r = ttsPago.setLanguage(Locale.forLanguageTag("es-CO"));
             if (r == TextToSpeech.LANG_MISSING_DATA || r == TextToSpeech.LANG_NOT_SUPPORTED) ttsPago.setLanguage(new Locale("es"));
-            ttsPago.setSpeechRate(1f);
+            ttsPago.setSpeechRate(AvisoPago.VELOCIDAD);
             // En el parlante de avisos no se toca la música del celular (va por otro lado) ni el volumen de la alarma.
             if (!alParlante) { bajarMusica(); ponerVolumen(); }
             pagosHablando++;
@@ -367,14 +368,16 @@ public class VentoApp extends Application {
             decirDirecto(frase);
         } catch (Exception e) {
             pagoTermino();
-            try { app.new Puente().hablar(frase, "es-CO", 1f); } catch (Exception ignorado) { }
+            try { app.new Puente().hablar(frase, "es-CO", AvisoPago.VELOCIDAD); } catch (Exception ignorado) { }
         }
     }
 
-    // ¿La voz SÍ arrancó? Vento queda prendida días de fondo con su motor de voz abierto, y Android (sobre todo Xiaomi, o
-    // tras horas) a veces cierra ese motor sin avisar: desde ahí cada «Recibiste…» se mandaba a un motor muerto y no
-    // sonaba nada, sin ningún error. Ahora, si a los 2,5 s no empezó a hablar (ni está hablando), se abre un motor nuevo y
-    // se vuelve a decir; si tampoco, se dice con la voz de la página. Queda en el registro de pagos.
+    // ¿La voz SÍ arrancó? Vento queda prendida días de fondo con su motor de voz abierto, y Android a veces cierra ese motor
+    // sin avisar: desde ahí cada «Recibiste…» se mandaba a un motor muerto y no sonaba nada. Si el motor no responde (error
+    // al hablar) se abre uno nuevo y se dice otra vez; si tampoco, con la voz de la página.
+    // 1.43.4: en la 1.43.3 se esperaban solo 2,5 s a que empezara: el motor de voz de Xiaomi tarda más en arrancar, Vento
+    // creía que estaba muerto, lo cerraba EN MEDIO de la frase y la voz se cortaba o no salía. Ahora se esperan 9 s y basta
+    // cualquier señal del motor (empezó, terminó o falló); y por esa vía nunca se dice con una segunda voz encima.
     private static volatile long vozEmpezo = 0;
     private static final java.util.HashMap<String, Long> vozReintentada = new java.util.HashMap<>();
 
@@ -384,21 +387,21 @@ public class VentoApp extends Application {
         try { if (ttsPago != null && Build.VERSION.SDK_INT >= 21) ttsPago.playSilentUtterance(200, TextToSpeech.QUEUE_ADD, "sil" + System.nanoTime()); } catch (Exception ignorado) { }
         int r;
         try { r = ttsPago == null ? TextToSpeech.ERROR : ttsPago.speak(frase, TextToSpeech.QUEUE_ADD, null, "pago" + System.nanoTime()); } catch (Exception e) { r = TextToSpeech.ERROR; }
-        if (r != TextToSpeech.SUCCESS) { pagoTermino(); vozDeNuevo(frase, "el motor de voz no respondió"); return; }
+        if (r != TextToSpeech.SUCCESS) { pagoTermino(); vozDeNuevo(frase, "el motor de voz no respondió", true); return; }
         ui.postDelayed(() -> {
             boolean habla = false; try { habla = ttsPago != null && ttsPago.isSpeaking(); } catch (Exception ignorado) { }
-            if (vozEmpezo < pedido && !habla) { pagoTermino(); vozDeNuevo(frase, "la voz no arrancó"); }
-        }, 2500);
+            if (vozEmpezo < pedido && !habla) { pagoTermino(); vozDeNuevo(frase, "el motor de voz no dio señales en 9 s", false); }
+        }, 9000);
     }
 
     /** La voz del pago no sonó: motor de voz nuevo y se dice otra vez (una vez); si ya se intentó, con la voz de la página. */
-    private static void vozDeNuevo(String frase, String porQue) {
+    private static void vozDeNuevo(String frase, String porQue, boolean otraVoz) {
         long ahora = System.currentTimeMillis();
         vozReintentada.values().removeIf(t -> ahora - t > 30_000L);
         android.content.SharedPreferences sp = app.getSharedPreferences("vento", MODE_PRIVATE);
         if (vozReintentada.containsKey(frase)) {
-            VentoEscucha.traza(sp, "Vento", frase, "🔇 la voz del pago no sonó otra vez (" + porQue + "): se dijo con la voz de la página");
-            try { app.new Puente().hablar(frase, "es-CO", 1f); } catch (Exception ignorado) { }
+            VentoEscucha.traza(sp, "Vento", frase, "🔇 la voz del pago no sonó otra vez (" + porQue + ")" + (otraVoz ? ": se dijo con la voz de la página" : ""));
+            if (otraVoz) try { app.new Puente().hablar(frase, "es-CO", AvisoPago.VELOCIDAD); } catch (Exception ignorado) { }
             return;
         }
         vozReintentada.put(frase, ahora);
