@@ -59,7 +59,7 @@ Se publica solo con esta versión.
 - **`avisos` del servidor:** 27, con 4 nuevas sobre lo que entendió la app.
 - **Repetidas y bien:** `pagosaviso` 92, `avisosandroid`, `pagosguia`, `daviplatacobro`, `canalvivo`, `puertaytiemporeal`,
   `sincroniza`, `erroresreal`, `servidor` 101, `equipoactividad`, `parlante`.
-- Suite completa.
+- Suite completa: 69 de 70. `appoweb` (conectar YouTube) se cae igual con la versión anterior: el navegador de prueba se queda colgado al abrir el enlace `intent://`. No tiene que ver con los pagos.
 
 ## Lo que necesita el dueño
 - Que cada equipo entre a Vento con la cuenta del negocio: el mismo correo, o como administrador.
