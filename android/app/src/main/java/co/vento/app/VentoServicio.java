@@ -38,6 +38,8 @@ public class VentoServicio extends Service {
             if (++vueltas % 12 == 0) revisarEscucha();               // cada minuto: ¿sigue leyendo los avisos de los bancos?
             // Cada 5 min: ¿hay una versión nueva de la app? (revisa cada 30 min; si ya hay una, la instala cuando no se use Vento)
             if (vueltas % 60 == 30) try { Actualizador.revisar(VentoServicio.this, false); } catch (Throwable ignorado) { }
+            // Cada 5 min: el motor de voz de los pagos listo (si Android lo cerró, se vuelve a preparar): el pago suena de una.
+            if (vueltas % 60 == 5) try { VentoApp.prepararVozPagos(); } catch (Throwable ignorado) { }
             VentoApp.ui.postDelayed(this, 5000);
         }
     };
@@ -83,6 +85,7 @@ public class VentoServicio extends Service {
         // Si no hay ventana (por ejemplo, el celular se acaba de prender), se crea la página de Vento aquí.
         VentoApp.ui.post(() -> VentoApp.motor(null));
         VentoApp.ui.postDelayed(latido, 5000);
+        VentoApp.ui.postDelayed(VentoApp::prepararVozPagos, 3000);   // la voz de los pagos lista desde ya (sale de una)
         try {
             PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
             cpu = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "vento:fondo");

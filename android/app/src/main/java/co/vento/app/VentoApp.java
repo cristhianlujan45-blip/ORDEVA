@@ -309,6 +309,19 @@ public class VentoApp extends Application {
             if (ttsPago != null && ttsPagoListo) { hablarPago(frase); return; }
             pagosEnFila.add(frase);
             if (ttsPago != null) return;                        // ya se está preparando: la dice apenas quede lista
+            crearVoz();
+        });
+    }
+
+    /** Deja el motor de voz de los pagos listo de antemano (al arrancar Vento y cada rato): así el primer «Recibiste…» sale
+     *  de una, sin esperar a que el motor arranque (en Xiaomi tarda segundos). */
+    static void prepararVozPagos() {
+        if (app == null) return;
+        ui.post(() -> { if (ttsPago == null) crearVoz(); });
+    }
+
+    private static void crearVoz() {
+        {
             try {
                 ttsPago = new TextToSpeech(app, st -> ui.post(() -> {
                     ttsPagoListo = st == TextToSpeech.SUCCESS && ttsPago != null;
@@ -321,6 +334,8 @@ public class VentoApp extends Application {
                         return;
                     }
                     try { ttsPago.setAudioAttributes(atributosPago()); } catch (Exception ignorado) { }
+                    // El idioma se carga de una vez (así el primer pago no espera a que cargue la voz en español).
+                    try { int lr = ttsPago.setLanguage(Locale.forLanguageTag("es-CO")); if (lr == TextToSpeech.LANG_MISSING_DATA || lr == TextToSpeech.LANG_NOT_SUPPORTED) ttsPago.setLanguage(new Locale("es")); ttsPago.setSpeechRate(AvisoPago.VELOCIDAD); } catch (Exception ignorado) { }
                     ttsPago.setOnUtteranceProgressListener(new UtteranceProgressListener() {
                         @Override public void onStart(String u) { vozEmpezo = System.currentTimeMillis(); }
                         @Override public void onDone(String u) { vozEmpezo = System.currentTimeMillis(); ui.post(() -> terminoVoz(u, true)); }
@@ -333,7 +348,7 @@ public class VentoApp extends Application {
                 for (String f : new ArrayList<>(pagosEnFila)) try { app.new Puente().hablar(AvisoPago.pausado(f.startsWith(AL_PARLANTE) ? f.substring(1) : f), "es-CO", AvisoPago.VELOCIDAD); } catch (Exception ignorado) { }
                 pagosEnFila.clear();
             }
-        });
+        }
     }
 
     private static void hablarPago(String frase0) {

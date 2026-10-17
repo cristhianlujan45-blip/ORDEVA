@@ -175,6 +175,12 @@ public class EscuchaPrueba {
         cola = VentoEscucha.tomar(sp);
         chk("Un pago que la app entiende va normal (ya dicho), no crudo", !cola.contains("crudo") && cola.contains("\"voz\":true"), cola);
 
+        // 1.43.6: avisos «resumen» (varios pagos agrupados). Antes se ignoraban: el pago que venía solo en el resumen no sonaba.
+        chk("Resumen: un pago que se dijo desde el resumen NO se repite cuando llega su aviso normal", 
+            ((java.util.function.BooleanSupplier) () -> { VentoEscucha.marcarResumen("Nequi", "ANA te envió 2000"); return VentoEscucha.porResumen("Nequi", "ANA te envió 2000"); }).getAsBoolean(), "");
+        chk("Resumen: …y solo una vez (un segundo pago igual en su aviso normal SÍ suena)", !VentoEscucha.porResumen("Nequi", "ANA te envió 2000"), "");
+        chk("Resumen: lo que no vino del resumen no se salta", !VentoEscucha.porResumen("Nequi", "JUAN te envió 5000"), "");
+        chk("Resumen: es por app (lo mismo en otra app no cuenta)", ((java.util.function.BooleanSupplier) () -> { VentoEscucha.marcarResumen("Nequi", "X te envió 100"); return !VentoEscucha.porResumen("DaviPlata", "X te envió 100"); }).getAsBoolean(), "");
         System.out.println("RESULTADO " + ok + " bien " + mal + " mal");
         System.exit(mal > 0 ? 1 : 0);
     }

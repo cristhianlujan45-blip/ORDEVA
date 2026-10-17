@@ -84,7 +84,10 @@ public class VentoEscucha extends NotificationListenerService {
         String pkg = sbn.getPackageName();
         if (pkg == null || pkg.equals(getPackageName())) return false;
         Notification n = sbn.getNotification();
-        if (n == null || (n.flags & Notification.FLAG_GROUP_SUMMARY) != 0) return false;
+        if (n == null) return false;
+        // Aviso «resumen» (cuando llegan varios seguidos, la app los agrupa). Antes se ignoraba SIEMPRE: hay apps (Nequi a
+        // veces) que ponen el pago SOLO en el resumen, y ese pago nunca sonaba. Ahora se lee, sin repetir lo ya dicho.
+        boolean resumen = (n.flags & Notification.FLAG_GROUP_SUMMARY) != 0;
         android.content.pm.PackageManager pm = getPackageManager();
         String app;
         android.content.pm.ApplicationInfo info;
@@ -153,14 +156,18 @@ public class VentoEscucha extends NotificationListenerService {
         if (atrasada && edad > 30 * 60_000L) return false;
         boolean callado = atrasada && edad > 3 * 60_000L;
         boolean alguno = false;
-        if (sms) return leerSms(sp, titulo, principal, mensajes, sbn.getKey() + ":" + cuando + ":", callado);
-        if (procesarApp(sp, app, titulo, principal, sbn.getKey() + ":" + cuando + ":", confiable, callado)) alguno = true;
+        if (sms) return resumen ? false : leerSms(sp, titulo, principal, mensajes, sbn.getKey() + ":" + cuando + ":", callado);
+        if (resumen ? !contenidoVisto(sp, app, principal) : !porResumen(app, principal)) {
+            if (procesarApp(sp, app, titulo, principal, sbn.getKey() + ":" + cuando + ":", confiable, callado)) alguno = true;
+            if (resumen) marcarResumen(app, principal);
+        }
         marcarContenido(sp, app, principal);
         // Las líneas de un aviso agrupado son los pagos de antes que siguen en la barra: solo cuenta la que no se había
         // visto (antes una línea vieja podía volver a sonar como pago nuevo).
         for (String l : otros) if (!l.isEmpty() && !l.equals(principal) && !principal.contains(l) && !contenidoVisto(sp, app, l)) {
             if (procesar(sp, app, titulo, l, "L:", confiable, callado)) alguno = true;
             marcarContenido(sp, app, l);
+            if (resumen) marcarResumen(app, l);
         }
         return alguno;
     }
@@ -198,6 +205,16 @@ public class VentoEscucha extends NotificationListenerService {
         }
         if (nuevo < 0 && procesarSms(sp, remitente, principal, prefijo, callado)) alguno = true;
         return alguno;
+    }
+
+    // Lo que se dijo desde un RESUMEN en los últimos 30 s: si después llega el aviso normal con el mismo texto, es el mismo
+    // pago (no se repite). Dos pagos iguales de verdad llegan cada uno en su aviso normal y suenan los dos.
+    private static final java.util.HashMap<String, Long> DESDE_RESUMEN = new java.util.HashMap<>();
+    static synchronized void marcarResumen(String app, String t) { DESDE_RESUMEN.put(claveContenido(app, t), System.currentTimeMillis()); }
+    static synchronized boolean porResumen(String app, String t) {
+        long ahora = System.currentTimeMillis();
+        DESDE_RESUMEN.values().removeIf(x -> ahora - x > 30_000L);
+        return DESDE_RESUMEN.remove(claveContenido(app, t)) != null;
     }
 
     private static String claveContenido(String app, String t) { return "C:" + (app + "|" + (t == null ? "" : t.replaceAll("\\s+", " ").trim())).hashCode(); }
