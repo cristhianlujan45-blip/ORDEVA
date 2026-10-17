@@ -85,13 +85,17 @@ final class Actualizador {
                 estado(c, "descargando la " + v.optString("nombre", "nueva"));
                 File f = new File(c.getCacheDir(), ARCHIVO);
                 bajar(BASE + v.optString("apk", "vento.apk"), f);
-                // La persona la pidió («Actualizar ahora») y Vento está a la vista: la pantalla de siempre de Android,
-                // «¿Quieres actualizar esta app?» → Actualizar. Funciona en todos los celulares (antes se instalaba de
-                // fondo y en varios celulares, como Xiaomi, Android lo bloqueaba sin decir nada: bajaba y no instalaba).
-                if ((ahora || pidioAhora) && VentoApp.alFrente) { pidioAhora = false; estado(c, "abriendo el instalador de la " + v.optString("nombre", "nueva")); abrirInstalador(c, f); return; }
-                pidioAhora = false;
+                // Siempre con el instalador de Vento (1.43.5): así Vento queda como la que instala sus propias versiones y,
+                // después de confirmar UNA vez «Actualizar», las siguientes se instalan solas sin preguntar. (En la 1.43.2
+                // «Actualizar ahora» abría el instalador de Android: Android seguía preguntando en cada versión.) Si el
+                // instalador de Vento falla, se abre el de Android (Receptor) para no quedarse sin actualizar.
+                boolean pidio = ahora || pidioAhora; pidioAhora = false;
                 estado(c, "instalando la " + v.optString("nombre", "nueva"));
-                instalar(c, f);
+                try { instalar(c, f); }
+                catch (Throwable e) {
+                    estado(c, "no se pudo instalar de fondo (" + e.getMessage() + ")");
+                    if (pidio && VentoApp.alFrente) abrirInstalador(c, f); else try { avisoTocar(c, intentInstalador(c, f)); } catch (Throwable ignorado) { }
+                }
             } catch (Throwable e) {
                 estado(c, "error: " + String.valueOf(e.getMessage()).replaceAll("\\s+", " ").trim());
             } finally { trabajando = false; }
@@ -135,6 +139,8 @@ final class Actualizador {
         PackageInstaller.SessionParams sp = new PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL);
         sp.setAppPackageName(c.getPackageName());
         if (Build.VERSION.SDK_INT >= 31) sp.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED);
+        // Android 14+: Vento queda como la dueña de sus actualizaciones (las siguientes, sin preguntar).
+        if (Build.VERSION.SDK_INT >= 34) try { sp.setRequestUpdateOwnership(true); } catch (Throwable ignorado) { }
         int id = pi.createSession(sp);
         try (PackageInstaller.Session s = pi.openSession(id)) {
             try (OutputStream o = s.openWrite("vento.apk", 0, f.length()); InputStream in = new FileInputStream(f)) {
@@ -187,7 +193,7 @@ final class Actualizador {
                 Intent confirmar = i.getParcelableExtra(Intent.EXTRA_INTENT);
                 if (confirmar == null) return;
                 confirmar.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                estado(c, "esperando que confirmes «Actualizar»");
+                estado(c, "esperando que confirmes «Actualizar» (solo esta vez: después se actualiza sola)");
                 if (VentoApp.alFrente) { try { c.startActivity(confirmar); return; } catch (Throwable ignorado) { } }
                 avisoTocar(c, confirmar);
             } else if (st == PackageInstaller.STATUS_SUCCESS) {
