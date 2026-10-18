@@ -1,0 +1,175 @@
+/* =====================================================================
+   Vento para PC (Windows) · programa de escritorio
+   • Abre Vento en su propia ventana, siempre en la última versión (es la misma página de la app; se actualiza sola).
+   • Funciona solo conectado a la base de datos de Vento: sin internet muestra «Sin conexión con Vento» y entra solo
+     apenas vuelve.
+   • Balanza, impresora de facturas y cajón de dinero por puerto COM / USB (Web Serial y WebUSB de Chrome): cuando la
+     página pide un aparato, el programa muestra la lista de los conectados para elegirlo.
+   • Sigue trabajando al cerrar la ventana (icono junto al reloj): los avisos de pagos y pedidos siguen sonando.
+     «Salir» en ese icono lo cierra del todo. Puede abrirse solo al prender el computador.
+   • Micrófono («Hola Vento», pedidos por voz), cámara (facturas, códigos) y avisos: solo para la página de Vento.
+   • Los enlaces de afuera (WhatsApp, Google, bancos) se abren en el navegador del computador.
+   • Se actualiza solo (el programa) desde las Descargas de Vento (release «pc»).
+   ===================================================================== */
+'use strict';
+const { app, BrowserWindow, shell, session, Menu, Tray, dialog, nativeImage, ipcMain, Notification } = require('electron');
+const path = require('path');
+
+const URL_VENTO = 'https://cristhianlujan45-blip.github.io/cuentas/';
+const HOST_VENTO = 'cristhianlujan45-blip.github.io';
+// Pruebas: VENTO_PC_URL=http://localhost:8765/ abre la copia local (solo para probar el programa).
+const INICIO = process.env.VENTO_PC_URL || URL_VENTO;
+const ORIGEN_PRUEBA = process.env.VENTO_PC_URL ? new URL(process.env.VENTO_PC_URL).origin : null;
+
+let ventana = null, bandeja = null, saliendo = false, avisoFondo = false;
+
+// Una sola copia del programa: abrirlo otra vez trae la ventana que ya está.
+if(!app.requestSingleInstanceLock()){ app.quit(); }
+app.on('second-instance', () => mostrar());
+app.setAppUserModelId('co.vento.pc');   // avisos de Windows con el nombre «Vento»
+
+function esVento(u){
+  try{
+    const x = new URL(u);
+    if(ORIGEN_PRUEBA && x.origin === ORIGEN_PRUEBA) return true;
+    return x.protocol === 'https:' && x.hostname === HOST_VENTO && x.pathname.startsWith('/cuentas');
+  }catch(e){ return false; }
+}
+const esOrigenVento = o => { try{ return esVento(String(o).replace(/\/?$/, '/cuentas/')) || esVento(o); }catch(e){ return false; } };
+
+function mostrar(){
+  if(!ventana) return crearVentana();
+  if(ventana.isMinimized()) ventana.restore();
+  ventana.show(); ventana.focus();
+}
+
+function crearVentana(){
+  ventana = new BrowserWindow({
+    width: 1280, height: 820, minWidth: 360, minHeight: 560, title: 'Vento', show: false,
+    icon: path.join(__dirname, 'icono.png'), backgroundColor: '#0b0a12', autoHideMenuBar: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true, nodeIntegration: false,
+      backgroundThrottling: false,   // con la ventana escondida los avisos y los relojes de la página siguen
+      spellcheck: false
+    }
+  });
+  Menu.setApplicationMenu(null);
+  // La página sabe que corre en el programa de PC («🔎 Este equipo: Vento para PC»). Sigue diciendo que es Chrome:
+  // no se esconde nada.
+  ventana.webContents.setUserAgent(ventana.webContents.getUserAgent() + ' VentoPC/' + app.getVersion());
+  ventana.once('ready-to-show', () => { if(!process.argv.includes('--escondido')) ventana.show(); });
+  ventana.loadURL(INICIO);
+
+  // Enlaces: los de Vento se quedan en la ventana; los demás (WhatsApp, Google, bancos…) en el navegador.
+  ventana.webContents.setWindowOpenHandler(({ url }) => {
+    if(esVento(url)) ventana.loadURL(url);
+    else if(/^(https?|mailto|tel|whatsapp):/i.test(url)) shell.openExternal(url);
+    return { action: 'deny' };
+  });
+  ventana.webContents.on('will-navigate', (e, url) => {
+    if(esVento(url) || url.startsWith('file:')) return;
+    e.preventDefault();
+    if(/^(https?|mailto|tel|whatsapp):/i.test(url)) shell.openExternal(url);
+  });
+  // Sin internet (o el servidor no responde): «Sin conexión con Vento», que vuelve sola a Vento al reconectar.
+  ventana.webContents.on('did-fail-load', (e, codigo, desc, url, principal) => {
+    if(principal && codigo !== -3) ventana.loadFile(path.join(__dirname, 'sin-internet.html'));
+  });
+  ventana.webContents.on('render-process-gone', () => { setTimeout(() => { if(ventana) ventana.loadURL(INICIO); }, 1000); });
+
+  // Cerrar la ventana = sigue trabajando junto al reloj (como la app Android). «Salir» lo cierra del todo.
+  ventana.on('close', e => {
+    if(saliendo || !bandeja) return;
+    e.preventDefault(); ventana.hide();
+    if(!avisoFondo){
+      avisoFondo = true;
+      try{ new Notification({ title: 'Vento sigue trabajando', body: 'Los avisos de pagos y pedidos siguen sonando. Para cerrarlo del todo: icono de Vento junto al reloj → Salir.', icon: path.join(__dirname, 'icono.png') }).show(); }catch(x){}
+    }
+  });
+  ventana.on('closed', () => { ventana = null; });
+}
+
+// ---------- Permisos: solo la página de Vento ----------
+const PERMISOS = ['media', 'notifications', 'clipboard-read', 'clipboard-sanitized-write', 'fullscreen', 'serial', 'usb', 'hid', 'geolocation', 'idle-detection', 'speaker-selection'];
+function permisos(){
+  const ses = session.defaultSession;
+  ses.setPermissionRequestHandler((wc, permiso, listo, det) => listo(PERMISOS.includes(permiso) && esVento((det && det.requestingUrl) || wc.getURL())));
+  ses.setPermissionCheckHandler((wc, permiso, origen) => PERMISOS.includes(permiso) && (esOrigenVento(origen) || (wc && esVento(wc.getURL()))));
+  // Aparatos ya elegidos (balanza, impresora, cajón): Vento los vuelve a usar sin preguntar al abrir.
+  ses.setDevicePermissionHandler(d => esOrigenVento(d.origin));
+  ses.setUSBProtectedClassesHandler && ses.setUSBProtectedClassesHandler(d => d.protectedClasses.filter(c => c !== 'printer'));
+
+  // La página pide un aparato (navigator.serial.requestPort / navigator.usb.requestDevice): lista para elegir.
+  ses.on('select-serial-port', (event, puertos, wc, listo) => {
+    event.preventDefault();
+    elegir('⚖️🧾 Elige el aparato (puerto COM / USB)', puertos.map(p => ({ id: p.portId, nombre: (p.displayName || p.portName || 'Puerto') + (p.portName && p.displayName ? ' (' + p.portName + ')' : '') })), listo);
+  });
+  ses.on('select-usb-device', (event, det, listo) => {
+    event.preventDefault();
+    elegir('🧾 Elige la impresora o el aparato USB', (det.deviceList || []).map(d => ({ id: d.deviceId, nombre: (d.productName || 'Aparato USB') + (d.manufacturerName ? ' · ' + d.manufacturerName : '') })), listo);
+  });
+  ses.on('select-hid-device', (event, det, listo) => {
+    event.preventDefault();
+    elegir('⚖️ Elige el aparato', (det.deviceList || []).map(d => ({ id: d.deviceId, nombre: d.name || 'Aparato' })), listo);
+  });
+}
+function elegir(titulo, lista, listo){
+  if(!lista.length){
+    dialog.showMessageBox(ventana, { type: 'info', title: 'Vento', message: 'No se encontró ningún aparato conectado.', detail: 'Conecta la balanza, la impresora o el cajón por USB (o el adaptador USB-serial), espera unos segundos y vuelve a intentar. Si es nuevo, instala primero el controlador que trae.' }).catch(() => {});
+    return listo('');
+  }
+  const botones = lista.slice(0, 8).map(x => x.nombre).concat(['Cancelar']);
+  dialog.showMessageBox(ventana, { type: 'question', title: 'Vento', message: titulo, buttons: botones, cancelId: botones.length - 1, noLink: true })
+    .then(r => listo(r.response < lista.length ? lista[r.response].id : '')).catch(() => listo(''));
+}
+
+// ---------- Icono junto al reloj ----------
+function crearBandeja(){
+  try{
+    bandeja = new Tray(nativeImage.createFromPath(path.join(__dirname, 'icono.png')).resize({ width: 16, height: 16 }));
+  }catch(e){ bandeja = null; return; }
+  bandeja.setToolTip('Vento');
+  const menu = () => Menu.buildFromTemplate([
+    { label: 'Abrir Vento', click: mostrar },
+    { type: 'separator' },
+    { label: 'Abrir Vento al prender el computador', type: 'checkbox', checked: app.getLoginItemSettings().openAtLogin,
+      click: it => { app.setLoginItemSettings({ openAtLogin: it.checked, args: ['--escondido'] }); } },
+    { label: 'Buscar actualización del programa', click: () => actualizar(true) },
+    { type: 'separator' },
+    { label: 'Salir', click: () => { saliendo = true; app.quit(); } }
+  ]);
+  bandeja.setContextMenu(menu());
+  bandeja.on('click', mostrar);
+  bandeja.on('right-click', () => bandeja.setContextMenu(menu()));
+}
+
+// ---------- Actualización del programa ----------
+let actualizador = null;
+function actualizar(aMano){
+  if(!app.isPackaged || process.env.VENTO_PC_URL) return Promise.resolve(false);
+  try{ if(!actualizador){ actualizador = require('electron-updater').autoUpdater; actualizador.autoDownload = true; actualizador.autoInstallOnAppQuit = true;
+    actualizador.on('update-downloaded', i => {
+      dialog.showMessageBox(ventana, { type: 'info', title: 'Vento', message: 'Hay una versión nueva del programa Vento (' + i.version + ').', detail: 'Se instala al cerrar Vento, o ahora mismo.', buttons: ['Instalar ahora', 'Después'], cancelId: 1 })
+        .then(r => { if(r.response === 0){ saliendo = true; actualizador.quitAndInstall(); } }).catch(() => {});
+    }); } }
+  catch(e){ return Promise.resolve(false); }
+  return actualizador.checkForUpdates().then(r => {
+    if(aMano && (!r || !r.updateInfo || r.updateInfo.version === app.getVersion())) dialog.showMessageBox(ventana, { type: 'info', title: 'Vento', message: 'Tienes la última versión del programa (' + app.getVersion() + ').' }).catch(() => {});
+    return true;
+  }).catch(() => { if(aMano) dialog.showMessageBox(ventana, { type: 'warning', title: 'Vento', message: 'No se pudo buscar la actualización. Revisa el internet.' }).catch(() => {}); return false; });
+}
+
+ipcMain.on('vento-version', e => { e.returnValue = app.getVersion(); });
+ipcMain.handle('vento-inicio', (e, si) => { app.setLoginItemSettings({ openAtLogin: !!si, args: ['--escondido'] }); return app.getLoginItemSettings().openAtLogin; });
+ipcMain.handle('vento-actualizar', () => actualizar(true));
+
+app.whenReady().then(() => {
+  permisos();
+  crearBandeja();
+  crearVentana();
+  setTimeout(() => actualizar(false), 15000);
+  setInterval(() => actualizar(false), 6 * 3600e3);
+});
+app.on('window-all-closed', () => { if(!bandeja || saliendo) app.quit(); });
+app.on('before-quit', () => { saliendo = true; });
+app.on('activate', mostrar);

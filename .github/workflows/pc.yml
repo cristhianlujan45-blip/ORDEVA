@@ -1,0 +1,70 @@
+# Compila Vento para PC (Windows) y lo publica en las Descargas del repositorio (release «pc»):
+#   https://github.com/cristhianlujan45-blip/cuentas/releases/download/pc/Vento-Setup.exe
+# El programa (carpeta pc/) abre la página de Vento en su propia ventana y se actualiza solo desde ese mismo release
+# (latest.yml). Corre solo cada vez que cambia pc/ en la rama principal, y también a mano (Actions → App PC → Run workflow).
+# OJO: el release «pc» NUNCA se marca como «latest»: el enlace del APK de Android (releases/latest/download/vento.apk)
+# depende de que el último sea el release «android».
+name: App PC
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/precio-margen-productos-tabla-mioclt]
+    paths: ['pc/**', '.github/workflows/pc.yml']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: app-pc
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    env:
+      VENTO_PC_VERSION: 1.0.${{ github.run_number }}
+    defaults:
+      run:
+        working-directory: pc
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Instalar
+        run: npm install --no-audit --no-fund
+      - name: Compilar el instalador (Vento-Setup.exe)
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npx electron-builder --win nsis --x64 --publish never -c.extraMetadata.version=${{ env.VENTO_PC_VERSION }}
+      - name: Revisar lo que salió
+        shell: bash
+        run: |
+          ls -la dist
+          test -s dist/Vento-Setup.exe
+          test -s dist/latest.yml
+          grep -q "version: ${VENTO_PC_VERSION}" dist/latest.yml
+          grep -q "Vento-Setup.exe" dist/latest.yml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vento-pc
+          path: |
+            pc/dist/Vento-Setup.exe
+            pc/dist/Vento-Setup.exe.blockmap
+            pc/dist/latest.yml
+      - name: Publicar en Descargas (release «pc», sin marcarlo como el último)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          NOTAS="Vento para PC ${VENTO_PC_VERSION} (Windows 10 y 11). Descarga Vento-Setup.exe, ábrelo y sigue los pasos. Si Windows dice «Windows protegió su PC», toca «Más información» → «Ejecutar de todas formas». Las versiones nuevas se instalan solas."
+          if gh release view pc >/dev/null 2>&1; then
+            gh release edit pc --title "Vento para PC ${VENTO_PC_VERSION}" --notes "$NOTAS" --latest=false
+          else
+            gh release create pc --title "Vento para PC ${VENTO_PC_VERSION}" --notes "$NOTAS" --target "${GITHUB_SHA}" --latest=false
+          fi
+          gh release upload pc dist/Vento-Setup.exe dist/Vento-Setup.exe.blockmap dist/latest.yml --clobber
+          # El APK de Android sigue siendo el «último» (su enlace releases/latest/download/vento.apk depende de eso).
+          gh release edit android --latest >/dev/null 2>&1 || true
+          echo "### 💻 Vento para PC: https://github.com/${GITHUB_REPOSITORY}/releases/download/pc/Vento-Setup.exe" >> "$GITHUB_STEP_SUMMARY"
