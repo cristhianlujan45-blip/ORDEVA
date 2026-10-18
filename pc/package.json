@@ -1,42 +1,13 @@
 {
   "name": "vento-pc",
   "productName": "Vento",
-  "version": "1.0.0",
+  "version": "1.0.7",
   "description": "Vento para PC: cuentas, pedidos, inventario, caja, balanza, impresora y cajón de tu negocio.",
   "author": "Vento",
   "license": "UNLICENSED",
   "private": true,
   "main": "main.js",
-  "scripts": {
-    "start": "electron .",
-    "dist": "electron-builder --win nsis --x64 --publish never"
-  },
   "dependencies": {
     "electron-updater": "6.3.9"
-  },
-  "devDependencies": {
-    "electron": "33.2.1",
-    "electron-builder": "25.1.8"
-  },
-  "build": {
-    "appId": "co.vento.pc",
-    "productName": "Vento",
-    "copyright": "Vento",
-    "directories": { "output": "dist" },
-    "files": ["main.js", "preload.js", "sin-internet.html", "icono.png", "package.json"],
-    "win": { "target": [{ "target": "nsis", "arch": ["x64"] }], "icon": "icono.png" },
-    "nsis": {
-      "oneClick": false,
-      "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "Vento",
-      "artifactName": "Vento-Setup.${ext}",
-      "installerLanguages": ["es_ES"],
-      "language": "3082"
-    },
-    "linux": { "target": ["AppImage"], "icon": "icono.png", "category": "Office", "artifactName": "Vento.${ext}" },
-    "publish": [{ "provider": "generic", "url": "https://github.com/cristhianlujan45-blip/cuentas/releases/download/pc" }]
   }
 }

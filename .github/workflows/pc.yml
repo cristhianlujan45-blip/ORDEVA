@@ -27,6 +27,8 @@ jobs:
     defaults:
       run:
         working-directory: pc
+        # bash también en Windows: PowerShell parte «-c.extraMetadata.version=…» en el punto y electron-builder lo lee mal.
+        shell: bash
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -37,9 +39,8 @@ jobs:
       - name: Compilar el instalador (Vento-Setup.exe)
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-        run: npx electron-builder --win nsis --x64 --publish never -c.extraMetadata.version=${{ env.VENTO_PC_VERSION }}
+        run: npx electron-builder --win nsis --x64 --publish never "-c.extraMetadata.version=${VENTO_PC_VERSION}"
       - name: Revisar lo que salió
-        shell: bash
         run: |
           ls -la dist
           test -s dist/Vento-Setup.exe
@@ -54,7 +55,6 @@ jobs:
             pc/dist/Vento-Setup.exe.blockmap
             pc/dist/latest.yml
       - name: Publicar en Descargas (release «pc», sin marcarlo como el último)
-        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
