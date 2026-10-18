@@ -12,6 +12,10 @@
 //    POST /sync                        consultar pagos pendientes (sesión o X-Vento-Cron)
 //    POST /webhook/wompi/{token}       eventos firmados de Wompi                                   (firma)
 //    POST /aviso[/{token}]             aviso reenviado desde un celular autorizado (MacroDroid)    (token de dispositivo)
+//    POST /dian/config                 facturación electrónica: ver / guardar / probar               (sesión; guardar: dueño o admin)
+//    POST /dian/emitir                 la venta → P.O.S. electrónico o factura electrónica (DIAN)    (sesión)
+//    POST /dian/anular                 nota crédito de una venta ya validada (anulación o devolución) (sesión)
+//    POST /dian/estado                 estado de los documentos de unas ventas (y reintenta los suyos) (sesión)
 // =====================================================================
 import { crearDb, type Db } from "./db.ts";
 import { cifrar, descifrar } from "./cifrado.ts";
@@ -21,9 +25,10 @@ import * as D from "./daviplata.ts";
 import { conPista, leerAviso, type Pista } from "./avisos.ts";
 import { avisarDispositivos, vapid } from "./push.ts";
 import * as G from "./google.ts";
+import * as F from "./dian.ts";
 import { type Env, ErrorVento, log, sha256 } from "./util.ts";
 
-export const VERSION = "1.19.0";
+export const VERSION = "1.20.0";
 const SITIO = "https://cristhianlujan45-blip.github.io/cuentas/";
 
 type Pago = { id: string; negocio_id?: string; referencia: string; proveedor: string; metodo: string; canal: string; monto: number;
@@ -562,6 +567,153 @@ async function aviso(req: Request, env: Env, tokenRuta: string | null) {
 }
 
 // ---------- Entrada ----------
+// =====================================================================
+//  Facturación electrónica DIAN (MATIAS API)
+// =====================================================================
+const DIAN_MSG: Record<string, [number, string]> = {
+  dian_inactivo: [409, "La facturación electrónica está apagada en este negocio (Ajustes → 🧾 Facturación electrónica DIAN)."],
+  dian_sin_resolucion: [409, "Falta la resolución de numeración de la DIAN (número, prefijo y rango) en Ajustes."],
+  dian_rango_agotado: [409, "Se acabó el rango de numeración autorizado por la DIAN. Pide una resolución nueva y escríbela en Ajustes."],
+  dian_resolucion_vencida: [409, "La resolución de numeración de la DIAN venció. Pide una nueva y escríbela en Ajustes."],
+  dian_faltan_datos: [400, "Para prender la facturación faltan: razón social, NIT con dígito de verificación y la resolución P.O.S. (número y rango)."],
+  dian_tarifa_invalida: [400, "La tarifa no corresponde: IVA 0, 5 o 19 %; impuesto al consumo 8 %."],
+  dian_consecutivo_fuera: [400, "El consecutivo siguiente tiene que estar dentro del rango autorizado."],
+  dian_numero_usado: [409, "Ese consecutivo ya se usó en un documento enviado. Pon el número que sigue."],
+  dian_config_invalida: [400, "Datos de facturación inválidos."],
+  dian_tipo_invalido: [400, "Tipo de documento inválido."],
+  dian_venta_invalida: [400, "La venta no tiene datos válidos."],
+  dian_cliente_invalido: [400, "El código de la empresa en MATIAS (client_uuid) no es válido."],
+};
+function dianError(e: unknown): never {
+  const m = e instanceof Error ? e.message : String(e);
+  const k = /(dian_[a-z_]+)/.exec(m);
+  if (k && DIAN_MSG[k[1]]) throw new ErrorVento(k[1], DIAN_MSG[k[1]][1], DIAN_MSG[k[1]][0]);
+  throw e;
+}
+const rpcD = async <T>(db: Db, fn: string, args: Record<string, unknown>) => { try { return await db.rpc<T>(fn, args); } catch (e) { dianError(e); } };
+
+// Manda (o reenvía) un documento y guarda lo que dijo la DIAN.
+async function dianMandar(env: Env, db: Db, cfg: F.Cfg, doc: F.Doc): Promise<Record<string, unknown>> {
+  let res: F.Resultado;
+  try { res = await F.enviar(env, db, cfg, doc); }
+  catch (e) {
+    const msg = e instanceof ErrorVento ? e.message : "Error del servidor";
+    log("warn", "dian_envio_fallo", { doc: doc.id, error: e instanceof Error ? e.message : String(e) });
+    res = { estado: "pendiente", mensaje: msg, errores: [] };
+  }
+  return await db.rpc<Record<string, unknown>>("srv_dian_resultado", { p_doc: doc.id, p_estado: res.estado,
+    p_datos: { cude: res.cude || null, qr: res.qr || null, pdf: res.pdf || null, xml: res.xml || null, mensaje: res.mensaje, errores: res.errores } });
+}
+
+async function dian(req: Request, env: Env, accion: string, b: Record<string, unknown>) {
+  const negocio = String(b.negocio || "");
+  if (!/^[0-9a-f-]{36}$/i.test(negocio)) throw new ErrorVento("falta_negocio", "Falta el negocio", 400);
+  const yo = usuario(req, env), db = servidor(env);
+  const ambiente = F.esPruebas(env) ? "pruebas" : "produccion";
+  if (accion === "config") {
+    const que = String(b.accion || "ver");
+    if (que === "guardar") {
+      const c = await rpcD<Record<string, unknown>>(yo, "dian_config_guardar", { p_negocio: negocio, p_cfg: b.config || {} });
+      return { ok: true, config: c, ambiente, servidor: F.configurado(env) };
+    }
+    const c = await rpcD<Record<string, unknown>>(yo, "dian_config_ver", { p_negocio: negocio });
+    if (que === "probar") {
+      await yo.rpc("pagos_puedo", { p_negocio: negocio, p_accion: "configurar" });
+      const cfg = await db.rpc<F.Cfg | null>("srv_dian_config", { p_negocio: negocio });
+      return { ok: true, config: c, ambiente, servidor: F.configurado(env), prueba: await F.probar(env, db, cfg) };
+    }
+    return { ok: true, config: c, ambiente, servidor: F.configurado(env) };
+  }
+  const quien = await yo.rpc<string>("pagos_puedo", { p_negocio: negocio, p_accion: "cobrar" });
+  const [uid, rol] = quien.split(":");
+  if (accion === "estado") {
+    const ventas = Array.isArray(b.ventas) ? (b.ventas as unknown[]).map(String).slice(0, 300) : null;
+    // Los que siguen sin respuesta de la DIAN se reintentan ya (máximo 5 por llamada).
+    if (b.reintentar !== false) { try { await repasarDian(env, db, negocio, 5); } catch (e) { log("warn", "dian_repaso", { error: String(e) }); } }
+    return { ok: true, ambiente, documentos: await yo.rpc("dian_documentos_de", { p_negocio: negocio, p_ventas: ventas }) };
+  }
+  if (!F.configurado(env)) throw new ErrorVento("dian_sin_proveedor", "El servidor de Vento todavía no tiene la cuenta de facturación electrónica (MATIAS).", 503);
+  const cfg = await db.rpc<F.Cfg | null>("srv_dian_config", { p_negocio: negocio });
+  if (!cfg || !cfg.activo) dianError("dian_inactivo");
+  if (accion === "emitir") {
+    const v = F.leerVenta(b.venta);
+    const c = v.cliente;
+    const quiereFactura = !!(v.factura && c && c.numero && c.nombre && c.correo && cfg!.fe_resolucion);
+    if (v.factura && !quiereFactura) {
+      if (!cfg!.fe_resolucion) throw new ErrorVento("dian_sin_factura", "Este negocio no tiene resolución de factura electrónica: sale como documento P.O.S. electrónico (quita «Factura electrónica» o agrega la resolución en Ajustes).", 409);
+      throw new ErrorVento("dian_cliente_incompleto", "Para la factura electrónica faltan los datos del cliente: cédula o NIT, nombre y correo.", 400);
+    }
+    const tipo = quiereFactura ? "factura" : "pos";
+    const k = F.calcular(cfg!, v.items);
+    const rsv = await rpcD<{ nuevo: boolean; doc: F.Doc; quedan?: number | null; vence?: string | null }>(db, "srv_dian_reservar",
+      { p_negocio: negocio, p_venta: v.id, p_tipo: tipo, p_total: k.pagar, p_cliente: c || null, p_usuario: uid, p_referencia: null });
+    let doc = rsv.doc;
+    if (doc.estado === "aceptado" || doc.estado === "anulado") return { ok: true, repetido: true, ambiente, documento: await db.rpc("srv_dian_resultado", { p_doc: doc.id, p_estado: doc.estado, p_datos: { intento: false } }) };
+    if (!doc.cuerpo || doc.estado === "rechazado") {
+      const cuerpo = F.armar(env, cfg!, doc, v);
+      await db.rpc("srv_dian_cuerpo", { p_doc: doc.id, p_cuerpo: cuerpo });
+      doc = { ...doc, cuerpo };
+    }
+    const r = await dianMandar(env, db, cfg!, doc);
+    const avisoRango = rsv.quedan != null && rsv.quedan <= 50 ? "Quedan " + rsv.quedan + " números de la resolución de la DIAN: pide una nueva pronto." : null;
+    return { ok: true, repetido: !rsv.nuevo, ambiente, documento: r, aviso: avisoRango };
+  }
+  if (accion === "anular") {
+    const ventaId = String(b.venta_id || "").slice(0, 80);
+    let ref = await db.rpc<F.Doc | null>("srv_dian_doc_de", { p_negocio: negocio, p_tipo: "pos", p_venta: ventaId });
+    if (!ref) ref = await db.rpc<F.Doc | null>("srv_dian_doc_de", { p_negocio: negocio, p_tipo: "factura", p_venta: ventaId });
+    if (!ref) throw new ErrorVento("no_existe", "Esa venta no tiene documento electrónico", 404);
+    // El cajero / mesero solo deshace lo recién cobrado; anular algo de antes es del dueño o el administrador.
+    if (!["dueno", "admin"].includes(rol) && Date.now() - Date.parse(ref.creado_en) > 15 * 60e3) throw new ErrorVento("sin_permiso", "Solo el dueño o el administrador pueden anular una venta de hace más de 15 minutos.", 403);
+    const parcial0 = Array.isArray(b.items) && (b.items as unknown[]).length > 0;
+    if (ref.estado === "anulado" && !parcial0) {   // ya anulada: la misma nota (o nada, si la DIAN nunca la validó)
+      const ya = await db.rpc<F.Doc | null>("srv_dian_doc_de", { p_negocio: negocio, p_tipo: "nota", p_venta: ventaId });
+      return { ok: true, repetido: true, ambiente, documento: await db.rpc("srv_dian_resultado", { p_doc: (ya || ref).id, p_estado: (ya || ref).estado, p_datos: { intento: false } }) };
+    }
+    if (ref.estado === "rechazado") {   // nunca fue válido ante la DIAN: no hace falta nota crédito
+      return { ok: true, ambiente, documento: await db.rpc("srv_dian_resultado", { p_doc: ref.id, p_estado: "anulado", p_datos: { mensaje: "Anulado en Vento (la DIAN nunca lo validó)", intento: false } }) };
+    }
+    if (ref.estado !== "aceptado") throw new ErrorVento("dian_espera", "La venta todavía no está validada por la DIAN. Vento la anula sola apenas la DIAN responda.", 409);
+    const parcial = Array.isArray(b.items) && (b.items as unknown[]).length > 0;
+    const vNota = parcial ? F.leerVenta({ id: ventaId, items: b.items, cliente: ref.cliente, cajero: b.cajero }) : null;
+    const totalNota = vNota ? F.calcular(cfg!, vNota.items).pagar : Number(ref.total) || 0;
+    if (vNota && totalNota > Number(ref.total) + 0.01) throw new ErrorVento("dian_devolucion_grande", "La devolución no puede ser mayor que la venta.", 400);
+    const idNota = parcial ? ventaId + ":" + String(b.nota_id || Date.now()).slice(0, 30) : ventaId;
+    const rsv = await rpcD<{ nuevo: boolean; doc: F.Doc }>(db, "srv_dian_reservar", { p_negocio: negocio, p_venta: idNota, p_tipo: "nota", p_total: totalNota, p_cliente: ref.cliente || null, p_usuario: uid, p_referencia: ref.id });
+    let nota = rsv.doc;
+    if (nota.estado === "aceptado") return { ok: true, repetido: true, ambiente, documento: await db.rpc("srv_dian_resultado", { p_doc: nota.id, p_estado: "aceptado", p_datos: { intento: false } }) };
+    if (!nota.cuerpo || nota.estado === "rechazado") {
+      const cuerpo = vNota ? F.armar(env, cfg!, nota, vNota, ref, true) : F.armarAnulacion(cfg!, nota, ref, String(b.cajero || ""), String(b.motivo || ""));
+      if (vNota && b.motivo) cuerpo.notes = String(b.motivo).slice(0, 300);
+      await db.rpc("srv_dian_cuerpo", { p_doc: nota.id, p_cuerpo: cuerpo });
+      nota = { ...nota, cuerpo };
+    }
+    const r = await dianMandar(env, db, cfg!, nota);
+    if (!parcial && r.estado === "aceptado") await db.rpc("srv_dian_resultado", { p_doc: ref.id, p_estado: "anulado", p_datos: { mensaje: "Anulado con la nota crédito " + r.documento, intento: false } });
+    try { await yo.rpc("actividad_registrar", { p_negocio: negocio, p_eventos: [{ a: parcial ? "dian:devolucion" : "dian:anulacion", d: (ref.prefijo || "") + ref.numero + " → " + r.documento, m: Math.round(Number(r.total) || 0) }] }); } catch { /* no es grave */ }
+    return { ok: true, ambiente, documento: r };
+  }
+  throw new ErrorVento("ruta", "Acción de facturación desconocida", 404);
+}
+
+// Reenvía lo que quedó sin respuesta de la DIAN (cada 10 minutos desde el repaso, y al pedir el estado).
+async function repasarDian(env: Env, db: Db, negocio: string | null, limite = 25) {
+  if (!F.configurado(env)) return { revisados: 0, aceptados: 0 };
+  const lista = await db.rpc<F.Doc[]>("srv_dian_pendientes", { p_negocio: negocio, p_limite: limite });
+  let revisados = 0, aceptados = 0;
+  const cfgs = new Map<string, F.Cfg | null>();
+  for (const d of lista || []) {
+    if (!d.cuerpo) continue;
+    if (!cfgs.has(d.negocio_id)) cfgs.set(d.negocio_id, await db.rpc<F.Cfg | null>("srv_dian_config", { p_negocio: d.negocio_id }));
+    const cfg = cfgs.get(d.negocio_id);
+    if (!cfg) continue;
+    revisados++;
+    const r = await dianMandar(env, db, cfg, d);
+    if (r.estado === "aceptado") aceptados++;
+  }
+  return { revisados, aceptados };
+}
+
 export async function manejar(req: Request, env: Env): Promise<Response> {
   const url = new URL(req.url);
   const partes = url.pathname.split("/").filter(Boolean);
@@ -571,7 +723,8 @@ export async function manejar(req: Request, env: Env): Promise<Response> {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
   try {
     const r0 = ruta[0] || "salud";
-    if (r0 === "salud") return json(200, { ok: true, servicio: "vento-pagos", version: VERSION, integraciones: ["wompi", "nequi_conecta", "daviplata_api", "avisos_dispositivo", "google_youtube"], push: true }, cors);
+    if (r0 === "salud") return json(200, { ok: true, servicio: "vento-pagos", version: VERSION, integraciones: ["wompi", "nequi_conecta", "daviplata_api", "avisos_dispositivo", "google_youtube", "dian_matias"], push: true,
+      dian: { listo: F.configurado(env), ambiente: F.esPruebas(env) ? "pruebas" : "produccion" } }, cors);
     if (r0 === "webhook" && ruta[1] === "wompi" && ruta[2] && req.method === "POST") return await webhookWompi(req, env, ruta[2]);
     if (r0 === "aviso" && req.method === "POST") return await aviso(req, env, ruta[1] || null);
     // Canal en vivo para quien publica desde afuera (MacroDroid con los avisos de pagos, el puente de WhatsApp):
@@ -587,11 +740,14 @@ export async function manejar(req: Request, env: Env): Promise<Response> {
     if (r0 === "sync" && env.VENTO_CRON_SECRETO && req.headers.get("x-vento-cron") === env.VENTO_CRON_SECRETO) {
       const db = servidor(env);
       const r = await sincronizar(env, db, null);
+      let dianR: Record<string, number> | null = null;
+      try { dianR = await repasarDian(env, db, null); } catch (e) { log("warn", "dian_repaso", { error: e instanceof Error ? e.message : String(e) }); }
       try { await db.rpc("srv_limpiar"); } catch { /* no es grave */ }
-      return json(200, { ok: true, ...r }, cors);
+      return json(200, { ok: true, ...r, dian: dianR }, cors);
     }
     const b = await req.json().catch(() => ({})) as Record<string, unknown>;
     if (r0 === "config") return json(200, await config(req, env, b), cors);
+    if (r0 === "dian") return json(200, await dian(req, env, ruta[1] || "", b), cors);
     if (r0 === "google") return json(200, await google(req, env, b), cors);
     if (r0 === "cobro") return json(200, await cobro(req, env, b), cors);
     if (r0 === "confirmar") return json(200, await confirmarDaviplata(req, env, b), cors);
