@@ -84,7 +84,7 @@ Cada aparato queda guardado en **ese** equipo, porque cada caja tiene los suyos.
 El dueño: «Hazme un programa también, un software para PC, para instalarlo».
 
 - **Descarga:** https://github.com/cristhianlujan45-blip/cuentas/releases/download/pc/Vento-Setup.exe
-  - También en la app: Ajustes → 💾 Datos y herramientas → **«💻 Instala Vento en tus equipos»**. Ahí están el
+  - También en la app: Ajustes → 💾 Datos y herramientas → **«💻 Instalar Vento en el PC (computador) y el celular»**. Ahí están el
     instalador de PC y la app de Android.
   - Si Windows dice «Windows protegió su PC», es porque el programa todavía no tiene firma comprada. Se toca
     **Más información → Ejecutar de todas formas**.
