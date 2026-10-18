@@ -284,6 +284,7 @@ public class MainActivity extends Activity {
         super.onRequestPermissionsResult(rc, permisos, resultados);
         boolean ok = resultados.length > 0;
         for (int r : resultados) if (r != PackageManager.PERMISSION_GRANTED) ok = false;
+        if (rc == Equipos.RC_BT) { Equipos.permisoBluetooth(ok); return; }   // impresora o balanza Bluetooth
         if (rc == RC_PERM_WEB && permisoWeb != null) {
             if (ok) permisoWeb.grant(permisoWeb.getResources()); else permisoWeb.deny();
             permisoWeb = null;
