@@ -34,12 +34,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Instalar
-        run: npm install --no-audit --no-fund
+      - name: Instalar (versiones fijas de package-lock.json, con electron y electron-builder)
+        run: |
+          npm ci --include=dev --no-audit --no-fund
+          test -f node_modules/electron/package.json
+          test -f node_modules/electron-builder/package.json
       - name: Compilar el instalador (Vento-Setup.exe)
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-        run: npx electron-builder --win nsis --x64 --publish never "-c.extraMetadata.version=${VENTO_PC_VERSION}"
+        run: npx --no-install electron-builder --win nsis --x64 --publish never "-c.extraMetadata.version=${VENTO_PC_VERSION}"
       - name: Revisar lo que salió
         run: |
           ls -la dist
