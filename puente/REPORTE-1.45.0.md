@@ -74,7 +74,7 @@ otro archivo (`lib/vento-confirma.js`) con ganchos pequeños.
 - **`pagosequipos`:** 27, con 6 nuevas. El computador espera el pago, el celular lo lee, la pantalla se pone verde y
   queda registrado una sola vez en todos los equipos.
 - **`pagosaviso`:** 92. La prueba del mesero ahora exige «ya pagó» sin el valor.
-- Suite completa.
+- Suite completa: todas bien menos `appoweb` (conectar YouTube), que se cae igual desde antes en el navegador de prueba (enlace `intent://`). No tiene que ver con los pagos.
 
 ## Lo que necesita el dueño
 Nada. La página se actualiza sola y sirve con la misma app 1.0.52.
