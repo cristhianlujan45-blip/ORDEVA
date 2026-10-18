@@ -132,6 +132,7 @@ public class VentoApp extends Application {
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(web, true);
         web.addJavascriptInterface(app.new Puente(), "VentoAndroid");
+        web.addJavascriptInterface(new Equipos(app), "VentoEquipos");   // 🔌 balanza, impresora de facturas y cajón
         web.setWebViewClient(new Clientes.Navegacion());
         web.setWebChromeClient(new Clientes.Cromo());
         // De fondo, Android baja la prioridad de la página y a veces la cierra: así sigue como «importante».

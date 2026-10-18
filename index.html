@@ -5465,6 +5465,7 @@ export default {
 <script src="nube/vento-suscripcion.js" defer></script>
 <script src="lib/vento-puerta.js" defer></script><!-- Puerta: la app solo funciona conectada a la base de datos de Vento -->
 <script src="lib/vento-pos.js" defer></script><!-- Modos de trabajo (tienda/mixto) y modo fácil -->
+<script src="lib/vento-equipos.js" defer></script><!-- 🔌 Balanza, impresora de facturas y cajón de dinero (USB, Bluetooth, red) -->
 <script src="lib/vento-confirma.js" defer></script><!-- Confirmación de pagos: ⏳ esperando el pago, mesa correcta, sin valor, mesero, cuadre -->
 <script src="lib/vento-guia.js" defer></script><!-- Modo fácil para mayores: guía paso a paso con voz, «Ayúdame» y recorrido -->
 <script src="lib/vento-cuenta.js" defer></script><!-- Soporte en la app, licencias del proveedor, recuperar por SMS, cuenta de cliente aparte del administrador -->
@@ -15461,17 +15462,17 @@ function qsRegistrarVenta(cart, opts){
   const envio = dom && dom.envio > 0 ? dom.envio : 0;
   const method = opts.method || 'efectivo';
   const deudor = method === 'debe' ? (opts.deudor || '') : '';
-  const items = cart.map(it => ({
+  const items = cart.map(it => Object.assign({
     name: it.name,
     qty: it.qty,
     price: it.price,
     cost: (data.products.find(p=>p.id===it.productId)||{}).cost ?? null
-  }));
+  }, it.unidad ? { unidad: it.unidad } : {}));      // ⚖️ vendido por kilo o por libra
   // El valor del domicilio se suma como una línea más (igual que la propina),
   // así el total del recibo y de las estadísticas ya lo incluyen sin tener
   // que tocar nada más en la app.
   if(dom && envio > 0) items.push({ name: '🛵 Domicilio', qty: 1, price: envio, cost: null });
-  const total = items.reduce((s, it) => s + it.price * it.qty, 0);
+  const total = Math.round(items.reduce((s, it) => s + it.price * it.qty, 0));   // sin centavos (también con productos por peso)
   const entry = {
     id: Date.now().toString() + '-qs',
     table: null,
@@ -25764,7 +25765,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-18 · v1.45.1';
+const MESORA_VERSION = '2026-10-18 · v1.46.0';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'Vento · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 /* 🔄 La app Android se actualiza SOLA (Actualizador): revisa cada 3 h, baja la versión nueva y la instala cuando no se
