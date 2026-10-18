@@ -80,6 +80,42 @@ Cada aparato queda guardado en **ese** equipo, porque cada caja tiene los suyos.
   - «Dispositivos cercanos» (Bluetooth) solo cuando se va a usar.
   - El USB lo pregunta Android una vez por aparato.
 
+## 💻 3. Vento para PC (programa para instalar en Windows)
+El dueño: «Hazme un programa también, un software para PC, para instalarlo».
+
+- **Descarga:** https://github.com/cristhianlujan45-blip/cuentas/releases/download/pc/Vento-Setup.exe
+  - También en la app: Ajustes → 💾 Datos y herramientas → **«💻 Instala Vento en tus equipos»**. Ahí están el
+    instalador de PC y la app de Android.
+  - Si Windows dice «Windows protegió su PC», es porque el programa todavía no tiene firma comprada. Se toca
+    **Más información → Ejecutar de todas formas**.
+- **Qué hace:**
+  - Abre Vento en su propia ventana, con acceso directo en el escritorio y en el menú Inicio.
+  - Es la misma página de la app, así que siempre está en la última versión. El programa también se actualiza solo,
+    desde el release «pc».
+  - Al cerrar la ventana sigue trabajando junto al reloj: los avisos de pagos y pedidos siguen sonando. «Salir», en ese
+    icono, lo cierra del todo.
+  - Puede abrirse solo al prender el computador. Se activa en el icono junto al reloj.
+  - Balanza, impresora de facturas y cajón por USB o puerto COM: cuando Vento pide un aparato, el programa muestra la
+    lista de los conectados.
+  - Sin internet muestra «📡 Sin conexión con Vento» y entra solo apenas vuelve, porque sin base de datos no funciona.
+  - Los enlaces de afuera (WhatsApp, bancos) se abren en el navegador.
+  - La app dice «🔎 Este equipo: Vento para PC 1.0.x».
+- **Cómo se hace:** carpeta `pc/`, con Electron e instalador NSIS en español. El flujo «App PC»
+  (`.github/workflows/pc.yml`) lo compila en Windows y lo publica en el release «pc».
+  - El release «android» sigue siendo el «último», para que el enlace del APK no cambie.
+- **Prueba `pc` (nueva):** abre el programa de verdad (Electron) con la copia local de Vento. 13 comprobaciones:
+  - la ventana, «VentoPC/» en el navegador, y que la página no tenga acceso a Node;
+  - la app lo reconoce;
+  - WhatsApp va al navegador;
+  - la lista para elegir el puerto serial, y Cancelar;
+  - cerrar la ventana no cierra el programa, y hay una sola copia;
+  - la pantalla «Sin conexión».
+
+## Arreglo: Vento Admin se recargaba solo
+Vento Admin tiene su propia versión. Seguía en 1.45.0 mientras la app decía 1.46.0, así que el panel creía que había una
+versión nueva y se recargaba a los pocos segundos de abrirlo. Ahora dice 1.46.0. Las pruebas `adminversion`,
+`adminsub`, `adminreal` y `adminsubreal` pasan.
+
 ## Pruebas
 - **`equipos` (nueva):** 35 comprobaciones con los aparatos simulados.
   - Las tramas de las balanzas.

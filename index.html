@@ -4574,6 +4574,26 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
       <div class="palette-grid" id="palettePersonalGrid"></div>
     </div>
 
+    <div class="settings-group" hidden data-cat="datos" id="instGrupo">
+      <h2>💻 Instala Vento en tus equipos</h2>
+      <div class="settings-desc">La misma cuenta y los mismos datos en todos lados (se sincronizan al instante con la nube).</div>
+      <div class="settings-desc" id="instAqui" style="opacity:.8"></div>
+      <a class="btn-primary" id="instPc" href="https://github.com/cristhianlujan45-blip/cuentas/releases/download/pc/Vento-Setup.exe" download="Vento-Setup.exe" rel="noopener" style="display:block;text-align:center;box-sizing:border-box;margin-top:8px;text-decoration:none">💻 Descargar Vento para PC (Windows)</a>
+      <div class="settings-desc" style="margin-top:6px"><small>Abre <b>Vento-Setup.exe</b> y sigue los pasos. Si Windows dice «Windows protegió su PC», toca <b>Más información → Ejecutar de todas formas</b>. Queda en el escritorio, sigue sonando con la ventana cerrada (icono junto al reloj), usa la balanza, la impresora y el cajón por USB, y se actualiza solo.</small></div>
+      <a class="btn-ghost" id="instApk" href="https://github.com/cristhianlujan45-blip/cuentas/releases/latest/download/vento.apk" download="vento.apk" rel="noopener" style="display:block;text-align:center;box-sizing:border-box;margin-top:10px;text-decoration:none">📲 Descargar la app para Android (vento.apk)</a>
+      <script>
+      (function(){
+        // Si ya está en el programa de PC o en la app Android, lo dice y esconde ese botón.
+        try{
+          var ua = navigator.userAgent || '', pc = /VentoPC\/([\d.]+)/.exec(ua), t = '';
+          if(pc){ t = '✅ Este computador ya tiene Vento para PC (versión ' + pc[1] + ').'; document.getElementById('instPc').style.display = 'none'; }
+          else if(window.VentoAndroid){ t = '✅ Este celular ya tiene la app Vento para Android.'; document.getElementById('instApk').style.display = 'none'; }
+          document.getElementById('instAqui').textContent = t; document.getElementById('instAqui').hidden = !t;
+        }catch(e){}
+      })();
+      </script>
+    </div>
+
     <div class="settings-group" hidden data-cat="datos">
       <h2>🧮 Calculadoras rápidas</h2>
       <div class="settings-desc">Herramientas rápidas para el día a día del negocio: no guardan nada, solo calculan.</div>
@@ -29540,6 +29560,8 @@ let fotosListas = false;
     if(AND()) return 'App Vento para Android' + (ver ? ' ' + ver : '') + (AND().pagosSmsConfiar ? '' : ' (no lee SMS: actualízala)');
     if(window.VentoAndroid) return 'App Vento para Android' + (ver ? ' ' + ver : '') + ' — VIEJA: no lee los avisos de pagos, actualízala';
     if(window.ventoAppSinPuente && window.ventoAppSinPuente()) return 'App Vento sin conexión con Android (ciérrala y ábrela otra vez)';
+    const pc = /VentoPC\/([\d.]+)/.exec(ua);
+    if(pc) return 'Vento para PC ' + pc[1] + (/Windows/i.test(ua) ? ' (Windows)' : '');
     let nav = navigator.brave ? 'Brave' : /SamsungBrowser/.test(ua) ? 'Samsung Internet' : /EdgA?\//.test(ua) ? 'Edge' : /Firefox\//.test(ua) ? 'Firefox' : /MiuiBrowser|XiaoMi/.test(ua) ? 'navegador de Xiaomi' : /OPR\//.test(ua) ? 'Opera' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'navegador';
     let inst = false; try{ inst = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; }catch(e){}
     return 'Vento Web' + (inst ? ' instalada (acceso directo de ' + nav + ')' : ' en ' + nav) + (/Android/i.test(ua) ? ' · Android' : '');

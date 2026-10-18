@@ -12,6 +12,12 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 const PC = path.join(__dirname, '..', 'pc');
 const exe = process.env.ELECTRON_PATH || [path.join(PC, 'node_modules', 'electron', 'dist', 'electron')].find(f => fs.existsSync(f));
 
+// Linux sin pantalla (servidor de pruebas): se vuelve a correr dentro de xvfb-run (pantalla virtual) si está.
+if(exe && process.platform === 'linux' && !process.env.DISPLAY && !process.env.VENTO_PC_XVFB){
+  const { spawnSync } = require('child_process');
+  const r = spawnSync('xvfb-run', ['-a', process.execPath, __filename], { stdio: 'inherit', env: Object.assign({}, process.env, { VENTO_PC_XVFB: '1' }) });
+  if(!r.error) process.exit(r.status == null ? 1 : r.status);
+}
 (async () => {
   if(!exe){ console.log('ℹ️ Sin Electron en este equipo: se omite (cd pc && npm install, o ELECTRON_PATH).'); console.log('RESULTADO 0 bien 0 mal'); process.exit(0); }
   let ok = 0, mal = 0; const errs = [];
@@ -29,6 +35,8 @@ const exe = process.env.ELECTRON_PATH || [path.join(PC, 'node_modules', 'electro
     const pc = await w.evaluate(() => window.ventoPC ? { v: window.ventoPC.version(), p: window.ventoPC.plataforma, i: typeof window.ventoPC.inicioConWindows } : null);
     chk('1. window.ventoPC: versión, plataforma y «abrir al prender el computador»', pc && /^\d+\.\d+\.\d+$/.test(pc.v) && pc.p && pc.i === 'function', pc);
     chk('1. La página NO tiene acceso a Node (seguro)', await w.evaluate(() => typeof require === 'undefined' && typeof process === 'undefined'));
+    const inst = await w.evaluate(() => ({ t: (document.getElementById('instAqui') || {}).textContent || '', pc: getComputedStyle(document.getElementById('instPc')).display, apk: getComputedStyle(document.getElementById('instApk')).display }));
+    chk('1. La app lo reconoce: «✅ Este computador ya tiene Vento para PC» (y no ofrece descargarlo otra vez)', /ya tiene Vento para PC \(versión \d+\.\d+\.\d+\)/.test(inst.t) && inst.pc === 'none' && inst.apk !== 'none', inst);
 
     // 2. Enlaces de afuera
     await app.evaluate(({ shell }) => { global.__abiertos = []; shell.openExternal = u => { global.__abiertos.push(u); return Promise.resolve(); }; });
