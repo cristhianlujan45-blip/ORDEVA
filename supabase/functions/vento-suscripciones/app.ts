@@ -100,6 +100,11 @@ async function estado(req: Request, env: Env, b: Record<string, unknown>) {
     catch (x) { log("warn", "lic_auto", { negocio, error: x instanceof Error ? x.message : String(x) }); }
   }
   const e = await N.estado(db, negocio);
+  // Bloqueado por el administrador de Vento (el negocio o la cuenta de quien entra): sin token, el equipo se bloquea.
+  let bloqueo: Record<string, unknown> | null = null;
+  try { const me = await yo.rpc<{ id: string }>("sub_yo"); bloqueo = await db.rpc<Record<string, unknown> | null>("srv_bloqueo_de", { p_negocio: negocio, p_usuario: me.id }); }
+  catch (x) { log("warn", "bloqueo_de", { negocio, error: x instanceof Error ? x.message : String(x) }); }
+  if (bloqueo) return { ok: true, ...N.paraRol(e, rol), rol, bloqueado: bloqueo };
   const token = await N.firmarToken(db, negocio, e, cacheId(env));
   return { ok: true, ...N.paraRol(e, rol), rol, token, ...(Array.isArray(licencias) && licencias.length ? { licencias_activadas: licencias } : {}) };
 }

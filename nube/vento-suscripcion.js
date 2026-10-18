@@ -20,8 +20,10 @@
 (function(){
   'use strict';
   var K_CLAVE = 'vento_sub_clave', K_TOKEN = 'vento_sub_token:', K_INFO = 'vento_sub_info:', K_IDEM = 'vento_sub_idem:',
-      K_BORRADOR = 'vento_sub_borrador:', K_PAGADOR = 'vento_sub_pagador', K_CAT = 'vento_sub_catalogo';
+      K_BORRADOR = 'vento_sub_borrador:', K_PAGADOR = 'vento_sub_pagador', K_CAT = 'vento_sub_catalogo', K_BLOQ = 'vento_sub_bloqueo:';
   var REFRESCO_MS = 60e3, H72 = 72 * 3600e3, DIA = 864e5;
+  // Sin poder hablar con la base de datos más de esto → «Sin conexión con Vento». Las pruebas lo acortan (solo en localhost).
+  var SIN_RED_MS = (function(){ try{ if(/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname) && +localStorage.getItem('vento_sin_red_ms') > 0) return +localStorage.getItem('vento_sin_red_ms'); }catch(e){} return 60e3; })();
   // Lo mínimo del plan gratis: con el token vencido y sin internet se sigue vendiendo (pero sin funciones PRO).
   var BASE_GRATIS = ['pos_basic', 'tables', 'inventory', 'expenses'];
   var BENEFICIOS = {
@@ -209,6 +211,14 @@
     E.cargando = api('estado', { negocio: id }).then(function(j){
       if(E.neg !== id) return;
       var tok = j.token, info = Object.assign({}, j); delete info.token; delete info.ok;
+      // Bloqueado por el administrador (el negocio o la cuenta): sin plan y con la pantalla de bloqueo; queda guardado
+      // para que siga bloqueado aunque se abra sin internet, hasta que el servidor diga que ya no.
+      if(j.bloqueado){
+        E.bloqueo = j.bloqueado; E.p = null; E.recibido = 0; E.info = info; E.error = ''; E.ultimo = Date.now();
+        lsSet(K_BLOQ + id, j.bloqueado); lsDel(K_TOKEN + id); lsDel(K_INFO + id);
+        return;
+      }
+      if(E.bloqueo){ E.bloqueo = null; lsDel(K_BLOQ + id); setTimeout(function(){ toast('🔓 Tu cuenta quedó desbloqueada. ¡Bienvenido de nuevo!', 7000); }, 300); }
       if(j.licencias_activadas && j.licencias_activadas.length){ var la = j.licencias_activadas[j.licencias_activadas.length - 1];
         setTimeout(function(){ toast('🎉 Se activó tu licencia ' + la.codigo + ': plan ' + nombrePlan(la.plan_id) + ' hasta el ' + fecha(la.hasta) + '.', 9000); }, 600); }
       delete info.licencias_activadas;
@@ -258,7 +268,7 @@
   }
   function cambiarNegocio(id){
     var habia = !!E.neg;
-    E = { neg: id, p: null, info: null, recibido: 0, ultimo: 0, error: '', cargando: null, cat: E.cat, catProm: null }; antes = '';
+    E = { neg: id, p: null, info: null, recibido: 0, ultimo: 0, error: '', cargando: null, cat: E.cat, catProm: null, bloqueo: id ? lsGet(K_BLOQ + id, null) : null, desde: Date.now() }; antes = '';
     if(!id){ rtCerrar(); if(habia) avisar(); return; }     // sin nube: no se toca nada de la app
     rtAbrir(id);
     cargarGuardado().catch(function(){}).then(refrescar);
@@ -694,6 +704,7 @@
   setInterval(function(){ if(E.neg && !document.hidden && !E.cargando && Date.now() - (E.intento || 0) >= (E.error === 'red' ? 15e3 : cadaCuanto()) - 250) refrescar(); }, 500);
   document.addEventListener('visibilitychange', function(){ if(!document.hidden && E.neg && Date.now() - E.ultimo > 5e3) refrescar(); });
   window.addEventListener('online', function(){ if(E.neg) refrescar(); });
+  window.addEventListener('offline', function(){ if(E.neg){ E.error = 'red'; avisar(); } });
 
   /* Puerta: ¿esta app puede funcionar? Solo con la base de datos de Vento:
        cuenta  → este equipo no está conectado a una cuenta/negocio de Vento Nube;
@@ -705,8 +716,15 @@
     var n = negocio();
     if(!nube() || !nube().configurada || !nube().configurada()) return { ok: false, motivo: 'cuenta', sinServidor: true };
     if(!n) return { ok: false, motivo: 'cuenta' };
+    // Bloqueado por el administrador de Vento: no funciona en ningún equipo (también sin internet, si ya se supo).
+    if(E.neg === n.id && E.bloqueo) return { ok: false, motivo: 'bloqueado', tipo: E.bloqueo.tipo === 'usuario' ? 'usuario' : 'negocio', texto: String(E.bloqueo.motivo || '') };
     if(E.neg !== n.id || !E.p) return { ok: false, motivo: 'espera', error: E.error || '', cargando: !!E.cargando };
     if(!vivo(E.p) && E.error) return { ok: false, motivo: 'sinconexion', error: E.error };
+    /* Siempre conectada: sin poder hablar con la base de datos por más de 60 s (sin internet o el servidor no
+       responde), la app no se usa; vuelve sola apenas responde (se reintenta cada 15 s). Antes se seguía hasta 72 h
+       con el último estado guardado. */
+    var sinRed = E.error === 'red' || navigator.onLine === false;
+    if(sinRed && Date.now() - Math.max(E.ultimo || 0, E.desde || 0) > SIN_RED_MS) return { ok: false, motivo: 'sinconexion', error: 'red', corto: true };
     /* Cancelada por el administrador: la app no se usa; lo único que queda es pagar para reactivarla (o esperar la
        revisión del pago enviado). Vencida, pago rechazado o sin pagar: sigue en el plan GRATIS con sus funciones
        limitadas (las PRO piden el plan) y con la opción de pagar. */
@@ -719,7 +737,7 @@
 
   // ---------- API ----------
   window.ventoSuscripcion = {
-    puerta: puerta,
+    puerta: puerta, bloqueado: function(){ return E.bloqueo || null; },
     estado: estado, refrescar: refrescar, enCuenta: enCuenta, verificado: function(){ return !!E.p; },
     tiene: function(ent){ return ents().indexOf(String(ent)) >= 0; }, entitlements: ents,
     planEfectivo: function(){ return estado().plan; },

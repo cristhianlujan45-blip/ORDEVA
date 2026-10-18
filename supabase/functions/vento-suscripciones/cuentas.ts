@@ -97,7 +97,16 @@ export async function accionAdmin(env: Env, db: Db, adminId: string, accion: str
       const id = uuid(b.usuario);
       if (id === adminId) throw new ErrorVento("sin_permiso", "No puedes bloquear tu propia cuenta.", 400);
       await auth(env, "PUT", "/admin/users/" + id, { ban_duration: b.bloquear === false ? "none" : "876000h" });
-      return { ok: true, bloqueado: b.bloquear !== false };
+      // Sus equipos se enteran al instante (aviso en vivo a todos sus negocios) y quedan en «Tu usuario está bloqueado».
+      let negocios = 0;
+      try { negocios = await db.rpc<number>("srv_usuario_avisar", { p_usuario: id, p_motivo: "usuario" }); } catch { /* el bloqueo ya quedó */ }
+      return { ok: true, bloqueado: b.bloquear !== false, negocios };
+    }
+    case "negocio_bloquear": {
+      // Bloquear (o desbloquear) un NEGOCIO: todos sus equipos quedan en «🔒 Cuenta bloqueada» al instante.
+      const r = await db.rpc<Record<string, unknown>>("srv_negocio_bloquear", { p_negocio: uuid(b.negocio, "negocio"), p_bloquear: b.bloquear !== false,
+        p_motivo: b.motivo ? String(b.motivo).slice(0, 300) : null, p_admin: adminId });
+      return { ok: true, negocio: r };
     }
     case "usuario_confirmar":
       await auth(env, "PUT", "/admin/users/" + uuid(b.usuario), { email_confirm: true });

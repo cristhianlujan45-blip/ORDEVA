@@ -96,7 +96,8 @@ const hoy = () => new Date(Date.now() - 5 * 3600e3).toISOString().slice(0, 10);
     await ctx.route('**/*', rt => { const u = new URL(rt.request().url()); return (u.hostname === 'localhost' || u.hostname === '127.0.0.1') ? rt.continue() : rt.abort(); });
     await enrutar(ctx, sb);
     const p = await ctx.newPage(); const errs = [];
-    p.on('pageerror', e => errs.push(e.message)); p.on('dialog', d => d.accept());
+    const dialogos = []; let respPrompt = null;
+    p.on('pageerror', e => errs.push(e.message)); p.on('dialog', d => { dialogos.push(d.type()); d.type() === 'prompt' && respPrompt != null ? d.accept(respPrompt) : d.accept(); });
     const resp = [];
     p.on('response', async x => { const m = /\/functions\/v1\/vento-suscripciones\/admin\/(\w+)/.exec(x.url()); if(m && x.request().method() === 'POST') resp.push({ accion: m[1], st: x.status(), j: await x.json().catch(() => null) }); });
     const texto = sel => p.$eval(sel, e => e.textContent).catch(() => '');
@@ -181,6 +182,19 @@ const hoy = () => new Date(Date.now() - 5 * 3600e3).toISOString().slice(0, 10);
     await p.click('#sxNegocios .sxc[data-id="' + NEG1 + '"]');
     chk('Detalle del negocio: pago aprobado e historial', await esperar(() => { const t = document.getElementById('sxNegCuerpo').textContent; return /Pago aprobado/.test(t) && /Empezó la prueba gratis/.test(t) && /Envió un pago/.test(t); }), (await texto('#sxNegCuerpo')).slice(0, 300));
     await captura('5-negocio');
+    // 🔒 Bloquear el negocio: pide el motivo, lo confirma, queda en la base y la app del negocio queda bloqueada
+    dialogos.length = 0; respPrompt = 'Pago pendiente'; const dlgs = dialogos;
+    await p.click('#sxNegCuerpo [data-sxa="bloquear"]');
+    chk('🔒 Bloquear negocio: pide el motivo y confirma, y el detalle muestra «Negocio bloqueado» con el motivo y «🔓 Desbloquear»',
+      await esperar(() => { const t = document.getElementById('sxNegCuerpo').textContent; return /Negocio bloqueado/.test(t) && /Pago pendiente/.test(t) && !!document.querySelector('#sxNegCuerpo [data-sxa="desbloquear"]'); }) && dlgs.join(',') === 'prompt,confirm', dlgs);
+    const nb = await uno('select bloqueado_en, bloqueo_motivo from negocios where id = $1', [NEG1]);
+    chk('Base de datos: negocio bloqueado con el motivo', nb && nb.bloqueado_en && nb.bloqueo_motivo === 'Pago pendiente', nb);
+    r = await api('/estado', { negocio: NEG1 }, dueno.token);
+    chk('La app del negocio queda bloqueada al instante («bloqueado», sin token del plan)', r.st === 200 && r.j.bloqueado && r.j.bloqueado.tipo === 'negocio' && !r.j.token, r.j);
+    await p.click('#sxNegCuerpo [data-sxa="desbloquear"]');
+    chk('🔓 Desbloquear: vuelve a funcionar (y el botón vuelve a «Bloquear»)', await esperar(() => !!document.querySelector('#sxNegCuerpo [data-sxa="bloquear"]')) &&
+      !(await uno('select bloqueado_en from negocios where id = $1', [NEG1])).bloqueado_en && !!(await api('/estado', { negocio: NEG1 }, dueno.token)).j.token);
+    respPrompt = null;
     await p.click('#dlgSxNeg [data-cerrar]');
 
     // Planes y configuración: lo que se guarda llega a la base

@@ -1784,7 +1784,7 @@
       const r = n.resumen || {}, m = +n.miembros || 0;
       return '<article class="sxc clic" data-sxa="detalle" data-id="' + esc(n.id) + '">' +
         '<div class="ph"><div class="av">' + inicial(n.nombre) + '</div><div class="t"><b>' + esc(n.nombre || 'Sin nombre') + '</b><small>' + esc((n.dueno_email || 'sin correo') + ' · ' + m + ' persona' + (m === 1 ? '' : 's')) + '</small></div>' +
-        '<span class="pill ' + (n.plan_efectivo && n.plan_efectivo !== 'free' ? 'ok' : 'soft') + '">' + esc(nomPlan(n.plan_efectivo || 'free')) + '</span></div>' +
+        (n.bloqueado_en ? '<span class="pill bad">⛔ Bloqueado</span>' : '<span class="pill ' + (n.plan_efectivo && n.plan_efectivo !== 'free' ? 'ok' : 'soft') + '">' + esc(nomPlan(n.plan_efectivo || 'free')) + '</span>') + '</div>' +
         sxStats(r) +
         '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="soft" style="flex:1;font-size:12.5px">' + esc('Creado ' + fCo(n.creado_en) + (r.actualizado_en ? ' · datos del ' + fCo(r.actualizado_en) : ' · sin datos en la nube')) + '</span>' + pillDe(sxEstadoSub(n.suscripcion)) + '</div>' +
         '</article>';
@@ -1813,13 +1813,16 @@
         esc([fCo(p.created_at), p.reference ? 'Ref. ' + p.reference : '', p.period_end ? 'hasta ' + fCo(p.period_end) : '', p.reject_reason ? 'motivo: ' + p.reject_reason : ''].filter(Boolean).join(' · ')) + '</small></div>' +
         pillDe(SX_PAGO[p.status] || [p.status, 'soft']) + (p.comprobante ? '<button class="b" type="button" data-sxa="ver" data-id="' + esc(p.id) + '" title="Ver comprobante">🧾</button>' : '') + '</div>').join('');
       const eventos = (j.eventos || []).map(e => { const t = sxEventoTxt(e); return '<li><b>' + esc(SX_EVENTO[e.type] || e.type) + '</b><small>' + esc(fCoHora(e.created_at) + (t ? ' · ' + t : '')) + '</small></li>'; }).join('');
-      $('sxNegCuerpo').innerHTML =
+      // Bloqueado: no funciona en ninguno de sus equipos (se aplica al instante); se desbloquea desde aquí.
+      const bloq = n.bloqueado_en ? '<div class="empty bad-t" style="margin-top:12px;text-align:left">⛔ <b>Negocio bloqueado</b> desde el ' + esc(fCoHora(n.bloqueado_en)) + (n.bloqueo_motivo ? ' · motivo: ' + esc(n.bloqueo_motivo) : '') + '. Vento no funciona en ninguno de sus equipos.</div>' : '';
+      $('sxNegCuerpo').innerHTML = bloq +
         '<div class="chips" style="margin-top:12px">' + pillDe(sxEstadoSub(s)) + '<span class="pill ' + (j.plan_efectivo && j.plan_efectivo !== 'free' ? 'ok' : 'soft') + '">' + esc('Usa hoy: ' + nomPlan(j.plan_efectivo || 'free')) + '</span></div>' +
         '<dl class="kv" style="margin-top:12px">' + kv('Creado por', n.creado_por_email) + kv('Creado', fCo(n.creado_en)) +
           (s ? kv('Plan', nomPlan(s.plan_id)) + kv('Origen', SX_ORIGEN[s.source] || s.source) + kv('Inicio', fCo(s.start_date)) + kv('Vence', fCo(s.expiry_date)) : kv('Suscripción', 'Todavía no tiene')) + '</dl>' +
         '<div class="acc3" style="margin-top:12px">' + (sxActivable(s) ? '<button class="b p" type="button" data-sxa="activar" data-id="' + nid + '">✅ Activar</button>' : '') +
           (s ? '<button class="b" type="button" data-sxa="plan" data-id="' + nid + '">🔀 Plan</button>' : '') +
-          '<button class="b" type="button" data-sxa="dar" data-id="' + nid + '">🎁 Dar meses</button>' + (s && s.status !== 'canceled' ? '<button class="b no" type="button" data-sxa="cancelar" data-id="' + nid + '">⛔ Cancelar</button>' : '') + '</div>' +
+          '<button class="b" type="button" data-sxa="dar" data-id="' + nid + '">🎁 Dar meses</button>' + (s && s.status !== 'canceled' ? '<button class="b no" type="button" data-sxa="cancelar" data-id="' + nid + '">⛔ Cancelar</button>' : '') +
+          (n.bloqueado_en ? '<button class="b p" type="button" data-sxa="desbloquear" data-id="' + nid + '">🔓 Desbloquear negocio</button>' : '<button class="b no" type="button" data-sxa="bloquear" data-id="' + nid + '">🔒 Bloquear negocio</button>') + '</div>' +
         '<div class="sx-sec"><h3>Datos del negocio</h3>' + sxStats(j.resumen) + '</div>' +
         '<div class="sx-sec"><h3>Lo que puede usar hoy</h3><div class="chips">' + (Object.keys(ents).map(k => '<span class="chip' + (ents[k] ? '' : ' no') + '">' + (ents[k] ? '✓ ' : '') + esc(nomEnt(k)) + '</span>').join('') || '<span class="soft">—</span>') + '</div></div>' +
         '<div class="sx-sec"><h3>Equipo</h3><div class="list">' + (miembros || '<div class="soft">Sin personas.</div>') + '</div></div>' +
@@ -1919,6 +1922,25 @@
     }else if(a === 'detalle') sxAbrirNegocio(id);
     else if(a === 'plan' || a === 'dar' || a === 'cancelar' || a === 'activar') sxAbrirAccion(a, id);
     else if(a === 'editarplan') sxAbrirPlan(id);
+    else if(a === 'bloquear' || a === 'desbloquear') sxBloquearNegocio(id, a === 'bloquear', b);
+  }
+  // Bloquear / desbloquear un negocio: todos sus equipos quedan en «🔒 Cuenta bloqueada» al instante (y vuelven al desbloquear).
+  async function sxBloquearNegocio(id, bloquear, b){
+    const nom = (sx.negAct && sx.negAct.negocio && sx.negAct.negocio.nombre) || 'este negocio';
+    let motivo = '';
+    if(bloquear){
+      motivo = prompt('¿Por qué bloqueas «' + nom + '»? (lo verá el cliente en su pantalla; puedes dejarlo vacío)', '');
+      if(motivo === null) return;
+      if(!confirm('¿Bloquear «' + nom + '»? Vento deja de funcionar YA en todos sus celulares y equipos hasta que lo desbloquees.')) return;
+    }else if(!confirm('¿Desbloquear «' + nom + '»? Vuelve a funcionar al instante en todos sus equipos.')) return;
+    if(b) b.disabled = true;
+    try{
+      await sxApi('negocio_bloquear', { negocio: id, bloquear, motivo: String(motivo || '').trim() });
+      toast(bloquear ? '🔒 «' + nom + '» quedó bloqueado en todos sus equipos.' : '🔓 «' + nom + '» quedó desbloqueado.', 6000);
+      sx.negocios = null; try{ sxCargarNegocios(); }catch(x){}
+      await sxAbrirNegocio(id, true);
+    }catch(e){ sxFallo(e); }
+    finally{ if(b) b.disabled = false; }
   }
   $('sxPanel').addEventListener('click', sxClic);
   $('dlgSxNeg').addEventListener('click', sxClic);
