@@ -118,6 +118,20 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     tab = null; for(let i = 0; i < 90; i++){ await latir(TAB); tab = await and(TAB); if(tab.pagos.some(x => x.v === '$45.000')) break; await new Promise(r => setTimeout(r, 500)); }
     chk('5. La tablet recibe ese pago: «Recibiste 45000 pesos por DaviPlata, de Maria Lopez»', tab.pagos.some(x => x.v === '$45.000' && x.bco === 'DaviPlata') && tab.decir.some(t => /^Recibiste 45000 pesos por DaviPlata, de Maria Lopez/.test(t)), tab);
 
+    // ===== 7. ⏳ El computador espera el pago de la Mesa 4; el celular lo lee =====
+    await CEL.p.evaluate(() => { data.pagos = data.pagos || {}; data.pagos.on = true; data.tables[4] = { items: [{ productId: 'p4', name: 'Bandeja', price: 27300, qty: 1 }], payments: [], people: [] }; saveData(); });
+    chk('7. La mesa llega al computador', await esperar(PC.p, () => !!(data.tables[4] && data.tables[4].items.length), null, 15000));
+    await PC.p.evaluate(() => window.ventoConfirma.abrir(4));
+    chk('7. Computador: «⏳ Esperando el pago · $27.300»', await esperar(PC.p, () => /Esperando el pago/.test((document.getElementById('vcEspera') || {}).innerText || '') && /27\.300/.test(document.getElementById('vcEspera').innerText), null, 5000));
+    chk('7. El celular y la tablet saben que el computador espera esa mesa', await esperar(CEL.p, () => !!((data.pagos || {}).pantallas || {})[4], null, 15000) && await esperar(TAB.p, () => !!((data.pagos || {}).pantallas || {})[4], null, 15000));
+    await CEL.p.evaluate(() => { window.__and.cola.push({ id: 'k7:7:7', txt: 'Nequi | Nequi | CAMILO ROJAS te envió $27.300', t: Date.now(), voz: true }); window.ventoAvisosNativos(); });
+    let verde7 = false; for(let i = 0; i < 90 && !verde7; i++){ await latir(PC); verde7 = await PC.p.evaluate(() => /PAGADO/.test((document.getElementById('vcEspera') || {}).innerText || '')); if(!verde7) await new Promise(r => setTimeout(r, 500)); }
+    chk('7. Computador: la pantalla se pone verde «✅ PAGADO $27.300» y lo registra en la Mesa 4', verde7 && await PC.p.evaluate(() => (data.tables[4].payments || []).reduce((a, q) => a + q.amount, 0) === 27300));
+    const modal7 = E => E.p.evaluate(() => { const o = document.getElementById('pagoOv'); return !!o && o.classList.contains('show') && /27\.300/.test(o.innerText); });
+    for(let i = 0; i < 6; i++){ await latir(TAB); await new Promise(r => setTimeout(r, 500)); }
+    chk('7. El celular y la tablet NO abren «Llegó un pago» para esa mesa (se registra en el computador)', !(await modal7(CEL)) && !(await modal7(TAB)));
+    chk('7. Queda registrado UNA sola vez en todos los equipos', await esperar(CEL.p, () => (data.tables[4].payments || []).length === 1, null, 15000) && await esperar(TAB.p, () => (data.tables[4].payments || []).length === 1, null, 15000));
+
     // ===== 6. El valor que entendió la app manda cuando el servidor no entiende el aviso =====
     const dev = await CEL.p.evaluate(() => JSON.parse(localStorage.getItem('vento_pagos_dev')));
     const F = sb.url + '/functions/v1/vento-pagos/aviso/' + dev.token;

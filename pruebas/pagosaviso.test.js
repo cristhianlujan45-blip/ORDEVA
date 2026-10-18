@@ -254,7 +254,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
       const dueno = window.ventoPagoParaMi(14200, 2) && window.ventoPagoParaMi(99999, null);
       return { mia, otra, sinMesa, suMesa, mesa2, cobra2, dueno, at1: data.tables[1].atiende && data.tables[1].atiende.u };
     });
-    chk('17. Mesero: el pago de SU mesa le suena («Recibiste 7100 pesos…»)', r17.mia.d.some(t => /^Recibiste 7100 pesos/.test(t)) && r17.at1 === 'ana', r17);
+    chk('17. Mesero: el pago de SU mesa le suena, pero solo «Cuenta 1 ya pagó» (sin el valor ni quién pagó: lo de Nequi lo ve el administrador)', r17.mia.d.some(t => /ya pagó/.test(t)) && !r17.mia.d.concat(r17.mia.t).some(t => /7100|7\.100/.test(t)) && r17.at1 === 'ana', r17);
     chk('17. Mesero: el pago de la mesa de OTRO mesero no le sale ni le suena (pero queda registrado)', !r17.otra.d.length && !r17.otra.t.some(t => /14\.200/.test(t)) && r17.otra.reg, r17.otra);
     chk('17. Mesero: un pago que no es de ninguna mesa suya no le llega; si cobra esa mesa, sí', !r17.sinMesa && r17.suMesa && !r17.mesa2 && r17.cobra2, r17);
     chk('17. Dueño / administrador: le llegan todos', r17.dueno, r17);

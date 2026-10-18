@@ -115,7 +115,9 @@
     // Un aviso que este mismo celular ya leyó por MacroDroid (y reenvió al servidor) no se duplica: se enlaza.
     if(!x && p.proveedor === 'dispositivo'){
       var tp = Date.parse(p.creado_en || p.actualizado_en) || Date.now();
-      x = g.lista.find(function(y){ return !y.srv && Number(y.monto) === Number(p.monto) && Math.abs((y.t || 0) - tp) < 3 * 60e3 && String(y.app || '').toUpperCase().replace('TRANSFERENCIA', '') === String(nombreMetodo(p.metodo)).toUpperCase().replace('TRANSFERENCIA', ''); });
+      // Un SMS se enlaza con el SMS y un aviso de la app con el de la app (el mismo pago puede llegar por los dos).
+      var smsP = /\bSMS\b/.test(String(p.detalle || '')), smsY = function(y){ return !!y.sms || /\bSMS\b/.test(String(y.fuente || '')); };
+      x = g.lista.find(function(y){ return !y.srv && Number(y.monto) === Number(p.monto) && Math.abs((y.t || 0) - tp) < 3 * 60e3 && String(y.app || '').toUpperCase().replace('TRANSFERENCIA', '') === String(nombreMetodo(p.metodo)).toUpperCase().replace('TRANSFERENCIA', '') && smsY(y) === smsP; });
       if(x){ x.srv = p.id; return x; }
     }
     var fuente = p.verificado ? 'Verificado por ' + entidad(p, true) + (p.aprobacion ? ' · N.º ' + p.aprobacion : '') : (p.detalle || 'Aviso del celular');
@@ -160,11 +162,14 @@
     }catch(e){}
     return true;
   }
-  function avisar(p, x){
+  function avisar(p, x, enPantalla){
     if(!paraMi(p, x)) return;
+    // Mesero, empleado o cajero: solo «✅ Mesa 3 ya pagó», sin el valor ni quién pagó.
+    try{ if(window.ventoConfirma && window.ventoConfirma.mesero(x || p)) return; }catch(e){}
     var m = (p.mesa ? ' · ' + etiquetaMesa(p.mesa) : '');
     var nivel = p.confianza === 'falso' ? 'falso' : p.confianza === 'revisar' ? 'revisar' : 'ok';
-    if(!avisoPagoCompleto(p, x, nivel))
+    if(enPantalla && document.visibilityState === 'visible'){}         // ya lo muestra la pantalla «Esperando el pago»
+    else if(!avisoPagoCompleto(p, x, nivel))
     avisoCelular(p.confianza === 'falso' ? '🚨 Pago FALSO' : p.confianza === 'revisar' ? '⚠️ Pago por revisar' : '✅ Pago confirmado',
       plata(p.monto) + ' por ' + nombreMetodo(p.metodo) + (p.pagador ? ' de ' + p.pagador : '') + m + (p.verificado ? ' · ✅ verificado' + (p.aprobacion ? ' (N.º ' + p.aprobacion + ')' : '') : ''));
     if(p.confianza === 'falso'){
@@ -210,7 +215,11 @@
     if(p.estado !== 'aprobado' && !(p.estado === 'rechazado' && p.confianza === 'falso') && p.estado !== 'anulado') { pintarHistorial(); return; }
     var x = regLocal(p); if(!x){ return; }
     try{ saveData(); }catch(e){}
-    if(nuevoAprobado && enVivo && !leidoAqui(x)) avisar(p, x);
+    // ⏳ «Esperando el pago» abierta aquí, o el mismo pago por SMS y por la app (lib/vento-confirma.js).
+    var vc = null;
+    if(nuevoAprobado && enVivo && !leidoAqui(x)){ try{ vc = window.ventoConfirma ? window.ventoConfirma.llego(x, p) : null; }catch(e){} }
+    if(vc === 'duplicado' || vc === 'junto'){ try{ saveData(); }catch(e){} pintarHistorial(); return; }
+    if(nuevoAprobado && enVivo && !leidoAqui(x)) avisar(p, x, !!vc);
     else if(p.estado === 'rechazado' && p.confianza === 'falso' && !antes && enVivo) avisar(p, x);
     pintarHistorial();
     try{ window.layaPintarTarjeta && window.layaPintarTarjeta(); }catch(e){}

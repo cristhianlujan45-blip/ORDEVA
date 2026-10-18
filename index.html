@@ -5465,6 +5465,7 @@ export default {
 <script src="nube/vento-suscripcion.js" defer></script>
 <script src="lib/vento-puerta.js" defer></script><!-- Puerta: la app solo funciona conectada a la base de datos de Vento -->
 <script src="lib/vento-pos.js" defer></script><!-- Modos de trabajo (tienda/mixto) y modo fácil -->
+<script src="lib/vento-confirma.js" defer></script><!-- Confirmación de pagos: ⏳ esperando el pago, mesa correcta, sin valor, mesero, cuadre -->
 <script src="lib/vento-guia.js" defer></script><!-- Modo fácil para mayores: guía paso a paso con voz, «Ayúdame» y recorrido -->
 <script src="lib/vento-cuenta.js" defer></script><!-- Soporte en la app, licencias del proveedor, recuperar por SMS, cuenta de cliente aparte del administrador -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -29081,6 +29082,9 @@ let fotosListas = false;
 
   // ---------- ¿De qué mesa es? ----------
   function pgMesaPara(monto){
+    // La mesa que está «⏳ Esperando el pago», la que se está cobrando, el valor exacto, la propina o el abono
+    // (lib/vento-confirma.js). Con dos mesas que deben lo mismo y nada que las distinga: ninguna (se pregunta).
+    try{ if(window.ventoConfirma) return window.ventoConfirma.mesaPara(monto); }catch(e){}
     const g = PG(), ahora = Date.now(), cands = [];
     Object.keys(data.tables || {}).forEach(id => {
       const t = data.tables[id]; if(!t || !(t.items || []).length) return;
@@ -29110,6 +29114,9 @@ let fotosListas = false;
     return { nivel: 'revisar', txt: 'Llegó por SMS' + (quien ? ' (' + quien + ')' : '') + ': confírmalo en la app del banco antes de entregar' };
   }
   const pgConfirmado = x => !x.estado || x.estado === 'app' || x.estado === 'ok';
+  // ¿El aviso llegó por SMS? («origen | remitente | texto»)
+  const pgEsSms = t => { const pz = String(t || '').split('|').map(y => y.trim()); return PG_APPS_SMS.test(pz[0] || '') || /^sms$/i.test(pz[1] || ''); };
+  const pgEsSmsX = x => x.sms != null ? !!x.sms : pgEsSms(x.txt);
   // op.voz: la app Android ya dijo «Pago confirmado…» y sacó el aviso del celular (aquí no se repite).
   // ---------- 🪟 Ventana emergente de cada pago (dentro de Vento) ----------
   // El valor grande, por qué banco, de quién y el texto, con «✕ Cerrar»; se cierra sola a los 15 s. Fuera de Vento (otra
@@ -29236,6 +29243,7 @@ let fotosListas = false;
       try{ const A = window.VentoAndroid; if(A && A.alFrente ? A.alFrente() : document.visibilityState === 'visible') pgVentana({ monto: 0, app: fr.app, txt: String(txt).split('|').slice(1).join(' · ').trim().slice(0, 220), nivel: 'app' }); }catch(e){}
       if(!op.voz) window.ventoDecirPago('Llegó plata por ' + fr.app + '. Mira el valor en la aplicación.');
       if(!op.voz) pgNotificarAndroid('💜 Llegó plata por ' + fr.app, 'Llegó plata por ' + fr.app + '. Mira el valor en la aplicación.', String(txt).split('|').slice(1).join(' · ').trim().slice(0, 220), '', fr.app, 'sinvalor');
+      try{ window.ventoConfirma && window.ventoConfirma.sinValor(fr.app, txt); }catch(e){}   // ¿de qué mesa es? poner el valor con un toque
       saveData(); return;
     }
     if(!p){
@@ -29248,6 +29256,7 @@ let fotosListas = false;
           const app0 = (String(txt).split('|')[0] || 'el banco').trim();
           showToast('💜 Llegó plata por ' + app0 + ' (el aviso no trae el valor)' + (esperan.length ? '. Estaba esperando el pago: ' + esperan.map(m => tableLabel(m) + ' (' + plata(tableTotal(m) - tablePaid(m)) + ')').join(', ') + '. Mira el valor en la app del banco y regístralo.' : '. Mira el valor en la app del banco.'), 12000); }catch(e){}
         try{ const A = window.VentoAndroid; if(A && A.alFrente ? A.alFrente() : document.visibilityState === 'visible') pgVentana({ monto: 0, app: (String(txt).split('|')[0] || 'el banco').trim(), txt: String(txt).split('|').slice(1).join(' · ').replace(/\s+/g, ' ').trim().slice(0, 220), nivel: 'app' }); }catch(e){}
+        try{ window.ventoConfirma && window.ventoConfirma.sinValor((String(txt).split('|')[0] || 'el banco').trim(), txt); }catch(e){}
       }
       if(String(id || '').startsWith('and-') && !/(recibiste|lleg[oó]) (plata|dinero)|usando llaves/i.test(String(txt))) try{ const pz = String(txt).split('|').map(x => x.trim());
         window.ventoError && window.ventoError('pago', 'Aviso de pago que Vento no entendió (' + (pz[0] || 'app') + ')', { app: (pz[0] || '').slice(0, 40), texto: pz.slice(1).join(' | ').replace(/\b[A-ZÁÉÍÓÚÑ]{2,}(?:\s+[A-ZÁÉÍÓÚÑ]{2,})*\b/g, 'NOMBRE').replace(/\d[\d.,]*/g, '#').slice(0, 200) }, 'pago|no-entendido|' + (pz[0] || '').toLowerCase().slice(0, 30)); }catch(e){}
@@ -29268,22 +29277,47 @@ let fotosListas = false;
     // op.smsOk: SMS del código corto del banco y el dueño eligió confirmarlos (Ajustes → Pagos). Nunca uno «falso».
     const f = op.revisar ? { nivel: 'revisar', txt: String(op.revisar) }
       : op.smsOk && f0.nivel === 'revisar' ? { nivel: 'app', txt: 'Confirmado por SMS del banco (elegiste confirmar los SMS del banco)' } : f0;
+    // 📩 + 📱 El MISMO pago por SMS y por la app del banco → uno solo (uno con uno, en 5 min). Si el SMS llegó primero
+    // («⚠️ Revisar»), el aviso de la app lo confirma solo; si llega después de la app, ya estaba confirmado.
+    const sms = pgEsSms(txt);
+    let silencio = false, delSms = null;
+    if(!op.reemplaza && f.nivel !== 'falso'){
+      const cerca = x => !x.par && x.estado !== 'falso' && Number(x.monto) === p.monto && Date.now() - (x.t || 0) < 5 * 60e3;
+      if(sms){
+        const app = (g.lista || []).find(x => cerca(x) && !pgEsSmsX(x) && pgConfirmado(x));
+        if(app){ app.par = true; saveData(); pgPintar(); return; }
+      } else if(f.nivel === 'app'){
+        const i = (g.lista || []).findIndex(x => cerca(x) && pgEsSmsX(x));
+        if(i >= 0){ delSms = g.lista.splice(i, 1)[0]; silencio = pgConfirmado(delSms); }
+      }
+    }
     // También al Servidor Vento → a los demás equipos del negocio (celulares, computador, tablet), con lo que se entendió.
     try{ window.ventoPagosReenviarAviso && window.ventoPagosReenviarAviso(txt, id, { monto: p.monto, app: p.app, de: p.de, nivel: f.nivel }); }catch(e){}
     // op.reemplaza: este aviso de la app del banco es el MISMO pago que ya había llegado por SMS → se queda uno (confirmado).
     if(op.reemplaza){ const i = g.lista.findIndex(x => x.id === 'and-' + op.reemplaza); if(i >= 0) g.lista.splice(i, 1); }
     const mesa = f.nivel === 'falso' ? null : pgMesaPara(p.monto);
     const reg = { id: id || Date.now().toString(36), via, eq: pgEq, t: Date.now(), monto: p.monto, app: p.app, de: p.de, mesa: mesa ? Number(mesa) : null, estado: f.nivel, fuente: f.txt, txt: String(txt).slice(0, 200) };
+    if(sms) reg.sms = true;
+    if(delSms){ reg.par = true; reg.fuente = f.txt + ' (y el mensaje de texto del banco)'; if(delSms.aplicado){ reg.aplicado = delSms.aplicado; reg.mesa = delSms.mesa || reg.mesa; try{ const t = data.tables[delSms.aplicado]; ((t && t.payments) || []).forEach(q => { if(q.pagoDigital && q.pagoDigital.id === delSms.id) q.pagoDigital.id = reg.id; }); }catch(e){} } }
     g.lista.unshift(reg); g.lista = g.lista.slice(0, 200);
     if(mesa && f.nivel === 'app') delete g.espera[mesa];
     saveData();
+    if(silencio){ pgPintar(); return; }                    // ya se había avisado con el SMS (el dueño confía en los SMS)
+    // ⏳ «Esperando el pago» abierta en este equipo: la pantalla lo muestra y lo registra (no sale otra ventana encima).
+    let enPantalla = false; try{ enPantalla = window.ventoConfirma ? window.ventoConfirma.llego(reg) : null; }catch(e){}
+    if(enPantalla === 'junto'){                             // el valor de un pago que ya se registró «a mano»
+      try{ showToast('✅ Llegó el valor: ' + plata(p.monto) + ' por ' + p.app + (reg.aplicado ? ' (ya estaba registrado en ' + tableLabel(reg.aplicado) + ')' : '') + '.', 7000); }catch(e){}
+      pgPintar(); return;
+    }
     // Por el canal (otro celular o MacroDroid): solo le sale y le suena al dueño, al administrador y a quien cobra o atiende
     // esa mesa. El celular que leyó el aviso del banco (via «and») siempre avisa: es el que recibe la plata.
     if(via !== 'and' && window.ventoPagoParaMi && !window.ventoPagoParaMi(p.monto, mesa)){ pgPintar(); return; }
+    // Mesero, empleado o cajero: solo «✅ Mesa 3 ya pagó», sin el valor ni quién pagó (lo de Nequi lo ve el administrador).
+    try{ if(via !== 'and' && window.ventoConfirma && window.ventoConfirma.mesero(reg)){ pgPintar(); return; } }catch(e){}
     // 🪟 La ventana con el valor, si Vento se está viendo (fuera de Vento la muestra la app Android).
     const origTxt = String(txt).split('|').slice(1).join(' · ').replace(/\s+/g, ' ').trim().slice(0, 220);
     try{ const A = window.VentoAndroid, viendo = A && A.alFrente ? !!A.alFrente() : document.visibilityState === 'visible';
-      if(viendo) pgVentana({ monto: p.monto, app: p.app, de: p.de, breb: p.breb, mesa: mesa ? tableLabel(mesa) : '', txt: origTxt, nivel: f.nivel }); }catch(e){}
+      if(viendo && !enPantalla) pgVentana({ monto: p.monto, app: p.app, de: p.de, breb: p.breb, mesa: mesa ? tableLabel(mesa) : '', txt: origTxt, nivel: f.nivel }); }catch(e){}
     if(f.nivel === 'falso'){
       try{ showToast('🚨 OJO, PAGO FALSO: un SMS dice que llegaron ' + plata(p.monto) + ', pero ' + f.txt + '. No entregues nada.', 15000); }catch(e){}
       if(!op.voz) window.ventoDecirPago('Ojo. Llegó un mensaje de pago sospechoso por ' + p.monto + ' pesos. Parece falso. No entregues nada hasta revisar la aplicación del banco.');
@@ -31813,7 +31847,8 @@ window.mesoraCelebrar = function(emojis){
     const op = mesas.map(id => '<option value="' + id + '"' + (id === sug ? ' selected' : '') + '>' + esc(tableLabel(id)) + ' · debe ' + plata(saldoDe(id)) + '</option>').join('');
     ov.innerHTML = '<div class="modal pago-modal"><h2>💜 Llegó un pago</h2>' +
       '<div class="pago-monto">' + plata(x.monto) + '</div><div class="modal-sub">' + esc(x.app) + (x.de ? ' · de <b>' + esc(x.de) + '</b>' : '') + ' · ✅ verificado por la app del banco</div>' +
-      (sug ? '<button type="button" class="btn-primary pago-go" data-m="' + sug + '">Registrar en ' + esc(tableLabel(sug)) + ' (debe ' + plata(saldoDe(sug)) + ')</button>' : '') +
+      (sug ? '<button type="button" class="btn-primary pago-go" data-m="' + sug + '">Registrar en ' + esc(tableLabel(sug)) + ' (debe ' + plata(saldoDe(sug)) + ')</button>' :
+        (x.cands || []).filter(id => data.tables[id]).length ? '<div class="modal-sub">¿De cuál cuenta es?</div>' + (x.cands || []).filter(id => data.tables[id]).map(id => '<button type="button" class="btn-primary pago-go" data-m="' + id + '" style="margin-top:6px">' + esc(tableLabel(id)) + ' · debe ' + plata(saldoDe(id)) + '</button>').join('') : '') +
       (mesas.length ? '<div class="pago-otra"><select id="pagoMesaSel" class="mz-in">' + (sug ? '' : '<option value="">¿De qué cuenta es?</option>') + op + '</select><button type="button" class="btn-ghost" id="pagoOtraBtn">' + (sug ? 'Es de otra' : 'Registrar') + '</button></div>' : '<div class="modal-sub">No hay cuentas abiertas con saldo: queda guardado en «💜 Pagos».</div>') +
       '<div class="modal-actions"><button type="button" class="btn-close" id="pagoSolo">Solo guardar</button></div></div>';
     const fin = m => {
@@ -31825,7 +31860,7 @@ window.mesoraCelebrar = function(emojis){
       });
       showToast(registrar(x, m), 7000);
     };
-    const go = ov.querySelector('.pago-go'); if(go) go.onclick = () => fin(+go.dataset.m);
+    ov.querySelectorAll('.pago-go').forEach(go => { go.onclick = () => fin(+go.dataset.m); });
     const ob = ov.querySelector('#pagoOtraBtn'); if(ob) ob.onclick = () => { const v = +ov.querySelector('#pagoMesaSel').value; if(!v) return showToast('Elige la cuenta.'); fin(v); };
     ov.querySelector('#pagoSolo').onclick = () => { x.ignorado = true; saveData(); ov.classList.remove('show'); try{ window.layaPintarTarjeta && window.layaPintarTarjeta(); }catch(e){} };
     ov.classList.add('show');
