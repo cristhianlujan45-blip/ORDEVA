@@ -119,6 +119,7 @@ function crearMatias(opts = {}) {
     if (!sim.tokens.has(tok)) return responder(401, { message: 'Unauthenticated.' });
     if (cliente && !sim.clientes[cliente]) return responder(404, { message: 'Cliente no encontrado', success: false });
     if (ruta === '/auth/user') return responder(200, { id: 1, email: sim.cuenta.email });
+    if (ruta === '/company/customers') return responder(200, { dataRecords: { data: Object.entries(sim.clientes).map(([k, c]) => ({ client_uuid: k, company_name: c.company_name, dni: c.dni, is_active: true })) } });
     if (ruta === '/company') { const c = cliente ? sim.clientes[cliente] : { dni: '900000001', company_name: 'VENTO CASA DE SOFTWARE' }; return responder(200, { company: c, success: true }); }
     if (ruta === '/status' && metodo === 'GET') {
       const n = u.searchParams.get('number');

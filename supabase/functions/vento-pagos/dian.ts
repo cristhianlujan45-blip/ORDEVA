@@ -362,3 +362,13 @@ export async function probar(env: Env, db: Db, cfg: Cfg | null) {
   return { ok: e.ok, empresa: emp ? { nombre: limpio((emp as Record<string, unknown>).company_name, 120), nit: dni } : null,
     coincide: !cfg.nit || !dni || dni === soloDig(cfg.nit), mensaje: e.ok ? "Conectado con MATIAS." : "No se pudo leer tu empresa en MATIAS (" + e.status + ")." };
 }
+
+// Vento Admin: las empresas cliente de la casa de software en MATIAS (para conectar cada negocio con su NIT).
+export async function clientesMatias(env: Env, db: Db) {
+  if (!configurado(env)) return [];
+  const r = await conToken(env, db, "GET", "/company/customers", null, null, 20000);
+  if (!r.ok) throw new ErrorVento("dian_proveedor", "MATIAS no respondió la lista de empresas (" + r.status + ")", 502);
+  const dr = (r.j.dataRecords || {}) as Record<string, unknown>;
+  const lista = (Array.isArray(dr.data) ? dr.data : Array.isArray(r.j.data) ? r.j.data : []) as Array<Record<string, unknown>>;
+  return lista.slice(0, 500).map((c) => ({ client_uuid: String(c.client_uuid || ""), nombre: limpio(c.company_name, 120), nit: soloDig(c.dni), activo: c.is_active !== false }));
+}

@@ -164,6 +164,27 @@ jobs:
           done
           echo "::warning title=IA de Vento::La función se desplegó pero no responde todavía."
 
+      - name: Facturación electrónica DIAN (cuenta de casa de software en MATIAS API)
+        if: steps.listo.outputs.ok == 'true'
+        env:
+          MATIAS_EMAIL: ${{ secrets.MATIAS_EMAIL }}
+          MATIAS_PASSWORD: ${{ secrets.MATIAS_PASSWORD }}
+          MATIAS_TOKEN: ${{ secrets.MATIAS_TOKEN }}
+          MATIAS_URL: ${{ secrets.MATIAS_URL }}
+          VENTO_FABRICANTE: ${{ secrets.VENTO_FABRICANTE }}
+          VENTO_FABRICANTE_DUENO: ${{ secrets.VENTO_FABRICANTE_DUENO }}
+        run: |
+          # MATIAS_URL vacío = ambiente de PRUEBAS (sandbox, sin validez fiscal). Producción: https://api-v2.matias-api.com/api/ubl2.1
+          ARGS=()
+          for k in MATIAS_EMAIL MATIAS_PASSWORD MATIAS_TOKEN MATIAS_URL VENTO_FABRICANTE VENTO_FABRICANTE_DUENO; do
+            v="${!k}"; [ -n "$v" ] && ARGS+=("$k=$v")
+          done
+          if [ ${#ARGS[@]} -eq 0 ]; then
+            echo "::notice title=Facturación DIAN::Para la facturación electrónica agrega MATIAS_EMAIL y MATIAS_PASSWORD (la cuenta de casa de software en MATIAS API) en Settings → Secrets and variables → Actions. Sin MATIAS_URL se usa el ambiente de pruebas."
+            exit 0
+          fi
+          supabase secrets set --project-ref "$PROJECT_REF" "${ARGS[@]}" >/dev/null && echo "✅ Facturación electrónica DIAN: ${#ARGS[@]} datos guardados en el servidor (no se muestran)."
+
       - name: Servidor de pagos (Edge Function vento-pagos)
         if: steps.listo.outputs.ok == 'true'
         run: supabase functions deploy vento-pagos --project-ref "$PROJECT_REF" --no-verify-jwt

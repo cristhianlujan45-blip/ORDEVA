@@ -23,6 +23,7 @@ import { enviarPush, vapid } from "../vento-pagos/push.ts";
 import { disponibles, elegir, googlePlay } from "./proveedores/index.ts";
 import type { EntradaPago } from "./proveedores/tipos.ts";
 import { accionAdmin } from "./cuentas.ts";
+import * as DIAN from "../vento-pagos/dian.ts";
 
 export const VERSION = N.VERSION;
 const MAX_CUERPO = 6 * 1024 * 1024;   // la foto (3 MB) en base64 + los datos
@@ -269,6 +270,20 @@ async function admin(req: Request, env: Env, accion: string, b: Record<string, u
       return { ok: true, negocios: await db.rpc("srv_admin_negocios") };
     case "negocio":
       return { ok: true, ...(await db.rpc<Record<string, unknown>>("srv_admin_negocio", { p_negocio: negocioDe(b) })) };
+    // 🧾 Facturación electrónica DIAN: cada negocio con su empresa (NIT) en MATIAS
+    case "dian_lista":
+      return { ok: true, servidor: DIAN.configurado(env), ambiente: DIAN.esPruebas(env) ? "pruebas" : "produccion", negocios: await db.rpc("srv_dian_admin_lista") };
+    case "dian_negocio":
+      return { ok: true, servidor: DIAN.configurado(env), ambiente: DIAN.esPruebas(env) ? "pruebas" : "produccion", ...(await db.rpc<Record<string, unknown>>("srv_dian_admin", { p_negocio: negocioDe(b) })) };
+    case "dian_clientes":
+      return { ok: true, clientes: await DIAN.clientesMatias(env, db) };
+    case "dian_conectar": {
+      const cu = b.client_uuid == null || b.client_uuid === "" ? null : String(b.client_uuid).trim();
+      if (cu && !/^[0-9a-f-]{36}$/i.test(cu)) throw new ErrorVento("dian_cliente_invalido", "El código de la empresa en MATIAS (client_uuid) no es válido.", 400);
+      const r = await db.rpc<Record<string, unknown>>("srv_dian_admin_cliente", { p_negocio: negocioDe(b), p_client_uuid: cu, p_admin: a });
+      log("info", "dian_conectado", { negocio: negocioDe(b), conectado: !!cu, admin: a });
+      return { ok: true, ...r };
+    }
     case "cancelar":
       return { ok: true, ...(await db.rpc<Record<string, unknown>>("srv_sub_cancelar", { p_negocio: negocioDe(b), p_admin: a, p_motivo: b.motivo ? String(b.motivo) : null })) };
     case "cambiar_plan":

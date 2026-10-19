@@ -1827,7 +1827,9 @@
         '<div class="sx-sec"><h3>Lo que puede usar hoy</h3><div class="chips">' + (Object.keys(ents).map(k => '<span class="chip' + (ents[k] ? '' : ' no') + '">' + (ents[k] ? '✓ ' : '') + esc(nomEnt(k)) + '</span>').join('') || '<span class="soft">—</span>') + '</div></div>' +
         '<div class="sx-sec"><h3>Equipo</h3><div class="list">' + (miembros || '<div class="soft">Sin personas.</div>') + '</div></div>' +
         '<div class="sx-sec"><h3>Pagos</h3><div class="list">' + (pagos || '<div class="soft">Todavía no ha enviado pagos.</div>') + '</div></div>' +
-        '<div class="sx-sec"><h3>Historial</h3>' + (eventos ? '<ul class="tl">' + eventos + '</ul>' : '<div class="soft">Sin movimientos.</div>') + '</div>';
+        '<div class="sx-sec"><h3>Historial</h3>' + (eventos ? '<ul class="tl">' + eventos + '</ul>' : '<div class="soft">Sin movimientos.</div>') + '</div>' +
+        '<div class="sx-sec" id="sxDian"><h3>🧾 Facturación electrónica DIAN</h3><div class="soft">Cargando…</div></div>';
+      sxPintarDian(n.id);
     }catch(e){
       if(e.codigo === 'no_admin' || e.status === 401){ sxFallo(e); return; }
       $('sxNegCuerpo').innerHTML = '<div class="empty bad-t">⚠️ ' + esc(sxMsgError(e)) + '</div>';
@@ -1923,6 +1925,37 @@
     else if(a === 'plan' || a === 'dar' || a === 'cancelar' || a === 'activar') sxAbrirAccion(a, id);
     else if(a === 'editarplan') sxAbrirPlan(id);
     else if(a === 'bloquear' || a === 'desbloquear') sxBloquearNegocio(id, a === 'bloquear', b);
+    else if(a === 'dianconectar' || a === 'diandesconectar') sxDianConectar(id, a === 'dianconectar' ? (b.dataset.cu || ($('sxDianCu') || {}).value || '') : '', b);
+  }
+  // ---- 🧾 Facturación electrónica DIAN del negocio: su empresa (NIT) en MATIAS y sus documentos ----
+  const SX_DIAN = { aceptado: ['✅ Validado', 'ok'], pendiente: ['⏳ Por enviar', 'soft'], en_proceso: ['⏳ En proceso', 'soft'], rechazado: ['❌ Rechazado', 'bad'], anulado: ['↩️ Anulado', 'soft'] };
+  async function sxPintarDian(id){
+    const box = $('sxDian'); if(!box) return;
+    let j, cl = [];
+    try{ j = await sxApi('dian_negocio', { negocio: id }); }catch(e){ box.innerHTML = '<h3>🧾 Facturación electrónica DIAN</h3><div class="empty bad-t">⚠️ ' + esc(sxMsgError(e)) + '</div>'; return; }
+    const c = j.config || null, r = j.resumen || {};
+    if(c && !c.client_uuid && j.servidor){ try{ cl = (await sxApi('dian_clientes', {})).clientes || []; }catch(e){} }
+    const mismo = c && c.nit ? cl.find(x => x.nit === String(c.nit)) : null;
+    const docs = (j.documentos || []).slice(0, 25).map(d => '<div class="item" style="cursor:default"><div class="t"><b>' + esc(d.documento + ' · ' + plata(d.total)) + '</b><small>' +
+      esc([d.tipo === 'pos' ? 'P.O.S.' : d.tipo === 'factura' ? 'Factura' : 'Nota crédito', fCoHora(d.creado_en), (d.errores || [])[0] || ''].filter(Boolean).join(' · ')) + '</small></div>' + pillDe(SX_DIAN[d.estado] || [d.estado, 'soft']) + '</div>').join('');
+    box.innerHTML = '<h3>🧾 Facturación electrónica DIAN</h3>' +
+      (!j.servidor ? '<div class="empty bad-t" style="text-align:left">⚠️ El servidor no tiene la cuenta de MATIAS: agrega los secretos MATIAS_EMAIL y MATIAS_PASSWORD (o MATIAS_TOKEN) en GitHub → Settings → Secrets → Actions.</div>' : '') +
+      (!c ? '<div class="soft">Este negocio todavía no configuró la facturación electrónica (Ajustes → Negocio → 🧾 Facturación electrónica DIAN).</div>' :
+        '<div class="chips">' + pillDe(c.activo ? ['Prendida', 'ok'] : ['Apagada', 'soft']) + pillDe(c.client_uuid ? ['Empresa conectada', 'ok'] : ['Sin conectar en MATIAS', 'bad']) + pillDe([j.ambiente === 'pruebas' ? '🧪 Pruebas' : 'Producción', 'soft']) + '</div>' +
+        '<dl class="kv" style="margin-top:10px">' + kv('Razón social', c.razon_social || '—') + kv('NIT', c.nit ? c.nit + '-' + (c.dv || '?') : '—') + kv('Resolución P.O.S.', c.pos_resolucion ? c.pos_resolucion + ' · ' + (c.pos_prefijo || '') + c.pos_desde + ' a ' + (c.pos_prefijo || '') + c.pos_hasta + ' · sigue ' + c.pos_siguiente : '—') +
+          kv('Documentos', (r.aceptados || 0) + ' validados · ' + (r.pendientes || 0) + ' por enviar · ' + (r.rechazados || 0) + ' rechazados · ' + (r.mes || 0) + ' este mes') + kv('Empresa en MATIAS', c.client_uuid || '—') + '</dl>' +
+        (c.client_uuid ? '<div class="acc3" style="margin-top:10px"><button class="b no" type="button" data-sxa="diandesconectar" data-id="' + esc(id) + '">Desconectar empresa</button></div>' :
+          (mismo ? '<div class="empty" style="text-align:left;margin-top:10px">En MATIAS ya está <b>' + esc(mismo.nombre) + '</b> con el NIT ' + esc(mismo.nit) + '.<div class="acc3" style="margin-top:8px"><button class="b p" type="button" data-sxa="dianconectar" data-id="' + esc(id) + '" data-cu="' + esc(mismo.client_uuid) + '">🔗 Conectar con esa empresa</button></div></div>' : '') +
+          '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><input id="sxDianCu" placeholder="client_uuid de la empresa en MATIAS" style="flex:1;min-width:220px"><button class="b" type="button" data-sxa="dianconectar" data-id="' + esc(id) + '">Conectar</button></div>' +
+          '<div class="soft" style="font-size:12.5px;margin-top:6px">Crea la empresa del cliente en el portal de MATIAS (casa de software → clientes) con su NIT, su certificado y su resolución, y conéctala aquí.</div>')) +
+      (docs ? '<div class="list" style="margin-top:12px">' + docs + '</div>' : '');
+  }
+  async function sxDianConectar(id, cu, b){
+    if(!cu && !confirm('¿Desconectar la empresa en MATIAS? Las ventas de este negocio dejarían de salir a nombre de su NIT.')) return;
+    if(b) b.disabled = true;
+    try{ await sxApi('dian_conectar', { negocio: id, client_uuid: cu || null }); toast(cu ? '🔗 Empresa conectada: las ventas salen a nombre de su NIT.' : 'Empresa desconectada.', 5000); await sxPintarDian(id); }
+    catch(e){ sxFallo(e); }
+    finally{ if(b) b.disabled = false; }
   }
   // Bloquear / desbloquear un negocio: todos sus equipos quedan en «🔒 Cuenta bloqueada» al instante (y vuelven al desbloquear).
   async function sxBloquearNegocio(id, bloquear, b){

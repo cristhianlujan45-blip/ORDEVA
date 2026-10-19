@@ -227,7 +227,7 @@ async function pruebas(sb) {
   await sb.sql('update dian_config set pos_hasta = pos_siguiente - 1 where negocio_id = $1', [NEG]);
   r = await api('/dian/emitir', { negocio: NEG, venta: venta('v-agotado') }, cajero.token);
   chk('Rango agotado → 409 con qué hacer (y no se gasta número)', r.st === 409 && r.j.error === 'dian_rango_agotado' && /resolución nueva/.test(r.j.mensaje) && !(await uno("select 1 x from dian_documentos where venta_id = 'v-agotado'")), r.j);
-  await sb.sql("update dian_config set pos_hasta = 5000, pos_vence = current_date - 1 where negocio_id = $1", [NEG]);
+  await sb.sql("update dian_config set pos_hasta = 5000, pos_vence = (now() at time zone 'America/Bogota')::date - 1 where negocio_id = $1", [NEG]);
   r = await api('/dian/emitir', { negocio: NEG, venta: venta('v-vencida') }, cajero.token);
   chk('Resolución vencida → 409', r.st === 409 && r.j.error === 'dian_resolucion_vencida', r.j);
   await sb.sql("update dian_config set pos_vence = '2030-12-31' where negocio_id = $1", [NEG]);
@@ -243,6 +243,24 @@ async function pruebas(sb) {
   chk('Las funciones srv_dian_* no se pueden llamar desde la app', r.st >= 400, r);
   r = await rpc('dian_documentos_de', { p_negocio: NEG, p_ventas: ['v-1'] }, cajero.token);
   chk('El cajero ve el documento de su venta (sin el cuerpo completo)', r.st === 200 && r.j.length === 1 && r.j[0].documento === 'FPOS1' && !('cuerpo' in r.j[0]), r.j);
+  // ---------- Vento Admin (panel del proveedor) ----------
+  sb.env.VENTO_ADMIN_EMAILS = 'admin@vento.co';
+  const admin = await sb.usuario('admin@vento.co');
+  const adm2 = async (accion, cuerpo, tok) => { const x = await fetch(sb.url + '/functions/v1/vento-suscripciones/admin/' + accion, { method: 'POST', headers: cab(tok), body: JSON.stringify(cuerpo || {}) }); return { st: x.status, j: await x.json().catch(() => ({})) }; };
+  r = await adm2('dian_lista', {}, dueno.token);
+  chk('Vento Admin: alguien que no es administrador no ve la facturación de los negocios (403)', r.st === 403, r.j);
+  r = await adm2('dian_lista', {}, admin.token);
+  chk('Vento Admin: lista de negocios con facturación (prendida y conectada)', r.st === 200 && r.j.servidor === true && r.j.negocios.some((x) => x.negocio === NEG && x.activo && x.conectado), r.j);
+  r = await adm2('dian_clientes', {}, admin.token);
+  chk('Vento Admin: las empresas cliente en MATIAS (para conectar por NIT)', r.st === 200 && r.j.clientes.some((x) => x.client_uuid === CLIENTE_UUID && x.nit === '901091403'), r.j);
+  r = await adm2('dian_conectar', { negocio: NEG, client_uuid: 'no-es-un-uuid' }, admin.token);
+  chk('Vento Admin: un client_uuid inválido se rechaza (400)', r.st === 400 && r.j.error === 'dian_cliente_invalido', r.j);
+  r = await adm2('dian_conectar', { negocio: NEG, client_uuid: null }, admin.token);
+  chk('Vento Admin: desconectar la empresa (queda anotado)', r.st === 200 && r.j.config.client_uuid === null && (await uno("select count(*)::int n from auditoria where negocio_id = $1 and accion = 'dian_cliente'", [NEG])).n >= 2, r.j);
+  r = await adm2('dian_conectar', { negocio: NEG, client_uuid: CLIENTE_UUID }, admin.token);
+  const dn = await adm2('dian_negocio', { negocio: NEG }, admin.token);
+  chk('Vento Admin: conectar otra vez y ver el detalle (resumen y documentos)', r.st === 200 && dn.st === 200 && dn.j.config.client_uuid === CLIENTE_UUID && dn.j.resumen.aceptados >= 10 && dn.j.documentos.length > 0 && dn.j.ambiente === 'pruebas', dn.j.resumen);
+
   await api('/dian/config', { negocio: NEG, accion: 'guardar', config: { activo: false } }, dueno.token);
   r = await api('/dian/emitir', { negocio: NEG, venta: venta('v-apagado') }, cajero.token);
   chk('Facturación apagada → 409 «está apagada»', r.st === 409 && r.j.error === 'dian_inactivo', r.j);
