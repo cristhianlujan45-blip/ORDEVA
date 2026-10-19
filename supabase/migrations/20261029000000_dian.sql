@@ -99,7 +99,8 @@ language sql immutable as $$
   select jsonb_build_object('id', d.id, 'venta_id', d.venta_id, 'tipo', d.tipo, 'referencia_id', d.referencia_id,
     'prefijo', d.prefijo, 'numero', d.numero, 'documento', d.prefijo || d.numero, 'estado', d.estado, 'total', d.total,
     'cude', d.cude, 'qr', d.qr, 'pdf', d.pdf, 'mensaje', d.mensaje, 'errores', d.errores, 'intentos', d.intentos,
-    'creado_en', d.creado_en, 'aceptado_en', d.aceptado_en)
+    'creado_en', d.creado_en, 'aceptado_en', d.aceptado_en, 'resolucion', d.resolucion,
+    'impuestos', coalesce(d.cuerpo->'tax_totals', '[]'::jsonb), 'totales', d.cuerpo->'legal_monetary_totals')
 $$;
 
 -- ---------- Para la app (sesión) ----------

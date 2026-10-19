@@ -4327,7 +4327,7 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
 
     <div class="settings-group" hidden data-cat="negocio">
       <h2>🧾 Factura de venta (Colombia)</h2>
-      <div class="settings-desc">Estos datos aparecen en el recibo que imprimes o envías al cliente (NIT, dirección, número consecutivo y, si eres responsable de IVA, el desglose). <b>Ojo:</b> esto NO es facturación electrónica DIAN — esa exige CUFE, firma digital y validación en tiempo real con un proveedor tecnológico autorizado (Siigo, Alegra, Factus, etc.). Si tu negocio ya está obligado a eso, necesitas contratar uno de esos proveedores; esta app deja el recibo listo con el formato que usan los negocios que no tienen esa obligación.</div>
+      <div class="settings-desc">Estos datos aparecen en el recibo que imprimes o envías al cliente (NIT, dirección, número consecutivo y, si eres responsable de IVA, el desglose). <b>Ojo:</b> esto solo es el recibo. La <b>facturación electrónica DIAN</b> (CUDE, firma y validación de la DIAN) está más abajo: «🧾 Facturación electrónica DIAN».</div>
       <div class="settings-row" style="flex-direction:column;align-items:stretch">
         <div class="settings-row-text"><strong>NIT o cédula</strong><span>Se muestra en el recibo si lo llenas.</span></div>
         <input type="text" id="bizNitInput" class="mz-in" style="width:100%" placeholder="Ej: 900123456-7" autocomplete="off">
@@ -4355,6 +4355,12 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
         <div class="settings-row-text"><strong>Resolución DIAN (opcional)</strong><span>Solo si te la dieron para autorizar la numeración. Pégala tal como te la enviaron.</span></div>
         <textarea id="dianResolucionInput" class="mz-in" style="width:100%;min-height:60px;resize:vertical" placeholder="Ej: Resolución DIAN N.º 000000000 del 01/01/2026, rango autorizado FV-1 a FV-5000, vigente 24 meses."></textarea>
       </div>
+    </div>
+
+    <div class="settings-group" hidden data-cat="negocio" id="dianGrupo">
+      <h2>🧾 Facturación electrónica DIAN</h2>
+      <div class="settings-desc">Cada venta sale sola como <b>documento equivalente electrónico P.O.S.</b> (o <b>factura electrónica</b> si el cliente la pide), validada por la DIAN con CUDE y código QR, por medio de un proveedor tecnológico autorizado. Anular o devolver hace la nota crédito.</div>
+      <div id="dianCaja"><div class="settings-desc">Cargando…</div></div>
     </div>
 
     <div class="settings-group" hidden data-cat="pedidos" data-novocab>
@@ -5482,6 +5488,7 @@ export default {
 <script src="nube/config.js"></script>
 <script src="nube/vento-nube.js"></script>
 <script src="nube/vento-pagos.js" defer></script>
+<script src="nube/vento-dian.js" defer></script><!-- 🧾 Facturación electrónica DIAN (P.O.S. electrónico, factura y notas crédito) -->
 <script src="nube/vento-suscripcion.js" defer></script>
 <script src="lib/vento-puerta.js" defer></script><!-- Puerta: la app solo funciona conectada a la base de datos de Vento -->
 <script src="lib/vento-pos.js" defer></script><!-- Modos de trabajo (tienda/mixto) y modo fácil -->
@@ -10213,6 +10220,7 @@ document.getElementById('chargeBtn').addEventListener('click', async ()=>{
   const loyaltyPhone = data.loyaltyOn ? document.getElementById('loyaltyPhone').value : '';
   const loyaltyName = data.loyaltyOn ? document.getElementById('loyaltyName').value : '';
   const entry = closeTableToHistory(currentTable);
+  try{ window.ventoDian && window.ventoDian.alVender(entry); }catch(x){}   // 🧾 a la DIAN (si está prendida)
   if(entry && !(entry.debt > 0)) sonidoPos('success');      // cuenta cobrada completa
   if(loyaltyPhone) registrarVisitaCliente(loyaltyPhone, loyaltyName, entry.total);
   saveData();
@@ -10598,6 +10606,7 @@ document.getElementById('personChargeBtn').addEventListener('click', async ()=>{
     items: items.map(it=>({name:it.name, qty:it.qty, price:it.price, cost: (data.products.find(p=>p.id===it.productId)||{}).cost ?? null})),
     date: new Date().toISOString()
   });
+  try{ window.ventoDian && window.ventoDian.alVender(data.history[0]); }catch(x){}   // 🧾 a la DIAN (si está prendida)
   t.items = t.items.filter(it => !(it.personId === currentPersonId));
   t.payments = (t.payments||[]).filter(p => !(p.personId === currentPersonId));
   t.people = (t.people||[]).filter(p => p.id !== currentPersonId);
@@ -15512,8 +15521,10 @@ function qsRegistrarVenta(cart, opts){
   };
   // Lo que se descontó del inventario queda anotado en la venta (sin guardarlo): así «deshacer» devuelve lo mismo.
   Object.defineProperty(entry, '_inv', { value: cart.filter(it => it.productId).map(it => ({ productId: it.productId, qty: it.qty })), enumerable: false });
+  if(opts.cliente){ entry.dianCliente = opts.cliente; entry.dianFactura = !!opts.factura; }
   data.history.unshift(entry);
   entry._inv.forEach(it => { try{ invOnSale({ productId: it.productId }, it.qty); }catch(e){} });
+  try{ window.ventoDian && window.ventoDian.alVender(entry); }catch(e){}   // 🧾 a la DIAN (si está prendida)
   saveData();
   return entry;
 }
@@ -15523,6 +15534,7 @@ function qsDeshacerVenta(entry){
   if(i < 0) return false;
   data.history.splice(i, 1);
   (entry._inv || []).forEach(it => { try{ invOnSale({ productId: it.productId }, -it.qty); }catch(e){} });
+  try{ window.ventoDian && window.ventoDian.alDeshacer(entry); }catch(e){}   // 🧾 si ya salió a la DIAN: nota crédito
   saveData();
   return true;
 }
@@ -17590,7 +17602,7 @@ editProductOverlay.addEventListener('click', (e)=>{ if(e.target === editProductO
 /* ---------- Compartir por WhatsApp ---------- */
 function methodLabelShort(m){ return methodLabelHist[m] || m; }
 
-function buildReceiptText({businessName, tableLabel, dateStr, items, payments, total, debt, invoiceNo, nit, bizAddress, ivaResponsable, ivaRate, dianResolucionText, pendiente}){
+function buildReceiptText({businessName, tableLabel, dateStr, items, payments, total, debt, invoiceNo, nit, bizAddress, ivaResponsable, ivaRate, dianResolucionText, pendiente, dian}){
   const lines = [];
   lines.push(`*${businessName}*`);
   if(nit) lines.push(`NIT/CC: ${nit}`);
@@ -17621,6 +17633,7 @@ function buildReceiptText({businessName, tableLabel, dateStr, items, payments, t
     lines.push(`⚠️ Queda debiendo: ${fmt(debt)}`);
   }
   { const qp = receiptQrPago(pendiente); if(qp) lines.push('', '💳 ' + qp.titulo.replace(' con este QR', '') + (qp.llave ? ' a la llave ' + qp.llave : ' con el QR del negocio')); }
+  if(dian && window.ventoDian){ lines.push('', window.ventoDian.reciboTexto(dian)); if(dian.qr) lines.push('Consulta en la DIAN: ' + dian.qr); }
   return lines.join('\n');
 }
 
@@ -17633,7 +17646,7 @@ function receiptQrPago(pendiente){
   const q = data.qrPago; if(!q || !(pendiente > 0)) return null;
   return { src: q.orig || q.img, titulo: 'Paga ' + fmt(pendiente) + ' con este QR' + (q.tipo ? ' (' + q.tipo + ')' : ''), llave: q.llave || '' };
 }
-function buildReceiptHTML({businessName, tableLabel, dateStr, items, payments, total, debt, invoiceNo, nit, bizAddress, ivaResponsable, ivaRate, dianResolucionText, pendiente}){
+function buildReceiptHTML({businessName, tableLabel, dateStr, items, payments, total, debt, invoiceNo, nit, bizAddress, ivaResponsable, ivaRate, dianResolucionText, pendiente, dian}){
   const qp = receiptQrPago(pendiente);
   const itemsHtml = (items||[]).map(it=>`<div class="r-line"><span>${it.qty} x ${it.name}${it.size ? ' (' + it.size + ')' : ''}${it.person ? ' — ' + it.person : ''}</span><span>${fmt(it.price*it.qty)}</span></div>`).join('') || '<div class="r-line"><span>Sin productos</span><span></span></div>';
   const paymentsHtml = (payments||[]).map(p=>`<div class="r-line"><span>${p.note || 'Pago'} (${methodLabelShort(p.method)})</span><span>${fmt(p.amount)}</span></div>`).join('') || '<div class="r-line"><span>Sin pagos registrados</span><span></span></div>';
@@ -17656,6 +17669,7 @@ function buildReceiptHTML({businessName, tableLabel, dateStr, items, payments, t
     ${debtHtml}
     <div class="r-total"><span>Total</span><span>${fmt(total)}</span></div>
     ${qp ? `<div style="text-align:center;margin-top:14px"><div style="font-weight:700;margin-bottom:6px">${invEsc(qp.titulo)}</div><img src="${qp.src}" alt="QR de pago" style="width:170px;height:auto;image-rendering:pixelated">${qp.llave ? `<div style="font-size:12px;margin-top:4px">Llave: ${invEsc(qp.llave)}</div>` : ''}</div>` : ''}
+    ${dian && window.ventoDian ? window.ventoDian.reciboHTML(dian) : ''}
   `;
 }
 
@@ -17740,6 +17754,7 @@ function printReceipt(receiptData){
     (receiptData.payments && receiptData.payments.length ? '<div style="margin-top:8px"><b>Pagos:</b>' + receiptData.payments.map(p=>'<div style="display:flex;justify-content:space-between"><span>' + invEsc(p.note || 'Pago') + '</span><span>' + fmt(p.amount) + '</span></div>').join('') + '</div>' : '') +
     (receiptData.debt > 0 ? '<div style="margin-top:8px;font-weight:bold">⚠️ Queda debiendo: ' + fmt(receiptData.debt) + '</div>' : '') +
     ((qp => qp ? '<div style="text-align:center;margin-top:14px"><b>' + invEsc(qp.titulo) + '</b><br><img src="' + qp.src + '" style="width:170px;margin-top:6px">' + (qp.llave ? '<div style="font-size:12px">Llave: ' + invEsc(qp.llave) + '</div>' : '') + '</div>' : '')(receiptQrPago(receiptData.pendiente))) +
+    (receiptData.dian && window.ventoDian ? window.ventoDian.reciboHTML(receiptData.dian, 140) : '') +
     '</body>');
   d.close();
   setTimeout(()=>{ f.contentWindow.focus(); f.contentWindow.print(); setTimeout(()=> f.remove(), 2000); }, 300);
@@ -17791,6 +17806,7 @@ function histFila(h, idx){
         <div class="hist-detail-title">Pagos</div>
         ${paymentsHtml}
         ${debtHtml}
+        ${window.ventoDian ? window.ventoDian.bloqueHistorial(h) : ''}
         <div class="hist-share-row">
           <button class="hist-share-image" data-idx="${idx}">🖼️ Enviar captura por WhatsApp</button>
         </div>
@@ -17814,12 +17830,13 @@ function histReceiptData(h){
     debt: h.debt || 0,
     // Cuentas cerradas antes de esta versión no tienen estos campos
     // guardados — en ese caso, simplemente no aparecen en la factura.
-    invoiceNo: h.invoiceNo || '',
+    invoiceNo: h.dian ? '' : (h.invoiceNo || ''),   // con documento DIAN, el número que vale es el de la DIAN
     nit: h.nit || '',
     bizAddress: h.bizAddress || '',
     ivaResponsable: !!h.ivaResponsable,
     ivaRate: h.ivaRate || 19,
-    dianResolucionText: h.dianResolucionText || ''
+    dianResolucionText: h.dianResolucionText || '',
+    dian: h.dian || null
   };
 }
 function renderHistorial(masPagina){
@@ -32624,6 +32641,7 @@ window.mesoraCelebrar = function(emojis){
     const como = await autorizar('borrar la venta ' + nombreVenta(h)); if(!como) return;
     if(!await showConfirm({ title: '¿Borrar esta venta?', message: nombreVenta(h) + '\nSale del historial y lo vendido vuelve al inventario. Queda anotado en la actividad del equipo.', confirmText: 'Sí, borrar', icon: '🗑️' })) return;
     data.history = data.history.filter(x => x !== h);
+    try{ window.ventoDian && window.ventoDian.alBorrar(h); }catch(x){}   // 🧾 nota crédito si ya estaba en la DIAN
     (h.items || []).forEach(it => stock(it.name, +it.qty || 0));
     try{ window.ventoAuditar && window.ventoAuditar('venta borrada a mano', nombreVenta(h) + ' · ' + (h.items || []).map(i => i.qty + ' ' + i.name).join(', ') + ' · por ' + quien(como)); }catch(x){ saveData(); }
     refrescar(); showToast('🗑️ Venta borrada.');
@@ -32637,6 +32655,7 @@ window.mesoraCelebrar = function(emojis){
     t.items = (h.items || []).map(it => { const p = (data.products || []).find(x => x.name === it.name); return { productId: p ? p.id : null, name: it.name, price: it.price, size: '', qty: it.qty, personId: null, history: [] }; });
     t.payments = []; if(h.tableName && !t.name) t.name = h.tableName;
     data.history = data.history.filter(x => x !== h);
+    try{ window.ventoDian && window.ventoDian.alLiberar(h); }catch(x){}   // 🧾 al cobrarla de nuevo sale otro documento
     try{ window.ventoAuditar && window.ventoAuditar('venta liberada', nombreVenta(h) + ' volvió a la cuenta · por ' + quien(como), [h.table]); }catch(x){ saveData(); }
     refrescar(); showToast('🔓 La venta volvió a su cuenta: cóbrala de nuevo.');
   }
@@ -32666,6 +32685,7 @@ window.mesoraCelebrar = function(emojis){
         else if(pagos.length){ const dif = nuevo - totAntes, last = pagos[pagos.length - 1]; last.amount = Math.max(0, (+last.amount || 0) + dif); }
         h.debt = pagos.filter(p => p.method === 'debe').reduce((s, p) => s + (+p.amount || 0), 0);
         h.corregida = { t: Date.now(), por: typeof authUser !== 'undefined' ? authUser : null };
+        try{ window.ventoDian && window.ventoDian.alCorregir(h); }catch(x){}   // 🧾 nota crédito del documento viejo + el nuevo
         if(!h.items.length){ data.history = data.history.filter(x => x !== h); }
         cerrar();
         try{ window.ventoAuditar && window.ventoAuditar('venta corregida', (h.tableName || 'Venta') + ': ' + antes + ' (' + fmt(totAntes) + ') → ' + (h.items.map(i => i.qty + ' ' + i.name).join(', ') || 'nada') + ' (' + fmt(nuevo) + ')' + (metodo && metodo !== metodoAntes ? ' · pago ' + metodoAntes + ' → ' + metodo : '') + ' · por ' + quien(como)); }catch(x){ saveData(); }
