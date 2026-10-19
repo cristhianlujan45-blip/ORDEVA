@@ -5492,7 +5492,9 @@ export default {
 <script src="nube/vento-suscripcion.js" defer></script>
 <script src="lib/vento-puerta.js" defer></script><!-- Puerta: la app solo funciona conectada a la base de datos de Vento -->
 <script src="lib/vento-pos.js" defer></script><!-- Modos de trabajo (tienda/mixto) y modo fácil -->
-<script src="lib/vento-equipos.js" defer></script><!-- 🔌 Balanza, impresora de facturas y cajón de dinero (USB, Bluetooth, red) -->
+<script src="lib/vento-equipos.js" defer></script>
+<script src="lib/vento-turno.js" defer></script>
+<script src="lib/vento-inventario.js" defer></script><!-- 🔢 Inventario por código: consultar, entrada de mercancía, toma de inventario, kárdex y devoluciones --><!-- 💵 Caja con base, entradas / salidas y arqueo --><!-- 🔌 Balanza, impresora de facturas y cajón de dinero (USB, Bluetooth, red) -->
 <script src="lib/vento-confirma.js" defer></script><!-- Confirmación de pagos: ⏳ esperando el pago, mesa correcta, sin valor, mesero, cuadre -->
 <script src="lib/vento-guia.js" defer></script><!-- Modo fácil para mayores: guía paso a paso con voz, «Ayúdame» y recorrido -->
 <script src="lib/vento-cuenta.js" defer></script><!-- Soporte en la app, licencias del proveedor, recuperar por SMS, cuenta de cliente aparte del administrador -->
@@ -17812,6 +17814,7 @@ function histFila(h, idx){
         </div>
         <div class="hist-fix-row">
           <button type="button" class="hist-fix" data-fix="corregir" data-id="${String(h.id).replace(/"/g, '')}">✏️ Corregir</button>
+          ${window.ventoInventario ? `<button type="button" class="hist-fix" data-fix="devolver" data-id="${String(h.id).replace(/"/g, '')}">↩️ Devolución</button>` : ''}
           ${h.table != null && data.tables && data.tables[h.table] ? `<button type="button" class="hist-fix" data-fix="liberar" data-id="${String(h.id).replace(/"/g, '')}">🔓 Liberar</button>` : ''}
           <button type="button" class="hist-fix peligro" data-fix="borrar" data-id="${String(h.id).replace(/"/g, '')}">🗑️ Borrar</button>
         </div>
@@ -17927,7 +17930,8 @@ function computeClosureStats(fromISO, toISO){
   return { tickets, totalSold, totalEfectivo, totalTransferencia, totalDebe, hourly };
 }
 
-function closeCashRegister(){
+async function closeCashRegister(opts){
+  const auto = !!(opts && opts.auto === true);   // el cierre automático programado no espera a que alguien cuente
   const openIds = getOpenTableIds();
   if(openIds.length){
     const ok = confirm('Hay ' + openIds.length + ' mesa(s) con cuentas abiertas (Mesa ' + openIds.join(', Mesa ') + '). Para cerrar el día hay que cerrarlas: lo que no esté abonado quedará registrado como "Debe". ¿Cerrarlas y continuar?');
@@ -17938,7 +17942,13 @@ function closeCashRegister(){
   const fromISO = lastClosure ? lastClosure.date : null;
   const toISO = new Date().toISOString();
   const stats = computeClosureStats(fromISO, toISO);
-  if(stats.tickets.length === 0){
+  // 🧮 Arqueo: contar el efectivo de la caja (base + ventas en efectivo + entradas − salidas). Cancelar = no se cierra.
+  let caja = null;
+  if(window.ventoTurno && (stats.tickets.length || window.ventoTurno.turno())){
+    caja = auto ? window.ventoTurno.sinContar(stats.totalEfectivo) : await window.ventoTurno.arqueo(stats.totalEfectivo);
+    if(!caja){ saveData(); renderMesas(); return; }
+  }
+  if(stats.tickets.length === 0 && !caja){
     saveData();
     renderMesas();
     showToast('No hay cuentas nuevas para cerrar. La caja ya está al día.');
@@ -17954,8 +17964,10 @@ function closeCashRegister(){
     totalEfectivo: stats.totalEfectivo,
     totalTransferencia: stats.totalTransferencia,
     totalDebe: stats.totalDebe,
-    hourly: stats.hourly
+    hourly: stats.hourly,
+    caja
   };
+  try{ window.ventoTurno && window.ventoTurno.cerrar(caja); }catch(e){}
   if(!data.closures) data.closures = [];
   data.closures.unshift(closure);
   saveData();
@@ -17996,6 +18008,7 @@ function buildClosureText(closure){
     lines.push('*Ventas por hora:*');
     closure.hourly.forEach(h=> lines.push(`${h.hour} — ${fmt(h.total)}`));
   }
+  if(closure.caja && window.ventoTurno) lines.push(window.ventoTurno.texto(closure.caja));
   lines.push('');
   lines.push('¡Buen cierre! 🍻');
   return lines.join('\n');
@@ -18014,6 +18027,7 @@ function buildClosureHTML(closure){
     ${debtHtml}
     <div class="r-section">Ventas por hora</div>
     ${hourlyHtml}
+    ${closure.caja && window.ventoTurno ? window.ventoTurno.html(closure.caja, 'r') : ''}
     <div class="r-total"><span>Total vendido</span><span>${fmt(closure.totalSold)}</span></div>
   `;
 }
@@ -18072,6 +18086,7 @@ function openClosureReport(closure){
     ${closure.totalDebe > 0 ? `<div class="total-row sub"><span class="label">Quedó debiendo</span><span class="amount hist-debt-flag">${fmt(closure.totalDebe)}</span></div>` : ''}
     <div class="hist-detail-title">Ventas por hora</div>
     ${hourlyHtml}
+    ${closure.caja && window.ventoTurno ? window.ventoTurno.html(closure.caja) : ''}
     <div class="total-row">
       <span class="label">Total vendido</span>
       <span class="amount">${fmt(closure.totalSold)}</span>
@@ -21258,7 +21273,7 @@ function acRender(){
   c.times.forEach(t=>{const b=btn(t+'  ✕',()=>{const x=acCfg();x.times=x.times.filter(y=>y!==t);SS('vito_auto',x);acRender();});b.style.margin='3px';l.appendChild(b);});
 }
 function cierreAuto(c){
-  if(c.open==='cerrar'){const oc=window.confirm;window.confirm=()=>true;try{closeCashRegister();}finally{window.confirm=oc;}return;}
+  if(c.open==='cerrar'){const oc=window.confirm;window.confirm=()=>true;try{closeCashRegister({ auto: true });}finally{window.confirm=oc;}return;}
   const last=data.closures.length?data.closures[0]:null,fromISO=last?last.date:null,toISO=new Date().toISOString();
   const s=computeClosureStats(fromISO,toISO);
   if(!s.tickets.length){showToast('Cierre automático: no había cuentas nuevas.');return;}
@@ -25802,7 +25817,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-18 · v1.46.0';
+const MESORA_VERSION = '2026-10-19 · v1.47.0';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'Vento · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 /* 🔄 La app Android se actualiza SOLA (Actualizador): revisa cada 3 h, baja la versión nueva y la instala cuando no se
@@ -32697,6 +32712,7 @@ window.mesoraCelebrar = function(emojis){
     const h = venta(id); if(!h){ showToast('No encontré esa venta.'); return; }
     if(accion === 'borrar') return borrar(h);
     if(accion === 'liberar') return liberar(h);
+    if(accion === 'devolver'){ return autorizar('hacer una devolución de ' + nombreVenta(h)).then(como => { if(como && window.ventoInventario) window.ventoInventario.devolucion(h); }); }
     return corregir(h);
   };
   window.ventoVentaFix.ponerClave = ponerClave;

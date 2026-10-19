@@ -211,6 +211,16 @@
     encolar({ accion: 'emitir', venta_id: nuevo, v: ventaDe(h, nuevo) });
     guardar();
   }
+  // Devolución de parte de una venta ya validada: nota crédito parcial por lo devuelto (si aún no salió, sale corregida).
+  function devolver(h, items, motivo){
+    if(!h || !h.dian || !activo() || !(items || []).length) return;
+    var id = h.dian.venta || String(h.id), c = cola();
+    var emision = c.find(function(x){ return x.accion === 'emitir' && x.venta_id === id; });
+    if(emision && !(enCurso && enCurso.venta_id === id)){ emision.v = ventaDe(h, id); ponerCola(c); return; }   // todavía no salió: sale con lo que quedó
+    var its = items.map(function(it){ var p = prod(it), tar = p && p.iva != null && p.iva !== '' && isFinite(+p.iva) ? +p.iva : null;
+      return { name: it.name, qty: +it.qty, price: +it.price, unidad: it.unidad || null, codigo: (p && (p.codigo || (p.barcodes || [])[0])) || null, tarifa: tar }; });
+    encolar({ accion: 'anular', venta_id: id, items: its, nota_id: 'dev' + Date.now().toString(36), motivo: motivo || 'Devolución', cajero: (typeof authUser !== 'undefined' && authUser) || null });
+  }
   // Para imprimir con el CUDE: espera la respuesta de la DIAN (máx. ms).
   function esperar(h, ms){
     return new Promise(function(res){
@@ -436,7 +446,7 @@
     document.addEventListener('click', function(e){ var c = e.target.closest && e.target.closest('.ajustes-cat[data-cat="negocio"]'); if(c) setTimeout(function(){ pintarAjustes(); cargar(); }, 50); });
   }
   window.ventoDian = { activo: activo, cfg: cfg, cargar: cargar, alVender: alVender, alDeshacer: function(h){ return anularVenta(h, 'Cobro deshecho'); }, alBorrar: function(h){ return anularVenta(h, 'Venta borrada'); },
-    alLiberar: function(h){ return anularVenta(h, 'Venta devuelta a la cuenta'); }, alCorregir: alCorregir, facturaA: facturaA, pedirCliente: pedirCliente, esperar: esperar,
+    alLiberar: function(h){ return anularVenta(h, 'Venta devuelta a la cuenta'); }, alCorregir: alCorregir, devolver: devolver, facturaA: facturaA, pedirCliente: pedirCliente, esperar: esperar,
     reciboHTML: reciboHTML, reciboTexto: reciboTexto, lineasRecibo: lineasRecibo, bloqueHistorial: bloqueHistorial, pintarAjustes: pintarAjustes, procesar: procesar, cola: cola, _ventaDe: ventaDe };
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar); else iniciar();
 })();
