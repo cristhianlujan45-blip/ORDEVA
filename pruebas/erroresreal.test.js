@@ -137,6 +137,6 @@ const ADMIN = 'cristhianwkh@gmail.com', CLAVE_ADMIN = 'Clave-de-prueba-77';
     await N.p.evaluate(() => { window.__voz5 = []; const d = window.ventoDecirPago; window.ventoDecirPago = f => { window.__voz5.push(String(f)); }; });
     await avisar('and-frase-2');
     chk('5. El siguiente aviso igual ya es un pago en la app del negocio, sin reinstalar: $4.000 por Bancolombia', await N.p.waitForFunction(() => (data.pagos.lista || []).some(x => x.monto === 4000 && x.app === 'Bancolombia'), null, { timeout: 8000 }).then(() => true, () => false));
-    chk('5. … y lo dice en voz alta («Recibiste 4000 pesos por Bancolombia»)', await N.p.evaluate(() => window.__voz5.some(x => /^Recibiste 4000 pesos por Bancolombia/.test(x))), await N.p.evaluate(() => window.__voz5));
+    chk('5. … y lo dice en voz alta («Recibiste 4000 pesos por Bancolombia»)', await N.p.evaluate(() => window.__voz5.some(x => /^Llegaron 4000 pesos por Bancolombia/.test(x))), await N.p.evaluate(() => window.__voz5));
   }
 })();

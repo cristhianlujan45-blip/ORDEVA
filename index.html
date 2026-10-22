@@ -29096,7 +29096,8 @@ let fotosListas = false;
   // En la app Android la dice la voz de pagos de Android (canal de la alarma, al volumen elegido; más de 100 % = reforzada,
   // más fuerte de lo normal). En el navegador, la voz del navegador (hasta 100 %).
   const PG_VOL_KEY = 'vento_pagos_vol';
-  const pgVol = () => { try{ const v = Number(localStorage.getItem(PG_VOL_KEY)); return v >= 10 && v <= 150 ? v : 100; }catch(e){ return 100; } };
+  // De fábrica 130 % (1.49.0: «que suene alto, muy duro»): más fuerte de lo normal, con la ganancia FIJA (estable).
+  const pgVol = () => { try{ const v = Number(localStorage.getItem(PG_VOL_KEY)); return v >= 10 && v <= 150 ? v : 130; }catch(e){ return 130; } };
   window.ventoPagosVolumen = pgVol;
   // «🗣️ Decir los pagos en voz alta» (Ajustes → Pagos): prendido de fábrica. Apagado: llegan con notificación y ventana.
   const PG_VOZ_KEY = 'vento_pagos_voz';
@@ -29413,7 +29414,8 @@ let fotosListas = false;
       if(!pgNotificarAndroid(tit, fr, orig, plata(p.monto), (p.breb ? 'Bre-B en ' : '') + p.app, 'ok')) window.ventoAvisoCel && window.ventoAvisoCel(tit, fr + (orig ? '\n«' + orig + '»' : ''), 'pagos'); } }catch(e){}
     try{ window.ventoSonidos && window.ventoSonidos.success(); }catch(e){}
     // «Pago confirmado. 200 pesos desde DaviPlata» (o «desde Nequi»…), con quién pagó y la mesa si se sabe.
-    if(!op.voz) window.ventoDecirPago('Recibiste ' + p.monto + ' pesos ' + (p.breb ? 'por Bre-B, en ' : 'por ') + p.app + (p.de ? ', de ' + p.de : '') + (mesa ? ', de la ' + tableLabel(mesa) : ''));
+    // «Llegaron 3200 pesos por Nequi»: la cantidad siempre, sin el nombre de quién pagó (1.49.0).
+    if(!op.voz) window.ventoDecirPago('Llegaron ' + p.monto + ' pesos ' + (p.breb ? 'por Bre-B, en ' : 'por ') + p.app + (mesa ? ', de la ' + tableLabel(mesa) : ''));
     if(navigator.vibrate) try{ navigator.vibrate([150, 80, 150]); }catch(e){}
     try{ window.mesoraCelebrar && window.mesoraCelebrar(['💜', '💰', '✨']); }catch(e){}
     pgPintar();
@@ -29708,9 +29710,9 @@ let fotosListas = false;
       '<div class="settings-desc" id="pgWebAviso" hidden style="border:1px solid #f5a524;border-radius:12px;padding:10px"><b id="pgWebAvisoTit">📲 Estás en Vento Web, no en la app.</b> Para que Vento lea los avisos de DaviPlata y Nequi y diga «Pago confirmado» (también con el celular bloqueado), usa <b>la app Vento</b> (archivo vento.apk) en este celular. <a class="btn-primary" id="pgBajarApk" href="https://github.com/cristhianlujan45-blip/cuentas/releases/latest/download/vento.apk" download="vento.apk" rel="noopener" style="margin-top:8px;width:100%;display:block;text-align:center;box-sizing:border-box">⬇️ Descargar la app (vento.apk)</a><button type="button" class="btn-ghost" id="pgAbrirApp" style="margin-top:8px;width:100%">📲 Ya la tengo: abrir la app Vento</button></div>' +
       '<div class="settings-row"><div class="settings-row-text"><strong>Recibir avisos de pagos</strong><span id="pgEstado"></span></div><label class="switch"><input type="checkbox" id="pgOn"><span class="switch-slider"></span></label></div>' +
       '<div id="pgCaja" hidden>' +
-      '<div class="settings-row" id="pgVolFila" style="flex-direction:column;align-items:stretch"><div class="settings-row-text"><strong>🔊 Volumen de la voz de los pagos: <span id="pgVolTxt"></span></strong><span>Qué tan alto dice «Recibiste 200 pesos por DaviPlata». ' + (enApp ? 'Suena a este volumen aunque la música o el celular estén bajitos, y luego deja el volumen como estaba. <b>Más de 100 % = más fuerte de lo normal.</b>' : 'En el navegador llega hasta 100 %; en la app Android se puede subir hasta 150 % (más fuerte de lo normal).') + '</span></div>' +
+      '<div class="settings-row" id="pgVolFila" style="flex-direction:column;align-items:stretch"><div class="settings-row-text"><strong>🔊 Volumen de la voz de los pagos: <span id="pgVolTxt"></span></strong><span>Qué tan alto dice «Llegaron 200 pesos por DaviPlata». ' + (enApp ? 'Suena a este volumen aunque la música o el celular estén bajitos, y luego deja el volumen como estaba. <b>Más de 100 % = más fuerte de lo normal.</b>' : 'En el navegador llega hasta 100 %; en la app Android se puede subir hasta 150 % (más fuerte de lo normal).') + '</span></div>' +
       '<input type="range" id="pgVol" min="10" max="' + (enApp ? 150 : 100) + '" step="10" style="width:100%;margin:6px 0" aria-label="Volumen de la voz de los pagos"><div class="mz-actions"><button class="btn-ghost" id="pgVolMenos" type="button">🔉 Más bajo</button><button class="btn-ghost" id="pgVolMas" type="button">🔊 Más alto</button><button class="btn-primary" id="pgVolProbar" type="button">▶ Probar la voz</button></div></div>' +
-      '<div class="settings-row" id="pgVozFila"><div class="settings-row-text"><strong>🗣️ Decir los pagos en voz alta</strong><span>Prendido: cada pago que llega se dice («Recibiste 20000 pesos por Nequi»), en este equipo y en los demás de la cuenta, también con el celular bloqueado. Si primero llega el aviso de Bre-B sin el valor, se dice ese y luego el valor. Apagado: llegan con su notificación y su ventana, sin voz.</span></div><label class="switch"><input type="checkbox" id="pgVozOn" checked><span class="switch-slider"></span></label></div>' +
+      '<div class="settings-row" id="pgVozFila"><div class="settings-row-text"><strong>🗣️ Decir los pagos en voz alta</strong><span>Prendido: cada pago que llega se dice con la cantidad («Llegaron 20000 pesos por Nequi»), en este equipo y en los demás de la cuenta, también con el celular bloqueado. Si primero llega el aviso de Bre-B sin el valor, se dice ese y luego el valor. Apagado: llegan con su notificación y su ventana, sin voz.</span></div><label class="switch"><input type="checkbox" id="pgVozOn" checked><span class="switch-slider"></span></label></div>' +
       '<div class="settings-row" id="pgChequeoFila"><div class="settings-row-text"><strong>🩺 ¿Les llegan los pagos a todos los equipos?</strong><span>Revisa este equipo (lectura de avisos, voz, servidor) y qué equipos de la cuenta están escuchando los pagos ahora mismo.</span></div><button class="btn-primary" id="pgChequeo" type="button">🩺 Revisar</button></div>' +
       '<div class="settings-row" id="pgVentFila" style="flex-direction:column;align-items:stretch"><div style="display:flex;align-items:center;gap:10px"><div class="settings-row-text" style="flex:1"><strong>🪟 Ventana emergente con el valor</strong><span>Cada pago sale en una ventana con el valor grande, el banco y el texto, con «Cerrar». Se cierra sola a los 15 s.' + (enApp ? ' También con el celular bloqueado o usando otra app.' : '') + '</span></div><label class="switch"><input type="checkbox" id="pgVentOn" checked><span class="switch-slider"></span></label></div>' +
       '<div id="pgVentPerm" style="font-size:14px;line-height:1.5;margin-top:6px"></div><div class="mz-actions"><button class="btn-ghost" id="pgVentProbar" type="button">▶ Probar la ventana</button></div></div>' +
@@ -29757,7 +29759,7 @@ let fotosListas = false;
     $p('pgVolProbar').onclick = () => {
       const A = window.VentoAndroid;
       if(A && A.pagosProbarVoz){ try{ A.pagosProbarVoz(); return; }catch(e){} }
-      window.ventoDecirPago('Recibiste 200 pesos por DaviPlata.');
+      window.ventoDecirPago('Llegaron 200 pesos por DaviPlata.');
     };
     $p('pgVozOn').onchange = () => { pgVozOn($p('pgVozOn').checked); showToast($p('pgVozOn').checked ? '🗣️ Los pagos se dicen en voz alta.' : '🔕 Voz de los pagos apagada: llegan con su notificación y su ventana.', 6000); };
     $p('pgChequeo').onclick = () => { try{ window.ventoPagosChequeo ? window.ventoPagosChequeo() : showToast('El chequeo necesita Vento Nube (entrar con tu correo).'); }catch(e){} };

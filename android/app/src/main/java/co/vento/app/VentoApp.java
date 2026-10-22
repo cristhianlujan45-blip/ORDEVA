@@ -262,7 +262,7 @@ public class VentoApp extends Application {
     static final String PREF_VOL = "pagosVolumen";
 
     static int volPagos() {
-        try { return AvisoPago.volumen(app.getSharedPreferences("vento", MODE_PRIVATE).getInt(PREF_VOL, 100)); } catch (Exception e) { return 100; }
+        try { return AvisoPago.volumen(app.getSharedPreferences("vento", MODE_PRIVATE).getInt(PREF_VOL, 130)); } catch (Exception e) { return 130; }   // de fábrica 130 %
     }
 
     private static android.media.AudioAttributes atributosPago() {
@@ -1491,7 +1491,7 @@ public class VentoApp extends Application {
 
         /** «▶ Probar»: dice un pago de prueba con el volumen elegido. */
         @JavascriptInterface
-        public void pagosProbarVoz() { decirPagoSiempre("Recibiste 200 pesos por DaviPlata."); }
+        public void pagosProbarVoz() { decirPagoSiempre("Llegaron 200 pesos por DaviPlata."); }
 
         /** «🔊 Decir los pagos en voz alta»: prendido (de fábrica) o apagado. */
         @JavascriptInterface

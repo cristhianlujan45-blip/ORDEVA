@@ -157,8 +157,7 @@ final class Cruce {
             VentoApp.decirPago(f);
             VentoApp.notificarPago("⚠️ Aviso de " + plata + ": revísalo", f, detalle, plata, banco, "revisar");
         } else {
-            String f = AvisoPago.pausado("Recibiste " + monto + " pesos por " + banco + (de.isEmpty() ? "" : ", de " + de) + ".");
-            VentoApp.decirPago(f);
+            VentoApp.decirPago("Llegaron " + monto + " pesos por " + banco + ".");   // la cantidad siempre; sin el nombre
             VentoApp.notificarPago("💜 Recibiste " + plata + " por " + banco, "Recibiste " + monto + " pesos por " + banco + (de.isEmpty() ? "" : ", de " + de) + ".", detalle, plata, banco, "ok");
         }
     }

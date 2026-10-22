@@ -27,13 +27,13 @@ public class EscuchaPrueba {
         Preferencias sp = new Preferencias();
         long ahora = System.currentTimeMillis(), min = 60_000L;
 
-        // 1) SMS del 85888: «Recibiste 200.» (sin $ y sin decir DaviPlata) → «Recibiste 200 pesos por DaviPlata.»
+        // 1) SMS del 85888: «Recibiste 200.» (sin $ y sin decir DaviPlata) → «Llegaron 200 pesos por DaviPlata.»
         limpiar();
         boolean r = VentoEscucha.leerSms(sp, "85888", "Recibiste  200. Para saber mas, consulta tus movimientos.",
                 conv(new Object[]{"Recibiste  200. Para saber mas, consulta tus movimientos.", ahora - 2000}), "k1:", false);
         VentoApp.ui.correr();
-        chk("SMS 85888 «Recibiste 200.» → suena «Recibiste 200 pesos por DaviPlata.»", r && VentoApp.dichos.contains("Recibiste 200 pesos por DaviPlata."), VentoApp.dichos);
-        chk("…y sale la notificación «💜 Recibiste $200 por DaviPlata» con el texto «Recibiste 200 pesos por DaviPlata.» y el SMS", VentoApp.notifs.stream().anyMatch(n -> n[0].equals("💜 Recibiste $200 por DaviPlata") && n[1].equals("Recibiste 200 pesos por DaviPlata.") && n[2].contains("Recibiste  200")), VentoApp.notifs.size());
+        chk("SMS 85888 «Recibiste 200.» → suena «Llegaron 200 pesos por DaviPlata.»", r && VentoApp.dichos.contains("Llegaron 200 pesos por DaviPlata."), VentoApp.dichos);
+        chk("…y sale la notificación «💜 Recibiste $200 por DaviPlata» con el texto «Llegaron 200 pesos por DaviPlata.» y el SMS", VentoApp.notifs.stream().anyMatch(n -> n[0].equals("💜 Recibiste $200 por DaviPlata") && n[1].equals("Llegaron 200 pesos por DaviPlata.") && n[2].contains("Recibiste  200")), VentoApp.notifs.size());
 
         // 2) La conversación trae los mensajes VIEJOS (65,000 · 100 · 1,000 de hace 40 min) y uno nuevo (20,000): solo suena el nuevo
         limpiar();
@@ -43,7 +43,7 @@ public class EscuchaPrueba {
                      new Object[]{"Recibiste  1,000. Para saber mas, consulta tus movimientos.", ahora - 40 * min},
                      new Object[]{"DaviPlata: recibiste  20,000 en tu DaviPlata. Usalos de forma segura para pagar, comprar y mucho mas! Conoce todo lo que puedes hacer en www.daviplata.com", ahora - 3000}), "k2:", false);
         VentoApp.ui.correr();
-        chk("Conversación con mensajes viejos: solo suena el NUEVO ($20.000), una vez", r && VentoApp.dichos.size() == 1 && VentoApp.dichos.get(0).equals("Recibiste 20000 pesos por DaviPlata."), VentoApp.dichos);
+        chk("Conversación con mensajes viejos: solo suena el NUEVO ($20.000), una vez", r && VentoApp.dichos.size() == 1 && VentoApp.dichos.get(0).equals("Llegaron 20000 pesos por DaviPlata."), VentoApp.dichos);
 
         // 3) El mismo SMS otra vez (la app de mensajes vuelve a publicar la conversación): no se repite
         limpiar();
@@ -56,14 +56,14 @@ public class EscuchaPrueba {
         VentoEscucha.leerSms(sp, "85888", "", conv(new Object[]{"Recibiste  1,000. Para saber mas, consulta tus movimientos.", ahora - 60_000},
                                                   new Object[]{"Recibiste  1,000. Para saber mas, consulta tus movimientos.", ahora - 5_000}), "k4:", false);
         VentoApp.ui.correr();
-        chk("Dos pagos iguales seguidos ($1.000 y $1.000): suenan los dos", VentoApp.dichos.size() == 2 && VentoApp.dichos.stream().allMatch(x -> x.equals("Recibiste 1000 pesos por DaviPlata.")), VentoApp.dichos);
+        chk("Dos pagos iguales seguidos ($1.000 y $1.000): suenan los dos", VentoApp.dichos.size() == 2 && VentoApp.dichos.stream().allMatch(x -> x.equals("Llegaron 1000 pesos por DaviPlata.")), VentoApp.dichos);
 
         // 5) Llave Bre-B: la app de DaviPlata avisa SIN valor y luego llega el SMS con el valor → una sola voz con el valor
         Preferencias sp0 = sp; sp = nuevo();
         app(sp, "DaviPlata", "DaviPlata", "Transaccion exitosa: Recibiste Plata de otra entidad usando Llaves, consulta el detalle de tus movimientos desde el app DaviPlata.", "k5:");
         chk("Llave Bre-B sin valor: suena DE UNA «Llegó plata por Bre-B, en DaviPlata.» (sin esperar: con la pantalla apagada la espera se dormía)", VentoApp.dichos.equals(java.util.Arrays.asList("Llegó plata por Bre-B, en DaviPlata.")) && VentoApp.ui.despues.isEmpty(), VentoApp.dichos);
         VentoEscucha.leerSms(sp, "85888", "", conv(new Object[]{"Recibiste  65,000. Para saber mas, consulta tus movimientos.", ahora - 1000}), "k5b:", false);
-        chk("…llega el SMS: suena de una «Recibiste 65000 pesos por Bre-B, en DaviPlata.»", VentoApp.dichos.size() == 2 && VentoApp.dichos.get(1).equals("Recibiste 65000 pesos por Bre-B, en DaviPlata.") && VentoApp.ui.despues.isEmpty(), VentoApp.dichos);
+        chk("…llega el SMS: suena de una «Llegaron 65000 pesos por Bre-B, en DaviPlata.»", VentoApp.dichos.size() == 2 && VentoApp.dichos.get(1).equals("Llegaron 65000 pesos por Bre-B, en DaviPlata.") && VentoApp.ui.despues.isEmpty(), VentoApp.dichos);
         chk("…y la ventana dice «$65.000» por «Bre-B en DaviPlata»", VentoApp.notifs.stream().anyMatch(n -> n[3].equals("$65.000") && n[4].equals("Bre-B en DaviPlata")), VentoApp.notifs.size());
 
         // 6) Llave Bre-B sin valor y SIN SMS: a los pocos segundos avisa sin el valor
@@ -77,7 +77,7 @@ public class EscuchaPrueba {
         VentoEscucha.leerSms(sp, "85888", "", conv(new Object[]{"Recibiste  140,000. Para saber mas, consulta tus movimientos.", ahora - 1000}), "k6b:", false);
         app(sp, "DaviPlata", "DaviPlata", "Transaccion exitosa: Recibiste Plata de otra entidad usando Llaves, consulta el detalle de tus movimientos desde el app DaviPlata.", "k6c:");
         VentoApp.ui.correr();
-        chk("Primero el SMS y luego la llave: suena de una el SMS «Recibiste 140000 pesos por DaviPlata.» y la llave no lo repite", VentoApp.dichos.equals(java.util.Arrays.asList("Recibiste 140000 pesos por DaviPlata.")), VentoApp.dichos);
+        chk("Primero el SMS y luego la llave: suena de una el SMS «Llegaron 140000 pesos por DaviPlata.» y la llave no lo repite", VentoApp.dichos.equals(java.util.Arrays.asList("Llegaron 140000 pesos por DaviPlata.")), VentoApp.dichos);
 
         // 6c) Un SMS de HACE 2 MIN (otro pago) y ahora la llave sin valor: NO se juntan (avisa sin valor)
         sp = nuevo();
@@ -92,19 +92,19 @@ public class EscuchaPrueba {
         sp = nuevo();
         VentoEscucha.leerSms(sp, "85888", "", conv(new Object[]{"Recibiste  7,000. Para saber mas, consulta tus movimientos.", ahora - 1000}), "k6f:", false);
         app(sp, "DaviPlata", "DaviPlata", "¡Le llegó plata! JUAN PEREZ le pasó $7.000 a su DaviPlata", "k6g:");
-        chk("El mismo pago por SMS y por la app con el valor: una sola voz, sin esperar", VentoApp.dichos.equals(java.util.Arrays.asList("Recibiste 7000 pesos por DaviPlata.")) && VentoApp.ui.despues.isEmpty(), VentoApp.dichos);
+        chk("El mismo pago por SMS y por la app con el valor: una sola voz, sin esperar", VentoApp.dichos.equals(java.util.Arrays.asList("Llegaron 7000 pesos por DaviPlata.")) && VentoApp.ui.despues.isEmpty(), VentoApp.dichos);
 
         // 7) Nequi con el valor en su aviso: suena directo
         sp = nuevo();
         app(sp, "Nequi", "Nequi", "¡Te llegó plata! ANA RUIZ te envió $2.500", "k7:");
-        chk("Nequi «te envió $2.500» → «Recibiste 2500 pesos por Nequi.»", VentoApp.dichos.contains("Recibiste 2500 pesos por Nequi."), VentoApp.dichos);
+        chk("Nequi «te envió $2.500» → «Llegaron 2500 pesos por Nequi.»", VentoApp.dichos.contains("Llegaron 2500 pesos por Nequi."), VentoApp.dichos);
         chk("Nequi: notificación «💜 Recibiste $2.500 por Nequi» con el texto del banco (se ve con el celular bloqueado)", VentoApp.notifs.size() == 1 && VentoApp.notifs.get(0)[0].equals("💜 Recibiste $2.500 por Nequi") && VentoApp.notifs.get(0)[2].contains("ANA RUIZ te envió $2.500"), VentoApp.notifs.size());
         chk("Nequi: la ventana emergente lleva el valor «$2.500», «Nequi» y es un pago confirmado", VentoApp.notifs.size() == 1 && VentoApp.notifs.get(0)[3].equals("$2.500") && VentoApp.notifs.get(0)[4].equals("Nequi") && VentoApp.notifs.get(0)[5].equals("ok"), VentoApp.notifs.isEmpty() ? "" : String.join(" | ", VentoApp.notifs.get(0)));
 
         // 7b) Nequi real (captura del 16-oct): título «Envío» y el valor SIN $ → suena, con notificación y ventana
         sp = nuevo();
         app(sp, "Nequi", "Envío", "MARIBE ARIAS te envió 1500, ¡lo mejor!", "k7b:");
-        chk("Nequi «Envío · MARIBE ARIAS te envió 1500, ¡lo mejor!» → suena «Recibiste 1500 pesos por Nequi.» y sale «💜 Recibiste $1.500 por Nequi»", VentoApp.dichos.contains("Recibiste 1500 pesos por Nequi.") && VentoApp.notifs.stream().anyMatch(n -> n[0].equals("💜 Recibiste $1.500 por Nequi") && n[3].equals("$1.500")), VentoApp.dichos);
+        chk("Nequi «Envío · MARIBE ARIAS te envió 1500, ¡lo mejor!» → suena «Llegaron 1500 pesos por Nequi.» y sale «💜 Recibiste $1.500 por Nequi»", VentoApp.dichos.contains("Llegaron 1500 pesos por Nequi.") && VentoApp.notifs.stream().anyMatch(n -> n[0].equals("💜 Recibiste $1.500 por Nequi") && n[3].equals("$1.500")), VentoApp.dichos);
 
         // 7c) Nequi que llega primero por SMS (sin número corto confirmado → «revísalo») y luego por la app: la app de Nequi
         //     lo CONFIRMA → suena «Recibiste…», con su notificación y su ventana. Antes se tomaba como «ya dicho» y no abría.
@@ -112,7 +112,7 @@ public class EscuchaPrueba {
         VentoEscucha.leerSms(sp, "85954", "", conv(new Object[]{"Nequi: MARIBE ARIAS te envio $1.500", ahora - 1000}), "k7c:", false);
         VentoApp.notifs.clear(); VentoApp.dichos.clear();
         app(sp, "Nequi", "Envío", "MARIBE ARIAS te envió 1500, ¡lo mejor!", "k7d:");
-        chk("Nequi por SMS («revísalo») y luego por la app: la app lo confirma con voz, notificación y 🪟 ventana «$1.500»", VentoApp.dichos.contains("Recibiste 1500 pesos por Nequi.") && VentoApp.notifs.stream().anyMatch(n -> n[3].equals("$1.500") && n[5].equals("ok")), VentoApp.dichos + " " + VentoApp.notifs.size());
+        chk("Nequi por SMS («revísalo») y luego por la app: la app lo confirma con voz, notificación y 🪟 ventana «$1.500»", VentoApp.dichos.contains("Llegaron 1500 pesos por Nequi.") && VentoApp.notifs.stream().anyMatch(n -> n[3].equals("$1.500") && n[5].equals("ok")), VentoApp.dichos + " " + VentoApp.notifs.size());
 
         // 8) «Pasaste $100 a otro DaviPlata» (plata que SALE): no suena
         limpiar();
@@ -130,7 +130,7 @@ public class EscuchaPrueba {
 
         // 10) Lo que hizo Vento queda en el registro de Ajustes → Pagos
         String d = VentoEscucha.diag(sp0) + VentoEscucha.diag(sp);
-        chk("Registro (Ajustes → Pagos): cada aviso con lo que hizo Vento", d.contains("Recibiste 200 pesos por DaviPlata") && d.contains("plata que SALE"), d.length() > 300 ? d.substring(0, 300) : d);
+        chk("Registro (Ajustes → Pagos): cada aviso con lo que hizo Vento", d.contains("Llegaron 200 pesos por DaviPlata") && d.contains("plata que SALE"), d.length() > 300 ? d.substring(0, 300) : d);
 
         // 10b) El 85888 manda el SMS con RETRASO (la hora del mensaje es de hace 20 min): igual suena, porque es el más nuevo
         //      de la conversación. En la 1.40.4 se ignoraba (solo se leían los de los últimos 3 min).
@@ -138,7 +138,7 @@ public class EscuchaPrueba {
         r = VentoEscucha.leerSms(sp, "85888", "", conv(new Object[]{"Recibiste  9,000. Para saber mas, consulta tus movimientos.", ahora - 50 * min},
                                                       new Object[]{"Recibiste  12,000. Para saber mas, consulta tus movimientos.", ahora - 20 * min}), "k10b:", false);
         VentoApp.ui.correr();
-        chk("SMS con retraso (hora de hace 20 min) pero es el más nuevo: suena «Recibiste 12000 pesos por DaviPlata.» (el viejo no)", r && VentoApp.dichos.size() == 1 && VentoApp.dichos.get(0).equals("Recibiste 12000 pesos por DaviPlata."), VentoApp.dichos);
+        chk("SMS con retraso (hora de hace 20 min) pero es el más nuevo: suena «Llegaron 12000 pesos por DaviPlata.» (el viejo no)", r && VentoApp.dichos.size() == 1 && VentoApp.dichos.get(0).equals("Llegaron 12000 pesos por DaviPlata."), VentoApp.dichos);
 
         // 10c) ⏱ El registro dice si el BANCO mandó el aviso tarde (el SMS dice que el pago fue hace 40 s)
         sp = nuevo();
@@ -185,7 +185,7 @@ public class EscuchaPrueba {
         { Preferencias spB = nuevo();
           boolean rb = app(spB, "Nequi Colombia", "Te enviaron plata por Bre-B", "Te enviaron $300. Entra a tu app y revisa tu saldo.", "kbreb:");
           VentoApp.ui.correr();
-          chk("Bre-B real de Nequi: suena «Recibiste 300 pesos por Bre-B, en Nequi.»", rb && VentoApp.dichos.contains("Recibiste 300 pesos por Bre-B, en Nequi."), VentoApp.dichos);
+          chk("Bre-B real de Nequi: suena «Llegaron 300 pesos por Bre-B, en Nequi.»", rb && VentoApp.dichos.contains("Llegaron 300 pesos por Bre-B, en Nequi."), VentoApp.dichos);
           chk("Bre-B real de Nequi: notificación y 🪟 ventana con «$300» por «Bre-B en Nequi» (pago confirmado)", VentoApp.notifs.stream().anyMatch(n -> n[3].equals("$300") && n[4].equals("Bre-B en Nequi") && n[5].equals("ok")), VentoApp.notifs.size());
           chk("Bre-B real de Nequi: se dice con pausas y despacio: «Recibiste, 300 pesos, por Bre-B, en Nequi.»", AvisoPago.pausado("Recibiste 300 pesos por Bre-B, en Nequi.").equals("Recibiste, 300 pesos, por Bre-B, en Nequi."), ""); }
         System.out.println("RESULTADO " + ok + " bien " + mal + " mal");

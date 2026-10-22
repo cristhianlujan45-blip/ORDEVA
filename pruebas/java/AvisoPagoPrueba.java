@@ -76,13 +76,13 @@ public class AvisoPagoPrueba {
         chk("Remitente celular (3001234567) → «celular» (falso)", AvisoPago.tipoRemitente("+57 300 123 4567").equals("celular"), AvisoPago.tipoRemitente("+57 300 123 4567"));
         chk("Remitente código corto (85888) → «corto»", AvisoPago.tipoRemitente("85888").equals("corto"), "");
         chk("Frase SMS sin confiar: «Llegó un mensaje de texto de 200 pesos desde DaviPlata. Revísalo…»", AvisoPago.fraseSms("DaviPlata: Recibió $200", 200, "corto", false).startsWith("Llegó un mensaje de texto de 200 pesos desde DaviPlata. Revísalo"), AvisoPago.fraseSms("DaviPlata: Recibió $200", 200, "corto", false));
-        chk("Frase SMS confiando: «Recibiste 200 pesos por DaviPlata, por mensaje de texto.»", AvisoPago.fraseSms("DaviPlata: Recibió $200", 200, "corto", true).equals("Recibiste 200 pesos por DaviPlata, por mensaje de texto."), AvisoPago.fraseSms("DaviPlata: Recibió $200", 200, "corto", true));
+        chk("Frase SMS confiando: «Llegaron 200 pesos por DaviPlata, por mensaje de texto.»", AvisoPago.fraseSms("DaviPlata: Recibió $200", 200, "corto", true).equals("Llegaron 200 pesos por DaviPlata, por mensaje de texto."), AvisoPago.fraseSms("DaviPlata: Recibió $200", 200, "corto", true));
         chk("Frase SMS desde celular: «Ojo… parece falso» aunque se confíe", AvisoPago.fraseSms("Nequi: te llegó $50.000", 50000, "celular", true).startsWith("Ojo."), "");
         chk("Banco: DaviPlata", AvisoPago.esBanco("DaviPlata"), "");
         chk("Banco: Nequi", AvisoPago.esBanco("Nequi"), "");
         chk("No es banco: WhatsApp", !AvisoPago.esBanco("WhatsApp"), "");
-        chk("Frase DaviPlata: «Recibiste 200 pesos por DaviPlata.»", AvisoPago.frase("DaviPlata", 200).equals("Recibiste 200 pesos por DaviPlata."), AvisoPago.frase("DaviPlata", 200));
-        chk("Frase Nequi: «Recibiste 25000 pesos por Nequi.»", AvisoPago.frase("Nequi", 25000).equals("Recibiste 25000 pesos por Nequi."), AvisoPago.frase("Nequi", 25000));
+        chk("Frase DaviPlata: «Llegaron 200 pesos por DaviPlata.»", AvisoPago.frase("DaviPlata", 200).equals("Llegaron 200 pesos por DaviPlata."), AvisoPago.frase("DaviPlata", 200));
+        chk("Frase Nequi: «Llegaron 25000 pesos por Nequi.»", AvisoPago.frase("Nequi", 25000).equals("Llegaron 25000 pesos por Nequi."), AvisoPago.frase("Nequi", 25000));
         chk("Plata: $1.500.000", AvisoPago.plata(1500000).equals("$1.500.000"), AvisoPago.plata(1500000));
         chk("Plata: $200", AvisoPago.plata(200).equals("$200"), AvisoPago.plata(200));
         // Voz de los pagos con volumen PAREJO (antes empezaba bajito y subía)
@@ -101,26 +101,32 @@ public class AvisoPagoPrueba {
         chk("Voz pareja: misma ganancia en TODA la frase (la parte bajita no se sube sola: sin compresor)", Math.abs((double) maxAbs(p100, 44 + sil * 2, n / 2) / maxAbs(p100, 44 + (sil + n / 2) * 2, n / 2) - 0.25) < 0.01,
             maxAbs(p100, 44 + sil * 2, n / 2) + " / " + maxAbs(p100, 44 + (sil + n / 2) * 2, n / 2));
         chk("Voz pareja: 100 % queda al 92 % del máximo (todas las frases al mismo nivel)", Math.abs(pico - 30145) < 60, pico);
-        chk("Voz pareja: 150 % suena más fuerte, sin pasarse del tope (sin chasquidos)", p150 != null && maxAbs(p150, 44 + (sil + n / 2) * 2, n / 2) <= 32767 && maxAbs(p150, 44 + sil * 2, n / 2) > maxAbs(p100, 44 + sil * 2, n / 2) * 2, p150 == null ? "null" : maxAbs(p150, 44 + sil * 2, n / 2));
-        // 1.43.4: arriba de 100 % ya no se recorta la voz (antes ×4 y tope: sonaba rasposa y no se entendía)
-        { int a0 = 44 + (sil + n / 2 + 2000) * 2, cuantos = 2000; double maxDif = 0;   // parte fuerte (ya estable): queda IGUAL que a 100 %
-          for (int k = 0; k < cuantos; k++) maxDif = Math.max(maxDif, Math.abs((short) ((p150[a0 + k * 2] & 0xff) | (p150[a0 + k * 2 + 1] << 8)) - (short) ((p100[a0 + k * 2] & 0xff) | (p100[a0 + k * 2 + 1] << 8))));
-          chk("Voz reforzada (150 %): la parte fuerte no se recorta ni se deforma (igual que a 100 %)", maxDif < 400, maxDif);
-          int b0 = 44 + (sil + n / 4) * 2; double r1 = 0, r2 = 0, mn = 9, mx = 0;          // parte bajita: se sube parejo (×2,5), con la misma forma
-          for (int k = 0; k < 500; k++) { int v1 = (short) ((p100[b0 + k * 2] & 0xff) | (p100[b0 + k * 2 + 1] << 8)), v2 = (short) ((p150[b0 + k * 2] & 0xff) | (p150[b0 + k * 2 + 1] << 8));
-            if (Math.abs(v1) > 2000) { double q = (double) v2 / v1; mn = Math.min(mn, q); mx = Math.max(mx, q); } }
-          chk("Voz reforzada (150 %): la parte bajita sube ×2,5 sin deformarse (la misma subida en cada punto)", mn > 2.3 && mx < 2.6, mn + " .. " + mx);
-          chk("Voz reforzada: nunca pasa del tope (92 %)", maxAbs(p150, 44 + sil * 2, n) <= 30160, maxAbs(p150, 44 + sil * 2, n)); }
+        chk("Voz pareja: 150 % suena más fuerte, sin pasarse del tope (sin chasquidos)", p150 != null && maxAbs(p150, 44 + (sil + n / 2) * 2, n / 2) <= 32767 && maxAbs(p150, 44 + sil * 2, n / 2) > maxAbs(p100, 44 + sil * 2, n / 2) * 1.5, p150 == null ? "null" : maxAbs(p150, 44 + sil * 2, n / 2));
+        // 1.49.0: arriba de 100 % la ganancia es FIJA en toda la frase (antes un nivelador la subía y la bajaba sílaba por
+        // sílaba y el dueño lo oía «subir y bajar»); solo la punta de los picos se dobla suave y nunca pasa de 97 %.
+        { double mn = 9, mx = 0, mnFin = 9, mxFin = 0;
+          int b0 = 44 + sil * 2, bFin = 44 + (sil + n / 2 - 600) * 2;
+          for (int k = 0; k < 500; k++) {
+            int v1 = (short) ((p100[b0 + k * 2] & 0xff) | (p100[b0 + k * 2 + 1] << 8)), v2 = (short) ((p150[b0 + k * 2] & 0xff) | (p150[b0 + k * 2 + 1] << 8));
+            if (Math.abs(v1) > 2000) { double q = (double) v2 / v1; mn = Math.min(mn, q); mx = Math.max(mx, q); }
+            int w1 = (short) ((p100[bFin + k * 2] & 0xff) | (p100[bFin + k * 2 + 1] << 8)), w2 = (short) ((p150[bFin + k * 2] & 0xff) | (p150[bFin + k * 2 + 1] << 8));
+            if (Math.abs(w1) > 2000) { double q = (double) w2 / w1; mnFin = Math.min(mnFin, q); mxFin = Math.max(mxFin, q); } }
+          chk("Voz reforzada (150 %): la parte bajita sube ×1,6 igual en cada punto (sin deformarse)", mn > 1.55 && mx < 1.65, mn + " .. " + mx);
+          chk("Voz reforzada (150 %): ESTABLE — la misma subida al principio y justo antes de la parte fuerte (no sube y baja)", Math.abs(mn - mnFin) < 0.02 && Math.abs(mx - mxFin) < 0.02, mn + "/" + mx + " vs " + mnFin + "/" + mxFin);
+          int fuerte = maxAbs(p150, 44 + (sil + n / 2) * 2, n / 2);
+          chk("Voz reforzada (150 %): la parte fuerte suena más duro que a 100 % y nunca pasa de 97 % (sin chasquidos)", fuerte > maxAbs(p100, 44 + (sil + n / 2) * 2, n / 2) && fuerte <= 31785, fuerte);
+        }
         // 1.43.7: llave Bre-B de Nequi con el valor escrito de otras formas
         chk("Bre-B: «Recibiste $ 50 000 por Bre-B» (miles con espacio) → $50.000 (antes «50»)", AvisoPago.monto("Nequi Recibiste $ 50 000 por Bre-B") == 50000 && AvisoPago.esRecibido("Nequi Recibiste $ 50 000 por Bre-B"), AvisoPago.monto("Nequi Recibiste $ 50 000 por Bre-B"));
         chk("Bre-B: «Movimiento recibido +$15.000» es un pago de $15.000", AvisoPago.esRecibido("Nequi Movimiento recibido +$15.000 Bre-B") && AvisoPago.monto("Nequi Movimiento recibido +$15.000 Bre-B") == 15000, AvisoPago.porQueNo("Nequi Movimiento recibido +$15.000 Bre-B"));
         chk("Bre-B: la llave (un celular) no se toma como el valor: «Recibiste $50.000 por Bre-B a tu llave 3001234567» → $50.000", AvisoPago.monto("Nequi Recibiste $50.000 por Bre-B a tu llave 3001234567") == 50000, AvisoPago.monto("Nequi Recibiste $50.000 por Bre-B a tu llave 3001234567"));
-        chk("Bre-B con valor: se dice «Recibiste 35000 pesos por Bre-B, en Nequi.»", AvisoPago.frase("Nequi", AvisoPago.monto("¡Te llegó plata por Bre-B! MARIA te envió $35.000"), "¡Te llegó plata por Bre-B! MARIA te envió $35.000").equals("Recibiste 35000 pesos por Bre-B, en Nequi."), AvisoPago.frase("Nequi", 35000, "¡Te llegó plata por Bre-B!"));
+        chk("Bre-B con valor: se dice «Llegaron 35000 pesos por Bre-B, en Nequi.»", AvisoPago.frase("Nequi", AvisoPago.monto("¡Te llegó plata por Bre-B! MARIA te envió $35.000"), "¡Te llegó plata por Bre-B! MARIA te envió $35.000").equals("Llegaron 35000 pesos por Bre-B, en Nequi."), AvisoPago.frase("Nequi", 35000, "¡Te llegó plata por Bre-B!"));
         chk("Plata que SALE con espacios tampoco es un pago: «Pagaste $ 50 000»", !AvisoPago.esRecibido("Nequi Pagaste $ 50 000 en Tienda"), "");
         chk("Valores de siempre siguen igual: $1.500.000 y 25,000", AvisoPago.monto("Recibiste $1.500.000") == 1500000 && AvisoPago.monto("JUAN te envió 25,000") == 25000, "");
         chk("Voz más pausada: velocidad 0,85 (antes 1)", AvisoPago.VELOCIDAD > 0.7f && AvisoPago.VELOCIDAD < 0.95f, AvisoPago.VELOCIDAD);
         chk("Pausas para que se entienda: «Recibiste, 20000 pesos, por Nequi.»", AvisoPago.pausado("Recibiste 20000 pesos por Nequi.").equals("Recibiste, 20000 pesos, por Nequi."), AvisoPago.pausado("Recibiste 20000 pesos por Nequi."));
         chk("Pausas con Bre-B: «Recibiste, 65000 pesos, por Bre-B, en DaviPlata.»", AvisoPago.pausado("Recibiste 65000 pesos por Bre-B, en DaviPlata.").equals("Recibiste, 65000 pesos, por Bre-B, en DaviPlata."), AvisoPago.pausado("Recibiste 65000 pesos por Bre-B, en DaviPlata."));
+        chk("Pausas: «Llegaron 3200 pesos, por Nequi.» (la cantidad clarita)", AvisoPago.pausado("Llegaron 3200 pesos por Nequi.").equals("Llegaron 3200 pesos, por Nequi."), AvisoPago.pausado("Llegaron 3200 pesos por Nequi."));
         chk("Pausas: decirlas dos veces no agrega más comas", AvisoPago.pausado(AvisoPago.pausado("Recibiste 1500 pesos por Nequi, de Ana.")).equals(AvisoPago.pausado("Recibiste 1500 pesos por Nequi, de Ana.")), AvisoPago.pausado("Recibiste 1500 pesos por Nequi, de Ana."));
         chk("Voz pareja: si no es un WAV de 16 bits, no se toca (se reproduce como siempre)", AvisoPago.vozPareja("hola".getBytes(), 100, 400) == null && AvisoPago.vozPareja(new byte[60], 100, 400) == null, "");
         // Más formas de DaviPlata, Nequi y la llave Bre-B (antes algunas no sonaban)
@@ -141,7 +147,7 @@ public class AvisoPagoPrueba {
         }
         String[] noMas = { "Enviaste $20.000 a la llave @juan. Nunca compartas tu clave", "Tu código de verificación es 123456. Te llegó por Bre-B", "Usted pagó $10.000. Le enviamos el comprobante" };
         for (String nm : noMas) chk("No es plata recibida: «" + nm + "»", !AvisoPago.esRecibido(nm), nm);
-        chk("Voz con Bre-B: «Recibiste 20000 pesos por Bre-B, en Nequi.»", "Recibiste 20000 pesos por Bre-B, en Nequi.".equals(AvisoPago.frase("Nequi", 20000, "Te llegaron $20.000 a tu llave")), AvisoPago.frase("Nequi", 20000, "Te llegaron $20.000 a tu llave"));
+        chk("Voz con Bre-B: «Llegaron 20000 pesos por Bre-B, en Nequi.»", "Llegaron 20000 pesos por Bre-B, en Nequi.".equals(AvisoPago.frase("Nequi", 20000, "Te llegaron $20.000 a tu llave")), AvisoPago.frase("Nequi", 20000, "Te llegaron $20.000 a tu llave"));
         chk("Voz sin Bre-B igual que antes", AvisoPago.frase("DaviPlata", 200, "Le llegó plata $200").equals(AvisoPago.frase("DaviPlata", 200)), "");
         chk("Bancos nuevos: Itaú, Banco Popular, Banco de Bogotá, Pibank, Bold", AvisoPago.esBanco("Itaú") && AvisoPago.esBanco("Banco Popular") && AvisoPago.esBanco("Bogotá App") && AvisoPago.esBanco("Pibank") && AvisoPago.esBanco("Bold"), "");
         chk("Diagnóstico: un aviso de banco con plata que no se tomó se guarda SIN nombres ni números", AvisoPago.pareceDePlata("Movimiento: JUAN PEREZ $20.000 llave") && AvisoPago.sinDatos("Movimiento: JUAN PEREZ $20.000 @juan").equals("Movimiento: NOMBRE $# @llave"), AvisoPago.sinDatos("Movimiento: JUAN PEREZ $20.000 @juan"));
@@ -165,7 +171,7 @@ public class AvisoPagoPrueba {
         String nq = "Envío MARIBE ARIAS te envió 1500, ¡lo mejor!";
         chk("Nequi «MARIBE ARIAS te envió 1500, ¡lo mejor!» (sin $) → $1500", AvisoPago.esRecibido(nq) && AvisoPago.monto(nq) == 1500, AvisoPago.esRecibido(nq) + " " + AvisoPago.monto(nq));
         chk("Nequi «te envió 25,000» → $25000 y «te envió 1.500.000» → $1500000", AvisoPago.monto("JUAN te envió 25,000") == 25000 && AvisoPago.monto("ANA te envió 1.500.000, ¡lo mejor!") == 1500000, AvisoPago.monto("JUAN te envió 25,000"));
-        chk("Voz: «Recibiste 1500 pesos por Nequi.»", "Recibiste 1500 pesos por Nequi.".equals(AvisoPago.frase("Nequi", 1500, nq)), AvisoPago.frase("Nequi", 1500, nq));
+        chk("Voz: «Llegaron 1500 pesos por Nequi.»", "Llegaron 1500 pesos por Nequi.".equals(AvisoPago.frase("Nequi", 1500, nq)), AvisoPago.frase("Nequi", 1500, nq));
 
         String llaves = "DaviPlata | Transaccion exitosa: Recibiste Plata de otra entidad usando Llaves, consulta el detalle de tus movimientos desde el app DaviPlata.";
         chk("DaviPlata por llave (sin valor): es plata recibida y SIN valor → se espera el SMS", AvisoPago.esRecibido(llaves) && AvisoPago.monto(llaves) == 0 && AvisoPago.esPlataSinValor(llaves) && AvisoPago.esBreB(llaves), AvisoPago.monto(llaves));
@@ -175,7 +181,7 @@ public class AvisoPagoPrueba {
         chk("SMS 85888 «Recibiste 140,000.» (sin decir DaviPlata): pago de 140000 de DaviPlata", AvisoPago.esSmsDePago("85888", sms2) && AvisoPago.monto(sms2) == 140000 && "DaviPlata".equals(AvisoPago.bancoDeCodigo("85888")), AvisoPago.monto(sms2));
         chk("…y desde un celular el mismo texto NO es del banco", !AvisoPago.esSmsDePago("3001234567", sms2), "");
         chk("Voz del SMS 85888: «… 140000 pesos desde DaviPlata …»", AvisoPago.fraseSms("85888", sms2, 140000, "corto", false).contains("140000 pesos desde DaviPlata"), AvisoPago.fraseSms("85888", sms2, 140000, "corto", false));
-        chk("Voz de la llave con el valor del SMS: «Recibiste 140000 pesos por Bre-B, en DaviPlata.»", "Recibiste 140000 pesos por Bre-B, en DaviPlata.".equals(AvisoPago.frase("DaviPlata", 140000, llaves)), AvisoPago.frase("DaviPlata", 140000, llaves));
+        chk("Voz de la llave con el valor del SMS: «Llegaron 140000 pesos por Bre-B, en DaviPlata.»", "Llegaron 140000 pesos por Bre-B, en DaviPlata.".equals(AvisoPago.frase("DaviPlata", 140000, llaves)), AvisoPago.frase("DaviPlata", 140000, llaves));
         String[] salen = { "DaviPlata | Pasaste $100 a otro DaviPlata. Para saber mas, consulta tus movimientos.", "DaviPlata: Compra exitosa en la Tienda Virtual por  20,000. Para saber mas, consulta tus movimientos" };
         for (String x : salen) chk("Plata que SALE no es pago: «" + x + "»", !AvisoPago.esRecibido(x) && !AvisoPago.esSmsDePago("85888", x), x);
         chk("Valores sin signo pequeños: «Recibiste 100 pesos» → 100; «recibiste 1000» → 1000", AvisoPago.monto("Recibiste 100 pesos") == 100 && AvisoPago.monto("DaviPlata: recibiste 1000 en tu DaviPlata") == 1000, AvisoPago.monto("Recibiste 100 pesos"));

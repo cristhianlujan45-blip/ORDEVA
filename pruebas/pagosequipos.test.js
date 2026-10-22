@@ -2,7 +2,7 @@
 // tablet, computador), de punta a punta (PostgreSQL REAL + Servidor Vento + la app de verdad):
 //  1. El celular de la caja (app Android) lee el aviso real de la llave Bre-B de Nequi → lo manda al Servidor Vento con
 //     lo que entendió (valor, banco, quién).
-//  2. La tablet (app Android): la notificación de pagos con la 🪟 ventana del valor y la voz «Recibiste 300 pesos por
+//  2. La tablet (app Android): la notificación de pagos con la 🪟 ventana del valor y la voz «Llegaron 300 pesos por
 //     Nequi», aunque Vento esté de fondo (el latido de la app la despierta).
 //  3. El computador (navegador): la 🪟 ventana con el valor y «Pago confirmado».
 //  4. El celular que lo leyó no lo repite (ni otra notificación ni otra voz).
@@ -93,7 +93,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     let tab = null;
     for(let i = 0; i < 90; i++){ await latir(TAB); tab = await and(TAB); if(tab.pagos.length) break; await new Promise(r => setTimeout(r, 500)); }
     chk('2. Tablet: notificación de pagos con la 🪟 ventana del valor «$300» por Nequi', tab.pagos.length === 1 && /^💜 Recibiste \$300 por Nequi/.test(tab.pagos[0].t) && tab.pagos[0].v === '$300' && tab.pagos[0].bco === 'Nequi' && tab.pagos[0].tipo === 'ok', tab.pagos);
-    chk('2. Tablet: la voz de los pagos dice «Recibiste 300 pesos por Nequi»', tab.decir.some(t => /^Recibiste 300 pesos por Nequi/.test(t)), tab.decir);
+    chk('2. Tablet: la voz de los pagos dice «Llegaron 300 pesos por Nequi»', tab.decir.some(t => /^Llegaron 300 pesos por Nequi/.test(t)), tab.decir);
     chk('2. Tablet: llegó en menos de 30 s con Vento de fondo', Date.now() - t0 < 30000, Date.now() - t0);
     chk('2. Tablet: sale en el canal de pagos, no como un aviso cualquiera', !tab.notifs.some(n => /\$300/.test(n.t + n.x) && n.c !== 'pagos'), tab.notifs);
 
@@ -119,7 +119,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     chk('5. Vuelve el internet: se manda solo y llega al servidor ($45.000 por DaviPlata)', llego && (await enServidor(45000))[0].metodo === 'DAVIPLATA');
     chk('5. … y la espera queda vacía', await esperar(CEL.p, () => JSON.parse(localStorage.getItem('vento_pagos_reenvio') || '[]').length === 0, null, 5000));
     tab = null; for(let i = 0; i < 90; i++){ await latir(TAB); tab = await and(TAB); if(tab.pagos.some(x => x.v === '$45.000')) break; await new Promise(r => setTimeout(r, 500)); }
-    chk('5. La tablet recibe ese pago: «Recibiste 45000 pesos por DaviPlata, de Maria Lopez»', tab.pagos.some(x => x.v === '$45.000' && x.bco === 'DaviPlata') && tab.decir.some(t => /^Recibiste 45000 pesos por DaviPlata, de Maria Lopez/.test(t)), tab);
+    chk('5. La tablet recibe ese pago: «Llegaron 45000 pesos por DaviPlata» (sin el nombre)', tab.pagos.some(x => x.v === '$45.000' && x.bco === 'DaviPlata') && tab.decir.some(t => /^Llegaron 45000 pesos por DaviPlata/.test(t)) && !tab.decir.some(t => /Maria/.test(t)), tab);
 
     // ===== 7. ⏳ El computador espera el pago de la Mesa 4; el celular lo lee =====
     await CEL.p.evaluate(() => { data.pagos = data.pagos || {}; data.pagos.on = true; data.tables[4] = { items: [{ productId: 'p4', name: 'Bandeja', price: 27300, qty: 1 }], payments: [], people: [] }; saveData(); });

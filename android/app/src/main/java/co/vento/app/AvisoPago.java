@@ -156,29 +156,17 @@ public final class AvisoPago {
         double g = 32767.0 * TOPE / pico;
         double[] x = new double[muestras];
         for (int k = 0; k < muestras; k++) x[k] = (short) le16(wav, ini + k * 2) * g / 32767.0;
-        // Arriba de 100 %: más fuerte SIN distorsión (1.43.4). Antes se multiplicaba todo hasta ×4 y se recortaban los picos:
-        // la voz quedaba rasposa y casi no se entendía. Ahora un nivelador suave: sube las sílabas bajitas (hasta ×2,5) y
-        // baja la ganancia ANTES de cada pico (mira 5 ms adelante), así nada pasa del tope y la forma de la voz se conserva.
-        double gmax = Math.min(2.5, Math.pow(10, refuerzo(volumenPct) / 2000.0));
+        // Arriba de 100 %: más fuerte y ESTABLE (1.49.0). La 1.43.4 usaba un nivelador que subía las sílabas bajitas y bajaba
+        // antes de cada pico: la ganancia cambiaba sílaba por sílaba y el dueño lo oía «subir y bajar». Ahora la ganancia es
+        // FIJA en toda la frase (hasta ×1,6 = +4 dB) y solo la punta de los picos se dobla suave (curva fija, sin memoria):
+        // suena más duro, parejo de principio a fin y sin chasquidos (nunca pasa de 97 %).
+        double gmax = Math.min(1.6, Math.pow(10, refuerzo(volumenPct) / 2000.0));
         if (gmax > 1.0001) {
-            int L = Math.max(1, frecuencia * canales * 5 / 1000);
-            double rel = Math.exp(-1.0 / (0.25 * frecuencia * canales)), env = 0, gs = gmax;
-            double baja = 1 - Math.exp(-1.0 / (0.001 * frecuencia * canales)), sube = 1 - Math.exp(-1.0 / (0.06 * frecuencia * canales));
-            // Máximo de los próximos 5 ms (ventana deslizante)
-            double[] adelante = new double[muestras];
-            java.util.ArrayDeque<Integer> dq = new java.util.ArrayDeque<>();
-            for (int k = muestras - 1; k >= 0; k--) {
-                while (!dq.isEmpty() && Math.abs(x[dq.peekLast()]) <= Math.abs(x[k])) dq.pollLast();
-                dq.addLast(k);
-                while (dq.peekFirst() > k + L) dq.pollFirst();
-                adelante[k] = Math.abs(x[dq.peekFirst()]);
-            }
+            final double RODILLA = 0.6, TECHO = 0.97, ANCHO = TECHO - RODILLA;
             for (int k = 0; k < muestras; k++) {
-                env = Math.max(adelante[k], env * rel);
-                double gd = env <= 1e-6 ? gmax : Math.min(gmax, TOPE / env);
-                gs += (gd - gs) * (gd < gs ? baja : sube);
-                double y = x[k] * gs;
-                x[k] = Math.abs(y) > TOPE ? Math.signum(y) * TOPE : y;      // seguro: nunca pasa del tope
+                double y = x[k] * gmax, a = Math.abs(y);
+                if (a > RODILLA) y = Math.signum(y) * (RODILLA + ANCHO * Math.tanh((a - RODILLA) / ANCHO));
+                x[k] = y;
             }
         }
         int sil = Math.max(0, Math.min(2000, silencioMs)) * frecuencia / 1000 * canales;
@@ -254,7 +242,7 @@ public final class AvisoPago {
         String b0 = bancoDe(cuerpo); if (b0.isEmpty() && bancoDeCodigo(remitente) != null) b0 = bancoDeCodigo(remitente);
         String banco = nombreApp(b0);
         if ("celular".equals(tipo)) return "Ojo. Llegó un mensaje de pago sospechoso por " + monto + " pesos desde un número de celular. Parece falso. No entregues nada.";
-        if (confiar) return "Recibiste " + monto + " pesos por " + banco + ", por mensaje de texto.";
+        if (confiar) return "Llegaron " + monto + " pesos por " + banco + ", por mensaje de texto.";
         return "Llegó un mensaje de texto de " + monto + " pesos desde " + banco + ". Revísalo en la aplicación del banco antes de entregar.";
     }
 
@@ -270,9 +258,9 @@ public final class AvisoPago {
         return "Llegó plata por " + nombreApp(app) + ". Mira el valor en la aplicación.";
     }
 
-    /** «Pago confirmado. 200 pesos desde DaviPlata.» */
+    /** «Llegaron 200 pesos por DaviPlata.» (1.49.0: el dueño pidió «llegaron tanto»: la cantidad siempre, sin el nombre). */
     static String frase(String app, long monto) {
-        return "Recibiste " + monto + " pesos por " + nombreApp(app) + ".";
+        return "Llegaron " + monto + " pesos por " + nombreApp(app) + ".";
     }
 
     /** Velocidad de la voz de los pagos: más pausada que la normal (1.43.4: «que se demore más diciendo el precio»). */
@@ -287,7 +275,7 @@ public final class AvisoPago {
 
     /** Con el texto del aviso: si llegó por la llave Bre-B lo dice («Pago confirmado. 20000 pesos por Bre-B, en Nequi.»). */
     static String frase(String app, long monto, String texto) {
-        return esBreB(texto) ? "Recibiste " + monto + " pesos por Bre-B, en " + nombreApp(app) + "." : frase(app, monto);
+        return esBreB(texto) ? "Llegaron " + monto + " pesos por Bre-B, en " + nombreApp(app) + "." : frase(app, monto);
     }
 
     /** ¿Vale la pena guardarlo para revisar? Aviso de una app de banco que habla de plata pero que Vento NO tomó como pago. */

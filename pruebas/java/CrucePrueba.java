@@ -72,7 +72,7 @@ public class CrucePrueba {
         // 2. Un pago nuevo de otro equipo
         responder("dueno", pago("p1", 20000, "NEQUI", "Ana Ruiz", "app", "OTRO", 2_000));
         revisarYEsperar();
-        chk("2. Pago de otro equipo: suena aquí «Recibiste 20000 pesos por Nequi, de Ana Ruiz»", VentoApp.dichos.size() == 1 && VentoApp.dichos.get(0).replace(",", "").contains("Recibiste 20000 pesos por Nequi de Ana Ruiz"), VentoApp.dichos);
+        chk("2. Pago de otro equipo: suena aquí «Llegaron 20000 pesos por Nequi» (la cantidad, sin el nombre)", VentoApp.dichos.size() == 1 && VentoApp.dichos.get(0).equals("Llegaron 20000 pesos por Nequi.") && !VentoApp.dichos.get(0).contains("Ana"), VentoApp.dichos);
         chk("2. … con la notificación de pagos y su ventana («💜 Recibiste $20.000 por Nequi», $20.000)", VentoApp.notifs.size() == 1 && VentoApp.notifs.get(0)[0].equals("💜 Recibiste $20.000 por Nequi") && VentoApp.notifs.get(0)[3].equals("$20.000") && VentoApp.notifs.get(0)[5].equals("ok"), VentoApp.avisos);
         chk("2. Le pide a la página que se ponga al día", VentoApp.jss.stream().anyMatch(x -> x.contains("ventoPagos.sincronizar")), VentoApp.jss);
         revisarYEsperar();
