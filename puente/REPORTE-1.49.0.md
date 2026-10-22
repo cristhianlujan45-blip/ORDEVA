@@ -72,7 +72,7 @@ Viene de la 1.48.0 (app Android 1.0.54, ya publicada):
 - **`pagosequipos`:** 40, con PostgreSQL real en celular, tablet y computador. Ahora incluye el chequeo en un Xiaomi con
   ahorro de batería: lo dice en rojo, y «Arreglar» y «Abrir inicio automático» abren sus ajustes.
 - Compila todo el código Android (con `android-all`, Android 14).
-- Suite completa.
+- Suite completa: 77 de 77 (`sincroniza` se cayó una vez porque la máquina de pruebas iba lenta; sola pasa 22 de 22).
 
 ## Lo que necesita el dueño
 - **La app Android nueva:** se instala sola, con «Actualizar ahora» en la 🔔 campanita.
