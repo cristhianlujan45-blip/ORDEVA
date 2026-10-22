@@ -129,7 +129,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 
     // 9. Volumen
     const ui9 = await p.evaluate(() => { const v = document.getElementById('pgVol'); return v ? { max: v.max, min: v.min, txt: document.getElementById('pgVolTxt').textContent, desc: document.getElementById('pgVolFila').textContent } : null; });
-    chk('9. Ajustes → Pagos: «🔊 Volumen de la voz de los pagos» de 10 a 150 % en la app, de fábrica 130 % (más fuerte de lo normal)', ui9 && ui9.min === '10' && ui9.max === '150' && /130 %/.test(ui9.txt) && /más fuerte de lo normal/i.test(ui9.desc), ui9);
+    chk('9. Ajustes → Pagos: «🔊 Volumen de la voz de los pagos» de 10 a 150 % en la app, de fábrica 100 % (lo más alto del celular, dicho directo: suena en todos)', ui9 && ui9.min === '10' && ui9.max === '150' && /^100 % · lo más alto del celular/.test(ui9.txt) && /más fuerte de lo normal/i.test(ui9.desc), ui9);
     await p.evaluate(() => { const v = document.getElementById('pgVol'); v.value = '130'; v.dispatchEvent(new Event('input')); v.dispatchEvent(new Event('change')); });
     let v9 = await p.evaluate(() => ({ ls: localStorage.getItem('vento_pagos_vol'), and: window.__and.vol, txt: document.getElementById('pgVolTxt').textContent }));
     chk('9. Subirlo a 130 % → se guarda, le llega a Android y dice «más fuerte de lo normal»', v9.ls === '130' && v9.and === 130 && /130 % · más fuerte de lo normal/.test(v9.txt), v9);

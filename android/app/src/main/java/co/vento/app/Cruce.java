@@ -18,13 +18,15 @@ import java.nio.charset.StandardCharsets;
  * nunca) a los demás, y el aviso de este celular al servidor salía solo cuando la página despertaba.
  *  • reenviar(): cada aviso de banco que lee este celular sale de una al Servidor Vento (con el mismo ID que usa la página:
  *    el servidor lo cuenta una sola vez aunque llegue por los dos lados).
- *  • revisar(): cada 10 s, desde el servicio de fondo, pregunta por los pagos nuevos del negocio (pagos_dispositivo) y los
+ *  • revisar(): cada 2,5 s, desde el servicio de fondo, pregunta por los pagos nuevos del negocio (pagos_dispositivo) y los
  *    anuncia aquí: notificación de pagos, 🪟 ventana y voz. Solo el dueño y los administradores; nunca el pago que leyó
  *    este mismo celular (ya sonó). Cada pago suena UNA vez: Android y la página lo «reclaman» antes de avisar.
  * La página le da la dirección, la llave pública y el token del celular (pagosCruce) al entrar al negocio.
  */
 final class Cruce {
     static final String PREF_CFG = "cruceCfg", PREF_DESDE = "cruceDesde", PREF_VISTOS = "cruceVistos", PREF_ESTADO = "cruceEstado";
+    /** Cada cuánto pregunta el servicio de fondo (VentoServicio). */
+    static final long CADA_MS = 2500;
     private static volatile boolean ocupado;
 
     private static SharedPreferences sp(Context c) { return c.getSharedPreferences("vento", Context.MODE_PRIVATE); }

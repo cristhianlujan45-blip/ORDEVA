@@ -263,7 +263,7 @@ public class VentoApp extends Application {
     static final String PREF_VOL = "pagosVolumen";
 
     static int volPagos() {
-        try { return AvisoPago.volumen(app.getSharedPreferences("vento", MODE_PRIVATE).getInt(PREF_VOL, 130)); } catch (Exception e) { return 130; }   // de fábrica 130 %
+        try { return AvisoPago.volumen(app.getSharedPreferences("vento", MODE_PRIVATE).getInt(PREF_VOL, 100)); } catch (Exception e) { return 100; }   // de fábrica 100 % (la alarma al máximo, dicha directo)
     }
 
     private static android.media.AudioAttributes atributosPago() {
@@ -414,12 +414,37 @@ public class VentoApp extends Application {
         final long pedido = System.currentTimeMillis();
         try { if (ttsPago != null && Build.VERSION.SDK_INT >= 21) ttsPago.playSilentUtterance(200, TextToSpeech.QUEUE_ADD, "sil" + System.nanoTime()); } catch (Exception ignorado) { }
         int r;
-        try { r = ttsPago == null ? TextToSpeech.ERROR : ttsPago.speak(frase, TextToSpeech.QUEUE_ADD, null, "pago" + System.nanoTime()); } catch (Exception e) { r = TextToSpeech.ERROR; }
+        try { r = ttsPago == null ? TextToSpeech.ERROR : ttsPago.speak(frase, TextToSpeech.QUEUE_ADD, paramsVoz(), "pago" + System.nanoTime()); } catch (Exception e) { r = TextToSpeech.ERROR; }
         if (r != TextToSpeech.SUCCESS) { pagoTermino(); vozDeNuevo(frase, "el motor de voz no respondió", true); return; }
         ui.postDelayed(() -> {
             boolean habla = false; try { habla = ttsPago != null && ttsPago.isSpeaking(); } catch (Exception ignorado) { }
             if (vozEmpezo < pedido && !habla) { pagoTermino(); vozDeNuevo(frase, "el motor de voz no dio señales en 9 s", false); }
         }, 9000);
+    }
+
+    // Más de 100 % (Ajustes → Pagos): el refuerzo va sobre la MISMA voz dicha directo (su sesión de audio con un
+    // LoudnessEnhancer de ganancia fija), sin grabarla antes a un archivo. Con 100 % o menos no se toca nada.
+    private static android.media.audiofx.LoudnessEnhancer realce;
+    private static int realceSesion = 0;
+    static android.os.Bundle paramsVoz() {
+        android.os.Bundle b = new android.os.Bundle();
+        int g = AvisoPago.refuerzo(volPagos());
+        if (g <= 0 || Build.VERSION.SDK_INT < 21 || app == null) return b;
+        try {
+            if (realce == null) {
+                android.media.AudioManager am = (android.media.AudioManager) app.getSystemService(Context.AUDIO_SERVICE);
+                if (am == null) return b;
+                realceSesion = am.generateAudioSessionId();
+                realce = new android.media.audiofx.LoudnessEnhancer(realceSesion);
+            }
+            realce.setTargetGain(g);
+            realce.setEnabled(true);
+            b.putInt(TextToSpeech.Engine.KEY_PARAM_SESSION_ID, realceSesion);
+        } catch (Throwable e) {
+            try { if (realce != null) realce.release(); } catch (Throwable ignorado) { }
+            realce = null; realceSesion = 0;                       // sin refuerzo: igual suena a lo más alto de la alarma
+        }
+        return b;
     }
 
     /** La voz del pago no sonó: motor de voz nuevo y se dice otra vez (una vez); si ya se intentó, con la voz de la página. */

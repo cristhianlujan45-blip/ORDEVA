@@ -37,14 +37,21 @@ public class VentoServicio extends Service {
             VentoApp.js("try{window.ventoLatido&&window.ventoLatido()}catch(e){}");
             if (++vueltas % 12 == 0) revisarEscucha();               // cada minuto: ¿sigue leyendo los avisos de los bancos?
             if (vueltas % 2 == 0) try { VentoEscucha.barrer(); } catch (Throwable ignorado) { }   // cada 10 s: ¿quedó un pago en la barra sin llegar?
-            // Cada 5 s: los pagos que leyeron los OTROS equipos del negocio (también con el celular bloqueado y la página
-            // dormida). 1.49.0: antes cada 10 s; «que lleguen de una, apenas pagan».
-            try { Cruce.revisar(VentoServicio.this); } catch (Throwable ignorado) { }
             // Cada 5 min: ¿hay una versión nueva de la app? (revisa cada 30 min; si ya hay una, la instala cuando no se use Vento)
             if (vueltas % 60 == 30) try { Actualizador.revisar(VentoServicio.this, false); } catch (Throwable ignorado) { }
             // Cada 5 min: el motor de voz de los pagos listo (si Android lo cerró, se vuelve a preparar): el pago suena de una.
             if (vueltas % 60 == 5) try { VentoApp.prepararVozPagos(); } catch (Throwable ignorado) { }
             VentoApp.ui.postDelayed(this, 5000);
+        }
+    };
+
+    /* Los pagos que leyeron los OTROS equipos del negocio, también con el celular bloqueado y la página dormida: cada
+       2,5 s (1.50.0; antes cada 5 s, y en la 1.48.0 cada 10 s). «Que suene apenas pagan, en todos los celulares». */
+    private final Runnable cruce = new Runnable() {
+        @Override public void run() {
+            if (!activo) return;
+            try { Cruce.revisar(VentoServicio.this); } catch (Throwable ignorado) { }
+            VentoApp.ui.postDelayed(this, Cruce.CADA_MS);
         }
     };
 
@@ -89,6 +96,8 @@ public class VentoServicio extends Service {
         // Si no hay ventana (por ejemplo, el celular se acaba de prender), se crea la página de Vento aquí.
         VentoApp.ui.post(() -> VentoApp.motor(null));
         VentoApp.ui.postDelayed(latido, 5000);
+        VentoApp.ui.removeCallbacks(cruce);
+        VentoApp.ui.postDelayed(cruce, 1000);
         VentoApp.ui.postDelayed(VentoApp::prepararVozPagos, 3000);   // la voz de los pagos lista desde ya (sale de una)
         try {
             PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
@@ -129,6 +138,7 @@ public class VentoServicio extends Service {
     public void onDestroy() {
         activo = false;
         VentoApp.ui.removeCallbacks(latido);
+        VentoApp.ui.removeCallbacks(cruce);
         try { if (cpu != null && cpu.isHeld()) cpu.release(); } catch (Exception ignorado) { }
         try { if (wifi != null && wifi.isHeld()) wifi.release(); } catch (Exception ignorado) { }
         super.onDestroy();

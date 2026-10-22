@@ -20,7 +20,9 @@
   'use strict';
   var SDK = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
   var K_CFG = 'vento_nube_cfg', K_ST = 'vento_nube_estado';
-  var POLL_MS = 5000, SUBIR_MS = 1000;
+  // 1.50.0: sube a los 0,3 s del último cambio (antes 1 s) y revisa cada 3 s (antes 5 s): «cuando agrego cervezas en una
+  // mesa, que se sincronice todo muy rápido».
+  var POLL_MS = 3000, SUBIR_MS = 300;
 
   // ---------- Estado guardado en el celular ----------
   function lsGet(k, d){ try{ var v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; }catch(e){ return d; } }
@@ -154,7 +156,7 @@
   // ---------- Conexión con la app ----------
   function datosApp(){ try{ return typeof window.ventoDatosActuales === 'function' ? window.ventoDatosActuales() : null; }catch(e){ return null; } }
   function aplicar(obj, respaldar){ return typeof window.ventoAplicarDatosNube === 'function' ? Promise.resolve(window.ventoAplicarDatosNube(obj, respaldar)) : Promise.resolve(); }
-  var subiendo = false, otraVez = false, tSubir = null, tPoll = null, ultimoError = '';
+  var subiendo = false, bajando = false, otraVez = false, tSubir = null, tPoll = null, ultimoError = '';
   function aviso(t){ try{ window.showToast && window.showToast(t, 5000); }catch(e){} }
   function pintarEstado(){ try{ var el = document.getElementById('nubeEstadoAj'); if(el) el.textContent = textoEstado(); }catch(e){} }
   function textoEstado(){
@@ -239,7 +241,10 @@
       try{ if(canal) c.removeChannel(canal); }catch(e){}
       canalDe = id;
       canal = c.channel('vento-datos-' + id, { config: { broadcast: { self: false } } })
-        .on('broadcast', { event: 'version' }, function(m){ var v = m && m.payload && m.payload.v; if(!v || v > (st.version || 0)) revisarNube(true); })
+        // Otro equipo guardó: si aquí no hay nada por subir, se baja de una (sin preguntar antes la versión: un viaje menos).
+        .on('broadcast', { event: 'version' }, function(m){ var v = m && m.payload && m.payload.v; if(v && v <= (st.version || 0)) return;
+          if(v && !st.sucio && !subiendo && !bajando && enSede()){ bajando = true; bajar().then(function(){ avisoBajada(); }, function(){ revisarNube(true); }).then(function(){ bajando = false; }); return; }
+          revisarNube(true); })
         .on('broadcast', { event: 'archivo' }, function(m){ var k = m && m.payload && m.payload.k; if(k) archivoCambiado(k); })
         .subscribe();
     }).catch(function(){});

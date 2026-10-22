@@ -92,7 +92,7 @@
     ultimaReaut = Date.now();
     return registrarDispositivo(true).then(function(d){ est.revocado = false; cruceAndroid(); try{ mandarPendientes(); }catch(e){} return d; }).catch(function(){ return null; });
   }
-  // App Android: los pagos de los otros equipos los pregunta Android cada 10 s desde el servicio de fondo (Cruce.java),
+  // App Android: los pagos de los otros equipos los pregunta Android cada 2,5 s desde el servicio de fondo (Cruce.java),
   // también con el celular bloqueado y la página dormida, y el aviso que lee este celular sale de una al servidor.
   var cruceDado = '';
   function cruceAndroid(){
@@ -135,12 +135,17 @@
     var g = data.pagos; g.lista = g.lista || [];
     var id = 'srv-' + p.id, x = g.lista.find(function(y){ return y.id === id || y.srv === p.id; });
     // Un aviso que este mismo celular ya leyó por MacroDroid (y reenvió al servidor) no se duplica: se enlaza.
-    if(!x && p.proveedor === 'dispositivo'){
+    if(p.proveedor === 'dispositivo' && !(x && leidoAqui(x))){
       var tp = Date.parse(p.creado_en || p.actualizado_en) || Date.now();
       // Un SMS se enlaza con el SMS y un aviso de la app con el de la app (el mismo pago puede llegar por los dos).
       var smsP = /\bSMS\b/.test(String(p.detalle || '')), smsY = function(y){ return !!y.sms || /\bSMS\b/.test(String(y.fuente || '')); };
-      x = g.lista.find(function(y){ return !y.srv && Number(y.monto) === Number(p.monto) && Math.abs((y.t || 0) - tp) < 3 * 60e3 && String(y.app || '').toUpperCase().replace('TRANSFERENCIA', '') === String(nombreMetodo(p.metodo)).toUpperCase().replace('TRANSFERENCIA', '') && smsY(y) === smsP; });
-      if(x){ x.srv = p.id; return x; }
+      // 1.50.0: la copia «srv-…» que bajó de la nube (la registró la tablet o el computador) NO es de este celular; si
+      // este celular tiene su propio registro de ese pago (lo leyó y ya sonó aquí), vale el suyo y la copia sobra.
+      // Antes el celular que leyó el pago a veces lo volvía a anunciar como si viniera de otro equipo.
+      var otra = x;
+      x = g.lista.find(function(y){ return y !== otra && (!y.srv || y.srv === p.id) && (!otra || leidoAqui(y)) && Number(y.monto) === Number(p.monto) && Math.abs((y.t || 0) - tp) < 3 * 60e3 && String(y.app || '').toUpperCase().replace('TRANSFERENCIA', '') === String(nombreMetodo(p.metodo)).toUpperCase().replace('TRANSFERENCIA', '') && smsY(y) === smsP; });
+      if(x){ x.srv = p.id; if(otra){ g.lista = g.lista.filter(function(y){ return y !== otra; }); if(otra.aplicado && !x.aplicado) x.aplicado = otra.aplicado; } return x; }
+      x = otra;
     }
     var fuente = p.verificado ? 'Verificado por ' + entidad(p, true) + (p.aprobacion ? ' · N.º ' + p.aprobacion : '') : (p.detalle || 'Aviso del celular');
     if(!x){
@@ -239,6 +244,10 @@
     oyentes.forEach(function(f){ try{ f(cache[p.id]); }catch(e){} });
     var nuevoAprobado = p.estado === 'aprobado' && (!antes || antes.estado !== 'aprobado');
     if(p.estado !== 'aprobado' && !(p.estado === 'rechazado' && p.confianza === 'falso') && p.estado !== 'anulado') { pintarHistorial(); return; }
+    // Un aviso que leyó un celular: si fue ESTE, Android ya lo dijo y lo tiene en su cola para la página. Se toma la cola
+    // ANTES de decidir, así se enlaza con el de este equipo y no suena dos veces (1.50.0: con la revisión más rápida, el
+    // servidor a veces le ganaba a la cola y el celular que lo leyó lo volvía a anunciar como si fuera de otro equipo).
+    if(enVivo && p.proveedor === 'dispositivo' && window.VentoAndroid) try{ window.ventoAvisosNativos && window.ventoAvisosNativos(); }catch(e){}
     var x = regLocal(p); if(!x){ return; }
     try{ saveData(); }catch(e){}
     // ⏳ «Esperando el pago» abierta aquí, o el mismo pago por SMS y por la app (lib/vento-confirma.js).
@@ -346,16 +355,17 @@
     // «Visto hace…» en «📱 Celulares autorizados»: así el chequeo sabe qué equipos están escuchando.
     if(Date.now() - ultimoLatido > 60e3 && (!document.hidden || est.vivo)){ ultimoLatido = Date.now(); latido(null); }
     try{ mandarPendientes(); }catch(e){}
-    if(est.servidor && !document.hidden && hayPendientes()){ api('sync', { negocio: n.id }).then(function(){ return sincronizar(); }).catch(function(){}); return; }
+    if(est.servidor && !document.hidden && hayPendientes() && Date.now() - (est.ultimoApiSync || 0) > 10000){ est.ultimoApiSync = Date.now(); api('sync', { negocio: n.id }).then(function(){ return sincronizar(); }).catch(function(){}); return; }
     // También con Vento de fondo o el celular bloqueado: si el tiempo real se cayó (Android lo corta cuando duerme), se
-    // pregunta cada 20 s; y aunque diga que está vivo, cada minuto, por si quedó colgado sin avisar.
-    if(Date.now() - est.ultimoSync > (est.vivo ? 60000 : 20000)) sincronizar();
+    // pregunta cada 6 s (1.50.0; antes 20 s); y aunque diga que está vivo, cada 20 s (antes cada minuto), por si quedó
+    // colgado sin avisar. «Que llegue en todo, siempre, y más rápido».
+    if(Date.now() - est.ultimoSync > (est.vivo ? 20000 : 6000)) sincronizar();
     if(!est.canal && Date.now() - (est.intentoCanal || 0) > 30000){ est.intentoCanal = Date.now(); conectarTiempoReal(); }
   }
   // La app Android despierta la página cada 5 s (window.ventoLatido): con Vento cerrada Android frena los relojes de la
   // página hasta 1 vez por minuto, y los pagos de los otros equipos llegarían tarde.
   var ultimoPulso = 0;
-  window.ventoPagosLatido = function(){ if(Date.now() - ultimoPulso < 9000) return; ultimoPulso = Date.now(); try{ vigilar(); }catch(e){} };
+  window.ventoPagosLatido = function(){ if(Date.now() - ultimoPulso < 4500) return; ultimoPulso = Date.now(); try{ vigilar(); }catch(e){} };
 
   function arrancar(){
     if(!negocio()) return;
@@ -365,7 +375,7 @@
       if(ok) crearBotonCuenta();
     });
   }
-  setInterval(vigilar, 10000);
+  setInterval(vigilar, 5000);
   setInterval(function(){ if(negocio()) latido(null); }, 5 * 60e3);
   window.addEventListener('online', function(){ if(negocio()){ mandarPendientes(); sincronizar(); conectarTiempoReal(); } });
   document.addEventListener('visibilitychange', function(){ if(!document.hidden && negocio()) sincronizar(); });
@@ -644,7 +654,7 @@
 
   // ---------- 🩺 Chequeo: ¿les llegan los pagos a todos los equipos? ----------
   // Este equipo (lectura de avisos, voz, servidor, autorizado, avisos por mandar, cómo recibe los de los demás) y cada
-  // equipo de la cuenta con «visto hace…»: Android pregunta cada 10 s y la página cada minuto, así que un equipo que no se
+  // equipo de la cuenta con «visto hace…»: Android pregunta cada 2,5 s y la página cada minuto, así que un equipo que no se
   // ve hace rato está cerrado o dormido y NO va a sonar.
   function haceTxt(ms){ var s = Math.max(0, Math.round(ms / 1000)); return s < 60 ? 'hace ' + s + ' s' : s < 3600 ? 'hace ' + Math.round(s / 60) + ' min' : s < 86400 ? 'hace ' + Math.round(s / 3600) + ' h' : 'hace ' + Math.round(s / 86400) + ' días'; }
   window.ventoPagosChequeo = function(){
@@ -681,10 +691,10 @@
         L.push(fila(!!d && !est.revocado, '🔑 Este equipo autorizado', d && !est.revocado ? 'Sí: lo que lee aquí les llega a los demás.' : 'No: toca «Autorizar».', d && !est.revocado ? '' : '<br><button type="button" class="btn-ghost" data-ck="aut" style="margin-top:6px">📱 Autorizar este equipo</button>'));
         L.push(fila(cola ? null : true, '📤 Avisos por mandar', cola ? cola + ' esperando internet: se mandan solos al volver.' : 'Ninguno: todo salió.'));
         var ahora = Date.now();
-        if(cr && cr.t) L.push(fila(cr.ok && ahora - cr.t < 60e3, '📡 Recibir los pagos de los otros equipos (Android)', cr.ok && ahora - cr.t < 60e3 ? 'Android pregunta cada 5 s, también con el celular bloqueado. Última: ' + haceTxt(ahora - cr.t) + '.' : 'Última vez ' + haceTxt(ahora - cr.t) + (cr.error ? ' (' + esc(cr.error) + ')' : '') + '. Revisa que Vento no tenga ahorro de batería.'));
+        if(cr && cr.t) L.push(fila(cr.ok && ahora - cr.t < 60e3, '📡 Recibir los pagos de los otros equipos (Android)', cr.ok && ahora - cr.t < 60e3 ? 'Android pregunta cada 2,5 s, también con el celular bloqueado. Última: ' + haceTxt(ahora - cr.t) + '.' : 'Última vez ' + haceTxt(ahora - cr.t) + (cr.error ? ' (' + esc(cr.error) + ')' : '') + '. Revisa que Vento no tenga ahorro de batería.'));
         else L.push(fila(est.vivo ? true : null, '📡 Recibir los pagos de los otros equipos', est.vivo ? 'En vivo.' : 'Revisa cada 20 s' + (est.ultimoSync ? ' (última ' + haceTxt(ahora - est.ultimoSync) + ')' : '') + '.'));
         var devs = r[1] || [], mio = d && d.id;
-        L.push('<li><span>👥</span><span><b>Equipos de la cuenta</b><br><small>Android pregunta cada 5 s; el computador y el navegador, cada minuto mientras Vento esté abierto.</small>' +
+        L.push('<li><span>👥</span><span><b>Equipos de la cuenta</b><br><small>Android pregunta cada 2,5 s; el computador y el navegador, cada minuto mientras Vento esté abierto.</small>' +
           (devs.length ? '<ul class="vp-checks" style="margin:6px 0 0">' + devs.map(function(x){
             var ms = ahora - Date.parse(x.ultimo_visto), oye = ms < 90e3, rato = ms < 15 * 60e3;
             return '<li><span>' + (oye ? '🟢' : rato ? '🟡' : '🔴') + '</span><span>' + esc(x.nombre) + (mio === x.id ? ' <b>(este)</b>' : '') + '<br><small>' + esc((x.usuario || '') + ' · ' + nombreRol(x.rol)) + ' · ' +

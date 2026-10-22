@@ -3753,6 +3753,7 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
   <section id="view-estadisticas">
     <div class="inv-head"><h2>📊 Estadísticas</h2><button type="button" class="btn-ghost" id="exportSalesExcelBtn" title="Descarga las ventas del período que elijas en un archivo que abre Excel">📥 Exportar ventas (Excel)</button></div>
     <div class="st-per" id="stPer"><button data-p="hoy">Hoy</button><button data-p="7">7 días</button><button data-p="30">30 días</button><button data-p="todo">Todo</button></div>
+    <div id="tableroVento" data-novocab></div><!-- 🛰️ Tablero: lib/vento-tablero.js -->
     <div id="statsBody"></div>
   </section>
 
@@ -5494,7 +5495,7 @@ export default {
 <script src="lib/vento-pos.js" defer></script><!-- Modos de trabajo (tienda/mixto) y modo fácil -->
 <script src="lib/vento-equipos.js" defer></script>
 <script src="lib/vento-turno.js" defer></script>
-<script src="lib/vento-inventario.js" defer></script><!-- 🔢 Inventario por código: consultar, entrada de mercancía, toma de inventario, kárdex y devoluciones --><!-- 💵 Caja con base, entradas / salidas y arqueo --><!-- 🔌 Balanza, impresora de facturas y cajón de dinero (USB, Bluetooth, red) -->
+<script src="lib/vento-tablero.js" defer></script><!-- 🛰️ Tablero de estadísticas --><script src="lib/vento-inventario.js" defer></script><!-- 🔢 Inventario por código: consultar, entrada de mercancía, toma de inventario, kárdex y devoluciones --><!-- 💵 Caja con base, entradas / salidas y arqueo --><!-- 🔌 Balanza, impresora de facturas y cajón de dinero (USB, Bluetooth, red) -->
 <script src="lib/vento-confirma.js" defer></script><!-- Confirmación de pagos: ⏳ esperando el pago, mesa correcta, sin valor, mesero, cuadre -->
 <script src="lib/vento-guia.js" defer></script><!-- Modo fácil para mayores: guía paso a paso con voz, «Ayúdame» y recorrido -->
 <script src="lib/vento-cuenta.js" defer></script><!-- Soporte en la app, licencias del proveedor, recuperar por SMS, cuenta de cliente aparte del administrador -->
@@ -12291,6 +12292,7 @@ function renderStats(){
     (tr.length ? stCard('📉 Se agotan primero', stRows(tr.slice().sort((a, b) => key(a) - key(b)).slice(0, 10).map(p => { const d = invDays(p); return { l: p.name, v: p.stock, c: COL[invStatus(p)], t: p.stock + ' u' + (d != null ? ' · ≈' + (d < 1 ? 'hoy' : Math.round(d) + ' d') : '') }; })))
       : '<div class="empty-state">Aún no controlas stock. Configúralo en Inventario para ver estas gráficas.</div>');
   box.innerHTML = '<h3 class="st-h">💵 Ventas</h3>' + sales + calendarComparisonCard() + '<h3 class="st-h">📦 Inventario</h3>' + inv;
+  try{ window.ventoTablero && window.ventoTablero.pintar(stPer); }catch(e){ console.error('vento-tablero', e); }
 }
 document.getElementById('stPer').addEventListener('click', e => { const b = e.target.closest('button[data-p]'); if(b){ stPer = b.dataset.p; renderStats(); } });
 
@@ -25822,7 +25824,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-22 · v1.49.0';
+const MESORA_VERSION = '2026-10-22 · v1.50.0';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'Vento · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 /* 🔄 La app Android se actualiza SOLA (Actualizador): revisa cada 3 h, baja la versión nueva y la instala cuando no se
@@ -29096,8 +29098,10 @@ let fotosListas = false;
   // En la app Android la dice la voz de pagos de Android (canal de la alarma, al volumen elegido; más de 100 % = reforzada,
   // más fuerte de lo normal). En el navegador, la voz del navegador (hasta 100 %).
   const PG_VOL_KEY = 'vento_pagos_vol';
-  // De fábrica 130 % (1.49.0: «que suene alto, muy duro»): más fuerte de lo normal, con la ganancia FIJA (estable).
-  const pgVol = () => { try{ const v = Number(localStorage.getItem(PG_VOL_KEY)); return v >= 10 && v <= 150 ? v : 130; }catch(e){ return 130; } };
+  // De fábrica 100 % = la alarma del celular al MÁXIMO, dicha directo por el motor de voz: lo que suena en TODOS los
+  // celulares. (1.50.0: en la 1.49.0 era 130 % y la página se lo mandaba también a las apps sin actualizar: con la voz de
+  // Google o Samsung eso grababa la frase a un archivo antes de tocarla, y en varios celulares el pago quedaba callado.)
+  const pgVol = () => { try{ const v = Number(localStorage.getItem(PG_VOL_KEY)); return v >= 10 && v <= 150 ? v : 100; }catch(e){ return 100; } };
   window.ventoPagosVolumen = pgVol;
   // «🗣️ Decir los pagos en voz alta» (Ajustes → Pagos): prendido de fábrica. Apagado: llegan con notificación y ventana.
   const PG_VOZ_KEY = 'vento_pagos_voz';
