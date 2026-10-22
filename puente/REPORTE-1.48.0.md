@@ -96,7 +96,7 @@ computador. Se revisaron las pantallas de mesas, vender, hoy y más.
 - **`facilpantallas` (nueva):** 28, en los 8 tamaños.
 - **Repetidas y bien:** `facil`, `modos`, `cajapos`, `guia`, `pagosaviso`, `confirmapago`, `avisosandroid` y `equipos`.
 - Compila todo el código Android (con `android-all`, Android 14).
-- Suite completa.
+- Suite completa: 77 de 77 bien.
 
 ## Lo que necesita el dueño
 - **La app Android nueva:** se instala sola, con «Actualizar ahora» en la 🔔 campanita.
