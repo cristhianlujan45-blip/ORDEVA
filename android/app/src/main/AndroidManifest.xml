@@ -109,6 +109,11 @@
         </service>
 
         <!-- Vento trabajando de fondo (aviso fijo en la barra): no se cierra al quitar la app de recientes -->
+        <!-- 🛡️ Guardia: cada 15 min vuelve a prender Vento si la marca del celular lo cerró (Guardia.java) -->
+        <service
+            android:name=".Guardia"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
         <service
             android:name=".VentoServicio"
             android:exported="false"

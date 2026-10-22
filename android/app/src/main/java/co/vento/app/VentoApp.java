@@ -69,6 +69,7 @@ public class VentoApp extends Application {
         super.onCreate();
         app = this;
         crearCanales();
+        Guardia.programar(this);                 // 🛡️ si la marca del celular cierra Vento, se vuelve a prender sola
     }
 
     /**

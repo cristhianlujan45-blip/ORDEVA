@@ -661,6 +661,18 @@
       try{ voz = A && A.pagosVozEstado ? !!A.pagosVozEstado() : (window.ventoPagosVozOn ? window.ventoPagosVozOn() : true); }catch(e){}
       if(and) L.push(fila(and.on && and.permiso && and.vivo !== false, '📲 Leer los avisos de Nequi, DaviPlata y Bre-B de este celular',
         and.on && and.permiso && and.vivo !== false ? 'Conectado.' : !and.permiso ? 'Falta el permiso «Acceso a notificaciones» para Vento.' : !and.on ? 'Apagado (Ajustes → Pagos → «Leer los avisos de ESTE celular»), si en este celular tienes Nequi o DaviPlata.' : 'Android lo desconectó: apaga y prende «Acceso a notificaciones» para Vento.'));
+      // Con el celular bloqueado: sin ahorro de batería, el servicio de fondo prendido y los pasos de cada marca.
+      var pm = null, marca = '';
+      try{ pm = A && A.permisos ? JSON.parse(A.permisos() || '{}') : null; }catch(e){}
+      try{ marca = A && A.fabricante ? String(A.fabricante() || '').toLowerCase() : ''; }catch(e){}
+      if(pm){
+        L.push(fila(pm.avisos !== false, '🔔 Notificaciones de Vento', pm.avisos !== false ? 'Permitidas.' : 'Bloqueadas: los pagos no salen en la barra ni con el celular bloqueado.', pm.avisos !== false ? '' : '<br><button type="button" class="btn-ghost" data-ck="perm" style="margin-top:6px">🔓 Permitir</button>'));
+        L.push(fila(pm.bateria !== false, '🔋 Vento sin ahorro de batería', pm.bateria !== false ? 'Sí: trabaja con el celular bloqueado.' : 'No: con el celular bloqueado Android la frena y los pagos llegan tarde o no suenan. Elige «Sin restricciones».', pm.bateria !== false ? '' : '<br><button type="button" class="btn-ghost" data-ck="bat" style="margin-top:6px">🔋 Arreglar</button>'));
+        L.push(fila(pm.fondo === true, '⚙️ Vento trabajando de fondo', pm.fondo === true ? 'Prendido (aviso fijo de Vento en la barra).' : 'Apagado: los pagos de los otros equipos no van a sonar con el celular bloqueado.'));
+        var m = /xiaomi|redmi|poco/.test(marca) ? 'Xiaomi' : /oppo|realme|oneplus/.test(marca) ? 'Oppo / Realme' : /vivo|iqoo/.test(marca) ? 'Vivo' : /huawei|honor/.test(marca) ? 'Huawei / Honor' : /tecno|infinix|itel/.test(marca) ? 'Tecno / Infinix' : /asus/.test(marca) ? 'Asus' : /samsung/.test(marca) ? 'Samsung' : '';
+        if(m === 'Samsung') L.push(fila(null, '📱 Samsung', 'Ajustes → Batería → Límites de uso en segundo plano: que Vento NO esté en «Aplicaciones en suspensión» ni «en suspensión profunda».'));
+        else if(m) L.push(fila(null, '🚀 ' + m + ': inicio automático', 'Prende «Inicio automático» para Vento (y para Nequi y DaviPlata). Sin eso la marca cierra Vento de fondo.', '<br><button type="button" class="btn-ghost" data-ck="auto" style="margin-top:6px">🚀 Abrir inicio automático</button>'));
+      }
       L.push(fila(voz ? true : null, '🗣️ Voz de los pagos', voz ? 'Prendida.' : 'Apagada: los pagos llegan sin voz (Ajustes → Pagos → «Decir los pagos en voz alta»).', '<br><button type="button" class="btn-ghost" data-ck="voz" style="margin-top:6px">▶ Probar la voz</button>'));
       if(!n){ L.push(fila(false, '👥 Pagos entre equipos', 'Entra con tu correo (Vento Nube) en cada equipo: así los pagos que lee un celular les llegan a todos.')); }
       else {
@@ -669,10 +681,10 @@
         L.push(fila(!!d && !est.revocado, '🔑 Este equipo autorizado', d && !est.revocado ? 'Sí: lo que lee aquí les llega a los demás.' : 'No: toca «Autorizar».', d && !est.revocado ? '' : '<br><button type="button" class="btn-ghost" data-ck="aut" style="margin-top:6px">📱 Autorizar este equipo</button>'));
         L.push(fila(cola ? null : true, '📤 Avisos por mandar', cola ? cola + ' esperando internet: se mandan solos al volver.' : 'Ninguno: todo salió.'));
         var ahora = Date.now();
-        if(cr && cr.t) L.push(fila(cr.ok && ahora - cr.t < 60e3, '📡 Recibir los pagos de los otros equipos (Android)', cr.ok && ahora - cr.t < 60e3 ? 'Android pregunta cada 10 s, también con el celular bloqueado. Última: ' + haceTxt(ahora - cr.t) + '.' : 'Última vez ' + haceTxt(ahora - cr.t) + (cr.error ? ' (' + esc(cr.error) + ')' : '') + '. Revisa que Vento no tenga ahorro de batería.'));
+        if(cr && cr.t) L.push(fila(cr.ok && ahora - cr.t < 60e3, '📡 Recibir los pagos de los otros equipos (Android)', cr.ok && ahora - cr.t < 60e3 ? 'Android pregunta cada 5 s, también con el celular bloqueado. Última: ' + haceTxt(ahora - cr.t) + '.' : 'Última vez ' + haceTxt(ahora - cr.t) + (cr.error ? ' (' + esc(cr.error) + ')' : '') + '. Revisa que Vento no tenga ahorro de batería.'));
         else L.push(fila(est.vivo ? true : null, '📡 Recibir los pagos de los otros equipos', est.vivo ? 'En vivo.' : 'Revisa cada 20 s' + (est.ultimoSync ? ' (última ' + haceTxt(ahora - est.ultimoSync) + ')' : '') + '.'));
         var devs = r[1] || [], mio = d && d.id;
-        L.push('<li><span>👥</span><span><b>Equipos de la cuenta</b><br><small>Android pregunta cada 10 s; el computador y el navegador, cada minuto mientras Vento esté abierto.</small>' +
+        L.push('<li><span>👥</span><span><b>Equipos de la cuenta</b><br><small>Android pregunta cada 5 s; el computador y el navegador, cada minuto mientras Vento esté abierto.</small>' +
           (devs.length ? '<ul class="vp-checks" style="margin:6px 0 0">' + devs.map(function(x){
             var ms = ahora - Date.parse(x.ultimo_visto), oye = ms < 90e3, rato = ms < 15 * 60e3;
             return '<li><span>' + (oye ? '🟢' : rato ? '🟡' : '🔴') + '</span><span>' + esc(x.nombre) + (mio === x.id ? ' <b>(este)</b>' : '') + '<br><small>' + esc((x.usuario || '') + ' · ' + nombreRol(x.rol)) + ' · ' +
@@ -686,7 +698,10 @@
         var k = b.dataset.ck;
         if(k === 'x') return cerrarVentana(ov);
         if(k === 'otra') return window.ventoPagosChequeo();
-        if(k === 'voz'){ try{ if(A && A.pagosProbarVoz) A.pagosProbarVoz(); else hablar('Recibiste 200 pesos por Nequi.'); }catch(x){} return; }
+        if(k === 'voz'){ try{ if(A && A.pagosProbarVoz) A.pagosProbarVoz(); else hablar('Llegaron 200 pesos por Nequi.'); }catch(x){} return; }
+        if(k === 'bat'){ try{ A.ajustesBateria(); }catch(x){} return; }
+        if(k === 'auto'){ try{ A.abrirInicioAutomatico(); }catch(x){} return; }
+        if(k === 'perm'){ try{ A.pedirPermisos ? A.pedirPermisos() : A.ajustesBateria(); }catch(x){} return; }
         if(k === 'aut'){ est.revocado = false; ultimaReaut = 0; reautorizar().then(function(){ window.ventoPagosChequeo(); }); }
       };
     });

@@ -13,5 +13,6 @@ public class Arranque extends BroadcastReceiver {
                 && !"android.intent.action.QUICKBOOT_POWERON".equals(a)) return;
         if (!c.getSharedPreferences("vento", Context.MODE_PRIVATE).getBoolean("fondo", true)) return;
         VentoServicio.arrancar(c);
+        Guardia.programar(c);
     }
 }
