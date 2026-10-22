@@ -10,7 +10,10 @@ public class VentoApp {
     static final Cola ui = new Cola();
     static final List<String> dichos = new ArrayList<>(), avisos = new ArrayList<>();
     static void motor(Object o) { }
-    static void js(String s) { }
+    static final List<String> jss = new ArrayList<>(), reenvios = new ArrayList<>();
+    static void js(String s) { jss.add(s); }
+    static String q(String s) { return "\"" + (s == null ? "" : s.replace("\"", "\\\"")) + "\""; }
+    static void reenviarPago(String id, String txt, String revisar, boolean smsOk) { reenvios.add(id + "|" + txt); }
     static void mantenerDespierto() { }
     static void decirPago(String f) { dichos.add(f); }
     static void anunciarPago(String app, long monto, boolean notif) { anunciarPago(app, monto, notif, null); }

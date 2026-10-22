@@ -32,6 +32,11 @@ if(jar && fs.existsSync(jar)){
     ...fs.readdirSync(sim).map(f => path.join(sim, f)), path.join(__dirname, 'java/EscuchaPrueba.java')]);
   if(r.status !== 0){ mal++; console.log('❌ No compila VentoEscucha: ' + r.stderr.slice(0, 800)); }
   else contar(correr('java', ['-Dstdout.encoding=UTF-8', '-cp', path.join(tmp, 'b') + path.delimiter + jar, 'co.vento.app.EscuchaPrueba']).stdout, 'Lectura de avisos y SMS reales (EscuchaPrueba)');
+  // Los pagos entre equipos desde Android (Cruce): contra un servidor HTTP de mentira.
+  r = correr('javac', ['-nowarn', '-encoding', 'UTF-8', '-cp', jar, '-d', path.join(tmp, 'c'), path.join(src, 'Cruce.java'), path.join(src, 'AvisoPago.java'),
+    ...fs.readdirSync(sim).map(f => path.join(sim, f)), path.join(__dirname, 'java/CrucePrueba.java')]);
+  if(r.status !== 0){ mal++; console.log('❌ No compila Cruce: ' + r.stderr.slice(0, 800)); }
+  else contar(correr('java', ['-Dstdout.encoding=UTF-8', '-cp', path.join(tmp, 'c') + path.delimiter + jar, 'co.vento.app.CrucePrueba']).stdout, 'Pagos entre equipos desde Android (CrucePrueba)');
 } else console.log('ℹ️ Sin la librería de Android (VENTO_ANDROID_ALL): se omitió la simulación de VentoEscucha.');
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log('RESULTADO', ok, 'bien', mal, 'mal'); process.exit(mal ? 1 : 0);

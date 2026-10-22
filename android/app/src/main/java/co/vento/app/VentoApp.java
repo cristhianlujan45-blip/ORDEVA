@@ -292,7 +292,16 @@ public class VentoApp extends Application {
     // Marca de «va al parlante de avisos» (ver Parlante): la frase viaja por la misma fila de la voz de los pagos.
     static final String AL_PARLANTE = "\u0001";
 
+    /** El aviso que leyó este celular, al Servidor Vento de una (Cruce): les llega ya a los demás equipos del negocio. */
+    static void reenviarPago(String id, String txt, String revisar, boolean smsOk) { if (app != null) Cruce.reenviar(app, id, txt, revisar, smsOk); }
+
+    /** «🔊 Decir los pagos en voz alta» (Ajustes → Pagos). Apagado: los pagos llegan con su notificación y su ventana, sin voz. */
+    static boolean vozPagosOn() { return app == null || app.getSharedPreferences("vento", MODE_PRIVATE).getBoolean("pagosVoz", true); }
     static void decirPago(final String frase) {
+        if (!vozPagosOn()) return;
+        decirPagoSiempre(frase);
+    }
+    static void decirPagoSiempre(final String frase) {
         ultimoPago = System.currentTimeMillis();
         decirVoz(Parlante.usa(app, "pagos") ? AL_PARLANTE + frase : frase);
     }
@@ -1482,7 +1491,22 @@ public class VentoApp extends Application {
 
         /** «▶ Probar»: dice un pago de prueba con el volumen elegido. */
         @JavascriptInterface
-        public void pagosProbarVoz() { decirPago("Recibiste 200 pesos por DaviPlata."); }
+        public void pagosProbarVoz() { decirPagoSiempre("Recibiste 200 pesos por DaviPlata."); }
+
+        /** «🔊 Decir los pagos en voz alta»: prendido (de fábrica) o apagado. */
+        @JavascriptInterface
+        public void pagosVozOn(boolean on) { getSharedPreferences("vento", MODE_PRIVATE).edit().putBoolean("pagosVoz", on).apply(); }
+        @JavascriptInterface
+        public boolean pagosVozEstado() { return vozPagosOn(); }
+
+        /** Los pagos de los otros equipos desde Android (Cruce): dirección, llave pública, token del celular. Vacío = apagar. */
+        @JavascriptInterface
+        public void pagosCruce(String json) { Cruce.configurar(VentoApp.this, json); }
+        @JavascriptInterface
+        public String pagosCruceEstado() { return getSharedPreferences("vento", MODE_PRIVATE).getString(Cruce.PREF_ESTADO, "{}"); }
+        /** true = este pago todavía no se había avisado aquí (y queda reclamado); false = ya lo avisó Android. */
+        @JavascriptInterface
+        public boolean pagoReclamar(String id) { return Cruce.reclamar(VentoApp.this, id); }
 
         @JavascriptInterface
         public void callar() { ui.post(() -> { try { if (tts != null) tts.stop(); } catch (Exception ignorado) { } }); }

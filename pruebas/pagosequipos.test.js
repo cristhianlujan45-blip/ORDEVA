@@ -43,6 +43,9 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
           pagoNotificar: (t, f, o, v, bco, tipo) => { A.pagos.push({ t, f, o, v, bco, tipo }); },
           pagosDecir: t => { A.decir.push(String(t)); },
           pagosNotif: () => {}, pagosVolumen: () => {}, ventanaPagoOn: () => {}, alFrente: () => false,
+          pagosCruce: j => { A.cruce = j; }, pagosCruceEstado: () => '{}',
+          pagoReclamar: id => { A.reclamados = A.reclamados || []; if(A.androidYaLoDijo || A.reclamados.includes(id)) return false; A.reclamados.push(id); return true; },
+          pagosVozOn: v => { A.vozOn = !!v; }, pagosVozEstado: () => A.vozOn !== false,
         };
       }, !!android);
       const p = await ctx.newPage();
@@ -139,5 +142,48 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     chk('6. «Movimiento recibido por $ 18 500» con lo que entendió la app → $18.500 por Nequi de Luis Gil', r6.ok && r6.monto === 18500 && (await sb.sql("select pagador from pagos where id = $1", [r6.pago]))[0].pagador === 'Luis Gil', r6);
     const r6b = await (await fetch(F, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ text: 'Nequi | Nequi | Tu saldo es $ 18 500', id: 'and-k6:2' }) })).json();
     chk('6. Sin lo que entendió la app, lo que no es un pago sigue sin ser un pago', r6b.ok && r6b.ignorado && !r6b.pago, r6b);
+
+    // ===== 8. Android pregunta por los pagos él mismo (Cruce), celular retirado, voz apagada y chequeo =====
+    const cruce = await CEL.p.evaluate(() => { try{ return JSON.parse(window.__and.cruce || '{}'); }catch(e){ return {}; } });
+    chk('8. La página le pasa a Android la dirección, la llave pública y el token del celular', cruce.token === dev.token && /^https:\/\/.+supabase\.co/.test(cruce.url) && !!cruce.key, cruce);
+    const rpcAnon = async (tok, desde) => (await fetch(sb.url + '/rest/v1/rpc/pagos_dispositivo', { method: 'POST', headers: { apikey: sb.anonKey, Authorization: 'Bearer ' + sb.anonKey, 'Content-Type': 'application/json' }, body: JSON.stringify({ p_token: tok, p_desde: desde || null }) })).json();
+    const devTab = await TAB.p.evaluate(() => JSON.parse(localStorage.getItem('vento_pagos_dev')));
+    const q1 = await rpcAnon(devTab.token), p300 = (q1.pagos || []).find(x => Number(x.monto) === 300);
+    chk('8. Con el token de la tablet (sin sesión) Android ve los pagos del negocio, y de cuál celular vino cada uno', q1.ok && q1.rol === 'dueno' && q1.dispositivo === devTab.id && p300 && p300.de_dispositivo === dev.id, { ok: q1.ok, rol: q1.rol, n: (q1.pagos || []).length, p300 });
+    const q2 = await rpcAnon('x'.repeat(40));
+    chk('8. Con un token que no es de un celular autorizado: nada', q2.ok === false && q2.error === 'dispositivo_no_autorizado' && !q2.pagos, q2);
+    const visto = (await sb.sql('select extract(epoch from now() - ultimo_visto)::int s from dispositivos where id = $1', [devTab.id]))[0].s;
+    chk('8. Cada pregunta deja la tablet «vista» (el chequeo sabe que está escuchando)', visto <= 5, visto);
+    const lee = (id, txt) => CEL.p.evaluate(([id, txt]) => { window.__and.cola.push({ id, txt, t: Date.now(), voz: true }); window.ventoAvisosNativos(); }, [id, txt]);
+    // Llegó POR EL SERVIDOR a la tablet (no solo la copia de la lista de pagos que viene de otro equipo).
+    const llegaTab = async (v) => { for(let i = 0; i < 90; i++){ await latir(TAB); const t = await TAB.p.evaluate(v => Object.values(window.ventoPagos._cache).some(x => Number(x.monto) === v), v); if(t){ await new Promise(r => setTimeout(r, 300)); return true; } await new Promise(r => setTimeout(r, 500)); } return false; };
+    // Android ya lo anunció → la página no lo repite
+    await TAB.p.evaluate(() => { window.__and.androidYaLoDijo = true; window.__and.pagos = []; window.__and.decir = []; });
+    await lee('k8:61:1', 'Nequi | Nequi | SOFIA te envió $61.000');
+    const t8 = await llegaTab(61000);
+    let a8 = await and(TAB);
+    chk('8. Si Android ya lo anunció (con la página dormida), la página no lo repite: ni otra ventana ni otra voz', t8 && !a8.pagos.some(x => x.v === '$61.000') && !a8.decir.some(x => /61000/.test(x)), { t8, a8: a8.pagos });
+    await TAB.p.evaluate(() => { window.__and.androidYaLoDijo = false; });
+    // Celular retirado: se vuelve a autorizar solo y el aviso igual llega
+    await sb.sql('update dispositivos set revocado_en = now() where id = $1', [dev.id]);
+    await lee('k8:62:1', 'Nequi | Nequi | RAUL te envió $62.000');
+    let ok62 = false; for(let i = 0; i < 40 && !ok62; i++){ ok62 = (await enServidor(62000)).length === 1; if(!ok62) await new Promise(r => setTimeout(r, 400)); }
+    const dev2 = await CEL.p.evaluate(() => JSON.parse(localStorage.getItem('vento_pagos_dev')));
+    chk('8. Celular retirado: se vuelve a autorizar solo (token nuevo) y el aviso llega igual al servidor', ok62 && dev2.token !== dev.token, { ok62, nuevo: dev2.token !== dev.token });
+    chk('8. … y la tablet lo recibe', await llegaTab(62000));
+    chk('8. … y Android queda con el token nuevo', await CEL.p.evaluate(t => JSON.parse(window.__and.cruce || '{}').token === t, dev2.token));
+    // Voz apagada en la tablet
+    await TAB.p.evaluate(() => { window.ventoPagosVozOn(false); window.__and.pagos = []; window.__and.decir = []; });
+    chk('8. «Decir los pagos en voz alta» apagado le llega a Android', await TAB.p.evaluate(() => window.__and.vozOn === false));
+    await lee('k8:63:1', 'Nequi | Nequi | ELENA te envió $63.000');
+    const t63 = await llegaTab(63000); await new Promise(r => setTimeout(r, 300));
+    a8 = await and(TAB);
+    chk('8. Con la voz apagada: llega con su notificación y su ventana, sin voz', t63 && a8.pagos.some(x => x.v === '$63.000') && !a8.decir.some(x => /63000/.test(x)), { t63, recl: a8.reclamados, ya: a8.androidYaLoDijo, cache: await TAB.p.evaluate(() => Object.values(window.ventoPagos._cache).filter(x => x.monto == 63000).map(x => x.id + ':' + x.estado + ':' + x.actualizado_en)), pagos: a8.pagos, lista: await TAB.p.evaluate(() => (data.pagos.lista || []).filter(x => x.monto === 63000)) });
+    await TAB.p.evaluate(() => window.ventoPagosVozOn(true));
+    // Chequeo
+    await PC.p.evaluate(() => window.ventoPagosChequeo());
+    const ck = await esperar(PC.p, () => { const o = document.getElementById('vpChequeo'); return !!o && /Equipos de la cuenta/.test(o.innerText) && /\(este\)/.test(o.innerText); }, null, 15000);
+    const ckTxt = await PC.p.evaluate(() => (document.getElementById('vpChequeo') || {}).innerText || '');
+    chk('8. 🩺 Chequeo: servidor, este equipo autorizado y los 3 equipos de la cuenta con «escuchando»', ck && /Servidor Vento/.test(ckTxt) && /Este equipo autorizado/.test(ckTxt) && (ckTxt.match(/🟢/g) || []).length >= 3, ckTxt.slice(0, 900));
   }
 })();

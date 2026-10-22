@@ -554,6 +554,8 @@ public class VentoEscucha extends NotificationListenerService {
         out.put(o);
         while (out.length() > 30) out.remove(0);
         sp.edit().putString(PREF_COLA, out.toString()).apply();
+        // Al Servidor Vento de una (sin esperar a que la página despierte): así les llega ya a los demás equipos.
+        if (!crudo && !id.startsWith("PRUEBA")) try { VentoApp.reenviarPago(id, txt, revisar, smsOk); } catch (Throwable ignorado) { }
     }
 
     /** Para la página: los avisos de banco que no se tomaron, el registro de los últimos avisos del banco y qué hizo Vento

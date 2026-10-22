@@ -73,15 +73,37 @@
     var d = miDispositivo();
     if(d && !forzar) return Promise.resolve(d);
     return rpc('registrar_dispositivo', { p_negocio: n.id, p_nombre: nombreRol(n.rol) + ' · ' + plataforma(), p_plataforma: (navigator.userAgent || '').slice(0, 120), p_dispositivo: d ? d.id : null })
-      .then(function(r){ var nd = { negocio: n.id, id: r.id, token: r.token, desde: Date.now() }; lsSet(K_DEV, nd); est.dev = nd; return nd; });
+      .then(function(r){ var nd = { negocio: n.id, id: r.id, token: r.token, desde: Date.now() }; lsSet(K_DEV, nd); est.dev = nd; est.revocado = false; cruceAndroid(); return nd; });
   }
   function latido(push){
     var d = miDispositivo(); if(!d) return Promise.resolve(false);
     return rpc('latido_dispositivo', { p_dispositivo: d.id, p_push: push || null }).then(function(ok){
-      if(ok === false){ est.revocado = true; }   // lo retiró el dueño: se vuelve a autorizar desde Ajustes → Pagos
+      // Retirado (o el token se perdió): mientras siga con la sesión del negocio se vuelve a autorizar solo. Antes quedaba
+      // con el token viejo: el servidor rechazaba sus avisos sin decir nada y los demás equipos nunca se enteraban.
+      if(ok === false){ est.revocado = true; reautorizar(); }
+      else if(ok === true) cruceAndroid();
       return ok;
     }).catch(function(){ return null; });
   }
+
+  var ultimaReaut = 0;
+  function reautorizar(){
+    if(!negocio() || Date.now() - ultimaReaut < 5 * 60e3) return Promise.resolve(null);
+    ultimaReaut = Date.now();
+    return registrarDispositivo(true).then(function(d){ est.revocado = false; cruceAndroid(); try{ mandarPendientes(); }catch(e){} return d; }).catch(function(){ return null; });
+  }
+  // App Android: los pagos de los otros equipos los pregunta Android cada 10 s desde el servicio de fondo (Cruce.java),
+  // también con el celular bloqueado y la página dormida, y el aviso que lee este celular sale de una al servidor.
+  var cruceDado = '';
+  function cruceAndroid(){
+    var A = window.VentoAndroid; if(!A || !A.pagosCruce) return;
+    var n = negocio(), d = miDispositivo(), c = nube() && nube().config && nube().config();
+    var j = n && d && d.token && c && c.url && c.key && !est.revocado ? JSON.stringify({ url: c.url, key: c.key, token: d.token, negocio: n.id }) : '';
+    if(j === cruceDado) return;
+    cruceDado = j;
+    try{ A.pagosCruce(j); }catch(e){}
+  }
+  window.ventoPagosCruceMal = function(err){ if(err === 'dispositivo_no_autorizado' || err === 'sin_permiso') reautorizar(); };
 
   // ---------- Notificaciones con la app cerrada (Web Push) ----------
   function pushSoportado(){ return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
@@ -168,6 +190,10 @@
     try{ if(window.ventoConfirma && window.ventoConfirma.mesero(x || p)) return; }catch(e){}
     var m = (p.mesa ? ' · ' + etiquetaMesa(p.mesa) : '');
     var nivel = p.confianza === 'falso' ? 'falso' : p.confianza === 'revisar' ? 'revisar' : 'ok';
+    // Cada pago suena UNA vez: si Android ya lo anunció (Cruce, con la página dormida), aquí solo se muestra.
+    var A0 = window.VentoAndroid;
+    if(A0 && A0.pagoReclamar){ var mio = true; try{ mio = A0.pagoReclamar(String(p.id)); }catch(e){}
+      if(!mio){ toast((nivel === 'falso' ? '🚨 Pago FALSO: ' : nivel === 'revisar' ? '⚠️ Pago por revisar: ' : '✅ Pago confirmado · ') + plata(p.monto) + ' por ' + nombreMetodo(p.metodo) + m, 9000); return; } }
     if(enPantalla && document.visibilityState === 'visible'){}         // ya lo muestra la pantalla «Esperando el pago»
     else if(!avisoPagoCompleto(p, x, nivel))
     avisoCelular(p.confianza === 'falso' ? '🚨 Pago FALSO' : p.confianza === 'revisar' ? '⚠️ Pago por revisar' : '✅ Pago confirmado',
@@ -253,7 +279,10 @@
     mandando = true;
     var r = l[0];
     fetch(base() + '/aviso/' + d.token, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: cuerpoAviso(r), keepalive: true })
-      .then(function(res){ return res.status >= 500 ? Promise.reject(new Error('http ' + res.status)) : res; })
+      .then(function(res){
+        if(res.status === 401){ est.revocado = true; mandando = false; reautorizar(); return Promise.reject(new Error('reautorizar')); }
+        return res.status >= 500 ? Promise.reject(new Error('http ' + res.status)) : res;
+      })
       .then(function(){ est.servidor = true; var q = lsGet(K_REENV, []).filter(function(y){ return !(y.t === r.t && y.txt === r.txt); }); lsSet(K_REENV, q); mandando = false; if(q.length) mandarPendientes(); })
       .catch(function(){ mandando = false; });
   }
@@ -310,8 +339,12 @@
 
   // Mientras haya cobros esperando, le pide al servidor que consulte a Wompi/Nequi (además del webhook).
   function hayPendientes(){ return Object.keys(cache).some(function(k){ var p = cache[k]; return p.estado === 'pendiente' && Date.now() - Date.parse(p.creado_en || 0) < 45 * 60e3; }); }
+  var ultimoLatido = 0;
   function vigilar(){
-    var n = negocio(); if(!n) return;
+    var n = negocio(); if(!n){ cruceAndroid(); return; }
+    cruceAndroid();
+    // «Visto hace…» en «📱 Celulares autorizados»: así el chequeo sabe qué equipos están escuchando.
+    if(Date.now() - ultimoLatido > 60e3 && (!document.hidden || est.vivo)){ ultimoLatido = Date.now(); latido(null); }
     try{ mandarPendientes(); }catch(e){}
     if(est.servidor && !document.hidden && hayPendientes()){ api('sync', { negocio: n.id }).then(function(){ return sincronizar(); }).catch(function(){}); return; }
     // También con Vento de fondo o el celular bloqueado: si el tiempo real se cayó (Android lo corta cuando duerme), se
@@ -327,7 +360,7 @@
   function arrancar(){
     if(!negocio()) return;
     salud().then(function(ok){
-      registrarDispositivo(false).then(function(){ return latido(null); }).catch(function(){});
+      registrarDispositivo(false).then(function(){ cruceAndroid(); return latido(null); }).catch(function(){});
       sincronizar().then(conectarTiempoReal);
       if(ok) crearBotonCuenta();
     });
@@ -608,6 +641,56 @@
       el.onclick = function(e){ var b = e.target.closest('[data-rev]'); if(!b || !confirm('¿Retirar este celular? Dejará de recibir y mandar avisos de pagos.')) return; rpc('revocar_dispositivo', { p_dispositivo: b.dataset.rev }).then(function(){ toast('Celular retirado.'); pintarDispositivos(); }); };
     }).catch(function(){ el.textContent = 'No se pudo cargar la lista.'; });
   }
+
+  // ---------- 🩺 Chequeo: ¿les llegan los pagos a todos los equipos? ----------
+  // Este equipo (lectura de avisos, voz, servidor, autorizado, avisos por mandar, cómo recibe los de los demás) y cada
+  // equipo de la cuenta con «visto hace…»: Android pregunta cada 10 s y la página cada minuto, así que un equipo que no se
+  // ve hace rato está cerrado o dormido y NO va a sonar.
+  function haceTxt(ms){ var s = Math.max(0, Math.round(ms / 1000)); return s < 60 ? 'hace ' + s + ' s' : s < 3600 ? 'hace ' + Math.round(s / 60) + ' min' : s < 86400 ? 'hace ' + Math.round(s / 3600) + ' h' : 'hace ' + Math.round(s / 86400) + ' días'; }
+  window.ventoPagosChequeo = function(){
+    var ov = ventana('vpChequeo');
+    ov.innerHTML = '<div class="modal vp-modal" role="dialog" aria-label="Chequeo de pagos"><h2>🩺 Pagos en todos los equipos</h2><div class="modal-sub">Revisando…</div></div>';
+    ov.classList.add('show');
+    var n = negocio(), A = window.VentoAndroid;
+    var fila = function(ok, t, d, bt){ return '<li><span>' + (ok === true ? '✅' : ok === false ? '❌' : '⚠️') + '</span><span><b>' + t + '</b>' + (d ? '<br><small>' + d + '</small>' : '') + (bt || '') + '</span></li>'; };
+    var dev = n ? rpc('mis_dispositivos', { p_negocio: n.id }).catch(function(){ return null; }) : Promise.resolve(null);
+    Promise.all([n ? salud() : Promise.resolve(false), dev]).then(function(r){
+      var L = [], and = null, cr = null, voz = true;
+      try{ and = A && A.pagosAvisosEstado ? JSON.parse(A.pagosAvisosEstado() || '{}') : null; }catch(e){}
+      try{ cr = A && A.pagosCruceEstado ? JSON.parse(A.pagosCruceEstado() || '{}') : null; }catch(e){}
+      try{ voz = A && A.pagosVozEstado ? !!A.pagosVozEstado() : (window.ventoPagosVozOn ? window.ventoPagosVozOn() : true); }catch(e){}
+      if(and) L.push(fila(and.on && and.permiso && and.vivo !== false, '📲 Leer los avisos de Nequi, DaviPlata y Bre-B de este celular',
+        and.on && and.permiso && and.vivo !== false ? 'Conectado.' : !and.permiso ? 'Falta el permiso «Acceso a notificaciones» para Vento.' : !and.on ? 'Apagado (Ajustes → Pagos → «Leer los avisos de ESTE celular»), si en este celular tienes Nequi o DaviPlata.' : 'Android lo desconectó: apaga y prende «Acceso a notificaciones» para Vento.'));
+      L.push(fila(voz ? true : null, '🗣️ Voz de los pagos', voz ? 'Prendida.' : 'Apagada: los pagos llegan sin voz (Ajustes → Pagos → «Decir los pagos en voz alta»).', '<br><button type="button" class="btn-ghost" data-ck="voz" style="margin-top:6px">▶ Probar la voz</button>'));
+      if(!n){ L.push(fila(false, '👥 Pagos entre equipos', 'Entra con tu correo (Vento Nube) en cada equipo: así los pagos que lee un celular les llegan a todos.')); }
+      else {
+        L.push(fila(r[0] === true, '🌐 Servidor Vento', r[0] === true ? 'Activo' + (est.version ? ' (v' + est.version + ')' : '') + '.' : 'No responde: sin internet, o el servidor de pagos no está desplegado.'));
+        var d = miDispositivo(), cola = (lsGet(K_REENV, []) || []).length;
+        L.push(fila(!!d && !est.revocado, '🔑 Este equipo autorizado', d && !est.revocado ? 'Sí: lo que lee aquí les llega a los demás.' : 'No: toca «Autorizar».', d && !est.revocado ? '' : '<br><button type="button" class="btn-ghost" data-ck="aut" style="margin-top:6px">📱 Autorizar este equipo</button>'));
+        L.push(fila(cola ? null : true, '📤 Avisos por mandar', cola ? cola + ' esperando internet: se mandan solos al volver.' : 'Ninguno: todo salió.'));
+        var ahora = Date.now();
+        if(cr && cr.t) L.push(fila(cr.ok && ahora - cr.t < 60e3, '📡 Recibir los pagos de los otros equipos (Android)', cr.ok && ahora - cr.t < 60e3 ? 'Android pregunta cada 10 s, también con el celular bloqueado. Última: ' + haceTxt(ahora - cr.t) + '.' : 'Última vez ' + haceTxt(ahora - cr.t) + (cr.error ? ' (' + esc(cr.error) + ')' : '') + '. Revisa que Vento no tenga ahorro de batería.'));
+        else L.push(fila(est.vivo ? true : null, '📡 Recibir los pagos de los otros equipos', est.vivo ? 'En vivo.' : 'Revisa cada 20 s' + (est.ultimoSync ? ' (última ' + haceTxt(ahora - est.ultimoSync) + ')' : '') + '.'));
+        var devs = r[1] || [], mio = d && d.id;
+        L.push('<li><span>👥</span><span><b>Equipos de la cuenta</b><br><small>Android pregunta cada 10 s; el computador y el navegador, cada minuto mientras Vento esté abierto.</small>' +
+          (devs.length ? '<ul class="vp-checks" style="margin:6px 0 0">' + devs.map(function(x){
+            var ms = ahora - Date.parse(x.ultimo_visto), oye = ms < 90e3, rato = ms < 15 * 60e3;
+            return '<li><span>' + (oye ? '🟢' : rato ? '🟡' : '🔴') + '</span><span>' + esc(x.nombre) + (mio === x.id ? ' <b>(este)</b>' : '') + '<br><small>' + esc((x.usuario || '') + ' · ' + nombreRol(x.rol)) + ' · ' +
+              (oye ? 'escuchando (' + haceTxt(ms) + ')' : rato ? 'visto ' + haceTxt(ms) + ': puede estar dormido' : 'cerrado (visto ' + haceTxt(ms) + '): no le sonará hasta abrir Vento') + '</small></span></li>';
+          }).join('') + '</ul>' : '<br><small>No se pudo cargar la lista.</small>') + '</span></li>');
+      }
+      ov.innerHTML = '<div class="modal vp-modal" role="dialog" aria-label="Chequeo de pagos"><h2>🩺 Pagos en todos los equipos</h2><ul class="vp-checks">' + L.join('') + '</ul>' +
+        '<div class="mz-actions" style="flex-wrap:wrap;gap:8px"><button type="button" class="btn-ghost" data-ck="otra">🔄 Revisar otra vez</button><button type="button" class="btn-close" data-ck="x">Cerrar</button></div></div>';
+      ov.onclick = function(e){
+        var b = e.target.closest('[data-ck]'); if(!b) return;
+        var k = b.dataset.ck;
+        if(k === 'x') return cerrarVentana(ov);
+        if(k === 'otra') return window.ventoPagosChequeo();
+        if(k === 'voz'){ try{ if(A && A.pagosProbarVoz) A.pagosProbarVoz(); else hablar('Recibiste 200 pesos por Nequi.'); }catch(x){} return; }
+        if(k === 'aut'){ est.revocado = false; ultimaReaut = 0; reautorizar().then(function(){ window.ventoPagosChequeo(); }); }
+      };
+    });
+  };
 
   // ---------- Asistente «Conectar Nequi / Conectar DaviPlata» ----------
   function asistente(cual){
