@@ -129,7 +129,7 @@ Arriba de Estadísticas, con el período de siempre (Hoy, 7 días, 30 días, Tod
   - `pagosaviso`: 92, ahora de fábrica 100 %;
   - `confirmapago`: 61;
   - `sincroniza`: 22.
-- **Suite completa:** ver el resultado de la corrida de esta versión en la conversación.
+- **Suite completa:** 79 de 79 pruebas, 2331 comprobaciones, 0 fallos.
 
 ## Lo que necesita el dueño
 - **Abrir Vento en cada celular**, para que tome la página nueva: la voz vuelve a 100 % directo, también con la app
