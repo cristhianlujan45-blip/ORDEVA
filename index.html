@@ -30024,6 +30024,7 @@ function pagoHuella(t){
       '<div class="settings-desc" id="pgWebAviso" hidden style="border:1px solid #f5a524;border-radius:12px;padding:10px"><b id="pgWebAvisoTit">📲 Estás en Vento Web, no en la app.</b> Para que Vento lea los avisos de DaviPlata y Nequi y diga «Pago confirmado» (también con el celular bloqueado), usa <b>la app Vento</b> (archivo vento.apk) en este celular. <a class="btn-primary" id="pgBajarApk" href="https://github.com/cristhianlujan45-blip/ORDEVA/releases/latest/download/vento.apk" download="vento.apk" rel="noopener" style="margin-top:8px;width:100%;display:block;text-align:center;box-sizing:border-box">⬇️ Descargar la app (vento.apk)</a><button type="button" class="btn-ghost" id="pgAbrirApp" style="margin-top:8px;width:100%">📲 Ya la tengo: abrir la app Vento</button></div>' +
       '<div class="settings-row"><div class="settings-row-text"><strong>Recibir avisos de pagos</strong><span id="pgEstado"></span></div><label class="switch"><input type="checkbox" id="pgOn"><span class="switch-slider"></span></label></div>' +
       '<div id="pgCaja" hidden>' +
+      '<div class="settings-row" id="pgAlertas" style="flex-direction:column;align-items:stretch"></div>' +
       '<div class="settings-row" id="pgVolFila" style="flex-direction:column;align-items:stretch"><div class="settings-row-text"><strong>🔊 Volumen de la voz de los pagos: <span id="pgVolTxt"></span></strong><span>Qué tan alto dice «Llegaron 200 pesos por DaviPlata». ' + (enApp ? 'Suena a este volumen aunque la música o el celular estén bajitos, y luego deja el volumen como estaba. <b>Más de 100 % = más fuerte de lo normal.</b>' : 'En el navegador llega hasta 100 %; en la app Android se puede subir hasta 150 % (más fuerte de lo normal).') + '</span></div>' +
       '<input type="range" id="pgVol" min="10" max="' + (enApp ? 150 : 100) + '" step="10" style="width:100%;margin:6px 0" aria-label="Volumen de la voz de los pagos"><div class="mz-actions"><button class="btn-ghost" id="pgVolMenos" type="button">🔉 Más bajo</button><button class="btn-ghost" id="pgVolMas" type="button">🔊 Más alto</button><button class="btn-primary" id="pgVolProbar" type="button">▶ Probar la voz</button></div></div>' +
       '<div class="settings-row" id="pgVozFila"><div class="settings-row-text"><strong>🗣️ Decir los pagos en voz alta</strong><span>Prendido: cada pago que llega se dice con la cantidad («Llegaron 20000 pesos por Nequi»), en este equipo y en los demás de la cuenta, también con el celular bloqueado. Si primero llega el aviso de Bre-B sin el valor, se dice ese y luego el valor. Apagado: llegan con su notificación y su ventana, sin voz.</span></div><label class="switch"><input type="checkbox" id="pgVozOn" checked><span class="switch-slider"></span></label></div>' +
@@ -30174,6 +30175,7 @@ function pagoHuella(t){
   window.ventoPagosDiag = () => { try{ pgDiagPintar(); }catch(e){} };
   // Con Ajustes → Pagos a la vista, el registro de avisos se actualiza solo (cada 4 s).
   setInterval(() => { const b = document.getElementById('pgDiag'); if(b && b.offsetParent) try{ pgDiagPintar(); }catch(e){} }, 4000);
+  setInterval(() => { const b = document.getElementById('pgAlertas'); if(b && b.offsetParent) try{ pgAlertasPintar(); }catch(e){} }, 4000);
   window.pgRepintar = () => { try{ pgPintar(); }catch(e){} };
   function pgPintar(){
     if(!data || !pgCrearUI()) return;
@@ -30204,7 +30206,71 @@ function pagoHuella(t){
       x.estado = 'ok'; if(x.mesa) delete PG().espera[x.mesa]; saveData(); pgPintar(); try{ window.pagoLlego && window.pagoLlego(x); }catch(e2){}
       showToast('✅ Listo: ' + plata(x.monto) + ' de ' + (pagoDet(x).de || x.app) + ' quedó como revisado en la app.');
     };
+    pgAlertasPintar();
   }
+  // ---------- 🚨 ALERTAS DE PAGOS (ORDEVA etapa 6): todo lo que hace falta para que un pago suene con el celular bloqueado,
+  // en una sola lista con su botón para arreglarlo, la conexión y el último pago. Solo lee lo que ya mide la app; no cambia
+  // cómo se leen ni cómo suenan los pagos.
+  function pgAlertasDatos(){
+    const A = AND(), g = PG(), l = [];
+    const j = f => { try{ return JSON.parse(f() || '{}'); }catch(e){ return {}; } };
+    const fila = (ok, txt, fix, btn) => l.push({ ok, txt, fix: ok ? '' : fix || '', btn: btn || '🔧 Arreglar' });
+    if(A){
+      const e = andEstado();
+      fila(!!(e.on && e.permiso && e.vivo !== false), !e.on ? 'Leer los avisos de Nequi y DaviPlata en este celular: APAGADO' : !e.permiso ? 'Falta el permiso «Acceso a notificaciones» para Vento' : e.vivo === false ? 'Android desconectó la lectura de avisos de Vento' : 'Lee los avisos de Nequi, DaviPlata y bancos de este celular', !e.on ? 'leer' : 'permiso', !e.on ? '▶ Prender' : '🔓 Dar el permiso');
+      if(A.avisosEstado){ const n = j(A.avisosEstado); fila(n.prendidos !== false && n.permiso !== false, n.prendidos !== false && n.permiso !== false ? 'Vento puede mostrar notificaciones (con sonido y vibración)' : 'Vento NO puede mostrar notificaciones: el aviso del pago no sale ni vibra', 'notif', '🔔 Permitir'); }
+      if(A.permisos){ const p = j(A.permisos);
+        if(p.bateria !== undefined) fila(!!p.bateria, p.bateria ? 'Batería de Vento: sin restricciones' : 'Vento tiene ahorro de batería: con el celular bloqueado Android puede dormirla', 'bateria', '🔋 Quitar ahorro');
+        if(p.fondo !== undefined) fila(!!p.fondo, p.fondo ? 'Vento sigue trabajando con la pantalla apagada' : 'Vento NO está trabajando de fondo (con la pantalla apagada se puede dormir)', 'fondo', '▶ Prender'); }
+      pgBancosBat().forEach(b => fila(!!b.sinRestriccion, b.nombre + (b.sinRestriccion ? ': batería sin restricciones (avisa al instante)' : ': con ahorro de batería (sus avisos pueden llegar tarde)'), 'banco:' + b.pkg, '🔋 Arreglar'));
+    } else {
+      fila(false, 'Aquí no se leen los avisos del banco: eso lo hace la app Vento en el celular donde está Nequi o DaviPlata. Este equipo recibe los pagos por la cuenta.', 'app', '📲 Abrir la app');
+      if('Notification' in window) fila(Notification.permission === 'granted', Notification.permission === 'granted' ? 'Este navegador puede mostrar notificaciones' : 'Este navegador no tiene permiso para notificaciones', 'notifweb', '🔔 Permitir');
+    }
+    fila(pgVozOn(), pgVozOn() ? 'Voz de los pagos prendida (volumen ' + pgVol() + ' %)' : 'Voz de los pagos APAGADA: solo llega la notificación', 'voz', '🗣️ Prender');
+    const red = navigator.onLine !== false, canal = !!(es && es.readyState === 1) || Date.now() - vivo < 100000;
+    fila(red && canal, !red ? 'Sin internet: los pagos de este celular sí se leen, pero no llegan a los demás equipos' : canal ? 'Conectado: los pagos llegan a todos los equipos de la cuenta' : 'Conectando con los demás equipos de la cuenta…', 'conectar', '🔄 Reconectar');
+    const ult = g.lista && g.lista[0];
+    let banco = 0; if(A && A.pagosAvisosDiag){ banco = +(j(A.pagosAvisosDiag).ultimo) || 0; }
+    return { l, ult, banco };
+  }
+  function pgAlertasPintar(){
+    const box = $p('pgAlertas'); if(!box) return;
+    const { l, ult, banco } = pgAlertasDatos(), mal = l.filter(x => !x.ok).length;
+    const hora = t => new Date(+t).toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    const abierto = box.querySelector('details') ? box.querySelector('details').open : mal > 0;
+    box.innerHTML = '<div class="settings-row-text"><strong>🚨 ALERTAS DE PAGOS</strong><span id="pgAlertasRes" style="font-weight:700;color:' + (mal ? '#f5a524' : '#30a46c') + '">' +
+      (mal ? '🟠 ' + mal + (mal === 1 ? ' cosa por arreglar' : ' cosas por arreglar') + ' para que los pagos suenen con el celular bloqueado.' : '🟢 Todo listo: los pagos suenan aunque el celular esté bloqueado.') + '</span></div>' +
+      '<details' + (abierto ? ' open' : '') + ' style="margin-top:6px"><summary style="cursor:pointer;font-weight:700">Ver la lista (' + l.length + ')</summary>' +
+      l.map(x => '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:5px 0;border-top:1px solid var(--line);font-size:14px"><span style="flex:1;min-width:180px">' + (x.ok ? '✅ ' : '⚠️ ') + escp(x.txt) + '</span>' +
+        (x.fix ? '<button type="button" class="btn-ghost" data-pga="' + escp(x.fix) + '" style="padding:4px 10px">' + escp(x.btn) + '</button>' : '') + '</div>').join('') + '</details>' +
+      '<div style="font-size:14px;margin-top:6px;opacity:.9">🕒 Último pago: ' + (ult ? '<b>' + plata(ult.monto) + '</b> por ' + escp(ult.app) + ' · ' + hora(ult.t) : 'todavía ninguno') +
+      (banco ? '<br>📨 Último aviso de un banco en este celular: ' + hora(banco) : '') + '</div>' +
+      '<div class="mz-actions"><button type="button" class="btn-primary" data-pga="probar">▶ Probar el sonido</button>' +
+      (AND() && AND().pagosPrueba ? '<button type="button" class="btn-ghost" data-pga="completa">📳 Probar la alerta completa</button>' : '<button type="button" class="btn-ghost" data-pga="vibrar">📳 Probar la vibración</button>') +
+      (AND() && AND().avisosAjustes ? '<button type="button" class="btn-ghost" data-pga="sonido">🎵 Elegir el sonido y la vibración</button>' : '') + '</div>';
+  }
+  document.addEventListener('click', ev => {
+    const b = ev.target.closest && ev.target.closest('[data-pga]'); if(!b || !b.closest('#pgAlertas')) return;
+    const A = AND(), k = b.dataset.pga;
+    try{
+      if(k === 'leer'){ const t = $p('pgAndOn'); if(t){ t.checked = true; t.onchange(); } }
+      else if(k === 'permiso') A.mediosPermiso();
+      else if(k === 'notif'){ A.avisosActivar ? A.avisosActivar() : A.avisosAjustes(); }
+      else if(k === 'bateria'){ A.ajustesBateria(); showToast('Elige «Sin restricciones» (o «Permitir») para Vento y vuelve con atrás.', 9000); }
+      else if(k === 'fondo') A.fondoActivar(true);
+      else if(k.startsWith('banco:')) pgBancoArreglar(k.slice(6));
+      else if(k === 'app') window.ventoAbrirApp();
+      else if(k === 'notifweb') Notification.requestPermission().then(() => pgAlertasPintar());
+      else if(k === 'voz'){ pgVozOn(true); if($p('pgVozOn')) $p('pgVozOn').checked = true; showToast('🗣️ Los pagos se dicen en voz alta.'); }
+      else if(k === 'conectar'){ try{ es && es.close(); }catch(e){} es = null; pgConectar(); pgSondear(); }
+      else if(k === 'probar') $p('pgVolProbar').click();
+      else if(k === 'vibrar'){ const ok = navigator.vibrate && navigator.vibrate([250, 120, 250]); showToast(ok ? '📳 ¿Vibró? Si no, este equipo no vibra desde el navegador: la vibración de los pagos la da la app Vento.' : '📳 Este equipo no vibra desde el navegador: la vibración de los pagos la da la app Vento en el celular.', 8000); }
+      else if(k === 'completa'){ const r = JSON.parse(A.pagosPrueba('Nequi', 'Nequi', '¡Te llegó plata! PRUEBA ORDEVA te envió $2.500', false) || '{}'); showToast('📳 Prueba: debe decir los 2.500 pesos por Nequi, salir el aviso y vibrar. ' + (r.r || '') + ' · No se registra como pago. Bloquea el celular para probarlo así.', 10000); }
+      else if(k === 'sonido'){ A.avisosAjustes(); showToast('Toca «💜 Pagos que te llegan»: ahí eliges el sonido, la vibración y que se vea con el celular bloqueado. Luego vuelve con atrás.', 12000); }
+    }catch(e){}
+    setTimeout(() => { try{ pgAlertasPintar(); }catch(e){} }, 800);
+  });
   const arr = setInterval(() => { if(typeof data !== 'undefined' && data){ clearInterval(arr); pgPintar(); pgConectar(); pgAvisarWeb(); } }, 1000);
   // Vento Web en Android con los avisos de pagos prendidos: aquí no se leen los avisos del banco (antes no se decía y
   // parecía que la app había dejado de avisar). Una vez por sesión.
