@@ -276,7 +276,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
       A.pagosAvisosDiag = () => JSON.stringify({ ultimo: Date.now(), vivo: true, lista: [], traza: [{ t: Date.now() - 5000, app: 'DaviPlata', txt: 'Pasaste $# a otro DaviPlata', r: '🚫 plata que SALE (pasaste, enviaste, compra…)' }, { t: Date.now(), app: 'Nequi', txt: '¡Te llegó plata! NOMBRE te envió $#', r: '🔊 Recibiste 2500 pesos por Nequi.' }] });
       window.ventoPagosDiag();
       const box = document.getElementById('pgDiag');
-      const tieneTraza = !!box && /Últimos avisos del banco y qué hizo Vento/.test(box.innerHTML) && /plata que SALE/.test(box.innerHTML);
+      const tieneTraza = !!box && /Últimos avisos del banco y qué hizo ORDEVA/.test(box.innerHTML) && /plata que SALE/.test(box.innerHTML);
       const btn = box && box.querySelector('[data-piloto="davi"]'); if(btn) btn.click();
       const res1 = (document.getElementById('pgPilotoRes') || {}).textContent || '';
       const antes = data.pagos.lista.length;

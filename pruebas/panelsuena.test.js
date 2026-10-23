@@ -58,7 +58,7 @@ const video = (id, t, c, d) => ({ id: { videoId: id }, snippet: { title: t, chan
     await p.waitForSelector('#ypRes .yp-card');
     await p.click('#ypRes .yp-card .btn-primary');
     chk('2. «⏭ Que siga» prende solo el reproductor de ORDEVA', await p.evaluate(() => !!JSON.parse(localStorage.getItem('vito_auto_play') || '{}').on));
-    chk('2. … y avisa que lo prendió', await p.evaluate(() => window.__toasts.some(t => /Encendí el reproductor de Vento/.test(t))));
+    chk('2. … y avisa que lo prendió', await p.evaluate(() => window.__toasts.some(t => /Encendí el reproductor de ORDEVA/.test(t))));
     chk('2. La canción elegida SUENA', await suena(p, 'feidlunaxxx'), await p.evaluate(() => [window.__yt.cargados, window.vitoMusica.cola().map(x => [x.song, x.status, x.vid, x.ok])]));
     await p.waitForTimeout(1300);
     chk('2. Se ve en el panel («En este equipo»)', /En este equipo/.test(await p.textContent('#ypDonde')) && /feid luna/i.test(await p.textContent('#ypTitulo')));

@@ -190,9 +190,9 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     await CEL.p.evaluate(() => window.ventoPagosChequeo());
     await esperar(CEL.p, () => /Equipos de la cuenta/.test((document.getElementById('vpChequeo') || {}).innerText || ''), null, 15000);
     const ckCel = await CEL.p.evaluate(() => document.getElementById('vpChequeo').innerText);
-    chk('8. 🩺 Chequeo en el celular (Xiaomi con ahorro de batería): «ORDEVA sin ahorro de batería» en rojo con «Arreglar», servicio de fondo y «Inicio automático» de Xiaomi', /❌\s*🔋 ORDEVA sin ahorro de batería/.test(ckCel) && /Arreglar/.test(ckCel) && /Vento trabajando de fondo/.test(ckCel) && /Xiaomi: inicio automático/.test(ckCel), ckCel.slice(0, 800));
+    chk('8. 🩺 Chequeo en el celular (Xiaomi con ahorro de batería): «ORDEVA sin ahorro de batería» en rojo con «Arreglar», servicio de fondo y «Inicio automático» de Xiaomi', /❌\s*🔋 ORDEVA sin ahorro de batería/.test(ckCel) && /Arreglar/.test(ckCel) && /ORDEVA trabajando de fondo/.test(ckCel) && /Xiaomi: inicio automático/.test(ckCel), ckCel.slice(0, 800));
     await CEL.p.click('#vpChequeo [data-ck="bat"]'); await CEL.p.click('#vpChequeo [data-ck="auto"]');
     chk('8. … «Arreglar» abre el ahorro de batería y «Abrir inicio automático» el de la marca', await CEL.p.evaluate(() => window.__and.abrioBateria === 1 && window.__and.abrioAuto === 1));
-    chk('8. 🩺 Chequeo: servidor, este equipo autorizado y los 3 equipos de la cuenta con «escuchando»', ck && /Servidor Vento/.test(ckTxt) && /Este equipo autorizado/.test(ckTxt) && (ckTxt.match(/🟢/g) || []).length >= 3, ckTxt.slice(0, 900));
+    chk('8. 🩺 Chequeo: servidor, este equipo autorizado y los 3 equipos de la cuenta con «escuchando»', ck && /Servidor ORDEVA/.test(ckTxt) && /Este equipo autorizado/.test(ckTxt) && (ckTxt.match(/🟢/g) || []).length >= 3, ckTxt.slice(0, 900));
   }
 })();

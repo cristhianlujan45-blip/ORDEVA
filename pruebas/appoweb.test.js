@@ -41,7 +41,7 @@ const UA_APP = UA_CHROME.replace('Mobile Safari/537.36', 'Mobile Safari/537.36 V
     await p.evaluate(() => { data.pagos = data.pagos || {}; data.pagos.on = true; saveData(); window.ventoPagosGuia(); });
     await p.waitForTimeout(300);
     let g = await p.evaluate(() => document.getElementById('pgGuiaOv').innerText);
-    chk('1. Paso a paso: ya NO dice «Falta instalarla»; dice «Estás en ORDEVA Web» y que solo la app lee los avisos', !/Falta instalarla/.test(g) && /Estás en ORDEVA Web/.test(g) && /solo los puede leer la app Vento/.test(g), g.slice(0, 400));
+    chk('1. Paso a paso: ya NO dice «Falta instalarla»; dice «Estás en ORDEVA Web» y que solo la app lee los avisos', !/Falta instalarla/.test(g) && /Estás en ORDEVA Web/.test(g) && /solo los puede leer la app ORDEVA/.test(g), g.slice(0, 400));
     const bajar = await p.evaluate(() => { const a = [...document.querySelectorAll('#pgGuiaOv a')].find(x => /Descargar la app \(vento\.apk\)/.test(x.textContent)); return a ? a.getAttribute('href') : null; });
     chk('1. Botón directo «⬇️ Descargar la app (vento.apk)» con el enlace del APK (no la web) y cómo instalarlo', bajar === 'https://github.com/cristhianlujan45-blip/ORDEVA/releases/latest/download/vento.apk' && /Permitir de esta fuente/.test(g) && /Instalar/.test(g), bajar);
     await p.click('[data-gp="abrirapp"]');
@@ -50,7 +50,7 @@ const UA_APP = UA_CHROME.replace('Mobile Safari/537.36', 'Mobile Safari/537.36 V
     await p.evaluate(() => { document.getElementById('pgGuiaOv').classList.remove('show'); try{ pgPintar(); }catch(e){} });
     await p.evaluate(() => { const i = document.getElementById('pgOn'); i.checked = true; i.dispatchEvent(new Event('change')); });
     const aj = await p.evaluate(() => { const a = document.getElementById('pgWebAviso'); return a ? { hidden: a.hidden, txt: a.innerText, est: document.getElementById('pgEstado').textContent } : null; });
-    chk('1. Ajustes → Pagos: «📲 Estás en ORDEVA Web, no en la app» con botón para abrirla', aj && !aj.hidden && /Estás en ORDEVA Web/.test(aj.txt) && /Vento Web/.test(aj.est), aj);
+    chk('1. Ajustes → Pagos: «📲 Estás en ORDEVA Web, no en la app» con botón para abrirla', aj && !aj.hidden && /Estás en ORDEVA Web/.test(aj.txt) && /ORDEVA Web/.test(aj.est), aj);
     chk('1. … y botón «⬇️ Descargar la app (vento.apk)» con el enlace del APK', await p.evaluate(() => { const a = document.getElementById('pgBajarApk'); return !!a && /releases\/latest\/download\/vento\.apk$/.test(a.href); }));
     // Al volver a abrir ORDEVA Web (los pagos ya prendidos): aviso una vez
     await p.reload(); await p.waitForTimeout(1500);
@@ -64,7 +64,7 @@ const UA_APP = UA_CHROME.replace('Mobile Safari/537.36', 'Mobile Safari/537.36 V
     await p.evaluate(() => { data.pagos = data.pagos || {}; data.pagos.on = true; saveData(); window.ventoPagosGuia(); });
     await p.waitForTimeout(300);
     g = await p.evaluate(() => document.getElementById('pgGuiaOv').innerText);
-    chk('2. En la app: «Ya estás en la app ORDEVA» (no «ORDEVA Web»)', /Ya estás en la app Vento/.test(g) && !/Estás en ORDEVA Web/.test(g), g.slice(0, 300));
+    chk('2. En la app: «Ya estás en la app ORDEVA» (no «ORDEVA Web»)', /Ya estás en la app ORDEVA/.test(g) && !/Estás en ORDEVA Web/.test(g), g.slice(0, 300));
     chk('2. En la app no sale el aviso de ORDEVA Web', await p.evaluate(() => { const a = document.getElementById('pgWebAviso'); return !a || a.hidden; }));
     await ctx.close();
     ({ ctx, p } = await nuevo(UA_APP, false));
@@ -111,7 +111,7 @@ const UA_APP = UA_CHROME.replace('Mobile Safari/537.36', 'Mobile Safari/537.36 V
     // Google vuelve al NAVEGADOR con el código de una conexión de la app
     ({ ctx, p } = await nuevo(UA_CHROME, false, BASE + '/index.html?code=4%2F0AQabc&scope=x&state=vento-yt.app123abc'));
     let v3 = await p.evaluate(() => ({ ir: window.__ventoVolverApp || '', btn: (document.getElementById('ventoVolverAppBtn') || {}).href || '', txt: (document.getElementById('ventoVolverApp') || {}).innerText || '', url: location.search + location.hash }));
-    chk('3. Vuelta de Google en el navegador → «📲 Volver a la app ORDEVA» con el código para la app', /^intent:\/\/abrir\?code=4%2F0AQabc&scope=x&state=vento-yt\.app123abc#Intent;scheme=vento;package=co\.vento\.app;end$/.test(v3.ir) && v3.btn === v3.ir && /Volver a la app Vento/.test(v3.txt), v3);
+    chk('3. Vuelta de Google en el navegador → «📲 Volver a la app ORDEVA» con el código para la app', /^intent:\/\/abrir\?code=4%2F0AQabc&scope=x&state=vento-yt\.app123abc#Intent;scheme=vento;package=co\.vento\.app;end$/.test(v3.ir) && v3.btn === v3.ir && /Volver a la app ORDEVA/.test(v3.txt), v3);
     chk('3. … y ORDEVA Web no la procesa (la dirección queda limpia, sin «no corresponde»)', v3.url === '' && !/no corresponde/.test(await p.evaluate(() => document.body.innerText)), v3.url);
     await ctx.close();
     ({ ctx, p } = await nuevo(UA_CHROME, false, BASE + '/index.html#access_token=ya29.tok&token_type=Bearer&expires_in=3599&state=vento-yt.app9'));

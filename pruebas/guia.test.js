@@ -40,7 +40,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 
     // ===== 1. Recorrido de la primera vez =====
     await p.waitForSelector('#gzTour', { timeout: 5000 }).catch(() => {});
-    chk('1. La primera vez sale el recorrido: «¡Hola! Soy ORDEVA»', await p.isVisible('#gzTour') && /Hola! Soy Vento/.test(await p.textContent('#gzTour .gz-gt')));
+    chk('1. La primera vez sale el recorrido: «¡Hola! Soy ORDEVA»', await p.isVisible('#gzTour') && /Hola! Soy ORDEVA/.test(await p.textContent('#gzTour .gz-gt')));
     chk('1. … y lo dice en voz alta', await dijo(/Hola.*Soy ORDEVA.*muy fácil/));
     await p.click('#gzTour .gz-gsig'); await p.waitForTimeout(450);
     let hueco = await p.evaluate(() => { const h = document.querySelector('#gzTour .gz-hueco').getBoundingClientRect(), m = document.querySelector('#facilApp .fz-mesa').getBoundingClientRect(); return { dx: Math.abs((h.left + 8) - m.left), dy: Math.abs((h.top + 8) - m.top), t: document.querySelector('#gzTour .gz-gt').textContent }; });

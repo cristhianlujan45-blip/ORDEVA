@@ -170,7 +170,7 @@ const b64u = b => Buffer.from(b).toString('base64').replace(/\+/g, '-').replace(
     await p.waitForTimeout(3000);
     await p.evaluate(() => ventoSuscripcion.refrescar(true)); await p.waitForTimeout(2200);
     const g2 = await puerta(p);
-    chk('Estado firmado vencido y sin poder renovarlo: «Sin conexión con ORDEVA»', !!g2 && g2.motivo === 'sinconexion' && /Sin conexión con Vento/.test(g2.txt), JSON.stringify(g2));
+    chk('Estado firmado vencido y sin poder renovarlo: «Sin conexión con ORDEVA»', !!g2 && g2.motivo === 'sinconexion' && /Sin conexión con ORDEVA/.test(g2.txt), JSON.stringify(g2));
     bd.offline = false; bd.vidaToken = 72 * H;
     await p.evaluate(() => window.dispatchEvent(new Event('online')));
     chk('Vuelve el internet: la app abre sola', await listo(p, () => !document.getElementById('vpOv'), 6000), JSON.stringify(await puerta(p)));

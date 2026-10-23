@@ -74,7 +74,7 @@ if(exe && process.platform === 'linux' && !process.env.DISPLAY && !process.env.V
     const w5 = await app.firstWindow();
     await w5.waitForTimeout(2500);
     const t5 = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.executeJavaScript('document.title + " | " + document.body.innerText'));
-    chk('5. Sin conexión con ORDEVA → «📡 Sin conexión con ORDEVA» con «Reintentar»', /Sin conexión con Vento/.test(t5) && /Reintentar/.test(t5), t5.slice(0, 160));
+    chk('5. Sin conexión con ORDEVA → «📡 Sin conexión con ORDEVA» con «Reintentar»', /Sin conexión con ORDEVA/.test(t5) && /Reintentar/.test(t5), t5.slice(0, 160));
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.stack || e)); }
   finally{ if(app) await app.close().catch(() => {}); }
   chk('Sin errores de página', !errs.length, errs);

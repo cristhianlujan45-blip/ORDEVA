@@ -36,7 +36,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     await p.waitForSelector('#pgOn', { state: 'attached', timeout: 5000 });
     const desc = await p.textContent('#pgGrupo');
     chk('1. Explica que la app de ORDEVA lee directamente el aviso del banco y dice «Pago confirmado»', /la app de ORDEVA lee directamente el aviso del banco/.test(desc) && /Pago confirmado/.test(desc), desc.slice(0, 300));
-    chk('1. MacroDroid queda solo como «otro método», plegado', await p.evaluate(() => { const d = [...document.querySelectorAll('#pgGrupo details')].find(x => /MacroDroid|NO usas la app/.test(x.querySelector('summary').textContent)); return !!d && !d.open && /NO usas la app Vento/.test(d.querySelector('summary').textContent); }));
+    chk('1. MacroDroid queda solo como «otro método», plegado', await p.evaluate(() => { const d = [...document.querySelectorAll('#pgGrupo details')].find(x => /MacroDroid|NO usas la app/.test(x.querySelector('summary').textContent)); return !!d && !d.open && /NO usas la app ORDEVA/.test(d.querySelector('summary').textContent); }));
     await p.evaluate(() => { const i = document.getElementById('pgOn'); i.checked = true; i.dispatchEvent(new Event('change')); });
     let A = await p.evaluate(() => window.__and);
     chk('1. Al prender «Recibir avisos de pagos» queda leyendo los avisos de este celular y, sin permiso, abre «Acceso a notificaciones»', A.on && A.permisoAbierto === 1 && await p.evaluate(() => data.pagos.on === true), A);

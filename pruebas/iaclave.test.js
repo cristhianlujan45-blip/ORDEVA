@@ -103,7 +103,7 @@ const vistos = [];
     await D.waitForSelector('#aiCfgStatus');
     const aj = await D.evaluate(() => ({ st: document.getElementById('aiCfgStatus').textContent, ph: document.getElementById('aiCfgKey').placeholder, val: document.getElementById('aiCfgKey').value,
       quitar: [...document.querySelectorAll('button')].some(x => /Quitar la clave del negocio/.test(x.textContent) && !x.hidden) }));
-    chk('3. Ajustes dice que la clave está en el servidor, con el final, y el campo queda vacío', /Servidor Vento/.test(aj.st) && /abcd/.test(aj.st) && /servidor/.test(aj.ph) && !aj.val && aj.quitar, aj);
+    chk('3. Ajustes dice que la clave está en el servidor, con el final, y el campo queda vacío', /Servidor ORDEVA/.test(aj.st) && /abcd/.test(aj.st) && /servidor/.test(aj.ph) && !aj.val && aj.quitar, aj);
     await D.click('#aiCfgSave');
     await D.waitForFunction(() => /Listo|funcionó|⚠️|❌/.test(document.getElementById('aiCfgStatus').textContent), null, { timeout: 15000 }).catch(() => {});
     let e = (await uno("select secreto is not null s from integraciones where negocio_id = $1 and tipo = 'ia'", [NEG]));
