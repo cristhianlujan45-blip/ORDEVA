@@ -21,6 +21,8 @@ async function pruebas(sb) {
   const repaso = (clave) => fetch(sb.url + '/functions/v1/vento-pagos/sync', { method: 'POST', headers: cab(null, { 'x-vento-cron': clave }), body: '{}' });
 
   const n = await uno("select count(*) n from pg_extension where extname in ('pg_cron','pg_net')");
+  const s0 = await (await fetch(sb.url + '/functions/v1/vento-pagos/salud')).json();
+  chk('/salud sin pg_cron: lo dice', s0.ok && s0.repasos && s0.repasos.pg_cron === false, s0.repasos);
   chk('Sin pg_cron ni pg_net la migración se aplicó igual (no rompe la revisión del despliegue)', Number(n.n) === 0);
   let r = await uno('select public.vento_repaso() r');
   chk('Sin configuración, vento_repaso() no hace nada y lo dice', r.r.ok === false && r.r.motivo === 'sin_config', r.r);
@@ -34,9 +36,10 @@ async function pruebas(sb) {
 
   // ---------- Imitación de pg_cron y pg_net (misma firma que en Supabase) ----------
   await sb.sql(`create schema if not exists cron;
-    create table if not exists cron.job (jobname text primary key, schedule text, command text);
+    create table if not exists cron.job (jobid bigserial primary key, jobname text unique, schedule text, command text, active boolean not null default true);
+    create table if not exists cron.job_run_details (runid bigserial primary key, jobid bigint, status text, end_time timestamptz);
     create or replace function cron.schedule(job_name text, schedule text, command text) returns bigint language sql as $$
-      insert into cron.job values (job_name, schedule, command) on conflict (jobname) do update set schedule = excluded.schedule, command = excluded.command returning 1::bigint $$;
+      insert into cron.job(jobname, schedule, command) values (job_name, schedule, command) on conflict (jobname) do update set schedule = excluded.schedule, command = excluded.command returning jobid $$;
     create schema if not exists net;
     create table if not exists net.pedidos (id bigserial primary key, url text, body jsonb, params jsonb, headers jsonb, tiempo int);
     create or replace function net.http_post(url text, body jsonb default '{}', params jsonb default '{}', headers jsonb default '{"Content-Type":"application/json"}', timeout_milliseconds integer default 5000)
@@ -51,6 +54,9 @@ async function pruebas(sb) {
   chk('Limpia cada día la bitácora de pg_cron (guarda una semana)', jobs.some((j) => j.jobname === 'vento-limpiar-cron' && /job_run_details/.test(j.command) && /7 days/.test(j.command)), jobs);
   chk('Correrla otra vez no duplica los trabajos', !err && Number((await uno('select count(*) n from cron.job')).n) === 3, err);
 
+  await sb.sql("insert into cron.job_run_details(jobid, status, end_time) select jobid, 'succeeded', now() from cron.job where jobname = 'vento-repaso'");
+  const sal = await (await fetch(sb.url + '/functions/v1/vento-pagos/salud')).json();
+  chk('/salud dice si los repasos están programados (sin comandos ni secretos)', sal.repasos && sal.repasos.pg_cron === true && sal.repasos.config === true && sal.repasos.trabajos['vento-repaso'] && sal.repasos.trabajos['vento-repaso'].cada === '*/5 * * * *' && sal.repasos.trabajos['vento-repaso'].ultimo.estado === 'succeeded' && !JSON.stringify(sal).includes(sb.cron), sal.repasos);
   r = await uno('select public.vento_repaso() r');
   const ped = await sb.sql('select url, headers, tiempo from net.pedidos order by id');
   chk('vento_repaso() pide /vento-pagos/sync y /vento-suscripciones/vencer', r.r.ok && ped.length === 2 && ped[0].url === sb.url + '/functions/v1/vento-pagos/sync' && ped[1].url === sb.url + '/functions/v1/vento-suscripciones/vencer', [r.r, ped]);

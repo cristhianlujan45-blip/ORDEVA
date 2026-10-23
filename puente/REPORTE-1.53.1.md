@@ -43,3 +43,12 @@ Archivos:
 - **Siguen pasando todas las pruebas del servidor:** `admin` 142, `avisos` 27, `bloqueos` 18, `daviplata` 101, `dian` 69,
   `errores` 30, `iaclave` 34, `proyeccion` 66 y `suscripciones` 154.
 - `revisar-migraciones`: no borra datos y las 27 migraciones se aplican con RLS en todas las tablas.
+
+## 1.53.2 · Ver desde afuera que los repasos corren
+- **`GET /vento-pagos/salud` ahora dice `repasos`:**
+  - si Supabase tiene `pg_cron` y `pg_net`;
+  - si el servidor ya dejó su configuración;
+  - cada trabajo, con su horario y su última corrida (cuándo terminó y si salió bien).
+- **No muestra** comandos ni secretos.
+- Migración `20261102100000_repasos_estado.sql` y servidor 1.22.1.
+- Pruebas: `servidor/repasos` pasa a 20 comprobaciones y todas las pruebas del servidor siguen pasando.

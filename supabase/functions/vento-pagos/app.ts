@@ -28,7 +28,7 @@ import * as G from "./google.ts";
 import * as F from "./dian.ts";
 import { type Env, ErrorVento, log, sha256 } from "./util.ts";
 
-export const VERSION = "1.22.0";
+export const VERSION = "1.22.1";
 const SITIO = "https://cristhianlujan45-blip.github.io/cuentas/";
 
 type Pago = { id: string; negocio_id?: string; referencia: string; proveedor: string; metodo: string; canal: string; monto: number;
@@ -784,8 +784,13 @@ export async function manejar(req: Request, env: Env): Promise<Response> {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
   try {
     const r0 = ruta[0] || "salud";
-    if (r0 === "salud") return json(200, { ok: true, servicio: "vento-pagos", version: VERSION, integraciones: ["wompi", "nequi_conecta", "daviplata_api", "avisos_dispositivo", "google_youtube", "dian_matias"], push: true,
-      dian: { listo: F.configurado(env), ambiente: F.esPruebas(env) ? "pruebas" : "produccion" } }, cors);
+    if (r0 === "salud") {
+      // ¿Corren los repasos dentro de Supabase (1.53.1)? Solo si están programados y cuándo fue la última corrida.
+      let repasos: unknown = null;
+      try { repasos = await servidor(env).rpc("srv_repasos_estado"); } catch { repasos = null; }
+      return json(200, { ok: true, servicio: "vento-pagos", version: VERSION, integraciones: ["wompi", "nequi_conecta", "daviplata_api", "avisos_dispositivo", "google_youtube", "dian_matias"], push: true,
+        dian: { listo: F.configurado(env), ambiente: F.esPruebas(env) ? "pruebas" : "produccion" }, repasos }, cors);
+    }
     if (r0 === "webhook" && ruta[1] === "wompi" && ruta[2] && req.method === "POST") return await webhookWompi(req, env, ruta[2]);
     if (r0 === "aviso" && req.method === "POST") return await aviso(req, env, ruta[1] || null);
     // Canal en vivo para quien publica desde afuera (MacroDroid con los avisos de pagos, el puente de WhatsApp):
