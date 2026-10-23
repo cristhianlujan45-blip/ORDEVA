@@ -1,5 +1,5 @@
 -- =====================================================================
---  Vento 1.57.0 · Restaurar un respaldo pasa por la misma limpieza que un guardado (hallazgo D10 + D5/D6)
+--  Vento 1.55.0 · Restaurar un respaldo pasa por la misma limpieza que un guardado (hallazgo D10 + D5/D6)
 --
 --  restaurar_respaldo copiaba el respaldo tal cual al documento compartido. Un respaldo de antes de la 1.53 / 1.55
 --  podía volver a meter en los datos que van a todos los celulares la clave de IA del negocio, o el nombre de quien

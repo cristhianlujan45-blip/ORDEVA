@@ -1,5 +1,5 @@
 -- =====================================================================
---  Vento 1.56.0 · El equipo (cajero, mesero, empleado) no reescribe precios, costos ni permisos desde su celular
+--  Vento 1.55.0 · El equipo (cajero, mesero, empleado) no reescribe precios, costos ni permisos desde su celular
 --  (hallazgo D2 de la auditoría de datos).
 --
 --  Antes: guardar_datos solo pedía ser miembro del negocio. La app no le muestra al mesero cómo cambiar precios, pero

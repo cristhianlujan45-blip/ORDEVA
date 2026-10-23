@@ -1,5 +1,5 @@
 // Pruebas del SERVIDOR: el equipo no reescribe precios, costos ni permisos (migración 20261106000000_equipo_no_reescribe,
-// Vento 1.56.0, hallazgo D2), contra PostgreSQL REAL. Con los permisos que el dueño da en «👥 Permisos del equipo».
+// Vento 1.55.0, hallazgo D2), contra PostgreSQL REAL. Con los permisos que el dueño da en «👥 Permisos del equipo».
 //  • Sin permiso: el precio, el nombre y el costo de los productos vuelven a los de antes; los productos borrados vuelven;
 //    el stock y los productos nuevos sí cambian.
 //  • Con «productos»: puede cambiar precios. Con solo «inventario»: el costo sí, el precio no.

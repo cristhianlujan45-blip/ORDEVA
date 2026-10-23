@@ -1,4 +1,4 @@
-// 🎓 Practicar una venta (Vento 1.57.0, guía para mayores): un ensayo completo con los productos del negocio y la voz,
+// 🎓 Practicar una venta (Vento 1.55.0, guía para mayores): un ensayo completo con los productos del negocio y la voz,
 // SIN tocar los datos del negocio.
 //  1. Sale en «Más» del modo fácil y en «🙋 Ayúdame» («quiero practicar una venta»).
 //  2. Mesa → productos → Cobrar → cómo pagan → billete → cuánto devolver (efectivo) o el aviso de Nequi.
