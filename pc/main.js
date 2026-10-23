@@ -15,7 +15,7 @@
 const { app, BrowserWindow, shell, session, Menu, Tray, dialog, nativeImage, ipcMain, Notification } = require('electron');
 const path = require('path');
 
-const URL_VENTO = 'https://cristhianlujan45-blip.github.io/cuentas/';
+const URL_VENTO = 'https://cristhianlujan45-blip.github.io/ORDEVA/';   // 1.55.2: el repositorio ahora es ORDEVA (antes …/cuentas/)
 const HOST_VENTO = 'cristhianlujan45-blip.github.io';
 // Pruebas: VENTO_PC_URL=http://localhost:8765/ abre la copia local (solo para probar el programa).
 const INICIO = process.env.VENTO_PC_URL || URL_VENTO;
@@ -32,10 +32,10 @@ function esVento(u){
   try{
     const x = new URL(u);
     if(ORIGEN_PRUEBA && x.origin === ORIGEN_PRUEBA) return true;
-    return x.protocol === 'https:' && x.hostname === HOST_VENTO && x.pathname.startsWith('/cuentas');
+    return x.protocol === 'https:' && x.hostname === HOST_VENTO && (x.pathname.startsWith('/ORDEVA') || x.pathname.startsWith('/cuentas'));
   }catch(e){ return false; }
 }
-const esOrigenVento = o => { try{ return esVento(String(o).replace(/\/?$/, '/cuentas/')) || esVento(o); }catch(e){ return false; } };
+const esOrigenVento = o => { try{ return esVento(String(o).replace(/\/?$/, '/ORDEVA/')) || esVento(o); }catch(e){ return false; } };
 
 function mostrar(){
   if(!ventana) return crearVentana();

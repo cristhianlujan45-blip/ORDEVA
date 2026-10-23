@@ -564,7 +564,7 @@
     var c = q('nubeCuerpo'); if(!c) return; msg('');
     if(!configurada()){
       var cf = cfg();
-      c.innerHTML = '<p class="nube-p">Para tener <b>usuarios</b> y usar el mismo negocio en <b>varios celulares</b>, conecta Vento a tu base de datos gratuita de Supabase. Los pasos están en <a href="https://github.com/cristhianlujan45-blip/cuentas/blob/claude/nuevo-repo-correcciones-xacdbz/nube/LEEME.md" target="_blank" rel="noopener">nube/LEEME.md</a> (5 minutos).</p>' +
+      c.innerHTML = '<p class="nube-p">Para tener <b>usuarios</b> y usar el mismo negocio en <b>varios celulares</b>, conecta Vento a tu base de datos gratuita de Supabase. Los pasos están en <a href="https://github.com/cristhianlujan45-blip/ORDEVA/blob/claude/nuevo-repo-correcciones-xacdbz/nube/LEEME.md" target="_blank" rel="noopener">nube/LEEME.md</a> (5 minutos).</p>' +
         '<label>Project URL<input id="nubeUrl" placeholder="https://xxxx.supabase.co" value="' + esc(cf.url) + '" autocapitalize="none" spellcheck="false"></label>' +
         '<label>Clave pública (anon / publishable key)<input id="nubeKey" placeholder="eyJhbGciOi… o sb_publishable_…" value="' + esc(cf.key) + '" autocapitalize="none" spellcheck="false"></label>' +
         '<button type="button" class="btn-primary" id="nubeGuardarCfg">Guardar y continuar</button>' +

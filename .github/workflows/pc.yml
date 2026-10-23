@@ -1,5 +1,5 @@
 # Compila Vento para PC (Windows) y lo publica en las Descargas del repositorio (release «pc»):
-#   https://github.com/cristhianlujan45-blip/cuentas/releases/download/pc/Vento-Setup.exe
+#   https://github.com/cristhianlujan45-blip/ORDEVA/releases/download/pc/Vento-Setup.exe
 # El programa (carpeta pc/) abre la página de Vento en su propia ventana y se actualiza solo desde ese mismo release
 # (latest.yml). Corre solo cada vez que cambia pc/ en la rama principal, y también a mano (Actions → App PC → Run workflow).
 # OJO: el release «pc» NUNCA se marca como «latest»: el enlace del APK de Android (releases/latest/download/vento.apk)

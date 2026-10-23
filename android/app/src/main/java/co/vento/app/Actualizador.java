@@ -29,7 +29,7 @@ import java.net.URL;
  */
 final class Actualizador {
     private Actualizador() { }
-    static final String BASE = "https://github.com/cristhianlujan45-blip/cuentas/releases/latest/download/";
+    static final String BASE = "https://github.com/cristhianlujan45-blip/ORDEVA/releases/latest/download/";
     static final String ACCION = "co.vento.app.ACTUALIZACION";
     static final String P_REV = "actRevisado", P_NUEVA = "actNueva", P_NOMBRE = "actNuevaNombre", P_ESTADO = "actEstado", P_INTENTOS = "actIntentos", P_AUTO = "actAuto";
     // Cada 30 min (antes 3 h: si se publicaban varias versiones seguidas, el celular se quedaba atrás horas).

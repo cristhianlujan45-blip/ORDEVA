@@ -121,7 +121,7 @@ async function licencia(req: Request, env: Env, b: Record<string, unknown>) {
 }
 
 // ---------- Soporte: fotos / pantallazos y avisos al administrador ----------
-const SITIO = "https://cristhianlujan45-blip.github.io/cuentas/";
+const SITIO = "https://cristhianlujan45-blip.github.io/ORDEVA/";
 
 // Quién llama, si viene con su sesión (el soporte también se puede usar sin cuenta, con la clave del caso).
 async function quienOpcional(req: Request, env: Env): Promise<string | null> {

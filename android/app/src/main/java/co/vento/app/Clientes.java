@@ -26,7 +26,7 @@ final class Clientes {
         if (u == null) return false;
         String esquema = u.getScheme() == null ? "" : u.getScheme().toLowerCase(Locale.ROOT);
         if ((esquema.equals("https") || esquema.equals("http")) && VentoApp.HOST_VENTO.equalsIgnoreCase(u.getHost())
-                && u.getPath() != null && u.getPath().startsWith("/cuentas")) return false;
+                && u.getPath() != null && (u.getPath().startsWith("/ORDEVA") || u.getPath().startsWith("/cuentas"))) return false;
         android.content.Context c = VentoApp.ventana != null ? VentoApp.ventana : VentoApp.app;
         try {
             Intent i;

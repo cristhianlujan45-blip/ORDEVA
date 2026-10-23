@@ -10,7 +10,7 @@
 // Los QR impresos apuntan a este sitio de Netlify: se reenvía a la versión de GitHub Pages
 // con los mismos datos del QR (mesa, canal y código), así cada cambio en GitHub llega solo.
 (function(){
-  var GH = 'https://cristhianlujan45-blip.github.io/cuentas/';
+  var GH = 'https://cristhianlujan45-blip.github.io/ORDEVA/';
   var ruta = location.pathname.replace(/^\/+/, '');
   var q = location.search, esQR = /[?&](c|mesa|dom)=/.test(q);
   var destino = (esQR || ruta === '' || ruta === 'pedido.html' || !/^[\w.-]+\.html$/.test(ruta)) ? 'pedido.html' : ruta;
@@ -28,7 +28,7 @@ a{color:#f2cf86}
 <body>
 <main>
   <div>Abriendo el menú…</div>
-  <a id="ir" href="https://cristhianlujan45-blip.github.io/cuentas/pedido.html">Si no se abre solo, toca aquí</a>
+  <a id="ir" href="https://cristhianlujan45-blip.github.io/ORDEVA/pedido.html">Si no se abre solo, toca aquí</a>
 </main>
 <script>try{document.getElementById('ir').href=window.__destino;}catch(e){}</script>
 </body>

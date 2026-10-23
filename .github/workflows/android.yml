@@ -1,7 +1,7 @@
 # Compila la app de Vento para Android (APK) y la publica en la página de descargas del repositorio:
-#   https://github.com/cristhianlujan45-blip/cuentas/releases/latest/download/vento.apk
+#   https://github.com/cristhianlujan45-blip/ORDEVA/releases/latest/download/vento.apk
 # y la del proveedor (panel de administración):
-#   https://github.com/cristhianlujan45-blip/cuentas/releases/latest/download/vento-admin.apk
+#   https://github.com/cristhianlujan45-blip/ORDEVA/releases/latest/download/vento-admin.apk
 # Corre sola cada vez que cambia la carpeta android/ en la rama principal, y también a mano
 # (Actions → App Android → Run workflow).
 name: App Android

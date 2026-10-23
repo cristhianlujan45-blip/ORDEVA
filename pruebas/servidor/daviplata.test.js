@@ -94,7 +94,7 @@ async function pruebas(sb) {
   const cons = await sb.sql("select conname, pg_get_constraintdef(oid) d from pg_constraint where conname in ('pagos_proveedor_check','pagos_canal_check','pago_proveedores_proveedor_check')");
   chk('Migración: proveedor «daviplata» y canal «otp» permitidos (CHECK reales)', cons.length === 3 && cons.every((c) => /daviplata|otp/.test(c.d)) && cons.some((c) => /'otp'/.test(c.d)), cons);
   let r = await api('/salud');
-  chk('GET /salud anuncia «daviplata_api» (v1.18)', r.st === 200 && r.j.integraciones.includes('daviplata_api') && r.j.version === '1.23.1', r.j);
+  chk('GET /salud anuncia «daviplata_api» (v1.18)', r.st === 200 && r.j.integraciones.includes('daviplata_api') && r.j.version === '1.23.2', r.j);
 
   // Celular del dueño con avisos push activos
   const cel = await celularPush();

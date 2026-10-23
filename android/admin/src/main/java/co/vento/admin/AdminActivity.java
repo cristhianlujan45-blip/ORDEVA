@@ -41,7 +41,7 @@ import java.nio.charset.StandardCharsets;
  */
 public class AdminActivity extends Activity {
 
-    static final String URL_ADMIN = "https://cristhianlujan45-blip.github.io/cuentas/admin.html";
+    static final String URL_ADMIN = "https://cristhianlujan45-blip.github.io/ORDEVA/admin.html";   // 1.55.2: antes …/cuentas/
     static final String HOST = "cristhianlujan45-blip.github.io";
     private static final int RC_ARCHIVO = 31;
 
@@ -163,12 +163,12 @@ public class AdminActivity extends Activity {
         web.saveState(b);
     }
 
-    /** Solo el panel (…/cuentas/admin.html) se queda adentro; lo demás se abre con su app. */
+    /** Solo el panel (…/ORDEVA/admin.html, o el …/cuentas/ de antes) se queda adentro; lo demás se abre con su app. */
     private boolean abrirFuera(Uri u) {
         if (u == null) return false;
         String esq = u.getScheme() == null ? "" : u.getScheme();
         if (("https".equals(esq) || "http".equals(esq)) && HOST.equalsIgnoreCase(u.getHost())
-                && u.getPath() != null && u.getPath().startsWith("/cuentas/admin")) return false;
+                && u.getPath() != null && (u.getPath().startsWith("/ORDEVA/admin") || u.getPath().startsWith("/cuentas/admin"))) return false;
         try {
             Intent i = "intent".equals(esq) ? Intent.parseUri(u.toString(), Intent.URI_INTENT_SCHEME) : new Intent(Intent.ACTION_VIEW, u);
             i.addCategory(Intent.CATEGORY_BROWSABLE);

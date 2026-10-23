@@ -43,7 +43,7 @@ import java.util.Locale;
  */
 public class VentoApp extends Application {
 
-    static final String URL_VENTO = "https://cristhianlujan45-blip.github.io/cuentas/";
+    static final String URL_VENTO = "https://cristhianlujan45-blip.github.io/ORDEVA/";   // 1.55.2: el repositorio ahora es ORDEVA (antes …/cuentas/)
     static final String HOST_VENTO = "cristhianlujan45-blip.github.io";
 
     static VentoApp app;

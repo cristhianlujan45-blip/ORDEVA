@@ -37,6 +37,6 @@
       "language": "3082"
     },
     "linux": { "target": ["AppImage"], "icon": "icono.png", "category": "Office", "artifactName": "Vento.${ext}" },
-    "publish": [{ "provider": "generic", "url": "https://github.com/cristhianlujan45-blip/cuentas/releases/download/pc" }]
+    "publish": [{ "provider": "generic", "url": "https://github.com/cristhianlujan45-blip/ORDEVA/releases/download/pc" }]
   }
 }

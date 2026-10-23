@@ -43,7 +43,7 @@ const UA_APP = UA_CHROME.replace('Mobile Safari/537.36', 'Mobile Safari/537.36 V
     let g = await p.evaluate(() => document.getElementById('pgGuiaOv').innerText);
     chk('1. Paso a paso: ya NO dice «Falta instalarla»; dice «Estás en Vento Web» y que solo la app lee los avisos', !/Falta instalarla/.test(g) && /Estás en Vento Web/.test(g) && /solo los puede leer la app Vento/.test(g), g.slice(0, 400));
     const bajar = await p.evaluate(() => { const a = [...document.querySelectorAll('#pgGuiaOv a')].find(x => /Descargar la app \(vento\.apk\)/.test(x.textContent)); return a ? a.getAttribute('href') : null; });
-    chk('1. Botón directo «⬇️ Descargar la app (vento.apk)» con el enlace del APK (no la web) y cómo instalarlo', bajar === 'https://github.com/cristhianlujan45-blip/cuentas/releases/latest/download/vento.apk' && /Permitir de esta fuente/.test(g) && /Instalar/.test(g), bajar);
+    chk('1. Botón directo «⬇️ Descargar la app (vento.apk)» con el enlace del APK (no la web) y cómo instalarlo', bajar === 'https://github.com/cristhianlujan45-blip/ORDEVA/releases/latest/download/vento.apk' && /Permitir de esta fuente/.test(g) && /Instalar/.test(g), bajar);
     await p.click('[data-gp="abrirapp"]');
     let ab = await p.evaluate(() => window.__abrir.slice());
     chk('1. «📲 Abrir la app Vento» abre la app (intent vento://abrir del paquete co.vento.app; si no está, la descarga)', ab.length === 1 && /^intent:\/\/abrir#Intent;scheme=vento;package=co\.vento\.app;S\.browser_fallback_url=https%3A%2F%2Fgithub\.com%2F.*vento\.apk;end$/.test(ab[0]), ab);

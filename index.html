@@ -51,7 +51,7 @@
    de otras apps. Antes no se distinguían y el paso a paso decía «Falta instalarla» con la app ya instalada.
    ventoAbrirApp() abre la app (o la descarga si no está). */
 (function(){
-  var APK = 'https://github.com/cristhianlujan45-blip/cuentas/releases/latest/download/vento.apk';
+  var APK = 'https://github.com/cristhianlujan45-blip/ORDEVA/releases/latest/download/vento.apk';
   var ua = navigator.userAgent || '';
   window.ventoEnApp = function(){ return !!window.VentoAndroid; };
   // La app sin su puente (no cargó bien): el navegador de la app dice «VentoAndroid/…» pero falta window.VentoAndroid.
@@ -3899,7 +3899,7 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
         <div id="tvvLista"></div>
         <div class="tvv-add"><input id="tvvIn" class="mz-in" placeholder="Agregar canción al TV" autocomplete="off" enterkeyhint="send"><button class="btn-primary" id="tvvAdd" type="button">➕ Agregar</button></div>
       </div>
-      <a class="btn-ghost" id="tvApk" hidden href="https://github.com/cristhianlujan45-blip/cuentas/releases/latest/download/vento.apk" style="text-align:center;margin:8px 0;padding:11px;border-radius:12px;text-decoration:none">📲 ¿Tu TV no sale? Instala la app Vento para Android: encuentra TODOS los TV del wifi (LG, Samsung, TV Box, Fire TV…)</a>
+      <a class="btn-ghost" id="tvApk" hidden href="https://github.com/cristhianlujan45-blip/ORDEVA/releases/latest/download/vento.apk" style="text-align:center;margin:8px 0;padding:11px;border-radius:12px;text-decoration:none">📲 ¿Tu TV no sale? Instala la app Vento para Android: encuentra TODOS los TV del wifi (LG, Samsung, TV Box, Fire TV…)</a>
       <div class="settings-row" id="apkFondoFila" hidden><div class="settings-row-text"><strong>🔋 Trabajar con la app cerrada</strong><span id="apkFondoTxt">Pedidos y música siguen funcionando aunque cierres la app o apagues la pantalla.</span></div><label class="switch"><input type="checkbox" id="apkFondo"><span class="switch-slider"></span></label></div>
       <button class="btn-ghost" id="apkPermisos" type="button" hidden style="width:100%;margin:4px 0 4px">🔐 Permisos del celular</button>
       <div id="apkPermisosTxt" class="settings-desc" hidden style="margin:0 0 6px;font-size:12.5px"></div>
@@ -4588,9 +4588,9 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
       <h2>💻 Instalar Vento en el PC (computador) y el celular</h2>
       <div class="settings-desc">La misma cuenta y los mismos datos en todos lados (se sincronizan al instante con la nube).</div>
       <div class="settings-desc" id="instAqui" style="opacity:.8"></div>
-      <a class="btn-primary" id="instPc" href="https://github.com/cristhianlujan45-blip/cuentas/releases/download/pc/Vento-Setup.exe" download="Vento-Setup.exe" rel="noopener" style="display:block;text-align:center;box-sizing:border-box;margin-top:8px;text-decoration:none">💻 Descargar Vento para PC (Windows)</a>
+      <a class="btn-primary" id="instPc" href="https://github.com/cristhianlujan45-blip/ORDEVA/releases/download/pc/Vento-Setup.exe" download="Vento-Setup.exe" rel="noopener" style="display:block;text-align:center;box-sizing:border-box;margin-top:8px;text-decoration:none">💻 Descargar Vento para PC (Windows)</a>
       <div class="settings-desc" style="margin-top:6px"><small>Abre <b>Vento-Setup.exe</b> y sigue los pasos. Si Windows dice «Windows protegió su PC», toca <b>Más información → Ejecutar de todas formas</b>. Queda en el escritorio, sigue sonando con la ventana cerrada (icono junto al reloj), usa la balanza, la impresora y el cajón por USB, y se actualiza solo.</small></div>
-      <a class="btn-ghost" id="instApk" href="https://github.com/cristhianlujan45-blip/cuentas/releases/latest/download/vento.apk" download="vento.apk" rel="noopener" style="display:block;text-align:center;box-sizing:border-box;margin-top:10px;text-decoration:none">📲 Descargar la app para Android (vento.apk)</a>
+      <a class="btn-ghost" id="instApk" href="https://github.com/cristhianlujan45-blip/ORDEVA/releases/latest/download/vento.apk" download="vento.apk" rel="noopener" style="display:block;text-align:center;box-sizing:border-box;margin-top:10px;text-decoration:none">📲 Descargar la app para Android (vento.apk)</a>
       <script>
       (function(){
         // Si ya está en el programa de PC o en la app Android, lo dice y esconde ese botón.
@@ -22860,8 +22860,8 @@ const yGuardarTok=(t,exp)=>{const v=JSON.stringify({t:t,exp:Date.now()+(Math.max
 const yTokExp=()=>{try{const t=JSON.parse(localStorage.getItem('vito_ytok')||sessionStorage.getItem('vito_ytok'));return t&&t.exp||0;}catch(e){return 0;}};
 const ySrv=()=>!!(window.ventoGoogle&&window.ventoGoogle.disponible());
 const yEnApp=()=>{try{return matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;}catch(e){return false;}};
-// Dirección de regreso: la carpeta de Vento (…/cuentas/), igual a la registrada en Google Cloud,
-// aunque Vento se haya abierto como …/cuentas/index.html.
+// Dirección de regreso: la carpeta de Vento (…/ORDEVA/), igual a la registrada en Google Cloud,
+// aunque Vento se haya abierto como …/ORDEVA/index.html.
 const yRedir=()=>location.origin+location.pathname.replace(/index\.html$/,'');
 let yRenovando=null,yFalloSrv=0,yFalloMsg='';
 function yRenovarServidor(forzar){
@@ -26001,7 +26001,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-23 · v1.55.1';
+const MESORA_VERSION = '2026-10-23 · v1.55.2';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'Vento · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 /* 🔄 La app Android se actualiza SOLA (Actualizador): revisa cada 3 h, baja la versión nueva y la instala cuando no se
@@ -26017,7 +26017,7 @@ try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent =
     if(!a && window.VentoAndroid){
       const ps = document.getElementById('pgSalud'), yaDice = ps && !ps.hidden && ps.dataset.k === 'vieja';
       let luego = 0; try{ luego = Number(localStorage.getItem(LUEGO)) || 0; }catch(x){}
-      if(el){ el.hidden = false; el.innerHTML = '📲 Tu app Android todavía no se actualiza sola. <a href="https://github.com/cristhianlujan45-blip/cuentas/releases/latest/download/vento.apk" download="vento.apk" rel="noopener">⬇️ Instálala una última vez</a>'; }
+      if(el){ el.hidden = false; el.innerHTML = '📲 Tu app Android todavía no se actualiza sola. <a href="https://github.com/cristhianlujan45-blip/ORDEVA/releases/latest/download/vento.apk" download="vento.apk" rel="noopener">⬇️ Instálala una última vez</a>'; }
       banner(!yaDice && Date.now() > luego ? 'vieja' : ''); return null;
     }
     if(!a){ if(el) el.hidden = true; banner(''); return null; }
@@ -26052,7 +26052,7 @@ try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent =
         '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap"><button type="button" data-act="ahora" style="background:#fff;color:#1e3a8a;border:0;border-radius:10px;padding:7px 12px;font-weight:800">🔄 Actualizar ahora</button><button type="button" data-act="luego" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,.6);border-radius:10px;padding:6px 10px">Luego</button></div>';
       b.hidden = false; return; }
     b.innerHTML = '<style>#actBanner a,#actBanner button{pointer-events:auto}</style>' + (k === 'vieja' ? '<div>📲 <b>Instala la app Vento nueva una última vez</b>: desde esa versión se actualiza sola, sin instalar a mano.</div>' : '<div>🔄 <b>Que Vento se actualice sola</b>, sin descargar ni instalar a mano: dale un permiso una sola vez.</div>') +
-      '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">' + (k === 'vieja' ? '<a href="https://github.com/cristhianlujan45-blip/cuentas/releases/latest/download/vento.apk" download="vento.apk" rel="noopener" style="background:#fff;color:#1e3a8a;border-radius:10px;padding:7px 12px;font-weight:800;text-decoration:none">⬇️ Instalar la nueva</a>' : '<button type="button" data-act="permiso" style="background:#fff;color:#1e3a8a;border:0;border-radius:10px;padding:7px 12px;font-weight:800">🔓 Dar el permiso</button>') + '<button type="button" data-act="luego" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,.6);border-radius:10px;padding:6px 10px">Luego</button></div>';
+      '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">' + (k === 'vieja' ? '<a href="https://github.com/cristhianlujan45-blip/ORDEVA/releases/latest/download/vento.apk" download="vento.apk" rel="noopener" style="background:#fff;color:#1e3a8a;border-radius:10px;padding:7px 12px;font-weight:800;text-decoration:none">⬇️ Instalar la nueva</a>' : '<button type="button" data-act="permiso" style="background:#fff;color:#1e3a8a;border:0;border-radius:10px;padding:7px 12px;font-weight:800">🔓 Dar el permiso</button>') + '<button type="button" data-act="luego" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,.6);border-radius:10px;padding:6px 10px">Luego</button></div>';
     b.hidden = false;
   }
   document.addEventListener('click', ev => {
@@ -29675,7 +29675,7 @@ function pagoHuella(t){
   //  • la lectura se vuelve a prender sola (salvo que el dueño la haya apagado a propósito en Ajustes → Pagos);
   //  • si falta el permiso, Android desconectó la lectura o la app es vieja, sale un aviso fijo con el botón para arreglarlo.
   // (En el celular de un mesero o empleado no se prende sola: leería los avisos de su banco personal.)
-  const PG_APK = 'https://github.com/cristhianlujan45-blip/cuentas/releases/latest/download/vento.apk';
+  const PG_APK = 'https://github.com/cristhianlujan45-blip/ORDEVA/releases/latest/download/vento.apk';
   // 🔋 DaviPlata y Nequi con ahorro de batería («Optimizada»): Android retrasa SUS avisos de pago (llegan tarde o al
   // prender la pantalla) y Vento los dice tarde. Vento revisa cada app del banco instalada y abre su ajuste para elegir
   // «Sin restricciones». (Ninguna app puede cambiar eso por otra: lo elige el dueño con un toque.)
@@ -29817,7 +29817,7 @@ function pagoHuella(t){
   // ---------- 📘 Paso a paso: agregar DaviPlata (o Nequi) para que Vento avise «Pagaron $X» ----------
   // Para recibir los avisos NO hace falta convenio con Davivienda ni la API: la app Vento para Android lee el aviso
   // que DaviPlata ya muestra en el celular («¡Le llegó plata!…») y lo convierte en «Pago confirmado» + el aviso del celular.
-  const APK = 'https://github.com/cristhianlujan45-blip/cuentas/releases/latest/download/vento.apk';
+  const APK = 'https://github.com/cristhianlujan45-blip/ORDEVA/releases/latest/download/vento.apk';
   // Marca del celular (Xiaomi, Samsung…) y sus pasos para que no cierre Vento (esas marcas cierran las apps de fondo).
   function pgMarca(){ try{ const A = window.VentoAndroid; const f = A && A.fabricante ? String(A.fabricante()) : ''; return f.split('|')[0] || ''; }catch(e){ return ''; } }
   function pgPasosMarca(){
@@ -29934,7 +29934,7 @@ function pagoHuella(t){
       (enApp
         ? '<div class="settings-desc">Cuando te llega plata a <b>DaviPlata</b>, <b>Nequi</b> o tu banco, <b>la app de Vento lee directamente el aviso del banco en este celular</b> y te dice en voz alta <b>«Pago confirmado»</b> con el valor, quién pagó y de qué mesa es (como el parlante de Bold). No necesitas instalar nada más.</div>'
         : '<div class="settings-desc">Para que Vento te diga <b>«Pago confirmado»</b> apenas te llegue la plata, instala la <b>app Vento para Android</b> en el celular donde tienes DaviPlata o Nequi y prende esta opción allí: la app lee directamente el aviso del banco. Desde el navegador no se pueden leer los avisos de otras apps. Los demás celulares del negocio reciben el aviso por tu cuenta de Vento.</div>') +
-      '<div class="settings-desc" id="pgWebAviso" hidden style="border:1px solid #f5a524;border-radius:12px;padding:10px"><b id="pgWebAvisoTit">📲 Estás en Vento Web, no en la app.</b> Para que Vento lea los avisos de DaviPlata y Nequi y diga «Pago confirmado» (también con el celular bloqueado), usa <b>la app Vento</b> (archivo vento.apk) en este celular. <a class="btn-primary" id="pgBajarApk" href="https://github.com/cristhianlujan45-blip/cuentas/releases/latest/download/vento.apk" download="vento.apk" rel="noopener" style="margin-top:8px;width:100%;display:block;text-align:center;box-sizing:border-box">⬇️ Descargar la app (vento.apk)</a><button type="button" class="btn-ghost" id="pgAbrirApp" style="margin-top:8px;width:100%">📲 Ya la tengo: abrir la app Vento</button></div>' +
+      '<div class="settings-desc" id="pgWebAviso" hidden style="border:1px solid #f5a524;border-radius:12px;padding:10px"><b id="pgWebAvisoTit">📲 Estás en Vento Web, no en la app.</b> Para que Vento lea los avisos de DaviPlata y Nequi y diga «Pago confirmado» (también con el celular bloqueado), usa <b>la app Vento</b> (archivo vento.apk) en este celular. <a class="btn-primary" id="pgBajarApk" href="https://github.com/cristhianlujan45-blip/ORDEVA/releases/latest/download/vento.apk" download="vento.apk" rel="noopener" style="margin-top:8px;width:100%;display:block;text-align:center;box-sizing:border-box">⬇️ Descargar la app (vento.apk)</a><button type="button" class="btn-ghost" id="pgAbrirApp" style="margin-top:8px;width:100%">📲 Ya la tengo: abrir la app Vento</button></div>' +
       '<div class="settings-row"><div class="settings-row-text"><strong>Recibir avisos de pagos</strong><span id="pgEstado"></span></div><label class="switch"><input type="checkbox" id="pgOn"><span class="switch-slider"></span></label></div>' +
       '<div id="pgCaja" hidden>' +
       '<div class="settings-row" id="pgVolFila" style="flex-direction:column;align-items:stretch"><div class="settings-row-text"><strong>🔊 Volumen de la voz de los pagos: <span id="pgVolTxt"></span></strong><span>Qué tan alto dice «Llegaron 200 pesos por DaviPlata». ' + (enApp ? 'Suena a este volumen aunque la música o el celular estén bajitos, y luego deja el volumen como estaba. <b>Más de 100 % = más fuerte de lo normal.</b>' : 'En el navegador llega hasta 100 %; en la app Android se puede subir hasta 150 % (más fuerte de lo normal).') + '</span></div>' +
