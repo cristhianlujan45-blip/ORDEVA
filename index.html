@@ -1729,6 +1729,9 @@ body.neg-tienda #quickSaleBtn, body:not(.neg-tienda) #fiadosBtn, body:not(.neg-t
   .close-day-row{ margin-bottom: 20px; }
   .close-day-row .btn-primary{ width:100%; }
   .close-day-hint{ font-size:12px; color:var(--ink-soft); margin-top:6px; text-align:center; }
+  /* 1.55.0: «Cerrar caja del día» también arriba en Mesas (la pantalla de todo el día), grande y fácil de ver */
+  .close-day-top{ margin:0 0 12px; }
+  .close-day-top .btn-primary{ width:100%; min-height:52px; font-size:17px; font-weight:800; }
   .hist-section-title{
     font-size: 12px;
     text-transform: uppercase;
@@ -2639,7 +2642,7 @@ body.neg-tienda #quickSaleBtn, body:not(.neg-tienda) #fiadosBtn, body:not(.neg-t
   /* Equipo sin permiso de historial completo: solo las ventas de HOY, sin totales, gráficas ni cierres */
   .hist-hoy-aviso{ display:none; }
   body.hist-hoy .hist-hoy-aviso{ display:block; padding:10px 12px; border-radius:12px; background:var(--surface); border:1px solid var(--line); font-size:13.5px; line-height:1.45; margin:6px 0 10px; }
-  body.hist-hoy #view-historial .close-day-row, body.hist-hoy #chartsToggle, body.hist-hoy #chartsPanel, body.hist-hoy #closuresTitle, body.hist-hoy #closuresList,
+  body.hist-hoy #view-historial .close-day-row, body.hist-hoy .close-day-top, body.hist-hoy #chartsToggle, body.hist-hoy #chartsPanel, body.hist-hoy #closuresTitle, body.hist-hoy #closuresList,
   body.hist-hoy #histSummaryTitle, body.hist-hoy #histSummary{ display:none !important; }
   .hist-fix-row{ display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
   .hist-fix-row button{ flex:1 1 30%; min-width:96px; padding:9px 8px; border-radius:10px; border:1px solid var(--line); background:var(--surface-2); color:var(--ink); font:700 13px var(--font-main); cursor:pointer; }
@@ -3635,6 +3638,7 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
     <div id="primerosPasos" hidden></div>
     <div id="posPanel" hidden data-novocab></div><!-- Caja (POS) del modo tienda / mixto: lib/vento-pos.js -->
     <div class="mesas-summary" id="mesasSummary"></div>
+    <div class="close-day-top" id="closeDayTop"><button type="button" class="btn-primary" id="closeDayTopBtn" title="Cierra las cuentas del día y guarda el resumen (antes pregunta)">🔒 Cerrar caja del día</button></div>
     <div class="config-row" id="tableCountRow" hidden>
       <span>Número de mesas:</span>
       <input type="number" id="tableCountInput" min="1" max="60" value="4">
@@ -18052,16 +18056,40 @@ function computeClosureStats(fromISO, toISO){
   return { tickets, totalSold, totalEfectivo, totalTransferencia, totalDebe, hourly };
 }
 
+// 1.55.0: lo que se le muestra antes de cerrar la caja (ventas desde el último cierre, mesas abiertas y qué pasa).
+function cierreResumenTexto(s, openIds, last){
+  const L = [];
+  const desde = last ? 'desde el último cierre (' + new Date(last.date).toLocaleString('es-CO', { weekday:'short', hour:'numeric', minute:'2-digit' }) + ')' : 'desde el comienzo';
+  L.push(s.tickets.length ? 'Ventas ' + desde + ': ' + s.tickets.length + (s.tickets.length === 1 ? ' cuenta' : ' cuentas') + ' por ' + fmt(s.totalSold) + ' (efectivo ' + fmt(s.totalEfectivo) + ').' : 'No hay ventas nuevas ' + desde + '.');
+  if(openIds.length){
+    const tot = openIds.reduce((a, id) => a + tableTotal(id), 0);
+    L.push('Hay ' + openIds.length + (openIds.length === 1 ? ' mesa abierta' : ' mesas abiertas') + ' (Mesa ' + openIds.join(', Mesa ') + ') por ' + fmt(tot) + (openIds.length === 1 ? ': se cierra' : ': se cierran') + ' y lo que no esté pagado queda como «Debe».');
+  }
+  if(window.ventoTurno && (s.tickets.length || openIds.length || window.ventoTurno.turno())) L.push('Después cuenta el efectivo de la caja (o «Cerrar sin contar»).');
+  L.push('Se guarda el resumen del día y la caja empieza de cero.');
+  return L.join('\n\n');
+}
+
 async function closeCashRegister(opts){
   const auto = !!(opts && opts.auto === true);   // el cierre automático programado no espera a que alguien cuente
   const openIds = getOpenTableIds();
-  if(openIds.length){
+  const lastClosure = (data.closures && data.closures.length) ? data.closures[0] : null;
+  const fromISO = lastClosure ? lastClosure.date : null;
+  if(!auto){
+    // Siempre pregunta antes de cerrar, con lo que se va a cerrar (antes solo preguntaba si había mesas abiertas).
+    const pre = computeClosureStats(fromISO, new Date().toISOString());
+    if(!pre.tickets.length && !openIds.length && !(window.ventoTurno && window.ventoTurno.turno())){
+      showToast('No hay cuentas nuevas para cerrar. La caja ya está al día.');
+      return;
+    }
+    const ok = await showConfirm({ icon: '🔒', title: '¿Cerrar la caja del día?', message: cierreResumenTexto(pre, openIds, lastClosure), confirmText: '🔒 Sí, cerrar caja', cancelText: 'No, todavía no' });
+    if(!ok) return;
+    openIds.forEach(id => closeTableToHistory(id));
+  } else if(openIds.length){
     const ok = confirm('Hay ' + openIds.length + ' mesa(s) con cuentas abiertas (Mesa ' + openIds.join(', Mesa ') + '). Para cerrar el día hay que cerrarlas: lo que no esté abonado quedará registrado como "Debe". ¿Cerrarlas y continuar?');
     if(!ok) return;
     openIds.forEach(id => closeTableToHistory(id));
   }
-  const lastClosure = (data.closures && data.closures.length) ? data.closures[0] : null;
-  const fromISO = lastClosure ? lastClosure.date : null;
   const toISO = new Date().toISOString();
   const stats = computeClosureStats(fromISO, toISO);
   // 🧮 Arqueo: contar el efectivo de la caja (base + ventas en efectivo + entradas − salidas). Cancelar = no se cierra.
@@ -18097,7 +18125,8 @@ async function closeCashRegister(opts){
   renderHistorial();
   openClosureReport(closure);
 }
-document.getElementById('closeDayBtn').addEventListener('click', closeCashRegister);
+document.getElementById('closeDayBtn').addEventListener('click', () => closeCashRegister());
+document.getElementById('closeDayTopBtn').addEventListener('click', () => closeCashRegister());
 
 function closureDateRangeStr(closure){
   const to = new Date(closure.date);
@@ -18474,7 +18503,7 @@ const GUIDE_ENTRIES = [
   { title: '👤 Agregar un usuario', keywords: 'agregar usuario cuenta nueva empleado crear cuenta', body: 'Puedes crear cuentas adicionales para que otras personas del negocio (empleados) usen la app con su propio usuario y contraseña.' },
   { title: '🔑 Recuperar contraseña', keywords: 'recuperar contraseña olvide clave acceso perdido restaurar', body: 'Si olvidaste tu contraseña, en la pantalla de inicio toca "¿Olvidaste tu contraseña?" para recuperarla por WhatsApp. Si perdiste el acceso por completo (celular nuevo, app reinstalada), usa "Restaura tu copia de respaldo" con el archivo que descargaste antes.' },
   { title: '📋 Carta o menú para clientes (QR)', keywords: 'carta menu qr clientes ver productos mas vendido destacado agotado orden', body: 'Puedes compartir un menú o carta para que tus clientes vean los productos disponibles, por ejemplo con un código QR. Se ve en tarjetas por categoría, con las promociones destacadas arriba de todo, lo más vendido primero, y lo agotado al final para no interrumpir la lectura.' },
-  { title: '🌙 Cierre de caja', keywords: 'cierre caja dia cerrar jornada automatico manual resumen', body: 'Al final del día puedes hacer un cierre de caja, manual o automático, que te resume las ventas del día y deja todo listo para el día siguiente.' },
+  { title: '🌙 Cierre de caja', keywords: 'cierre caja dia cerrar jornada automatico manual resumen', body: 'Al final del día toca «🔒 Cerrar caja del día», arriba en Mesas (también está en Historial y, en el modo fácil, en «Hoy»). Antes de cerrar te pregunta y te muestra las ventas, el efectivo y las mesas abiertas. El cierre también puede ser automático; te resume las ventas del día y deja todo listo para el día siguiente.' },
   { title: '💵 Caja: base, entradas, salidas y arqueo', keywords: 'base caja sencillo abrir caja entrada salida efectivo pagar proveedor arqueo contar billetes monedas sobra falta descuadre', body: 'Historial → «💵 Caja: base, entradas y salidas»: abre la caja con su base, anota lo que entra o sale en efectivo (pago a proveedor, sencillo) y al «Cerrar caja del día» cuenta los billetes y monedas: Vento te dice si sobra o falta.' },
   { title: '🔢 Inventario por código', keywords: 'codigo barras plu sku inventario conteo toma de inventario entrada mercancia llego pedido kardex movimientos escanear lector existencias', body: 'Inventario → «🔢 Inventario por código»: dale código a cada producto, escanea lo que llegó (entrada de mercancía), haz la toma de inventario contando con el lector y mira el kárdex de cada producto.' },
   { title: '💲 Precio por cantidad (mayorista)', keywords: 'precio mayorista al por mayor por cantidad descuento por volumen docena', body: 'Inventario → «🔢 Inventario por código» → consulta el producto → «Precio por cantidad»: por ejemplo, desde 6 unidades a $3.500 cada una. La caja lo cobra sola.' },

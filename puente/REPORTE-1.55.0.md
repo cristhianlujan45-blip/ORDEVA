@@ -1,11 +1,12 @@
 # Vento 1.55.0 · Lo del Nequi solo para el jefe, el equipo no cambia precios, recetas con insumos y 🎓 practicar una venta
 
-Esta versión trae cinco cosas:
+Esta versión trae seis cosas:
 - **D5:** los datos de quien paga solo los ven el dueño y el administrador.
 - **D2:** el equipo no reescribe precios, costos ni permisos.
 - **🧾 Recetas e insumos.**
 - **🎓 Practicar una venta** en la guía para mayores.
 - **D10:** restaurar un respaldo de forma limpia y probada.
+- **🔒 Cerrar caja:** el botón a la vista y una pregunta antes de cerrar (pedido del dueño).
 
 ## 1. Lo del Nequi solo para el dueño y el administrador (D5)
 Regla del dueño: «solamente el administrador puede ver lo del Nequi».
@@ -87,6 +88,26 @@ en el servidor, no con lo que manda el celular.
 - **Sigue igual:**
   - solo el dueño o el administrador restauran (con el arreglo de permisos de la 1.54.0);
   - el estado de antes queda como respaldo, así que se puede deshacer.
+
+## 6. 🔒 Cerrar caja: a la vista y con pregunta antes de cerrar
+Pedido del dueño: «mueve el botón de cerrar caja a una zona más visible y un mensaje de confirmación».
+
+- **Dónde está:**
+  - **Arriba en «Mesas»**, la pantalla que se usa todo el día: grande, debajo del resumen (libres, abiertas, por
+    cobrar).
+  - **En «Historial»** sigue el de siempre.
+  - **En el modo fácil**, en «Hoy».
+- **Antes de cerrar pregunta** «¿Cerrar la caja del día?» y muestra:
+  - las ventas desde el último cierre (cuántas, el total y el efectivo);
+  - las mesas abiertas, que se cierran (lo que no esté pagado queda como «Debe»);
+  - que después se cuenta el efectivo (el arqueo de siempre, o «Cerrar sin contar»).
+- **Botones:** «🔒 Sí, cerrar caja» y «No, todavía no». «No» no toca nada.
+- **Si no hay nada que cerrar,** avisa «La caja ya está al día» sin preguntar.
+- **El cierre automático programado** no pregunta, igual que antes.
+- **Quien no tiene permiso de ver el historial** no ve el botón, igual que antes.
+- **Prueba nueva, `cerrarcaja`:** 16 comprobaciones.
+  - **Actualizada:** `mejoras` (acepta la pregunta antes del arqueo).
+  - **Pasan:** `facil`, `cajapos`, `cajaqr`, `guia`, `practica` y `equipoactividad`.
 
 ## Pruebas
 - **Nuevas pruebas del servidor**, contra PostgreSQL real:

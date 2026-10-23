@@ -42,6 +42,8 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
     await vender([['em', 2]], 'transferencia');   // $5.000 por Nequi (no entra a la caja)
     chk('1. «Caja de hoy» (POS) muestra el efectivo que debe haber: 100.000 + 8.000 + 20.000 − 30.000 = $98.000', await D(() => /98\.000/.test(ventoTurno.bloqueHoy())));
     const cierre = p.evaluate(() => closeCashRegister());
+    await p.waitForSelector('#confirmOverlay.show', { timeout: 5000 });   // 1.55.0: primero pregunta
+    await p.click('#confirmOkBtn');
     await p.waitForSelector('.vt-ov #vtDif', { timeout: 5000 });
     chk('1. Al cerrar: sale el arqueo con billetes y monedas y lo que debe haber', /Arqueo de caja/.test(await p.textContent('.vt-ov')) && /98\.000/.test(await p.textContent('.vt-ov')) && await p.locator('.vt-ov [data-b="50000"]').count() === 1);
     await p.fill('.vt-ov [data-b="50000"]', '1'); await p.fill('.vt-ov [data-b="20000"]', '2'); await p.fill('.vt-ov [data-mo="500"]', '6');   // 50.000 + 40.000 + 3.000 = 93.000
