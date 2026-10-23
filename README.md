@@ -1,25 +1,35 @@
-# Vento: cuentas, pedidos por QR, inventario y música para negocios (con Laya IA)
+# ORDEVA (antes Vento): cuentas, pedidos por QR, inventario, pagos y música para negocios (con Laya IA)
 
-Son páginas HTML independientes, sin backend ni instalación. Cada una corre entera en el navegador.
+Son páginas HTML que corren en el navegador (GitHub Pages) más un servidor en Supabase (base de datos PostgreSQL con
+RLS y funciones Edge). La app Android (`vento.apk`) y la de computador abren las mismas páginas.
 
-- **Datos del negocio:** quedan en el propio equipo (`localStorage`, con respaldo en IndexedDB) y viajan en las copias de seguridad.
-- **Comunicación en vivo:** la app del local, la página de pedidos, la pantalla de preparación, el TV y la app de meseros se comunican por canales de [ntfy.sh](https://ntfy.sh).
-- **Si se cae la conexión:** ntfy guarda los mensajes hasta 12 horas, así que un pedido no se pierde aunque la app del local esté cerrada o sin señal un rato.
+- **Datos del negocio:** quedan en el propio equipo (`localStorage`, con respaldo en IndexedDB) y, con la cuenta en la
+  nube, en Supabase (documento del negocio + tablas relacionales que se llenan solas; respaldos automáticos).
+- **Comunicación en vivo:** la app del local, la página de pedidos, la pantalla de preparación, el TV y la app de
+  meseros se hablan por **canales del servidor** (`canal_publicar` / `canal_leer` en Supabase, `lib/vento-canal.js`).
+  **ntfy ya no se usa** y no se debe volver a usar.
+- **Si se cae la conexión:** los mensajes quedan en el servidor y se leen al volver; un pedido no se pierde aunque la
+  app del local esté cerrada o sin señal un rato.
+- **Pagos:** lectura de los avisos de Nequi, DaviPlata y bancos en el celular (app Android), y las APIs oficiales de
+  Wompi, Nequi Conecta y DaviPlata cuando el negocio tiene sus credenciales (`puente/CREDENCIALES-PAGOS.md`).
 
 ## Arquitectura y flujos
 
 ```
-QR impreso (ORDEVA) ─────────────────────────────► GitHub Pages /ORDEVA/pedido.html?mesa=N&c=CANAL&v=CÓDIGO
-                                                     │  pedido JSON {id único, mesa, items, total}
-                                                     ▼
-                               ntfy.sh/CANAL  ──►  index.html (app del local)
-                                                     │  1 sola vez por ID · mesa correcta (si no existe se crea)
-                                                     │  suma a la cuenta · descuenta inventario
-                                                     ├─► ntfy.sh/CANAL+'e' ──► pedido.html muestra «Recibido / En preparación / Listo»
-                                                     └─► ntfy.sh/CANAL+'p'+código ──► preparacion.html (cocina / barra / despacho…)
-                                                                                         └─► cambios de estado de vuelta a la app
-Canción por QR ──► ntfy.sh/CANAL ──► cola de música (sin duplicados) ──► reproductor automático (celular o tv.html)
+QR impreso (ORDEVA) ───► GitHub Pages /ORDEVA/pedido.html?mesa=N&c=CANAL&v=CÓDIGO_DE_LA_MESA
+                           │  pedido JSON {id único, mesa, código de la mesa (vm), items, total}
+                           ▼
+          Supabase canal_publicar(CANAL)  ──►  index.html (app del local, canal_leer)
+                                                 │  1 sola vez por ID · solo con el código de esa mesa (si no, queda «por revisar»)
+                                                 │  suma a la cuenta · descuenta inventario
+                                                 ├─► canal CANAL+'e' ──► pedido.html: «Recibido / En preparación / Listo»
+                                                 └─► canal CANAL+'p'+código ──► preparacion.html (cocina / barra / despacho…)
+                                                                                  └─► cambios de estado de vuelta a la app
+Canción por QR ──► canal CANAL ──► cola de música (sin duplicados) ──► reproductor automático (celular o tv.html)
+Aviso de Nequi/DaviPlata en el celular ──► app Android (VentoEscucha) ──► voz + aviso + ventana ──► servidor ──► demás equipos
 ```
+
+Límites del canal (servidor): 240 mensajes/min por canal, 300/min por conexión y 6000/min en total.
 
 | Archivo | Para qué es |
 |---|---|
@@ -31,7 +41,9 @@ Canción por QR ──► ntfy.sh/CANAL ──► cola de música (sin duplicado
 | `licencias.html` | Códigos para sedes adicionales, firmados con una llave privada que no está en el repositorio. |
 | `puente/laya-worker.js` | Puente seguro (Cloudflare Worker) hacia el motor de decisiones Laya. |
 | `puente/youtube-tv-worker.js` | Puente para la opción "YouTube del TV" (vincular con código de TV). |
-| `icons/` | Ícono y logo de Vento. |
+| `icons/`, `marca/` | Íconos y logo de ORDEVA (SVG y PNG; `marca/LEEME.md` explica cómo se generan). |
+| `supabase/` | Migraciones (PostgreSQL) y funciones Edge: `vento-pagos`, `vento-ia`, `vento-suscripciones`. |
+| `pruebas/` | Pruebas de la app (Playwright) y del servidor (PostgreSQL real): `bash pruebas/correr.sh`. |
 
 ## Laya IA: la única IA de la app
 
@@ -199,11 +211,13 @@ un QR, hace que la app vuelva a escuchar el canal de los QR pegados.
 
 | Página | Link |
 |---|---|
-| App del negocio | https://cristhianlujan45-blip.github.io/cuentas/ |
-| Pedidos del cliente | https://cristhianlujan45-blip.github.io/cuentas/pedido.html |
-| Preparación | https://cristhianlujan45-blip.github.io/cuentas/preparacion.html#CANAL.CÓDIGO (el link completo sale en la app) |
-| Meseros | https://cristhianlujan45-blip.github.io/cuentas/mesero.html |
-| TV | https://cristhianlujan45-blip.github.io/cuentas/tv.html |
+| App del negocio | https://cristhianlujan45-blip.github.io/ORDEVA/ |
+| Pedidos del cliente | https://cristhianlujan45-blip.github.io/ORDEVA/pedido.html |
+| Preparación | https://cristhianlujan45-blip.github.io/ORDEVA/preparacion.html#CANAL.CÓDIGO (el link completo sale en la app) |
+| Meseros | https://cristhianlujan45-blip.github.io/ORDEVA/mesero.html |
+| TV | https://cristhianlujan45-blip.github.io/ORDEVA/tv.html |
+
+La dirección vieja (`…/cuentas/`) se reenvía a `…/ORDEVA/` con el sitio de `puente/sitio-reenvio/` (ver su LEEME).
 
 `version.txt` debe llevar el mismo texto que `MESORA_VERSION` en `index.html`; así la app avisa cuando hay una versión nueva.
 
@@ -212,6 +226,10 @@ un QR, hace que la app vuelva a escuchar el canal de los QR pegados.
 - No hay claves privadas en el frontend. La clave de Laya vive como secreto del Worker.
 - La llave que firma el APK **no** está en el repositorio: sale de los secretos `VENTO_KEYSTORE_B64` y `VENTO_KS_PASS` (ver `android/LEEME.md` → Firma).
 - La base de datos de producción solo se despliega desde la rama principal (`.github/workflows/servidor-vento.yml`).
-- La clave de navegador de YouTube Data API que trae la app debe estar restringida por referente HTTP a `cristhianlujan45-blip.github.io` en Google Cloud.
+- La clave de navegador de YouTube Data API que trae la app debe estar restringida por referente HTTP a `cristhianlujan45-blip.github.io/*` en Google Cloud (incluye `/ORDEVA/`).
+- Cada tabla tiene RLS y cada negocio solo ve lo suyo (`pruebas/servidor/aislamiento.test.js` lo revisa en TODAS las tablas).
+- Los límites de Laya (IA) están en la base de datos (`srv_ia_cupo`), por minuto y por día, compartidos por todas las instancias.
+- Las contraseñas de los usuarios del celular se guardan con PBKDF2 (100.000 vueltas), nunca en claro.
+- Las credenciales de pagos (Wompi, Nequi Conecta, DaviPlata) viven cifradas en el servidor (AES-256-GCM); nunca en la app.
 - Los archivos subidos se validan por tipo (imagen o PDF), tamaño (15 MB) y cantidad (10). Los textos se muestran escapados.
 - `puente/youtube-tv-worker.js` usa el sistema de "Vincular con código de TV" de YouTube. No es una API pública documentada, así que puede dejar de funcionar si YouTube lo cambia. Las demás opciones de música (`tv.html` y el reproductor de la app) usan solo la YouTube IFrame Player API oficial.
