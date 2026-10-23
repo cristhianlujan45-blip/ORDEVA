@@ -41,7 +41,7 @@ export function leerAviso(txt: string): Aviso | null {
   return { monto, metodo, de, confianza: f.nivel, fuente: f.txt };
 }
 
-// Lo que entendió la app Vento del celular que leyó el aviso (su lectura se actualiza con cada versión y con las frases del
+// Lo que entendió la app ORDEVA del celular que leyó el aviso (su lectura se actualiza con cada versión y con las frases del
 // administrador; la del servidor puede ir atrás: «$ 50 000», «movimiento recibido», «+$20.000»). Llega de un celular
 // autorizado por el dueño. El valor de la app manda; «falso» de cualquiera de los dos gana; si no, el nivel de la app
 // (p. ej. el dueño eligió confirmar los SMS del banco).

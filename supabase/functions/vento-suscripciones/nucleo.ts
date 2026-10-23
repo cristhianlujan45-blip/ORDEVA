@@ -1,5 +1,5 @@
 // =====================================================================
-//  Núcleo de las suscripciones de Vento (independiente del medio de pago).
+//  Núcleo de las suscripciones de ORDEVA (independiente del medio de pago).
 //   • estado del negocio (lo decide la base de datos: srv_sub_estado)
 //   • activar (único punto: srv_sub_activar)
 //   • token de estado FIRMADO (ECDSA P-256) para que la app funcione sin internet sin poder inventarse el plan
@@ -36,7 +36,7 @@ export type Catalogo = { planes: Plan[]; entitlements: Array<{ key: string; desc
 
 // ---------- Errores de la base de datos → mensajes para la persona ----------
 const MENSAJES: Record<string, [number, string]> = {
-  sin_sesion: [401, "Entra con tu cuenta de Vento Nube."],
+  sin_sesion: [401, "Entra con tu cuenta de ORDEVA Nube."],
   sin_permiso: [403, "Tu rol no permite hacer eso en este negocio."],
   no_existe: [404, "No se encontró."],
   plan_invalido: [400, "Ese plan no está disponible."],
@@ -93,7 +93,7 @@ export function catalogo(db: Db): Promise<Catalogo> {
   return db.rpc<Catalogo>("sub_catalogo");
 }
 
-// Cajero y mesero no ven nada de los cobros de Vento (solo qué pueden usar).
+// Cajero y mesero no ven nada de los cobros de ORDEVA (solo qué pueden usar).
 export function paraRol(e: Estado, rol: string): Estado {
   if (rol === "dueno" || rol === "admin") return e;
   return { ...e, pending_payment: null, last_payment: null, renew_notice: false };

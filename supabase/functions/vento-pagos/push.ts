@@ -1,4 +1,4 @@
-// Notificaciones Web Push (estándar de los navegadores) para avisar «✅ Pago confirmado» aunque Vento esté cerrada.
+// Notificaciones Web Push (estándar de los navegadores) para avisar «✅ Pago confirmado» aunque ORDEVA esté cerrada.
 //  • RFC 8292 (VAPID): el servidor se identifica con un par de llaves P-256 que crea solo la primera vez.
 //  • RFC 8291 (aes128gcm): el contenido va cifrado para cada celular; el servicio de push no lo puede leer.
 import { b64url, type Bytes, deB64url, log } from "./util.ts";

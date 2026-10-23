@@ -1,4 +1,4 @@
-// Utilidades del servidor de pagos de Vento. Solo APIs web estándar (fetch, crypto.subtle),
+// Utilidades del servidor de pagos de ORDEVA. Solo APIs web estándar (fetch, crypto.subtle),
 // así el mismo código corre en Supabase Edge Functions (Deno) y en las pruebas (Node).
 
 export type Env = Record<string, string | undefined>;

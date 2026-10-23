@@ -18,7 +18,7 @@
 //  TLS mutuo, dos modos (se elige en Ajustes → 💜 Pagos → Conectar DaviPlata):
 //   • «directo»: Deno.createHttpClient({ cert, key }) desde la Edge Function (si el entorno no lo permite → «mtls_no_disponible»).
 //   • «puente»:  un Cloudflare Worker propio (puente/daviplata-worker.js) con el certificado subido a Cloudflare
-//                (enlace mtls_certificates) que reenvía SOLO estas 4 rutas; Vento le habla con un secreto compartido.
+//                (enlace mtls_certificates) que reenvía SOLO estas 4 rutas; ORDEVA le habla con un secreto compartido.
 import { ErrorVento, pedir } from "./util.ts";
 
 export type Ambiente = "sandbox" | "produccion";
@@ -136,7 +136,7 @@ export function traducir(paso: "token" | "compra" | "otp" | "confirmar", r: Resp
   const todo = (codigo + " " + mensaje + " " + (leer(r.texto) ? "" : r.texto)).toLowerCase();
   if (r.puente_error) {
     const pe = r.puente_error;
-    if (pe === "secreto") return new ErrorVento("daviplata_puente", "El puente de DaviPlata rechazó el secreto: pega en Vento el mismo VENTO_PUENTE_SECRETO del Worker", 400);
+    if (pe === "secreto") return new ErrorVento("daviplata_puente", "El puente de DaviPlata rechazó el secreto: pega en ORDEVA el mismo VENTO_PUENTE_SECRETO del Worker", 400);
     if (pe === "sin_certificado") return new ErrorVento("daviplata_puente", "Al puente de DaviPlata le falta el certificado (enlace mtls_certificates «DAVIPLATA» en Cloudflare)", 400);
     if (pe === "sin_secreto") return new ErrorVento("daviplata_puente", "Al puente de DaviPlata le falta el secreto VENTO_PUENTE_SECRETO (wrangler secret put)", 400);
     if (pe === "red") return new ErrorVento("daviplata_no_disponible", mensajeNoDisponible(amb, ahora), 502);

@@ -18,7 +18,7 @@ function errorDeDb(status: number, cuerpo: string): ErrorVento {
     const st = conocido[1] === "sin_permiso" || conocido[1] === "sin_sesion" ? 403 : 400;
     return new ErrorVento(conocido[1], msg, st);
   }
-  if (status === 401 || /JWT|jwt/.test(msg)) return new ErrorVento("sin_sesion", "La sesión venció: vuelve a entrar a Vento Nube", 401);
+  if (status === 401 || /JWT|jwt/.test(msg)) return new ErrorVento("sin_sesion", "La sesión venció: vuelve a entrar a ORDEVA Nube", 401);
   return new ErrorVento("db", "Base de datos: " + msg, status >= 500 ? 502 : 400);
 }
 

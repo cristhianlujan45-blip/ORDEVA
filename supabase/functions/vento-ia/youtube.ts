@@ -4,7 +4,7 @@
 // ~50 búsquedas desde el QR de las mesas (que buscaba canciones Y artistas en cada búsqueda) YouTube respondía
 // «se alcanzó el límite» y ya no se encontraba nada hasta el otro día, en TODOS los negocios.
 // Aquí se lee la página pública de resultados de youtube.com (lo mismo que ve cualquier persona, y lo mismo que ya
-// hace la app Android de Vento): no tiene cupo. Se responde con la misma forma de la API para que la app no cambie.
+// hace la app Android de ORDEVA): no tiene cupo. Se responde con la misma forma de la API para que la app no cambie.
 //   GET /vento-ia/yt/buscar?q=…&tipo=video|canal|lista
 //   GET /vento-ia/yt/lista?id=…   → canciones de una playlist (respaldo: la app las lee primero con la API, que para
 //                                    playlists casi no gasta cupo: 1 unidad por cada 50 canciones)

@@ -1,5 +1,5 @@
 // =====================================================================
-//  Servidor Vento · pagos con Nequi y DaviPlata
+//  Servidor ORDEVA · pagos con Nequi y DaviPlata
 //
 //  Rutas (todas bajo /functions/v1/vento-pagos):
 //    GET  /salud                       estado del servidor
@@ -71,7 +71,7 @@ function usuario(req: Request, env: Env): Db {
   const jwt = auth.replace(/^Bearer\s+/i, "").trim();
   // La clave pública que usa la app (sirve también con las claves nuevas «sb_publishable_…»).
   const anon = req.headers.get("apikey") || env.SUPABASE_ANON_KEY || "";
-  if (!jwt || jwt === anon) throw new ErrorVento("sin_sesion", "Entra a Vento Nube para usar los pagos", 401);
+  if (!jwt || jwt === anon) throw new ErrorVento("sin_sesion", "Entra a ORDEVA Nube para usar los pagos", 401);
   return crearDb(env.SUPABASE_URL || "", anon, jwt);
 }
 
@@ -178,7 +178,7 @@ async function sincronizar(env: Env, db: Db, negocio: string | null) {
 
 // ---------- /ia (la IA con la clave PROPIA del negocio, sin que la clave llegue a los celulares; 1.53.0) ----------
 // La clave vive en integraciones (tipo «ia»), cifrada. Llega por Ajustes (POST /ia-clave) o la saca guardar_datos del
-// documento («plano:», se cifra aquí la primera vez que se usa). Sin clave del negocio la app usa la IA de Vento.
+// documento («plano:», se cifra aquí la primera vez que se usa). Sin clave del negocio la app usa la IA de ORDEVA.
 const GEMINI = "https://generativelanguage.googleapis.com";
 const IA_MAX_BYTES = 8 * 1024 * 1024;
 const iaUsos = new Map<string, number[]>();
@@ -549,7 +549,7 @@ async function confirmarDaviplata(req: Request, env: Env, b: Record<string, unkn
     } catch (e) { ultimo = e; await new Promise((ok) => setTimeout(ok, 300 * (i + 1))); }
   }
   log("error", "daviplata_aprobado_sin_guardar", { negocio, pago: p.id, referencia: p.referencia, transaccion: n, terminal: cred.id_terminal, aprobacion: x.num, error: ultimo instanceof Error ? ultimo.message : String(ultimo) });
-  throw new ErrorVento("daviplata_aprobado_sin_guardar", "DaviPlata APROBÓ el pago (N.º de aprobación " + x.num + ") pero Vento no pudo guardarlo. NO le cobres otra vez: regístralo a mano en la cuenta.", 502);
+  throw new ErrorVento("daviplata_aprobado_sin_guardar", "DaviPlata APROBÓ el pago (N.º de aprobación " + x.num + ") pero ORDEVA no pudo guardarlo. NO le cobres otra vez: regístralo a mano en la cuenta.", 502);
 }
 
 // ---------- /webhook/wompi/{token} ----------
@@ -613,12 +613,12 @@ async function aviso(req: Request, env: Env, tokenRuta: string | null) {
     if (j && typeof j === "object") {
       txt = [j.app, j.titulo, j.texto].filter(Boolean).join(" | ") || String(j.text || "");
       if (typeof j.id === "string") idAviso = j.id.slice(0, 160);
-      if (j.pista && typeof j.pista === "object") pista = j.pista as Pista;   // lo que entendió la app Vento
+      if (j.pista && typeof j.pista === "object") pista = j.pista as Pista;   // lo que entendió la app ORDEVA
     }
   } catch { /* texto plano de MacroDroid */ }
   txt = txt.slice(0, 1000);
   const a = conPista(leerAviso(txt), pista, txt);
-  // La app Vento manda el ID de cada aviso: dos pagos iguales (mismo valor, misma persona, en el mismo par de minutos) son
+  // La app ORDEVA manda el ID de cada aviso: dos pagos iguales (mismo valor, misma persona, en el mismo par de minutos) son
   // DOS pagos y el mismo aviso reenviado otra vez es uno. Sin ID (MacroDroid): dos minutos, la misma notificación repetida
   // no cuenta dos veces.
   const ventana = idAviso ? "id:" + idAviso : String(Math.floor(Date.now() / 120000));
@@ -700,7 +700,7 @@ async function dian(req: Request, env: Env, accion: string, b: Record<string, un
     if (b.reintentar !== false) { try { await repasarDian(env, db, negocio, 5); } catch (e) { log("warn", "dian_repaso", { error: String(e) }); } }
     return { ok: true, ambiente, documentos: await yo.rpc("dian_documentos_de", { p_negocio: negocio, p_ventas: ventas }) };
   }
-  if (!F.configurado(env)) throw new ErrorVento("dian_sin_proveedor", "El servidor de Vento todavía no tiene la cuenta de facturación electrónica (MATIAS).", 503);
+  if (!F.configurado(env)) throw new ErrorVento("dian_sin_proveedor", "El servidor de ORDEVA todavía no tiene la cuenta de facturación electrónica (MATIAS).", 503);
   const cfg = await db.rpc<F.Cfg | null>("srv_dian_config", { p_negocio: negocio });
   if (!cfg || !cfg.activo) dianError("dian_inactivo");
   if (accion === "emitir") {
@@ -739,9 +739,9 @@ async function dian(req: Request, env: Env, accion: string, b: Record<string, un
       return { ok: true, repetido: true, ambiente, documento: await db.rpc("srv_dian_resultado", { p_doc: (ya || ref).id, p_estado: (ya || ref).estado, p_datos: { intento: false } }) };
     }
     if (ref.estado === "rechazado") {   // nunca fue válido ante la DIAN: no hace falta nota crédito
-      return { ok: true, ambiente, documento: await db.rpc("srv_dian_resultado", { p_doc: ref.id, p_estado: "anulado", p_datos: { mensaje: "Anulado en Vento (la DIAN nunca lo validó)", intento: false } }) };
+      return { ok: true, ambiente, documento: await db.rpc("srv_dian_resultado", { p_doc: ref.id, p_estado: "anulado", p_datos: { mensaje: "Anulado en ORDEVA (la DIAN nunca lo validó)", intento: false } }) };
     }
-    if (ref.estado !== "aceptado") throw new ErrorVento("dian_espera", "La venta todavía no está validada por la DIAN. Vento la anula sola apenas la DIAN responda.", 409);
+    if (ref.estado !== "aceptado") throw new ErrorVento("dian_espera", "La venta todavía no está validada por la DIAN. ORDEVA la anula sola apenas la DIAN responda.", 409);
     const parcial = Array.isArray(b.items) && (b.items as unknown[]).length > 0;
     const vNota = parcial ? F.leerVenta({ id: ventaId, items: b.items, cliente: ref.cliente, cajero: b.cajero }) : null;
     const totalNota = vNota ? F.calcular(cfg!, vNota.items).pagar : Number(ref.total) || 0;

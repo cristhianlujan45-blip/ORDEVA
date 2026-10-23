@@ -1,5 +1,5 @@
 // =====================================================================
-//  Servidor Vento · suscripciones (BETA: pago manual por Nequi / DaviPlata)
+//  Servidor ORDEVA · suscripciones (BETA: pago manual por Nequi / DaviPlata)
 //
 //  Rutas (todas bajo /functions/v1/vento-suscripciones):
 //    GET  /salud                     estado del servidor
@@ -9,7 +9,7 @@
 //    POST /pago     {negocio, plan, metodo, monto, referencia, fecha, nombre, telefono, idem, comprobante:{base64, tipo}}
 //                                    envía un pago con su comprobante                (sesión; dueño o administrador)
 //    POST /licencia {negocio, codigo}  activa una licencia con su código              (sesión; dueño o administrador)
-//    POST /admin/*                   panel del proveedor de Vento                    (sesión de un administrador de Vento)
+//    POST /admin/*                   panel del proveedor de ORDEVA                    (sesión de un administrador de ORDEVA)
 //    POST /vencer                    vence las suscripciones con fecha pasada        (cabecera x-vento-cron)
 //    POST /google-play/rtdn          notificaciones de Google Play                   (501 mientras sea beta)
 //  El plan lo decide SIEMPRE la base de datos; la app solo consulta.
@@ -62,7 +62,7 @@ function servidor(env: Env): Db {
 function usuario(req: Request, env: Env): Db {
   const jwt = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
   const anon = req.headers.get("apikey") || env.SUPABASE_ANON_KEY || "";
-  if (!jwt || jwt === anon) throw new ErrorVento("sin_sesion", "Entra con tu cuenta de Vento Nube.", 401);
+  if (!jwt || jwt === anon) throw new ErrorVento("sin_sesion", "Entra con tu cuenta de ORDEVA Nube.", 401);
   return N.conErrores(crearDb(env.SUPABASE_URL || "", anon, jwt));
 }
 
@@ -101,7 +101,7 @@ async function estado(req: Request, env: Env, b: Record<string, unknown>) {
     catch (x) { log("warn", "lic_auto", { negocio, error: x instanceof Error ? x.message : String(x) }); }
   }
   const e = await N.estado(db, negocio);
-  // Bloqueado por el administrador de Vento (el negocio o la cuenta de quien entra): sin token, el equipo se bloquea.
+  // Bloqueado por el administrador de ORDEVA (el negocio o la cuenta de quien entra): sin token, el equipo se bloquea.
   let bloqueo: Record<string, unknown> | null = null;
   try { const me = await yo.rpc<{ id: string }>("sub_yo"); bloqueo = await db.rpc<Record<string, unknown> | null>("srv_bloqueo_de", { p_negocio: negocio, p_usuario: me.id }); }
   catch (x) { log("warn", "bloqueo_de", { negocio, error: x instanceof Error ? x.message : String(x) }); }
@@ -191,7 +191,7 @@ async function soporteAvisar(req: Request, env: Env, b: Record<string, unknown>)
   return { ok: true, avisados: n };
 }
 
-// ---------- /tipo-pedir: cambiar el tipo de negocio necesita permiso del administrador de Vento ----------
+// ---------- /tipo-pedir: cambiar el tipo de negocio necesita permiso del administrador de ORDEVA ----------
 async function tipoPedir(req: Request, env: Env, b: Record<string, unknown>) {
   const negocio = negocioDe(b);
   const me = await usuario(req, env).rpc<{ id: string }>("sub_yo");
@@ -240,7 +240,7 @@ async function admin(req: Request, env: Env, accion: string, b: Record<string, u
     log("info", "admin_agregado", { usuario: me.id });
     es = true;
   }
-  if (!es) throw new ErrorVento("no_admin", "Esta cuenta no es administradora de Vento.", 403);
+  if (!es) throw new ErrorVento("no_admin", "Esta cuenta no es administradora de ORDEVA.", 403);
   // La primera vez que entra por su correo, su cuenta queda amarrada como administradora (platform_admins): desde ahí,
   // otra cuenta con el mismo correo (borrada y creada otra vez) ya no entra.
   if (me.email) { try { await db.rpc("srv_admin_agregar", { p_usuario: me.id, p_email: me.email }); } catch (_) { /* ya estaba o sin confirmar */ } }

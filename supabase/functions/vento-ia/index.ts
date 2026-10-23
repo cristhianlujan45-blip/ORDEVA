@@ -1,4 +1,4 @@
-// Supabase Edge Function «vento-ia»: la IA de Vento YA CONFIGURADA para todos los negocios.
+// Supabase Edge Function «vento-ia»: la IA de ORDEVA YA CONFIGURADA para todos los negocios.
 //
 // La app (GitHub Pages / APK) no lleva ninguna clave. Cuando un negocio no puso su propia clave de Gemini,
 // la app le pide aquí: esta función agrega la clave del PROVEEDOR (secreto GEMINI_API_KEY del servidor, que
@@ -12,7 +12,7 @@
 //   POST /vento-ia/v1beta/models/<modelo>:streamGenerateContent?alt=sse
 //   GET  /vento-ia/yt/buscar?q=…&tipo=video|canal|lista    → canciones/artistas/playlists de YouTube SIN gastar cupo (youtube.ts)
 //   GET  /vento-ia/yt/lista?id=…                           → canciones de una playlist de YouTube, sin cupo
-// Solo se aceptan pedidos desde la página de Vento (VENTO_ORIGENES), modelos «gemini-…», cuerpos de hasta
+// Solo se aceptan pedidos desde la página de ORDEVA (VENTO_ORIGENES), modelos «gemini-…», cuerpos de hasta
 // 8 MB (fotos de facturas) y un máximo de pedidos por minuto por IP, para que nadie más gaste la clave.
 
 import * as YT from "./youtube.ts";
@@ -39,7 +39,7 @@ const json = (o: unknown, status: number, h: Record<string, string>) =>
   new Response(JSON.stringify(o), { status, headers: { ...h, "content-type": "application/json" } });
 
 // 1.57.0 (auditoría ORDEVA R7): el límite de verdad está en la base de datos (srv_ia_cupo), compartido por todas las
-// instancias: por conexión (minuto y día) y un tope del día para toda la IA de Vento (la clave del proveedor). Si la base
+// instancias: por conexión (minuto y día) y un tope del día para toda la IA de ORDEVA (la clave del proveedor). Si la base
 // no responde, queda el de memoria de abajo (la IA no se cae por eso).
 async function cupo(clave: string, porMin: number, porDia: number): Promise<{ ok: boolean; tope?: string } | null> {
   const url = Deno.env.get("SUPABASE_URL"), sk = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -53,10 +53,10 @@ async function cupo(clave: string, porMin: number, porDia: number): Promise<{ ok
 async function sinCupo(ip: string): Promise<string | null> {
   const n = (k: string, d: number) => Number(Deno.env.get(k) || d);
   const c = await cupo("vento-ia:" + ip, n("VENTO_IA_IP_MIN", POR_MINUTO), n("VENTO_IA_IP_DIA", 600));
-  if (c && !c.ok) return c.tope === "dia" ? "Llegaste al límite de hoy de la IA de Vento en esta conexión. Pon tu propia clave de Gemini en Ajustes → IA, o vuelve mañana." : "Demasiadas peticiones seguidas. Espera un momento.";
+  if (c && !c.ok) return c.tope === "dia" ? "Llegaste al límite de hoy de la IA de ORDEVA en esta conexión. Pon tu propia clave de Gemini en Ajustes → IA, o vuelve mañana." : "Demasiadas peticiones seguidas. Espera un momento.";
   if (!c && demasiados(ip)) return "Demasiadas peticiones seguidas. Espera un momento.";
   const g = await cupo("vento-ia:todos", 0, n("VENTO_IA_DIA", 20000));
-  if (g && !g.ok) return "La IA de Vento llegó al límite de hoy. Pon tu propia clave de Gemini en Ajustes → IA, o vuelve mañana.";
+  if (g && !g.ok) return "La IA de ORDEVA llegó al límite de hoy. Pon tu propia clave de Gemini en Ajustes → IA, o vuelve mañana.";
   return null;
 }
 
@@ -102,7 +102,7 @@ Deno.serve(async (req: Request) => {
       return json({ error: { code: 502, message: "No se pudo leer la playlist: " + (e instanceof Error ? e.message : String(e)) } }, 502, h);
     }
   }
-  if (!key) return json({ error: { message: "La IA de Vento todavía no tiene clave en el servidor (secreto GEMINI_API_KEY)." } }, 503, h);
+  if (!key) return json({ error: { message: "La IA de ORDEVA todavía no tiene clave en el servidor (secreto GEMINI_API_KEY)." } }, 503, h);
   const m = /^\/v1beta\/models(?:\/(gemini-[\w.-]+)(:generateContent|:streamGenerateContent)?)?$/.exec(ruta);
   if (!m || (req.method === "POST" && !m[2]) || (req.method === "GET" && m[2])) return json({ error: { message: "Ruta no permitida." } }, 404, h);
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "?";

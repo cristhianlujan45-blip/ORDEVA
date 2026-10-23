@@ -1,5 +1,5 @@
 // =====================================================================
-//  Facturación electrónica DIAN por MATIAS API (proveedor tecnológico autorizado; Vento como casa de software)
+//  Facturación electrónica DIAN por MATIAS API (proveedor tecnológico autorizado; ORDEVA como casa de software)
 //   • armar(): de una venta de la app al JSON de MATIAS (P.O.S. electrónico tipo 20, factura tipo 7, notas 94 / 5).
 //     Los precios de la app traen el impuesto por dentro: aquí se separan base e impuesto (IVA o INC) línea por línea,
 //     con 2 decimales y sumas que cuadran (la DIAN revisa la aritmética: FAS01A, DEAS07…).
@@ -248,7 +248,7 @@ async function iniciarSesion(env: Env, db: Db): Promise<string> {
   if (!env.MATIAS_EMAIL || !env.MATIAS_PASSWORD) throw new ErrorVento("dian_sin_proveedor", "El servidor no tiene la cuenta de MATIAS (facturación electrónica)", 503);
   const r = await llamar(env, "POST", "/auth/login", { email: env.MATIAS_EMAIL, password: env.MATIAS_PASSWORD, remember_me: 0 }, null, 20000);
   const tok = r.j && typeof r.j.access_token === "string" ? r.j.access_token : "";
-  if (!r.ok || !tok) throw new ErrorVento("dian_proveedor_clave", "MATIAS no aceptó la cuenta de Vento (revisa MATIAS_EMAIL / MATIAS_PASSWORD)", 502);
+  if (!r.ok || !tok) throw new ErrorVento("dian_proveedor_clave", "MATIAS no aceptó la cuenta de ORDEVA (revisa MATIAS_EMAIL / MATIAS_PASSWORD)", 502);
   const vence = Date.parse(String(r.j.expires_at || "").replace(" ", "T") + "-05:00") || Date.now() + 7 * 86400e3;
   tokenMem = { tok, vence, base: base(env) };
   try { await db.rpc("srv_config_poner", { p_clave: "matias_token", p_valor: { cifrado: await cifrar(env, { tok }), vence, base: base(env) } }); } catch (e) { log("warn", "dian_token_guardar", { error: String(e) }); }
@@ -312,13 +312,13 @@ export function leerRespuesta(r: Resp): Resultado {
   const msg = limpio(d.StatusMessage || d.StatusDescription || j.message || "", 300);
   const errs = lista(d.ErrorMessage);
   if (r.red || r.status === 0) return { estado: "pendiente", mensaje: "Sin respuesta de MATIAS: " + limpio(j.message, 120), errores: [], codigo: "red" };
-  if (r.status === 402) return { estado: "pendiente", mensaje: "La cuenta de facturación se quedó sin documentos (folios). Avísale al proveedor de Vento.", errores: [], codigo: "sin_folios" };
+  if (r.status === 402) return { estado: "pendiente", mensaje: "La cuenta de facturación se quedó sin documentos (folios). Avísale al proveedor de ORDEVA.", errores: [], codigo: "sin_folios" };
   if (r.status >= 500 || r.status === 429) return { estado: "pendiente", mensaje: "La DIAN o MATIAS no respondió (" + r.status + "). Se reintenta solo.", errores: [], codigo: "servidor" };
   const valido = String(d.IsValid) === "true" || d.IsValid === true;
   if (r.ok && valido && cude) return { estado: "aceptado", cude, qr: String(qr.qrDian || "") || null, pdf: String(pdf.url || "") || null, xml: String(ad.url || "") || null, mensaje: msg || "Validado por la DIAN", errores: errs };
   if (String(d.StatusCode) === "98") return { estado: "en_proceso", cude, mensaje: "La DIAN lo tiene en proceso", errores: [], codigo: "98" };
   if (/ya se encuentra validado/i.test(String(j.message || ""))) return { estado: "en_proceso", mensaje: "Ya estaba validado: se consulta", errores: [], codigo: "duplicado" };
-  if (r.status === 401 || r.status === 403) return { estado: "pendiente", mensaje: "MATIAS no aceptó la conexión de Vento (" + r.status + ")", errores: [], codigo: "auth" };
+  if (r.status === 401 || r.status === 403) return { estado: "pendiente", mensaje: "MATIAS no aceptó la conexión de ORDEVA (" + r.status + ")", errores: [], codigo: "auth" };
   // 400 / 422: rechazo de validación (datos). Se puede corregir y volver a mandar con el mismo número.
   const extra = j.errors && typeof j.errors === "object" ? lista(Object.values(j.errors as Record<string, unknown>).flat()) : [];
   return { estado: "rechazado", cude: null, mensaje: msg || "La DIAN rechazó el documento", errores: errs.concat(extra).slice(0, 20), codigo: String(d.StatusCode || r.status) };
@@ -352,10 +352,10 @@ export async function enviar(env: Env, db: Db, cfg: Cfg, doc: Doc): Promise<Resu
 
 // Para «Probar conexión»: inicia sesión y, si el negocio ya tiene su empresa en MATIAS, la lee.
 export async function probar(env: Env, db: Db, cfg: Cfg | null) {
-  if (!configurado(env)) return { ok: false, mensaje: "El servidor de Vento todavía no tiene la cuenta de MATIAS." };
+  if (!configurado(env)) return { ok: false, mensaje: "El servidor de ORDEVA todavía no tiene la cuenta de MATIAS." };
   const r = await conToken(env, db, "GET", "/auth/user", null, null, 15000);
   if (!r.ok) return { ok: false, mensaje: "MATIAS no respondió bien (" + r.status + ")." };
-  if (!cfg || !cfg.client_uuid) return { ok: true, empresa: null, mensaje: "Conexión con MATIAS lista. Falta que Vento Admin conecte tu empresa (NIT)." };
+  if (!cfg || !cfg.client_uuid) return { ok: true, empresa: null, mensaje: "Conexión con MATIAS lista. Falta que ORDEVA Admin conecte tu empresa (NIT)." };
   const e = await conToken(env, db, "GET", "/company", null, cfg.client_uuid, 15000);
   const emp = (e.j && (e.j.company || (e.j.dataRecords as Record<string, unknown> | undefined)?.data || e.j.data)) as Record<string, unknown> | undefined;
   const dni = emp ? soloDig((emp as Record<string, unknown>).dni) : "";
@@ -363,7 +363,7 @@ export async function probar(env: Env, db: Db, cfg: Cfg | null) {
     coincide: !cfg.nit || !dni || dni === soloDig(cfg.nit), mensaje: e.ok ? "Conectado con MATIAS." : "No se pudo leer tu empresa en MATIAS (" + e.status + ")." };
 }
 
-// Vento Admin: las empresas cliente de la casa de software en MATIAS (para conectar cada negocio con su NIT).
+// ORDEVA Admin: las empresas cliente de la casa de software en MATIAS (para conectar cada negocio con su NIT).
 export async function clientesMatias(env: Env, db: Db) {
   if (!configurado(env)) return [];
   const r = await conToken(env, db, "GET", "/company/customers", null, null, 20000);

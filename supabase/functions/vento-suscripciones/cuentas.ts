@@ -1,6 +1,6 @@
 // =====================================================================
-//  Vento Admin · cuentas, soporte y licencias (rutas /admin/* extra y /licencia)
-//   • Usuarios registrados (todas las cuentas de Vento Nube) y los equipos donde se abre Vento.
+//  ORDEVA Admin · cuentas, soporte y licencias (rutas /admin/* extra y /licencia)
+//   • Usuarios registrados (todas las cuentas de ORDEVA Nube) y los equipos donde se abre ORDEVA.
 //   • Soporte: casos que escriben los clientes desde la app; el administrador responde.
 //   • Recuperar la contraseña de un cliente: enlace por correo, o contraseña temporal para mandarle por mensaje
 //     de texto (SMS) o WhatsApp (la app le pide cambiarla al entrar).
