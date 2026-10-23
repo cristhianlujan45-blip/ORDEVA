@@ -169,7 +169,7 @@ function jpegTam(b){ let i = 2; while(i < b.length - 9){ if(b[i] !== 0xFF){ i++;
     chk('MÉTODO: botones grandes NEQUI y DAVIPLATA', await pantalla(p) === 'metodo' && await p.evaluate(() => !!document.querySelector('#vsOv [data-metodo="NEQUI"]') && !!document.querySelector('#vsOv [data-metodo="DAVIPLATA"]')));
     await p.click('#vsOv [data-metodo="NEQUI"]');
     let t = await textoOv(p);
-    chk('INSTRUCCIONES: valor, número, titular, botones Copiar y pasos', await pantalla(p) === 'instrucciones' && /\$59\.900/.test(t) && /300 123 4567/.test(t) && /Vento Pruebas SAS/.test(t) && (await p.$$('#vsOv [data-copiar]')).length >= 2 && /Ya pagué/i.test(t), t);
+    chk('INSTRUCCIONES: valor, número, titular, botones Copiar y pasos', await pantalla(p) === 'instrucciones' && /\$59\.900/.test(t) && /300 123 4567/.test(t) && /ORDEVA Pruebas SAS/.test(t) && (await p.$$('#vsOv [data-copiar]')).length >= 2 && /Ya pagué/i.test(t), t);
     await p.click('#vsYaPague');
     const campos = await p.evaluate(() => ({ pant: document.getElementById('vsOv').dataset.pantalla, tit: document.getElementById('vsTit').textContent, neg: vsNegocio.value, plan: vsPlan.value, met: vsMetodo.value, monto: vsMonto.value, fecha: vsFecha.value,
       cam: document.getElementById('vsFileCam').getAttribute('capture'), camAcc: document.getElementById('vsFileCam').accept, gal: document.getElementById('vsFileGal').accept, foto: !!document.getElementById('vsFotoCam') && !!document.getElementById('vsFotoGal'), nom: !!document.getElementById('vsNombre'), tel: !!document.getElementById('vsTel'), ref: !!document.getElementById('vsRef') }));

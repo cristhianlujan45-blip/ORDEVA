@@ -41,7 +41,10 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     const antes = await viendo();
     await p.evaluate(() => { window.__and.permiso = true; });                  // cambia el estado → se repinta (el paso 3 se achica)
     await p.waitForTimeout(3600);
-    const txt = await p.evaluate(() => document.getElementById('pgGuiaOv').innerText), despues = await viendo();
+    // El MISMO paso que se estaba leyendo (por su número): debe seguir en el mismo lugar. (Antes se buscaba otra vez «el
+    // primero que empieza en la pantalla»: si el de arriba se achica, su borde puede entrar en la pantalla y ser otro.)
+    const txt = await p.evaluate(() => document.getElementById('pgGuiaOv').innerText);
+    const despues = await p.evaluate(i => { const ps = [...document.querySelectorAll('#pgGuiaOv .gp-paso')]; return { i, y: ps[i] ? Math.round(ps[i].getBoundingClientRect().top) : null }; }, antes.i);
     chk('1. Llegó el permiso (cambió el estado, el paso de arriba se achicó): se repintó y el paso que leía queda quieto', /Permiso dado/.test(txt) && despues.i === antes.i && Math.abs(despues.y - antes.y) < 3, { antes, despues, permiso: /Permiso dado/.test(txt) });
     await p.evaluate(() => document.getElementById('pgGuiaOv').classList.remove('show'));
 
