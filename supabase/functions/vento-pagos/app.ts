@@ -28,7 +28,7 @@ import * as G from "./google.ts";
 import * as F from "./dian.ts";
 import { type Env, ErrorVento, log, sha256 } from "./util.ts";
 
-export const VERSION = "1.20.0";
+export const VERSION = "1.21.0";
 const SITIO = "https://cristhianlujan45-blip.github.io/cuentas/";
 
 type Pago = { id: string; negocio_id?: string; referencia: string; proveedor: string; metodo: string; canal: string; monto: number;
@@ -174,6 +174,67 @@ async function sincronizar(env: Env, db: Db, negocio: string | null) {
     }
   }
   return { revisados, cambios, errores };
+}
+
+// ---------- /ia (la IA con la clave PROPIA del negocio, sin que la clave llegue a los celulares; 1.53.0) ----------
+// La clave vive en integraciones (tipo «ia»), cifrada. Llega por Ajustes (POST /ia-clave) o la saca guardar_datos del
+// documento («plano:», se cifra aquí la primera vez que se usa). Sin clave del negocio la app usa la IA de Vento.
+const GEMINI = "https://generativelanguage.googleapis.com";
+const IA_MAX_BYTES = 8 * 1024 * 1024;
+const iaUsos = new Map<string, number[]>();
+function iaDemasiados(k: string, max = 40): boolean {
+  const ahora = Date.now(), l = (iaUsos.get(k) || []).filter((t) => ahora - t < 60_000);
+  l.push(ahora); iaUsos.set(k, l);
+  if (iaUsos.size > 5000) iaUsos.clear();
+  return l.length > max;
+}
+type IaGuardada = { publico: Record<string, unknown>; secreto: string | null } | null;
+async function iaClaveDe(env: Env, db: Db, negocio: string): Promise<string | null> {
+  const g = await db.rpc<IaGuardada>("srv_integracion", { p_negocio: negocio, p_tipo: "ia" });
+  if (!g || !g.secreto) return null;
+  if (g.secreto.startsWith("plano:")) {
+    const k = g.secreto.slice(6);
+    try { await db.rpc("srv_integracion_guardar", { p_negocio: negocio, p_tipo: "ia", p_publico: { ...g.publico, cifrada: true }, p_secreto: await cifrar(env, { k }), p_usuario: null }); }
+    catch (e) { log("warn", "ia_cifrar", { error: e instanceof Error ? e.message : String(e) }); }
+    return k;
+  }
+  return (await descifrar<{ k: string }>(env, g.secreto)).k;
+}
+async function iaProxy(req: Request, env: Env, ruta: string[], url: URL, cors: Record<string, string>): Promise<Response> {
+  const negocio = ruta[1] || "", resto = "/" + ruta.slice(2).join("/");
+  const m = /^\/v1beta\/models(?:\/(gemini-[\w.-]+)(:generateContent|:streamGenerateContent)?)?$/.exec(resto);
+  if (!m || !["GET", "POST"].includes(req.method) || (req.method === "POST" && !m[2]) || (req.method === "GET" && m[2])) return json(404, { ok: false, error: "ruta" }, cors);
+  await usuario(req, env).rpc("integracion_puedo", { p_negocio: negocio, p_accion: "usar" });       // miembro del negocio
+  if (iaDemasiados("ia:" + negocio)) return json(429, { error: { code: 429, status: "RESOURCE_EXHAUSTED", message: "Demasiadas peticiones seguidas. Espera un momento." } }, cors);
+  const key = await iaClaveDe(env, servidor(env), negocio);
+  if (!key) return json(404, { ok: false, error: "sin_clave", mensaje: "Este negocio no tiene clave propia de IA en el servidor" }, cors);
+  let cuerpo: string | undefined;
+  if (req.method === "POST") { cuerpo = await req.text(); if (cuerpo.length > IA_MAX_BYTES) return json(413, { error: { message: "La foto es demasiado grande." } }, cors); }
+  const q = new URLSearchParams();
+  for (const [k, v] of url.searchParams) if (k === "alt" || k === "pageSize" || k === "pageToken") q.set(k, v);
+  const r = await fetch((env.VENTO_GEMINI_URL || GEMINI) + resto + (q.toString() ? "?" + q.toString() : ""), {
+    method: req.method, headers: { "content-type": "application/json", "x-goog-api-key": key }, body: cuerpo,
+  });
+  return new Response(r.body, { status: r.status, headers: { ...cors, "Content-Type": r.headers.get("content-type") || "application/json", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
+}
+// Ajustes → IA: ver si hay clave (cualquier miembro), guardarla o quitarla (dueño o administrador). La clave se prueba
+// con Google antes de guardarla y nunca se devuelve: solo sus últimos 4 caracteres.
+async function iaClaveConfig(req: Request, env: Env, b: Record<string, unknown>) {
+  const yo = usuario(req, env), db = servidor(env);
+  const negocio = String(b.negocio || "");
+  if (!negocio) throw new ErrorVento("falta_negocio", "Falta el negocio", 400);
+  const accion = String(b.accion || "estado");
+  if (accion === "estado") return await yo.rpc("ia_clave_estado", { p_negocio: negocio });
+  const quien = await yo.rpc<string>("integracion_puedo", { p_negocio: negocio, p_accion: "configurar" });
+  const uid = quien.split(":")[0];
+  if (accion === "borrar") { await db.rpc("srv_ia_clave_quitar", { p_negocio: negocio, p_usuario: uid }); return await yo.rpc("ia_clave_estado", { p_negocio: negocio }); }
+  if (accion !== "guardar") throw new ErrorVento("accion", "Acción desconocida", 400);
+  const k = String(b.clave || "").replace(/\s+/g, "");
+  if (!/^[\x21-\x7e]{20,200}$/.test(k)) throw new ErrorVento("clave_invalida", "Esa no parece una clave de Gemini (empieza por AIza…)", 400);
+  const prueba = await fetch((env.VENTO_GEMINI_URL || GEMINI) + "/v1beta/models?pageSize=1", { headers: { "x-goog-api-key": k } }).catch(() => null);
+  if (prueba && (prueba.status === 400 || prueba.status === 401 || prueba.status === 403)) throw new ErrorVento("clave_invalida", "Google no aceptó esa clave: revísala en Google AI Studio", 400);
+  await db.rpc("srv_integracion_guardar", { p_negocio: negocio, p_tipo: "ia", p_publico: { final: k.slice(-4), huella: await sha256(k), desde: new Date().toISOString(), origen: "ajustes", cifrada: true }, p_secreto: await cifrar(env, { k }), p_usuario: uid });
+  return await yo.rpc("ia_clave_estado", { p_negocio: negocio });
 }
 
 // ---------- /google (YouTube sin vencerse) ----------
@@ -736,6 +797,7 @@ export async function manejar(req: Request, env: Env): Promise<Response> {
       return json(200, m, cors);
     }
     if (r0 === "push-clave") { const v = await vapid(servidor(env), env.VENTO_SITIO || SITIO); return json(200, { publica: v.publica }, cors); }
+    if (r0 === "ia" && ruta[1] && ruta[2] === "v1beta") return await iaProxy(req, env, ruta, url, cors);
     if (req.method !== "POST") return json(405, { ok: false, error: "metodo" }, cors);
     if (r0 === "sync" && env.VENTO_CRON_SECRETO && req.headers.get("x-vento-cron") === env.VENTO_CRON_SECRETO) {
       const db = servidor(env);
@@ -752,6 +814,7 @@ export async function manejar(req: Request, env: Env): Promise<Response> {
     if (r0 === "config") return json(200, await config(req, env, b), cors);
     if (r0 === "dian") return json(200, await dian(req, env, ruta[1] || "", b), cors);
     if (r0 === "google") return json(200, await google(req, env, b), cors);
+    if (r0 === "ia-clave") return json(200, await iaClaveConfig(req, env, b), cors);
     if (r0 === "cobro") return json(200, await cobro(req, env, b), cors);
     if (r0 === "confirmar") return json(200, await confirmarDaviplata(req, env, b), cors);
     if (r0 === "sync") {

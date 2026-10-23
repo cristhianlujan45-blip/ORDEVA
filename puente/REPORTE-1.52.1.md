@@ -25,8 +25,8 @@ Es el primer paso de la arquitectura de datos («Fase A»), autorizado por el du
 - Ningún dato se borra: lo que se deshace en la app queda marcado como eliminado, con fecha.
 
 ## Sin riesgo para la operación
-- El guardado de la app no se toca. El servidor copia cada 10 minutos solo los negocios que cambiaron, en tandas
-  cortas.
+- El guardado de la app no se toca. El servidor copia solo los negocios que cambiaron, en tandas cortas, en cada
+  repaso automático (GitHub lo corre cada 1 a 3 horas, aunque está pedido cada 10 minutos).
 - Si un negocio tiene un dato raro, se anota y los demás siguen.
 - **Seguro de espacio:** si la base de datos se acerca al límite del plan, la copia se detiene sola para que la app
   siga guardando.

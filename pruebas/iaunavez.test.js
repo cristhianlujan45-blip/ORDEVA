@@ -1,8 +1,9 @@
 // IA para leer facturas, configurada UNA sola vez (Gemini simulado, sin internet):
 //  1. Sin IA configurada, al escanear una factura se ofrece «⚡ Leer facturas con IA» → «Configurar IA» abre la ventana.
 //  2. La ventana explica los 2 pasos y trae «🔑 Sacar mi clave gratis» (aistudio.google.com/apikey).
-//  3. Pegar la clave y «Guardar» = guardar Y comprobar: «✅ Listo…», y la clave queda en los datos del negocio
-//     (así llega sola a los demás celulares con Vento Nube).
+//  3. Pegar la clave y «Guardar» = guardar Y comprobar: «✅ Listo…». Desde la 1.53.0 la clave NO va en los datos del
+//     negocio (se comparten con todos los equipos y van a los respaldos): sin la nube queda solo en este equipo, y con
+//     Vento Nube queda cifrada en el servidor (lo prueba iaclave.test.js).
 //  4. El mismo día no se vuelve a preguntar.
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
@@ -52,7 +53,7 @@ const CLAVE = 'AIzaPruebaUnaVez0000000000000000000000';
     await p.click('#aiCfgSave');
     const listo = await p.waitForFunction(() => /✅ Listo/.test(document.getElementById('aiCfgStatus').textContent), null, { timeout: 15000 }).then(() => true, () => false);
     chk('3. «Guardar» guarda y comprueba de una vez: «✅ Listo: la IA quedó configurada…»', listo, await p.textContent('#aiCfgStatus'));
-    chk('3. La clave queda en los datos del negocio (llega sola a los demás celulares)', await p.evaluate(k => data.iaClave === k && hasAIKey(), CLAVE));
+    chk('3. La clave queda en este equipo y NO en los datos del negocio (que se comparten y van a los respaldos)', await p.evaluate(k => localStorage.getItem('bar-gemini-api-key') === k && !('iaClave' in data) && hasAIKey() && !JSON.stringify(data).includes(k), CLAVE));
     await p.click('#aiCfgClose');
 
     // 4. Sin IA otra vez (otro celular sin la clave): el mismo día no se vuelve a preguntar

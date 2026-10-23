@@ -14,7 +14,7 @@ Archivos:
 ```mermaid
 flowchart LR
   A[Celulares y computadores] -- guardar_datos igual que antes --> D[(datos_negocio.datos)]
-  C[Repaso del Servidor Vento cada 10 min<br>POST /sync x-vento-cron] --> P[proyectar_pendientes]
+  C[Repaso automático del Servidor Vento<br>POST /sync x-vento-cron] --> P[proyectar_pendientes]
   P -- datos_negocio.version mayor que la proyectada --> N[proyectar_negocio]
   D -. solo lectura .-> N
   N --> T[(productos · ventas · venta_items · venta_pagos<br>inventario_movimientos · caja_cierres …)]
@@ -24,6 +24,9 @@ flowchart LR
 - **No hay trigger en `datos_negocio`:** el guardado de la app es exactamente el mismo y la proyección nunca lo bloquea,
   porque solo lee el documento.
 - **Pendiente** = `datos_negocio.version` mayor que `proyeccion_estado.version_proyectada`.
+- **Cuándo corre:** en cada repaso automático. El flujo pide «cada 10 minutos», pero GitHub corre esos repasos con
+  retraso: en la práctica, cada 1 a 3 horas. Para reportes del día alcanza; si hace falta más seguido, se puede programar
+  dentro de Supabase (`pg_cron`).
 - **Idempotente:**
   - cada fila usa el ID que ya trae en el JSON y una huella (`md5`) del objeto;
   - solo se reescribe lo que cambió, y proyectar dos veces el mismo documento no toca nada (probado).

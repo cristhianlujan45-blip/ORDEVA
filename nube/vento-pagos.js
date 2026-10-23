@@ -866,5 +866,23 @@
     olvidar: function(){ return api('google', { negocio: negocio().id, accion: 'olvidar' }); }
   };
 
-  window.ventoPagos = { estado: function(){ return est; }, sincronizar: sincronizar, recibir: recibir, cobrar: function(m, v){ return window.ventoPagosCobrar(m, v); }, activarPush: activarPush, abrirAjustes: pintarAjustes, _cache: cache };
+  // 🤖 IA con la clave propia del NEGOCIO por el Servidor Vento (1.53.0): la clave vive cifrada allá y ningún celular
+  // la guarda. estado() → { tiene, final }; guardar(clave) / borrar() solo dueño o administrador; pedir(ruta, init)
+  // llama a Gemini por el servidor (ruta como «/models/…:generateContent»).
+  var ia = {
+    disponible: function(){ return !!(nube() && nube().configurada && nube().configurada() && negocio()); },
+    estado: function(){ var n = negocio(); return n ? api('ia-clave', { negocio: n.id, accion: 'estado' }) : Promise.resolve({ tiene: false }); },
+    guardar: function(k){ var n = negocio(); return n ? api('ia-clave', { negocio: n.id, accion: 'guardar', clave: k }) : Promise.reject(new Error('sin_negocio')); },
+    borrar: function(){ var n = negocio(); return n ? api('ia-clave', { negocio: n.id, accion: 'borrar' }) : Promise.reject(new Error('sin_negocio')); },
+    pedir: function(ruta, init){
+      var n = negocio(); if(!n) return Promise.reject(new Error('sin_negocio'));
+      return sesion().then(function(s){
+        if(!s.token) throw Object.assign(new Error('sin_sesion'), { codigo: 'sin_sesion' });
+        var o = Object.assign({}, init || {}), h = Object.assign({}, o.headers || {});
+        delete h['x-goog-api-key']; h.apikey = nube().config().key; h.Authorization = 'Bearer ' + s.token; o.headers = h;
+        return fetch(base() + '/ia/' + encodeURIComponent(n.id) + '/v1beta' + ruta, o);
+      });
+    }
+  };
+  window.ventoPagos = { estado: function(){ return est; }, sincronizar: sincronizar, recibir: recibir, cobrar: function(m, v){ return window.ventoPagosCobrar(m, v); }, activarPush: activarPush, abrirAjustes: pintarAjustes, ia: ia, _cache: cache };
 })();

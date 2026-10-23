@@ -11066,9 +11066,43 @@ async function iaVentoRevisar(){
   return iaVentoOk;
 }
 setTimeout(iaVentoRevisar, 1500); setInterval(iaVentoRevisar, 30 * 60000);
-// Llama a Gemini: directo con la clave propia, o por el Servidor Vento si es la IA de Vento.
+/* 🔐 Clave propia del NEGOCIO en el servidor (1.53.0): con Vento Nube, la clave de Gemini del negocio vive cifrada en
+   el Servidor Vento y la IA pasa por allá; ningún celular la guarda ni viaja en los datos del negocio (antes llegaba a
+   todos los equipos, también a los meseros, y quedaba en los respaldos). Sin clave del negocio: la IA de Vento. */
+const IA_NEGOCIO = 'vento-negocio';
+const IA_NEG_KEY = 'vento-ia-negocio';
+function iaNegApi(){ try{ const ia = window.ventoPagos && window.ventoPagos.ia; return ia && ia.disponible() ? ia : null; }catch(e){ return null; } }
+function iaNegNegocio(){ try{ const n = window.ventoNube && window.ventoNube.negocio && window.ventoNube.negocio(); return n || null; }catch(e){ return null; } }
+function iaNegEstado(){ try{ const o = JSON.parse(localStorage.getItem(IA_NEG_KEY) || 'null'), n = iaNegNegocio(); return o && n && o.id === n.id ? o : null; }catch(e){ return null; } }
+function iaNegPoner(j){ const n = iaNegNegocio(); try{ if(n) localStorage.setItem(IA_NEG_KEY, JSON.stringify({ id: n.id, tiene: !!(j && j.tiene), final: (j && j.final) || '', t: Date.now() })); }catch(e){} }
+const iaNegAdmin = () => { const n = iaNegNegocio(); return !!n && (n.rol === 'dueno' || n.rol === 'admin'); };
+// Si el negocio tiene clave en el servidor, la copia de este celular sobra: se borra. Si no la tiene y este celular
+// sí (versiones anteriores la copiaban a todos), el dueño o el administrador la sube una vez.
+async function iaNegRevisar(){
+  const ia = iaNegApi(); if(!ia) return null;
+  try{
+    let j = await ia.estado();
+    const local = (lsGet(GEMINI_KEY_STORAGE) || '').replace(/\s+/g, '');
+    if(!j.tiene && !j.quitada && local && iaNegAdmin()) j = await ia.guardar(local).catch(() => j);
+    iaNegPoner(j);
+    if(j.tiene && local) lsSet(GEMINI_KEY_STORAGE, '');
+    if(j.tiene && typeof data !== 'undefined' && data && data.iaClave){ delete data.iaClave; saveData(); }
+    return j;
+  }catch(e){ return null; }
+}
+setTimeout(iaNegRevisar, 5000); setInterval(iaNegRevisar, 60 * 60000);
+// Llama a Gemini: directo con la clave propia de este equipo, por el Servidor Vento con la del negocio, o la IA de Vento.
 function gFetch(ruta, init, key){
   init = Object.assign({}, init || {}); const h = Object.assign({}, init.headers || {});
+  if(key === IA_NEGOCIO){
+    const ia = iaNegApi();
+    if(ia) return ia.pedir(ruta, init).then(r => {
+      if(r.status !== 404 && r.status !== 401) return r;
+      iaNegPoner({ tiene: false });                            // la quitaron o se cerró la sesión: la IA de Vento
+      return gFetch(ruta, init, iaVentoOk && iaVentoBase() ? IA_VENTO : '');
+    });
+    key = iaVentoOk && iaVentoBase() ? IA_VENTO : '';
+  }
   if(key === IA_VENTO){ delete h['x-goog-api-key']; init.headers = h; return fetch(iaVentoBase() + '/v1beta' + ruta, init); }
   h['x-goog-api-key'] = key; init.headers = h; return fetch(GEMINI_BASE + ruta, init);
 }
@@ -11078,21 +11112,29 @@ let aiLastNotice = 0;
 function lsGet(k){ try{ return localStorage.getItem(k) || ''; }catch(e){ return ''; } }
 function lsSet(k, v){ try{ if(v) localStorage.setItem(k, v); else localStorage.removeItem(k); }catch(e){} }
 
-// La clave de la IA se guarda en este celular Y en los datos del negocio: así llega sola a los demás celulares y a
-// la app de Android (con Vento Nube o un respaldo). Antes vivía solo en el navegador donde se pegó: en la app de
-// Android (que tiene su propia memoria) la IA quedaba «desconectada».
+// Con Vento Nube la clave del negocio está en el servidor (IA_NEGOCIO) y llega sola a todos los equipos sin copiarse.
+// Sin la nube, la clave queda solo en este equipo (y en los datos de un respaldo viejo, si venía ahí).
 function getGeminiKey(){
+  const neg = iaNegEstado();
+  if(neg && neg.tiene && iaNegApi()) return IA_NEGOCIO;
   let k = (lsGet(GEMINI_KEY_STORAGE) || '').replace(/\s+/g, '');
-  if(!k){ try{ const d = typeof data !== 'undefined' && data && data.iaClave; if(d && /^[\x21-\x7e]{20,}$/.test(d)){ k = d; lsSet(GEMINI_KEY_STORAGE, d); } }catch(e){} }
+  if(!k && !iaNegApi()){ try{ const d = typeof data !== 'undefined' && data && data.iaClave; if(d && /^[\x21-\x7e]{20,}$/.test(d)){ k = d; lsSet(GEMINI_KEY_STORAGE, d); } }catch(e){} }
   return k || BUILTIN_GEMINI_KEY || (iaVentoOk && iaVentoBase() ? IA_VENTO : '');
 }
+// Guardar la clave: con la nube y siendo dueño o administrador, va al servidor (cifrada) y no queda en el celular.
+// Devuelve una promesa con el resultado del servidor (o null si quedó solo en este equipo).
 function setGeminiKey(k){
   k = (k || '').replace(/\s+/g, '');
+  const ia = iaNegApi();
+  try{ if(typeof data !== 'undefined' && data && data.iaClave){ delete data.iaClave; saveData(); } }catch(e){}
+  if(ia && iaNegAdmin() && k){
+    lsSet(GEMINI_KEY_STORAGE, k);                             // mientras responde el servidor, sirve en este equipo
+    return ia.guardar(k).then(j => { iaNegPoner(j); if(j && j.tiene) lsSet(GEMINI_KEY_STORAGE, ''); return j; });
+  }
   lsSet(GEMINI_KEY_STORAGE, k);
-  try{ if(typeof data !== 'undefined' && data && data.iaClave !== k){ if(k) data.iaClave = k; else delete data.iaClave; saveData(); } }catch(e){}
+  return Promise.resolve(null);
 }
-// Si este celular ya tenía clave y los datos del negocio no, se copia (para que viaje a los demás).
-setTimeout(() => { try{ const k = (lsGet(GEMINI_KEY_STORAGE) || '').replace(/\s+/g, ''); if(k && typeof data !== 'undefined' && data && !data.iaClave){ data.iaClave = k; saveData(); } }catch(e){} }, 6000);
+function quitarClaveNegocio(){ const ia = iaNegApi(); if(!ia || !iaNegAdmin()) return Promise.resolve(null); return ia.borrar().then(j => { iaNegPoner(j); return j; }); }
 // «📲 Pasar la IA a la app Vento»: enlace vento://abrir#iaclave=… que la app abre y guarda la clave (sin escribirla).
 function iaClaveDeEnlace(){
   try{
@@ -11256,6 +11298,7 @@ async function geminiGenerate(o){
           if(res.status === 400 && /thinking/i.test(raw) && !aiSinPensarNo.has(model)){ aiSinPensarNo.add(model); attempt--; continue; }
           const err = geminiErrorFromResponse(res.status, raw);
           if(key === IA_VENTO && (err.kind === 'auth' || res.status === 503 || res.status === 403)) err.message = 'La IA de Vento no está disponible en este momento (el proveedor debe revisar la clave del servidor). Si quieres, pon tu propia clave en ⚙️ Configurar IA.';
+          if(key === IA_NEGOCIO && err.kind === 'auth') err.message = 'Google no aceptó la clave de IA del negocio. El dueño o el administrador la cambia en ⚙️ Configurar IA.';
           if(err.kind === 'model'){ skippedForModel = true; lastErr = err; break; }
           if(err.kind === 'daily'){ lastErr = err; break; }              // otro modelo tiene su propia cuota
           // Saturado: se pasa YA a otro modelo (cada uno tiene su propia capacidad) en vez de esperar a este.
@@ -11511,9 +11554,18 @@ function openAIConfigDialog(){
   };
   let current = getAIProvider();
   provEl.value = current;
+  // 🗑️ Solo dueño o administrador, con la clave del negocio en el servidor (el campo vacío ya no la borra).
+  const quitarBtn = document.createElement('button'); quitarBtn.type = 'button'; quitarBtn.className = 'btn-secondary'; quitarBtn.hidden = true;
+  quitarBtn.style.cssText = 'margin-top:8px;width:100%'; quitarBtn.textContent = '🗑️ Quitar la clave del negocio (usar la IA de Vento)';
+  statusEl.after(quitarBtn);
+  quitarBtn.onclick = async () => {
+    if(!(await showConfirm({ title: 'Quitar la clave del negocio', message: 'Todos los equipos pasan a usar la IA de Vento. ¿Seguro?', confirmText: 'Sí, quitar', icon: '🗑️' }))) return;
+    try{ await quitarClaveNegocio(); showToast('Clave del negocio quitada: se usa la IA de Vento.'); }catch(err){ showToast('No se pudo quitar: ' + (err && err.message ? err.message : err)); }
+    paint();
+  };
 
   const HELP = {
-    gemini: 'La mejor y más fácil para leer facturas. <b>1.</b> Toca <b>🔑 Sacar mi clave gratis</b> (entra con tu cuenta de Google → «Create API key»). <b>2.</b> Cópiala, pégala aquí y toca <b>Guardar</b>. Empieza por <b>AIza</b> o <b>AQ.</b>. Se configura <b>una sola vez</b>: queda en los datos del negocio y llega sola a los demás celulares.<br><a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" style="display:inline-block;margin-top:8px;padding:9px 12px;border-radius:10px;border:1px solid currentColor;color:inherit;text-decoration:none;font-weight:700">🔑 Sacar mi clave gratis</a>',
+    gemini: 'La mejor y más fácil para leer facturas. <b>1.</b> Toca <b>🔑 Sacar mi clave gratis</b> (entra con tu cuenta de Google → «Create API key»). <b>2.</b> Cópiala, pégala aquí y toca <b>Guardar</b>. Empieza por <b>AIza</b> o <b>AQ.</b>. Se configura <b>una sola vez</b>: con Vento Nube queda guardada en el servidor y sirve en todos los celulares del negocio sin copiarse en ninguno.<br><a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" style="display:inline-block;margin-top:8px;padding:9px 12px;border-radius:10px;border:1px solid currentColor;color:inherit;text-decoration:none;font-weight:700">🔑 Sacar mi clave gratis</a>',
     openai: 'Pega tu API key de OpenAI (empieza por <b>sk-</b>). Se guarda solo en este dispositivo. No la compartas. La app no pone límites; los únicos son los de tu cuenta en platform.openai.com.'
   };
   const paint = () => {
@@ -11523,7 +11575,11 @@ function openAIConfigDialog(){
     keyEl.value = vals[current].key;
     modelEl.value = vals[current].model;
     const has = current === 'gemini' ? getGeminiKey() : getOpenAIKey();
-    statusEl.textContent = vals[current].key ? 'Hay una clave guardada en este dispositivo.' : (has === IA_VENTO ? '✅ IA de Vento ya configurada: no tienes que poner nada. (Si quieres usar tu propia clave, pégala arriba.)' : has ? 'Usando la clave incluida dentro del archivo de la app.' : 'Aún no hay clave guardada.');
+    const neg = iaNegEstado();
+    if(current === 'gemini' && has === IA_NEGOCIO) keyEl.placeholder = iaNegAdmin() ? 'Guardada en el servidor' + (neg && neg.final ? ' (…' + neg.final + ')' : '') + ': pega otra solo para cambiarla' : 'La pone el dueño o el administrador';
+    quitarBtn.hidden = !(current === 'gemini' && has === IA_NEGOCIO && iaNegAdmin());
+    statusEl.textContent = has === IA_NEGOCIO && current === 'gemini' ? '🔐 La IA usa la clave del negocio, guardada en el Servidor Vento' + (neg && neg.final && iaNegAdmin() ? ' (termina en ' + neg.final + ')' : '') + '. Ningún celular la guarda.'
+      : vals[current].key ? 'Hay una clave guardada en este dispositivo.' : (has === IA_VENTO ? '✅ IA de Vento ya configurada: no tienes que poner nada. (Si quieres usar tu propia clave, pégala arriba.)' : has ? 'Usando la clave incluida dentro del archivo de la app.' : 'Aún no hay clave guardada.');
   };
   paint();
   provEl.onchange = () => {
@@ -11533,14 +11589,19 @@ function openAIConfigDialog(){
   };
   const persist = () => {
     vals[current].key = keyEl.value; vals[current].model = modelEl.value;
-    setGeminiKey(vals.gemini.key); setGeminiModel(vals.gemini.model);
+    // Con la clave del negocio en el servidor, dejar el campo vacío NO la borra (para eso está «🗑️ Quitar»).
+    const g = (vals.gemini.key || '').replace(/\s+/g, '');
+    const p = (g || getGeminiKey() !== IA_NEGOCIO) ? setGeminiKey(g) : Promise.resolve(null);
+    setGeminiModel(vals.gemini.model);
     setOpenAIKey(vals.openai.key); setOpenAIModel(vals.openai.model);
     setAIProvider(current);
     lsSet(AI_WEB_ALWAYS_KEY, webEl.checked ? '1' : '');
+    return p;
   };
   // Guardar = guardar Y comprobar de una vez (antes había que tocar «Probar conexión» aparte).
   box.querySelector('#aiCfgSave').onclick = async () => {
-    persist();
+    try{ const j = await persist(); if(j && j.tiene){ vals.gemini.key = ''; keyEl.value = ''; } }
+    catch(err){ statusEl.textContent = '❌ ' + (err && err.message ? err.message : err); return; }
     if(!hasAIKey()){ statusEl.textContent = 'Clave eliminada.'; showToast('Clave de IA eliminada.'); return; }
     statusEl.textContent = 'Guardado. Comprobando que funciona…';
     try{
@@ -11550,7 +11611,7 @@ function openAIConfigDialog(){
     }catch(err){ statusEl.textContent = '⚠️ Se guardó, pero no funcionó: ' + (err && err.message ? err.message : err); }
   };
   box.querySelector('#aiCfgTest').onclick = async () => {
-    persist();
+    try{ await persist(); }catch(err){ statusEl.textContent = '❌ ' + (err && err.message ? err.message : err); return; }
     if(!hasAIKey()){ statusEl.textContent = 'Primero pega tu API key.'; return; }
     statusEl.textContent = 'Probando…';
     try{ statusEl.textContent = await testAIConnection(); }
@@ -11559,7 +11620,7 @@ function openAIConfigDialog(){
   // Navegador con la IA ya conectada: un toque la pasa a la app de Android (que tiene su propia memoria).
   try{
     const k = getGeminiKey();
-    if(k && k !== IA_VENTO && !window.VentoAndroid && window.esAndroid && window.esAndroid()){
+    if(k && k !== IA_VENTO && k !== IA_NEGOCIO && !window.VentoAndroid && window.esAndroid && window.esAndroid()){
       const ln = document.createElement('a'); ln.className = 'btn-primary'; ln.style.cssText = 'display:block;text-align:center;padding:12px;border-radius:12px;text-decoration:none;margin-top:10px';
       ln.textContent = '📲 Pasar la IA a la app Vento'; ln.href = 'vento://abrir#iaclave=' + encodeURIComponent(k);
       const n = document.createElement('div'); n.className = 'settings-desc'; n.textContent = 'Abre la app Vento de este celular y le deja la IA conectada (no hay que volver a pegar la clave).';
@@ -25911,7 +25972,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-23 · v1.52.1';
+const MESORA_VERSION = '2026-10-23 · v1.53.0';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'Vento · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 /* 🔄 La app Android se actualiza SOLA (Actualizador): revisa cada 3 h, baja la versión nueva y la instala cuando no se
