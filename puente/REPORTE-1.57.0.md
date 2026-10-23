@@ -72,7 +72,8 @@ Ya estaban en el código, pero sin pruebas. Ahora se prueban contra una API simu
 ## Etapa 8 (1/2) · Identidad ORDEVA
 - **Íconos nuevos:** favicon (SVG y PNG), ícono de iPhone, y el acceso directo de la web, que ahora se llama
   **«ORDEVA Web»**.
-- **Título de la página:** «ORDEVA».
+- **Título de la página:** «ORDEVA», también en el acceso directo de iPhone y Android.
+- **Pantalla de inicio:** el logo de ORDEVA con «Tu negocio en orden».
 - **Ícono de la app Android** (sale en la próxima versión del APK).
 - **Íconos viejos:** `icons/vento-*` se quedan para no romper accesos directos ya instalados.
 - **Sin tocar:** ids, claves de almacenamiento, funciones del servidor y el paquete de Android.
