@@ -153,7 +153,7 @@ async function pruebas(sb) {
   doc.products = doc.products.filter((p) => p.id !== 'p2');                                                     // borran la picada
   doc.products[0].price = 5500;                                                                                 // sube el precio
   doc.inventarioMov = [doc.inventarioMov[1], { id: 'm3', tipo: 'venta', productId: 'p1', qty: -1, at: 1761210000000 }];   // la app recortó m1
-  r = await rpc('guardar_datos', { p_negocio: NEG, p_datos: doc, p_version: ver }, cajero.token); ver = r.j;
+  r = await rpc('guardar_datos', { p_negocio: NEG, p_datos: doc, p_version: ver }, dueno.token); ver = r.j;   // el dueño (desde la 1.55.0 el cajero sin permiso «productos» no cambia precios ni borra productos)
   r = await repaso();
   chk('El repaso proyecta solo el negocio que cambió', r.j.proyeccion && r.j.proyeccion.proyectados === 1, r.j);
   const est2 = await uno('select filas from proyeccion_estado where negocio_id = $1', [NEG]);
