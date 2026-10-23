@@ -374,8 +374,7 @@ window.esAndroid = function(){ var ua = navigator.userAgent || ''; if(/Android/i
   };
   const F = {
     comida:   { esp: ['Mesa', 'Mesas', '🍽️', 'f'], n: 8, fun: 'dp', mod: 'kpwdqv', prod: ['Producto', 'Productos'], icE: 'mesa', icP: 'plato', campos: [['porcion','Porción','txt','Ej. para 2 personas'],['ingre','Ingredientes o acompañamientos','txt','Ej. arroz, papa y ensalada'],['prep','Minutos de preparación','num','15']], inv: ['Inventario','unidades'], carta: 'Menú', icCarta: '🍽️', gastos: ['insumos', 'gas', 'empaques', 'licencias'], cat: 'Platos',
-      vento: 'Pedidos por mesa (voz, QR de la mesa o app de meseros) que llegan a Cocina, cobro y división de cuentas, domicilios, costo de cada plato e inventario de insumos.',
-      falta: 'Recetas que descuenten insumos automáticamente.' },
+      vento: 'Pedidos por mesa (voz, QR de la mesa o app de meseros) que llegan a Cocina, cobro y división de cuentas, domicilios, costo de cada plato e inventario de insumos con recetas que se descuentan solas al vender.' },
     bar:      { esp: ['Mesa', 'Mesas', '🍻', 'f'], n: 10, fun: 'mp', mod: 'kpwdq', prod: ['Producto', 'Productos'], icE: 'mesa', icP: 'cerveza', campos: [['ml','Contenido','txt','Ej. 330 ml'],['grados','Grados de alcohol','txt','Ej. 4,5 %'],['personas','Alcanza para','num','1']], inv: ['Inventario','unidades'], carta: 'Carta', icCarta: '🍻', gastos: ['licores', 'licencias', 'musica'], cat: 'Bebidas',
       vento: 'Rondas por voz («otra ronda para la 3»), música que piden los clientes con el QR, juntar mesas, fiados en la libreta y control de cerveza y licor.',
       falta: '' },
@@ -5495,7 +5494,7 @@ export default {
 <script src="lib/vento-pos.js" defer></script><!-- Modos de trabajo (tienda/mixto) y modo fácil -->
 <script src="lib/vento-equipos.js" defer></script>
 <script src="lib/vento-turno.js" defer></script>
-<script src="lib/vento-tablero.js" defer></script><!-- 🛰️ Tablero de estadísticas --><script src="lib/vento-inventario.js" defer></script><!-- 🔢 Inventario por código: consultar, entrada de mercancía, toma de inventario, kárdex y devoluciones --><!-- 💵 Caja con base, entradas / salidas y arqueo --><!-- 🔌 Balanza, impresora de facturas y cajón de dinero (USB, Bluetooth, red) -->
+<script src="lib/vento-tablero.js" defer></script><!-- 🛰️ Tablero de estadísticas --><script src="lib/vento-recetas.js" defer></script><!-- 🧾 Recetas e insumos (descuentan al vender) --><script src="lib/vento-inventario.js" defer></script><!-- 🔢 Inventario por código: consultar, entrada de mercancía, toma de inventario, kárdex y devoluciones --><!-- 💵 Caja con base, entradas / salidas y arqueo --><!-- 🔌 Balanza, impresora de facturas y cajón de dinero (USB, Bluetooth, red) -->
 <script src="lib/vento-confirma.js" defer></script><!-- Confirmación de pagos: ⏳ esperando el pago, mesa correcta, sin valor, mesero, cuadre -->
 <script src="lib/vento-guia.js" defer></script><!-- Modo fácil para mayores: guía paso a paso con voz, «Ayúdame» y recorrido -->
 <script src="lib/vento-cuenta.js" defer></script><!-- Soporte en la app, licencias del proveedor, recuperar por SMS, cuenta de cliente aparte del administrador -->

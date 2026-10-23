@@ -103,7 +103,7 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
  // ---------- MÁS → Productos: agregar y cambiar precio ----------
  await p.click('#facilApp [data-fz="mas"]'); await p.waitForTimeout(200);
  r=await p.evaluate(()=>[...document.querySelectorAll('#facilApp .fz-btn')].map(b=>b.dataset.ir).join(','));
- chk('MÁS: tareas grandes (agregar producto, llegó mercancía, foto, precio, factura, mis facturas), Libreta, Mis productos, Ayúdame, Ayuda por WhatsApp y Salir', r===('g-producto,g-llego,g-foto,g-precio,g-factura,g-facturas,'+(await p.evaluate(()=>data.musicOn?'musica,':''))+'libreta,productos,ayudame,ayuda,salir'), r);
+ chk('MÁS: tareas grandes (agregar producto, llegó mercancía, foto, precio, factura, mis facturas, practicar una venta), Libreta, Mis productos, Ayúdame, Ayuda por WhatsApp y Salir', r===('g-producto,g-llego,g-foto,g-precio,g-factura,g-facturas,g-practica,'+(await p.evaluate(()=>data.musicOn?'musica,':''))+'libreta,productos,ayudame,ayuda,salir'), r);
  await p.click('#facilApp [data-ir="productos"]'); await p.waitForTimeout(200);
  await p.click('#facilApp [data-nuevo]'); await p.waitForTimeout(150);
  await p.fill('#facilApp .fz-nombre','Tamal'); await p.fill('#facilApp .fz-precio','5000'); await p.click('#facilApp .fz-ok'); await p.waitForTimeout(300);
