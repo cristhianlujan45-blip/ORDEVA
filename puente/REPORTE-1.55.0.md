@@ -6,7 +6,7 @@ Esta versión trae seis cosas:
 - **🧾 Recetas e insumos.**
 - **🎓 Practicar una venta** en la guía para mayores.
 - **D10:** restaurar un respaldo de forma limpia y probada.
-- **🔒 Cerrar caja:** el botón a la vista y una pregunta antes de cerrar (pedido del dueño).
+- **🔒 Cerrar caja:** el botón a la vista, una pregunta antes de cerrar y, si el dueño quiere, una clave (pedido del dueño).
 
 ## 1. Lo del Nequi solo para el dueño y el administrador (D5)
 Regla del dueño: «solamente el administrador puede ver lo del Nequi».
@@ -105,7 +105,22 @@ Pedido del dueño: «mueve el botón de cerrar caja a una zona más visible y un
 - **Si no hay nada que cerrar,** avisa «La caja ya está al día» sin preguntar.
 - **El cierre automático programado** no pregunta, igual que antes.
 - **Quien no tiene permiso de ver el historial** no ve el botón, igual que antes.
-- **Prueba nueva, `cerrarcaja`:** 16 comprobaciones.
+- **🔑 Clave para cerrar la caja (opcional).** Pedido del dueño: «la opción de ponerle clave para cerrar la caja,
+  una clave diferente o la misma del usuario».
+  - Se elige en Ajustes → Negocio → «🔒 Clave para cerrar la caja». Solo la ven el dueño y el administrador.
+  - **Opciones:**
+    - sin clave (como siempre);
+    - **la contraseña de quien está usando Vento**, la misma con la que entra en ese celular;
+    - **una clave solo para cerrar la caja**.
+  - **Cuándo se pide:** después de la pregunta, a todos, también al dueño.
+  - **Lo que no la pide:** el cierre automático programado.
+  - **5 claves malas** → espera 5 minutos.
+  - **Cómo se guarda:** solo la huella de la clave (PBKDF2, igual que la clave de autorización), dentro de los
+    permisos del equipo. Así el servidor (D2) no deja que el equipo la cambie ni la quite.
+  - **Queda en la actividad del equipo:** cada clave mala y cada cambio.
+- **Prueba nueva, `cerrarcaja`:** 26 comprobaciones.
+  - Incluye la clave propia (solo la huella), la clave mala, «Cancelar», la contraseña del usuario, que el cierre
+    automático no la pide y «Sin clave».
   - **Actualizada:** `mejoras` (acepta la pregunta antes del arqueo).
   - **Pasan:** `facil`, `cajapos`, `cajaqr`, `guia`, `practica` y `equipoactividad`.
 
@@ -120,4 +135,11 @@ Pedido del dueño: «mueve el botón de cerrar caja a una zona más visible y un
   - `recetas`: 21.
   - `practica`: 25.
 - **Actualizadas:** `daviplata` (servidor 1.23.0 y el pago recortado) y `facil`.
-- El resultado de todas las pruebas está al final del commit de esta versión.
+- **Servidor:** las 16 pruebas pasan, incluidas `respaldos`, `permisos` (1.54.0) y `proyeccion` (66, con el cambio
+  de precio hecho por el dueño).
+  - `revisar-migraciones` también pasa: 32 migraciones, sin borrar datos y con RLS en todas las tablas.
+- **App:** de las 86 pruebas, 83 pasan en la corrida completa. Las otras se revisaron una por una:
+  - **`appoweb`:** pasa sola (25 de 25). Falló por la carga de este computador, con dos corridas a la vez.
+  - **`dian`:** pasa sola (29 de 29).
+  - **`cuentas`:** falla a veces, en el paso de cambiar de cuenta en el mismo celular. Falla igual con la 1.53.2
+    publicada, y pasó completa dos veces seguidas (43 de 43) con esta versión.

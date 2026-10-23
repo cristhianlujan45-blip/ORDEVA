@@ -7,6 +7,9 @@
 //  5. El cierre automático programado no pregunta.
 //  6. Quien no tiene permiso de ver el historial no ve el botón.
 //  7. Modo fácil: «🔒 Cerrar caja del día» en «Hoy», con la misma pregunta.
+//  8. 🔑 Clave para cerrar la caja (Ajustes → Negocio): una clave propia (solo se guarda su huella) o la contraseña de
+//     quien usa Vento. Se pide después de la pregunta; clave mala no cierra; «Cancelar» no cierra; el automático no la
+//     pide; «Sin clave» la quita.
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html';
 (async () => {
@@ -15,7 +18,7 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
   try{
     const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
     await ctx.route('**/*', r => new URL(r.request().url()).hostname === 'localhost' ? r.continue() : r.abort());
-    await ctx.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); }catch(e){} });
+    await ctx.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('vento-guia-tour', '1'); }catch(e){} });   // sin el recorrido automático
     const p = await ctx.newPage(); p.on('pageerror', e => errs.push(e.message));
     await p.goto(BASE, { waitUntil: 'load' }); await p.waitForTimeout(2500);
     await p.evaluate(async () => { await enterApp('test', null); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento-pp-oculta', '1');
@@ -85,6 +88,48 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
     chk('7. La pregunta sale encima del modo fácil, con la venta de $5.000', encima && /1 cuenta por \$\s?5\.000/.test(await D(() => document.getElementById('confirmMessage').textContent)));
     await p.click('#confirmOkBtn'); await sinContar();
     chk('7. …y cierra la caja', await D(() => data.closures.length === 4 && data.closures[0].totalSold === 5000));
+
+    // ===== 8. 🔑 Clave para cerrar la caja =====
+    await D(() => { data.easyMode = false; window.ventoFacil.aplicar(); document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')); window.ventoCierreClave.pintar(); const m = document.querySelector('nav button[data-view="mesas"]'); m && m.click(); });
+    await p.waitForTimeout(300);
+    chk('8. Ajustes → Negocio: «🔒 Clave para cerrar la caja» con 3 opciones (sin clave marcado)', await D(() => { const b = document.getElementById('cierreClaveBox'); return !!b && b.querySelectorAll('input[name="ccModo"]').length === 3 && b.querySelector('input[value="no"]').checked; }));
+    await D(() => { document.querySelector('#cierreClaveBox input[value="propia"]').click(); document.getElementById('ccIn').value = '4321'; document.getElementById('ccGo').click(); });
+    await p.waitForTimeout(800);
+    const cc = await D(() => ({ c: window.ventoRoles.permisos().cierre, todo: JSON.stringify(data), modo: window.ventoCierreClave.modo() }));
+    chk('8. Una clave solo para cerrar la caja: se guarda solo su huella (no «4321»)', cc.modo === 'propia' && cc.c.h && cc.c.h.length === 64 && !cc.todo.includes('4321'), cc.c);
+    const cerrarCon = async (clave) => {
+      await p.click('#closeDayTopBtn'); await p.waitForSelector('#confirmOverlay.show', { timeout: 4000 }); await p.click('#confirmOkBtn');
+      await p.waitForSelector('#vfOv.show #ccClave', { timeout: 4000 });
+      if(clave === null){ await p.click('#ccNo'); await p.waitForTimeout(300); return; }
+      for(const k of [].concat(clave)){ await p.fill('#ccClave', k); await p.click('#ccSi'); await p.waitForTimeout(400); }
+    };
+    let n0 = await D(() => data.closures.length);
+    await venta(4000, 'efectivo');
+    await cerrarCon(null);
+    chk('8. Después de la pregunta pide la clave; «Cancelar» no cierra', await D(() => data.closures.length) === n0);
+    await cerrarCon('1111');
+    chk('8. Clave equivocada: «Clave equivocada (4 intentos más)» y no cierra', /Clave equivocada \(4 intentos más\)/.test(await D(() => document.getElementById('ccErr').textContent)) && await D(() => data.closures.length) === n0);
+    await p.fill('#ccClave', '4321'); await p.click('#ccSi'); await sinContar();
+    chk('8. Con la clave correcta cierra la caja', await D(() => data.closures.length) === n0 + 1);
+    await D(() => document.getElementById('closureOverlay').classList.remove('show'));
+    await venta(4000, 'efectivo'); n0 = await D(() => data.closures.length);
+    await D(() => closeCashRegister({ auto: true })); await p.waitForTimeout(300);
+    chk('8. El cierre automático programado no pide la clave', await D(() => data.closures.length) === n0 + 1 && !(await D(() => (document.getElementById('vfOv') || { classList: { contains: () => false } }).classList.contains('show'))));
+    await D(() => document.getElementById('closureOverlay').classList.remove('show'));
+    // La contraseña de quien usa Vento
+    await D(async () => { await authAddUser('cajera1', 'secreta1', 'admin'); authUser = 'cajera1'; document.querySelector('#cierreClaveBox input[value="usuario"]').click(); });
+    await p.waitForTimeout(300);
+    chk('8. «La contraseña de quien está usando Vento» queda activa', await D(() => window.ventoCierreClave.modo() === 'usuario'));
+    await venta(4000, 'efectivo'); n0 = await D(() => data.closures.length);
+    await cerrarCon('4321');
+    chk('8. …la clave propia de antes ya no sirve', await D(() => data.closures.length) === n0 && /Clave equivocada/.test(await D(() => document.getElementById('ccErr').textContent)));
+    await p.fill('#ccClave', 'secreta1'); await p.click('#ccSi'); await sinContar();
+    chk('8. …y con la contraseña del usuario (la misma con la que entra) cierra', await D(() => data.closures.length) === n0 + 1);
+    await D(() => { document.getElementById('closureOverlay').classList.remove('show'); document.querySelector('#cierreClaveBox input[value="no"]').click(); });
+    await p.waitForTimeout(300);
+    await venta(4000, 'efectivo'); n0 = await D(() => data.closures.length);
+    await p.click('#closeDayTopBtn'); await p.waitForSelector('#confirmOverlay.show', { timeout: 4000 }); await p.click('#confirmOkBtn'); await sinContar();
+    chk('8. «Sin clave»: vuelve a cerrar solo con la pregunta', await D(() => window.ventoCierreClave.modo() === 'no' && !window.ventoRoles.permisos().cierre) && await D(() => data.closures.length) === n0 + 1);
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.stack || e)); }
   chk('Sin errores de página', !errs.length, errs);
   await b.close();
