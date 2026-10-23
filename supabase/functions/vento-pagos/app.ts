@@ -28,7 +28,7 @@ import * as G from "./google.ts";
 import * as F from "./dian.ts";
 import { type Env, ErrorVento, log, sha256 } from "./util.ts";
 
-export const VERSION = "1.21.0";
+export const VERSION = "1.22.0";
 const SITIO = "https://cristhianlujan45-blip.github.io/cuentas/";
 
 type Pago = { id: string; negocio_id?: string; referencia: string; proveedor: string; metodo: string; canal: string; monto: number;
@@ -801,6 +801,8 @@ export async function manejar(req: Request, env: Env): Promise<Response> {
     if (req.method !== "POST") return json(405, { ok: false, error: "metodo" }, cors);
     if (r0 === "sync" && env.VENTO_CRON_SECRETO && req.headers.get("x-vento-cron") === env.VENTO_CRON_SECRETO) {
       const db = servidor(env);
+      // Deja la dirección y el secreto para que la base de datos dispare este repaso cada 5 min (pg_cron + pg_net, 1.53.1).
+      try { if (env.SUPABASE_URL) await db.rpc("srv_repaso_config", { p_url: env.SUPABASE_URL, p_secreto: env.VENTO_CRON_SECRETO }); } catch (e) { log("warn", "repaso_config", { error: e instanceof Error ? e.message : String(e) }); }
       const r = await sincronizar(env, db, null);
       let dianR: Record<string, number> | null = null;
       try { dianR = await repasarDian(env, db, null); } catch (e) { log("warn", "dian_repaso", { error: e instanceof Error ? e.message : String(e) }); }

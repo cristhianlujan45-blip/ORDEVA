@@ -96,7 +96,7 @@ jobs:
       - uses: supabase/setup-cli@v1
         if: steps.listo.outputs.ok == 'true'
         with:
-          version: latest
+          version: 2.121.0   # fija (1.53.1): la última que desplegó bien; «latest» podía romper el despliegue sin aviso
 
       - name: Enlazar el proyecto
         if: steps.listo.outputs.ok == 'true'
@@ -262,6 +262,16 @@ jobs:
             sleep 10
           done
           echo "::warning title=Suscripciones::La función se desplegó pero no responde todavía."
+
+      # 1.53.1: un primer repaso autorizado deja en el servidor la dirección y el secreto para que Supabase dispare los
+      # repasos solo, cada 5 minutos (pg_cron + pg_net). Así no dependen de que GitHub corra el «schedule» a tiempo.
+      - name: Repasos automáticos dentro de Supabase
+        if: steps.listo.outputs.ok == 'true'
+        continue-on-error: true
+        run: |
+          CRON=$(printf '%s' "vento-cron:${PROJECT_REF}:${SUPABASE_DB_PASSWORD}" | sha256sum | cut -c1-48)
+          R=$(curl -fsS -X POST -H "x-vento-cron: $CRON" -H "content-type: application/json" -d '{}' "https://${PROJECT_REF}.supabase.co/functions/v1/vento-pagos/sync") || { echo "::warning title=Repasos::El servidor no respondió; se programan en el próximo repaso."; exit 0; }
+          echo "Primer repaso: $R"
 
       - name: Conectar todos los celulares (nube/config.js)
         if: steps.listo.outputs.ok == 'true'
