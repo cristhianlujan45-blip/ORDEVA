@@ -15,6 +15,8 @@ public class AvisoPagoPrueba {
             {"Nequi Recibiste $1.500.000 de ANA", "1500000"},
             {"Bancolombia Recibiste 30.000 pesos de LUIS", "30000"},
             {"¡Le pasaron plata! Le enviaron $200,00 a su DaviPlata", "200"},
+            {"Nequi | Recarga realizada | Recarga desde Bancolombia por $71.800,00", "71800"},   // 1.57.1 (foto del dueño)
+            {"Nequi | Nequi | Recarga Desde Bancolombia $71.800,00", "71800"},
         };
         for (String[] r : recibidos) {
             chk("Plata recibida: «" + r[0] + "»", AvisoPago.esRecibido(r[0]), r[0]);
