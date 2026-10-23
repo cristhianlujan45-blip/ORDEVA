@@ -19,3 +19,18 @@ que reenvía a `/ORDEVA/…` con los mismos datos (`?mesa=…`, `#…`).
 
 **No** cree un repositorio llamado «cuentas»: rompería la redirección de GitHub que usan las actualizaciones de las
 apps.
+
+## Los QR que pasan por Netlify (joyful-basbousa-0bc49b.netlify.app)
+Revisado el 23 de octubre de 2026: Netlify **no** está sirviendo el reenvío de `netlify-qr/`. Sirve una copia vieja
+de la página «Mi mesa» que manda los pedidos por **ntfy.sh**, que ya no funciona. Los pedidos de los QR que apuntan a
+Netlify no llegan desde antes del cambio de nombre.
+
+Para arreglarlo (1 minuto):
+1. Descargue la carpeta `netlify-qr` del repositorio. Tiene `index.html` y `_redirects`, que ya apuntan a
+   `…/ORDEVA/`.
+2. En Netlify: el sitio → **Deploys** → arrastre la carpeta `netlify-qr` a «Drag and drop your site output folder
+   here».
+3. Pruebe: `https://joyful-basbousa-0bc49b.netlify.app/?mesa=1` debe abrir `…github.io/ORDEVA/pedido.html?mesa=1`.
+
+Si el sitio de Netlify está conectado a GitHub, también sirve **Deploys → Trigger deploy**. Revise que la rama de
+producción sea `claude/precio-margen-productos-tabla-mioclt` y la carpeta `netlify-qr`.

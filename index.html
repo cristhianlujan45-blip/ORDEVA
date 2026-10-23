@@ -21567,7 +21567,8 @@ const qCfg=()=>{
   // Los pedidos van directo a GitHub: si quedó guardada la dirección de Netlify (la de los QR impresos), los
   // links que arma Vento (pedido, WhatsApp, domicilios, ver/imprimir QR) pasan a GitHub. El canal y el código
   // de cada mesa NO cambian, así que los QR ya pegados siguen sirviendo igual.
-  if(/\.github\.io$/.test(location.hostname)&&c.url&&/netlify\.app/i.test(c.url)){c.urlImpreso=c.url;c.url=location.origin+location.pathname.replace(/[^/]*$/,'')+'pedido.html';SS('vito_qr',c);}
+  // 1.55.2: también la dirección vieja de este mismo sitio (…/cuentas/ → …/ORDEVA/, el repositorio cambió de nombre).
+  if(/\.github\.io$/.test(location.hostname)&&c.url&&(/netlify\.app/i.test(c.url)||qOtraCarpeta(c.url))){c.urlImpreso=c.url;c.url=location.origin+location.pathname.replace(/[^/]*$/,'')+'pedido.html';SS('vito_qr',c);}
   return c;
 };
 /* Canales de pedidos del negocio. Cada celular tenía su propio canal guardado SOLO en ese celular: si se
@@ -21660,9 +21661,13 @@ function qrFijoDesdeLinks(texto){
   });
   return res;
 }
+// ¿La dirección es de este mismo sitio pero de otra carpeta? (…github.io/cuentas/ con la app abierta en …github.io/ORDEVA/)
+function qOtraCarpeta(u){
+  try{ const x=new URL(u,location.href), base=location.pathname.replace(/[^/]*$/,''); return x.hostname===location.hostname&&base.length>1&&!x.pathname.startsWith(base); }catch(e){ return false; }
+}
 function qrFijoAplicar(r){
   const c=qCfg();
-  c.topic=r.c;if(r.url){if(/\.github\.io$/.test(location.hostname)&&!/\.github\.io$/i.test(new URL(r.url,location.href).hostname)){c.urlImpreso=r.url;c.url=location.origin+location.pathname.replace(/[^/]*$/,'')+'pedido.html';}else c.url=r.url;}if(r.wa)c.wa=r.wa;c.v=Object.assign({},c.v||{},r.v);c.fijo=true;
+  c.topic=r.c;if(r.url){if(/\.github\.io$/.test(location.hostname)&&(!/\.github\.io$/i.test(new URL(r.url,location.href).hostname)||qOtraCarpeta(r.url))){c.urlImpreso=r.url;c.url=location.origin+location.pathname.replace(/[^/]*$/,'')+'pedido.html';}else c.url=r.url;}if(r.wa)c.wa=r.wa;c.v=Object.assign({},c.v||{},r.v);c.fijo=true;
   SS('vito_qr',c);qrFijoSync();
   try{$('qrUrl').value=c.url;$('qrWa').value=c.wa;}catch(e){}
   try{conectar();}catch(e){}
@@ -26001,7 +26006,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-23 · v1.55.2';
+const MESORA_VERSION = '2026-10-23 · v1.55.3';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'Vento · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 /* 🔄 La app Android se actualiza SOLA (Actualizador): revisa cada 3 h, baja la versión nueva y la instala cuando no se

@@ -40,3 +40,13 @@
 - `javaavisos`: 224.
 - `daviplata`: 102 (servidor 1.23.2).
 - `node --check pc/main.js`: sin errores.
+
+## 1.55.3
+- **La dirección de la página de pedidos guardada en el negocio** (`c.url`, el QR fijo) se corrige sola a
+  `…/ORDEVA/pedido.html` al abrir la app, y también cuando llega desde otro celular. Antes se corregía solo al abrir
+  el panel de QR.
+  - Los links que arma la app (pedido, WhatsApp, domicilios, QR nuevos) ya no salen con `…/cuentas/`.
+  - El canal y los códigos de cada mesa no cambian.
+- **Hallazgo:** el sitio de Netlify de los QR sirve una copia vieja con ntfy.sh, que no funciona. Los pasos para
+  arreglarlo están en `puente/sitio-reenvio/LEEME.md`.
+- **Pruebas:** `cajaqr` 13, `seguridadqr` 6, `qrprivado` 9 y `canalvivo` 17.
