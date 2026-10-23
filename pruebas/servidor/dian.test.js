@@ -77,7 +77,7 @@ async function pruebas(sb) {
   chk('El dueño la prende: NIT sin puntos, prefijo en mayúscula y consecutivo = inicio del rango', r.st === 200 && r.j.config.activo === true && r.j.config.nit === '901091403' &&
     r.j.config.pos_prefijo === 'FPOS' && Number(r.j.config.pos_siguiente) === 1 && r.j.config.conectado === false && !('client_uuid' in r.j.config), r.j.config);
   r = await api('/dian/config', { negocio: NEG, accion: 'probar' }, dueno.token);
-  chk('«Probar conexión»: inicia sesión en MATIAS y avisa que falta conectar la empresa', r.st === 200 && r.j.prueba.ok === true && /Vento Admin/.test(r.j.prueba.mensaje) && M.logins === 1, r.j.prueba);
+  chk('«Probar conexión»: inicia sesión en MATIAS y avisa que falta conectar la empresa', r.st === 200 && r.j.prueba.ok === true && /ORDEVA Admin/.test(r.j.prueba.mensaje) && M.logins === 1, r.j.prueba);
   const tokFila = await uno("select valor from servidor_config where clave = 'matias_token'");
   chk('El token de MATIAS queda CIFRADO en la base (no en texto plano)', tokFila && /^v1:/.test(tokFila.valor.cifrado) && !JSON.stringify(tokFila.valor).includes('jwt-'), tokFila);
 
