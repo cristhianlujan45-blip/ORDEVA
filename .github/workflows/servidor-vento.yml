@@ -156,11 +156,11 @@ jobs:
           # 2) Opcional: correo propio (SMTP). Sin él, Supabase gratis solo manda a los correos del equipo de Supabase
           #    y con su texto de siempre (enlace). Con él: a cualquier correo y con código de 6 números.
           if [ -n "$SMTP_HOST" ] && [ -n "$SMTP_USER" ] && [ -n "$SMTP_PASS" ]; then
-            CUERPO='<h2>Vento</h2><p>Tu código para entrar o cambiar la contraseña es:</p><p style="font-size:30px;font-weight:bold;letter-spacing:6px">{{ .Token }}</p><p>O toca este enlace desde tu celular: <a href="{{ .ConfirmationURL }}">cambiar mi contraseña</a></p><p>Vence en 15 minutos. Si no lo pediste, ignora este correo.</p>'
+            CUERPO='<h2>ORDEVA</h2><p>Tu código para entrar o cambiar la contraseña es:</p><p style="font-size:30px;font-weight:bold;letter-spacing:6px">{{ .Token }}</p><p>O toca este enlace desde tu celular: <a href="{{ .ConfirmationURL }}">cambiar mi contraseña</a></p><p>Vence en 15 minutos. Si no lo pediste, ignora este correo.</p>'
             jq -n --arg h "$SMTP_HOST" --arg p "${SMTP_PORT:-587}" --arg u "$SMTP_USER" --arg w "$SMTP_PASS" --arg f "${SMTP_FROM:-$SMTP_USER}" --arg c "$CUERPO" \
-              '{external_email_enabled:true, smtp_host:$h, smtp_port:$p, smtp_user:$u, smtp_pass:$w, smtp_admin_email:$f, smtp_sender_name:"Vento", rate_limit_email_sent:30,
-                mailer_subjects_magic_link:"Tu código de Vento", mailer_templates_magic_link_content:$c, mailer_subjects_confirmation:"Tu código de Vento", mailer_templates_confirmation_content:$c,
-                mailer_subjects_recovery:"Cambiar tu contraseña de Vento", mailer_templates_recovery_content:$c, mailer_otp_exp:900, mailer_otp_length:6}' > /tmp/a2.json
+              '{external_email_enabled:true, smtp_host:$h, smtp_port:$p, smtp_user:$u, smtp_pass:$w, smtp_admin_email:$f, smtp_sender_name:"ORDEVA", rate_limit_email_sent:30,
+                mailer_subjects_magic_link:"Tu código de ORDEVA", mailer_templates_magic_link_content:$c, mailer_subjects_confirmation:"Tu código de ORDEVA", mailer_templates_confirmation_content:$c,
+                mailer_subjects_recovery:"Cambiar tu contraseña de ORDEVA", mailer_templates_recovery_content:$c, mailer_otp_exp:900, mailer_otp_length:6}' > /tmp/a2.json
             C=$(curl -s -o /tmp/a2.out -w '%{http_code}' -X PATCH "${H[@]}" "$API" --data @/tmp/a2.json); echo "Correo propio (SMTP): $C"
             [ "$C" -ge 200 ] && [ "$C" -lt 300 ] && echo "✅ Correo propio configurado: llegan a cualquier correo y con código" || echo "::warning title=Correo propio::No se pudo configurar el SMTP ($C): $(head -c 300 /tmp/a2.out)"
           else
@@ -185,7 +185,7 @@ jobs:
           API="https://api.supabase.com/v1/projects/${PROJECT_REF}/config/auth"
           jq -n --arg s "$TW_SID" --arg t "$TW_TOKEN" --arg m "$TW_SERVICIO" \
             '{external_phone_enabled:true, sms_provider:"twilio", sms_twilio_account_sid:$s, sms_twilio_auth_token:$t, sms_twilio_message_service_sid:$m,
-              sms_template:"Tu código de Vento es {{ .Code }}. Vence en 10 minutos.", sms_otp_exp:600, sms_otp_length:6}' > /tmp/tw.json
+              sms_template:"Tu código de ORDEVA es {{ .Code }}. Vence en 10 minutos.", sms_otp_exp:600, sms_otp_length:6}' > /tmp/tw.json
           C=$(curl -s -o /tmp/tw.out -w '%{http_code}' -X PATCH -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" -H 'Content-Type: application/json' "$API" --data @/tmp/tw.json)
           rm -f /tmp/tw.json
           [ "$C" -ge 200 ] && [ "$C" -lt 300 ] && echo "✅ Entrar con el celular activado (código por SMS)." || echo "::warning title=Entrar con el celular::No se pudo activar ($C): $(head -c 300 /tmp/tw.out)"
