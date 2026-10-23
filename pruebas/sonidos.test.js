@@ -73,7 +73,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
  chk('ventoSonidos.lote con 10 agregados: UN sonido', JSON.stringify(nuevos(a,d))==='["add"]', JSON.stringify(nuevos(a,d)));
  // Pedidos del QR: no suenan
  a=await S();
- r=await p.evaluate(()=>{ const x=window.vitoPedidos.entrante({id:'qrprueba1',mesa:4,items:[{n:'Águila',q:2},{n:'Poker',q:1}]},'qr'); return (data.tables[4].items||[]).reduce((s,i)=>s+i.qty,0); });
+ r=await p.evaluate(()=>{ const x=window.vitoPedidos.entrante({id:'qrprueba1',mesa:4,vm:window.vitoCanalPrueba.vTopic(4),items:[{n:'Águila',q:2},{n:'Poker',q:1}]},'qr'); return (data.tables[4].items||[]).reduce((s,i)=>s+i.qty,0); });
  await pausa(); d=await S();
  chk('Pedido del QR: entra a la cuenta y NO suena', r===3 && nuevos(a,d).length===0, r+' '+JSON.stringify(nuevos(a,d)));
 

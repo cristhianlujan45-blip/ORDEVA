@@ -9049,6 +9049,7 @@ function renderCocina(){
     const tarde = p.estado !== 'listo' && min(p) >= 15;
     return '<div class="kds-ticket e-' + p.estado + (tarde ? ' tarde' : '') + '" data-pid="' + invEsc(p.id) + '">' +
       '<div class="kds-ticket-h">' + invEsc(window.vitoGrupos ? window.vitoGrupos.etiquetaDe(p.mesa) : tableLabel(p.mesa)) + (window.vitoGrupos && window.vitoGrupos.de(p.mesa) ? ' <small>(de ' + invEsc(tableLabel(p.mesa)) + ')</small>' : '') + '</div>' +
+      (p.sinCodigo && p.estado === 'nuevo' ? '<div class="kds-nota" style="border-color:#f59e0b">⚠️ Sin el código del QR de la mesa: confirma con la mesa antes de aceptarlo</div>' : '') +
       '<div class="kds-meta"><span>' + (p.origen === 'qr' ? '📱 QR' : p.origen === 'whatsapp' ? '💬 WhatsApp' : '🧑‍🍳 ' + invEsc(String(p.origen || '').replace(/^mesero:/, ''))) + '</span><b>' + (min(p) ? 'hace ' + min(p) + ' min' : 'ahora') + '</b></div>' +
       '<div class="kds-items">' + p.items.map(it => '<div class="kds-item">' + it.qty + '× ' + invEsc(it.name) + (it.ok ? '' : ' ⚠️') + '</div>').join('') + '</div>' +
       (p.nota ? '<div class="kds-nota">📝 ' + invEsc(p.nota) + '</div>' : '') +
@@ -21853,7 +21854,17 @@ function procesarPrep(txt){
   if(!o||o.t==='prep')return;                                   // eco de lo que publicamos
   SS('vito_prep_visto',Date.now());                              // hay una pantalla de preparación abierta
   if(o.k==='hola'){prepPublicar(true);return;}
-  if(o.k==='estado'&&o.id&&PEDIDO_EST[o.e]){pedidoCambiar(String(o.id),o.e);try{renderCocina();}catch(e){}}
+  if(o.k==='estado'&&o.id&&PEDIDO_EST[o.e]){
+    // 1.56.0 (auditoría ORDEVA R4): cancelar desde la pantalla de preparación le quita los productos a la cuenta. Queda en
+    // la actividad del equipo y se avisa en este celular (si alguien con el link lo hace sin razón, se ve).
+    const ant=pedidosLista().find(x=>x.id===String(o.id));
+    if(o.e==='cancelado'&&ant&&ant.estado!=='cancelado'){
+      const det=tableLabel(ant.mesa)+': '+ant.items.map(i=>i.qty+' '+i.name).join(', ').slice(0,160);
+      try{window.ventoAuditar&&window.ventoAuditar('pedido cancelado desde '+prepNombre(),det);}catch(e){}
+      try{showToast('✕ '+prepNombre()+' canceló el pedido de '+det,8000);}catch(e){}
+    }
+    pedidoCambiar(String(o.id),o.e);try{renderCocina();}catch(e){}
+  }
 }
 function iniPrep(){
   const on=$('prepOn');if(!on)return;
@@ -21883,6 +21894,8 @@ function iniPrep(){
   pintarVista();
   pintar();
 }
+// Lo que la app de meseros NO puede pedir (texto ya normalizado con normVoiceText: minúsculas y sin tildes).
+const MESERO_NO=/\b(borra\w*|elimina\w*|reinicia\w*|resetea\w*|vacia\w*|limpia\w*|cierra\w* (la )?caja|cerrar (la )?caja|cierre( de caja)?|abre (la )?caja|precio\w*|inventario|stock|configura\w*|ajustes?|recarga\w* (la )?(app|aplicacion|pagina)|contrasena|clave|usuario\w*|suscripcion|plan|factura\w*|dian|devolucion\w*|descuento\w*|libera\w*|anula\w*|cambia\w* (el )?nombre|producto nuevo|nuevo producto|crea\w* (un |el )?producto|agrega\w* (un |el )?producto|laya|vento|bento|respaldo\w*|copia de seguridad|sede\w*|negocio)\b/;
 async function procesarMesero(txt){
   let o;try{o=JSON.parse(txt);}catch(e){return;}
   if(!o||o.e)return;                                    // mensajes de estado propios
@@ -21891,6 +21904,14 @@ async function procesarMesero(txt){
   if(o.k==='hola'){mPublicar(true);return;}
   if(o.k!=='voz'||!o.texto)return;
   const texto=String(o.texto).slice(0,400);
+  // 1.56.0 (seguridad, auditoría ORDEVA R3): desde la app de meseros se anotan pedidos (agregar, quitar, misma ronda, crear
+  // mesa, pedir la cuenta), pero NO comandos que borran, reinician, cierran la caja o cambian productos, precios, inventario
+  // o la configuración: esos solo en el celular principal. (Quien tenga el link de mesero no puede manejar todo el negocio.)
+  if(MESERO_NO.test(normVoiceText(texto))){
+    try{window.ventoAuditar&&window.ventoAuditar('comando de mesero bloqueado',quien+': '+texto.slice(0,160));}catch(e){}
+    try{await fetch('https://canal.vento.local/'+mTopic()+'s',{method:'POST',body:JSON.stringify({r:o.id,ok:['⛔ Eso solo se hace en el celular principal del negocio.'],t:Date.now()})});}catch(e){}
+    return;
+  }
   // Se captura lo que la app avisaría (para devolvérselo al mesero) y no se habla en voz alta aquí.
   const capt=[],oT=showToast,oV=speakVoice;
   showToast=(msg,ms)=>{capt.push(String(msg));oT('🧑‍🍳 '+quien+': '+msg,ms);};
@@ -22044,6 +22065,29 @@ function procesar(txt){
 const PEDIDO_EST={nuevo:'Nuevo',recibido:'Recibido',preparacion:'En preparación',listo:'Listo',entregado:'Entregado',cancelado:'Cancelado'};
 const pedidosLista=()=>{if(typeof data==='undefined'||!data)return[];if(!Array.isArray(data.pedidos))data.pedidos=[];return data.pedidos;};
 const pedidosAuto=()=>!(data&&data.pedidosAuto===false);        // por defecto el pedido entra solo a la cuenta
+// Los códigos secretos de la mesa que van en sus QR (los que ya existen; no se inventa uno nuevo aquí): los de este
+// celular, los de los QR fijados y los que guardaron los demás celulares del negocio en data.qrCodigos (1.56.0: así un
+// pedido del QR se reconoce en todos los celulares, no solo en el que generó los QR).
+function qMesaCodigos(id){
+  const l=[];
+  try{ const c=qCfg(), f=qrFijoDe(), g=(data&&data.qrCodigos&&data.qrCodigos[id])||[];
+    [c.v&&c.v[id], f&&f.v&&f.v[id]].concat(Array.isArray(g)?g:[g]).forEach(x=>{ if(x&&l.indexOf(String(x))<0) l.push(String(x)); }); }catch(e){}
+  return l;
+}
+function qMesaCodigo(id){ return qMesaCodigos(id)[0]||null; }
+// Sube a los datos del negocio los códigos de mesa que tiene este celular (los de sus QR impresos).
+function qCodigosCompartir(){
+  try{
+    if(typeof data==='undefined'||!data)return;
+    const c=LS('vito_qr',{}),v=Object.assign({},(qrFijoDe()||{}).v||{},c.v||{});let cambio=false;
+    data.qrCodigos=data.qrCodigos&&typeof data.qrCodigos==='object'?data.qrCodigos:{};
+    Object.keys(v).forEach(id=>{ const k=String(v[id]||'');if(!/^\w{6,40}$/.test(k))return;
+      const a=Array.isArray(data.qrCodigos[id])?data.qrCodigos[id]:(data.qrCodigos[id]?[data.qrCodigos[id]]:[]);
+      if(a.indexOf(k)<0){a.push(k);data.qrCodigos[id]=a.slice(-4);cambio=true;} });
+    if(cambio)saveData();
+  }catch(e){}
+}
+setTimeout(qCodigosCompartir,4000);
 function asegurarMesa(id){
   id=parseInt(id,10);if(!id||id>500)return false;
   if(!data.tables[id]){data.tables[id]={items:[],people:[]};if((data.tableCount||0)<id)data.tableCount=id;try{renderMesas();}catch(e){}}
@@ -22058,6 +22102,7 @@ function pedidoPublicar(p){
 }
 function pedidoAplicar(p){
   if(p.aplicado)return;
+  asegurarMesa(p.mesa);                                          // un pedido aceptado a mano de una mesa que no estaba (1.56.0)
   const its=p.items.filter(i=>i.ok).map(i=>({productText:i.name,qty:i.qty}));
   // Pedidos del QR: no suenan aquí (ya tienen su timbre y su aviso; si llegan muchos no se llena de «tún»).
   if(its.length){const r=sinSonidoPos(()=>applyVoiceItems(p.mesa,its,'add'));p.agregados=r.added.map(a=>a.qty+' '+a.name);}
@@ -22077,7 +22122,12 @@ function pedidoEntrante(o,origen){
   const ya=pedidosLista().find(x=>x.id===id);
   if(ya){pedidoPublicar(ya);return ya;}                           // reintento del cliente: solo se le vuelve a confirmar
   const mesa=parseInt(o.mesa,10);
-  if(!mesa||!asegurarMesa(mesa))return null;
+  // 1.56.0 (seguridad, auditoría ORDEVA R1): un pedido del QR trae el código secreto de SU mesa (el del QR impreso). Sin ese
+  // código (alguien que conoce el canal y escribe un pedido para otra mesa, o un QR muy viejo) NO entra solo a la cuenta ni
+  // crea mesas: queda «🆕 Por aceptar» para que una persona lo revise.
+  const cods=origen==='qr'?qMesaCodigos(mesa):[];
+  const verificado=origen!=='qr'||(!!o.vm&&cods.indexOf(String(o.vm))>=0);
+  if(!mesa||(verificado?!asegurarMesa(mesa):(mesa<1||mesa>500)))return null;
   const items=(Array.isArray(o.items)?o.items:[]).slice(0,40).map(x=>{
     const n=String(x.n||x.name||'').slice(0,60),q=Math.max(1,Math.min(99,Math.round(Number(x.q||x.qty)||1)));
     const pr=n?pedidoProducto(n):null;
@@ -22085,10 +22135,14 @@ function pedidoEntrante(o,origen){
   }).filter(x=>x.name);
   if(!items.length)return null;
   const p={id,mesa,mesaNombre:tableLabel(mesa),items,total:items.reduce((s,i)=>s+i.qty*i.price,0),nota:String(o.nota||'').slice(0,140),
-    at:Number(o.at)||Date.now(),recibidoEn:Date.now(),estado:'nuevo',origen:origen||'qr',negocio:qCfg().topic,canal:qCanalOk(window.__canalTopic)?window.__canalTopic:qCfg().topic,hist:[{e:'nuevo',at:Date.now()}]};
+    at:Number(o.at)||Date.now(),recibidoEn:Date.now(),estado:'nuevo',origen:origen||'qr',sinCodigo:!verificado||undefined,negocio:qCfg().topic,canal:qCanalOk(window.__canalTopic)?window.__canalTopic:qCfg().topic,hist:[{e:'nuevo',at:Date.now()}]};
   pedidosLista().push(p);
   try{const g=window.vitoGrupos&&window.vitoGrupos.de(mesa);if(g&&window.ventoAuditar)window.ventoAuditar('pedido en grupo','Nuevo pedido de '+tableLabel(mesa)+' agregado al grupo '+window.vitoGrupos.etiqueta(g)+': '+items.map(i=>i.qty+' '+i.name).join(', '),[mesa]);}catch(e){}
-  if(pedidosAuto()){pedidoAplicar(p);p.estado='recibido';p.hist.push({e:'recibido',at:Date.now()});}
+  if(pedidosAuto()&&verificado){pedidoAplicar(p);p.estado='recibido';p.hist.push({e:'recibido',at:Date.now()});}
+  if(!verificado){
+    try{window.ventoAuditar&&window.ventoAuditar('pedido sin código de mesa','Pedido para '+tableLabel(mesa)+' sin el código de su QR: quedó por aceptar ('+items.map(i=>i.qty+' '+i.name).join(', ').slice(0,200)+')');}catch(e){}
+    setTimeout(()=>{try{showToast('⚠️ Pedido para '+tableLabel(mesa)+' sin el código de su QR: revísalo antes de aceptarlo.',9000);}catch(e){}},400);
+  }
   pedidosGuardar();pedidoPublicar(p);
   const txt=items.map(i=>i.qty+' '+i.name+(i.ok?'':' ⚠️')).join(', ');
   try{window.vitoLogNotif&&window.vitoLogNotif(p.estado==='nuevo'?'recibido':'enviado',mesa,items.map(i=>({productText:i.name,qty:i.qty})),id);}catch(e){}
@@ -22119,6 +22173,8 @@ function pedidoRegistrarAplicado(mesa,added,origen){
   pedidosLista().push(p);pedidosGuardar();return p;
 }
 window.vitoPedidos={lista:pedidosLista,entrante:pedidoEntrante,cambiar:pedidoCambiar,registrarAplicado:pedidoRegistrarAplicado,EST:PEDIDO_EST,auto:pedidosAuto};
+// Para las pruebas de seguridad de los canales (pruebas/canalseguro.test.js): lo que llega por cada canal.
+window.vitoCanalPrueba={procesar:procesar,procesarMesero:procesarMesero,procesarPrep:procesarPrep,vTopic:vTopic,qMesaCodigo:qMesaCodigo};
 // Compatibilidad con la campana y la pantalla vieja: aceptar = recibido; rechazar = cancelado.
 window.vitoDespacharPedido=id=>pedidoCambiar(id,'recibido');
 window.vitoRechazarPedido=id=>pedidoCambiar(id,'cancelado');
@@ -23510,8 +23566,9 @@ function vTopic(id){
   const c=qCfg();c.v=c.v||{};
   if(!c.v[id]){
     const f=qrFijoDe();
-    c.v[id]=(f&&f.v&&f.v[id])||('vb'+Array.from(crypto.getRandomValues(new Uint8Array(12)),b=>(b%36).toString(36)).join(''));
-    SS('vito_qr',c);qrFijoSync();
+    const g=(typeof data!=='undefined'&&data&&data.qrCodigos&&data.qrCodigos[id])||null;
+    c.v[id]=(f&&f.v&&f.v[id])||(Array.isArray(g)?g[0]:g)||('vb'+Array.from(crypto.getRandomValues(new Uint8Array(12)),b=>(b%36).toString(36)).join(''));
+    SS('vito_qr',c);qrFijoSync();qCodigosCompartir();
   }
   return c.v[id];
 }
@@ -26006,7 +26063,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-23 · v1.55.5';
+const MESORA_VERSION = '2026-10-23 · v1.56.0';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'Vento · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 /* 🔄 La app Android se actualiza SOLA (Actualizador): revisa cada 3 h, baja la versión nueva y la instala cuando no se

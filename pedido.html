@@ -1343,9 +1343,9 @@ $('b').onclick=async()=>{
     if(modo=='p'){
       const precioDe=n=>{const k=norm(n);const x=cat&&Array.isArray(cat.p)?cat.p.find(r=>norm(r[0])===k):null;return x?Math.round(+x[1]||0):0;};
       const items=env.map(l=>({n:l.n,q:l.q,p:precioDe(l.n)}));
-      cuerpo=JSON.stringify({t:'pedido',v:2,id,mesa:+mesa,items,total:items.reduce((a,x)=>a+x.q*x.p,0),at:Date.now(),txt:ultimo.slice(0,300)});
+      cuerpo=JSON.stringify({t:'pedido',v:2,id,mesa:+mesa,vm:v,items,total:items.reduce((a,x)=>a+x.q*x.p,0),at:Date.now(),txt:ultimo.slice(0,300)});
       misPedidosAgregar({id,txt:txt.slice(0,120),at:Date.now(),e:'enviado',body:cuerpo});
-    } else{cuerpo=JSON.stringify({t:'cancion',v:2,id,mesa:+mesa,s:txt.slice(0,120),at:Date.now()});jset(MISC,jget(MISC,[]).concat(id).slice(-12));escucharEstados(true)}
+    } else{cuerpo=JSON.stringify({t:'cancion',v:2,id,mesa:+mesa,vm:v,s:txt.slice(0,120),at:Date.now()});jset(MISC,jget(MISC,[]).concat(id).slice(-12));escucharEstados(true)}
   }
   if(c){
     if(cuerpo.length>3800||ultimo.length>(dom?500:2000))return setMsg(()=>t('pedidoLargo'),'err');

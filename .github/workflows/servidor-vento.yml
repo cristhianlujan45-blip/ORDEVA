@@ -70,6 +70,20 @@ jobs:
           fi
           echo "Migraciones a revisar: ${NUEVAS:-ninguna nueva}"
           NODE_PATH="$PWD/pruebas/node_modules" node pruebas/servidor/revisar-migraciones.js $NUEVAS
+      # 1.56.0 (auditoría ORDEVA R5): las pruebas del servidor contra PostgreSQL REAL (pagos, DIAN, permisos, canales,
+      # respaldos, proyección, suscripciones…) corren ANTES de tocar producción. Si una falla, no se despliega.
+      - name: Pruebas del servidor (PostgreSQL real)
+        env:
+          VENTO_PG_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres
+        run: |
+          npm install --prefix pruebas --no-save --no-audit --no-fund pg@8 @supabase/supabase-js@2.117.2 >/dev/null
+          mal=0
+          for t in pruebas/servidor/*.test.js; do
+            echo "::group::$(basename "$t")"
+            if NODE_PATH="$PWD/pruebas/node_modules" timeout 900 node "$t"; then echo "✅ $(basename "$t")"; else echo "::error title=Prueba del servidor::Falló $(basename "$t")"; mal=1; fi
+            echo "::endgroup::"
+          done
+          exit $mal
 
   desplegar:
     needs: revisar

@@ -63,7 +63,7 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
  await p.evaluate(()=>{ document.querySelector('.vito-campana-menu').style.display='none'; data.products=[{id:'ag',name:'Águila',price:4000},{id:'pa',name:'Papas',price:3000}]; data.tables={1:{items:[],people:[],payments:[]},2:{items:[],people:[],payments:[]}}; data.tableCount=2; data.pedidos=[]; localStorage.removeItem('vito_notif_log'); saveData(); renderAll(); });
  await p.click('.vito-campana'); await p.waitForTimeout(300);
  chk('Sin pedidos: la campanita lo dice («Aquí salen los que hace la gente desde la app…»)', /Aquí salen los que hace la gente desde la app/.test(await p.textContent('.vito-campana-menu')));
- await p.evaluate(()=>{ document.querySelector('.vito-campana-menu').style.display='none'; window.vitoPedidos.entrante({ id:'pq1', mesa:1, items:[{n:'Águila',q:2},{n:'Papas',q:1}], nota:'sin hielo' }, 'qr'); });
+ await p.evaluate(()=>{ document.querySelector('.vito-campana-menu').style.display='none'; window.vitoPedidos.entrante({ id:'pq1', mesa:1, vm:window.vitoCanalPrueba.vTopic(1), items:[{n:'Águila',q:2},{n:'Papas',q:1}], nota:'sin hielo' }, 'qr'); });
  await p.waitForTimeout(400); await p.click('.vito-campana'); await p.waitForTimeout(400);
  r=await p.evaluate(()=>{ const f=document.querySelector('.vito-campana-menu [data-pedido="pq1"]'); return { t: f?f.textContent:'', curso: /En curso \(1\)/.test(document.querySelector('.vito-campana-menu').textContent), badge: document.querySelector('.vito-campana-badge').textContent }; });
  chk('Pedido desde la app: sale «En curso» con la mesa, lo que pidió, la nota y «📱 App»', r.curso && /Mesa 1/.test(r.t) && /2 Águila/.test(r.t) && /1 Papas/.test(r.t) && /sin hielo/.test(r.t) && /📱 App/.test(r.t), r);

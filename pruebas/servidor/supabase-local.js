@@ -152,12 +152,12 @@ async function iniciar(opts = {}) {
     const rol = ['anon', 'authenticated', 'service_role'].includes(c.role) ? c.role : 'anon';
     return { rol, claims: c };
   }
-  async function enTransaccion(rol, claims, fn) {
+  async function enTransaccion(rol, claims, fn, headers) {
     const c = await pool.connect();
     try {
       await c.query('begin');
-      await c.query("select set_config('role', $1, true), set_config('request.jwt.claims', $2, true), set_config('request.jwt.claim.sub', $3, true), set_config('request.jwt.claim.role', $1, true)",
-        [rol, JSON.stringify(claims || {}), (claims && claims.sub) || '']);
+      await c.query("select set_config('role', $1, true), set_config('request.jwt.claims', $2, true), set_config('request.jwt.claim.sub', $3, true), set_config('request.jwt.claim.role', $1, true), set_config('request.headers', $4, true)",
+        [rol, JSON.stringify(claims || {}), (claims && claims.sub) || '', JSON.stringify(headers || {})]);   // request.headers: como PostgREST (x-forwarded-for…)
       const r = await fn(c);
       await c.query('commit');
       return r;
@@ -215,7 +215,7 @@ async function iniciar(opts = {}) {
     if (typeof v === 'object' && !Array.isArray(v)) return JSON.stringify(v);
     return v;
   }
-  async function rpc(fn, args, rol, claims) {
+  async function rpc(fn, args, rol, claims, headers) {
     if (!IDENT.test(fn)) throw Object.assign(new Error('Función inválida'), { code: 'PGRST202', status: 404 });
     const llaves = Object.keys(args || {});
     const opciones = await firmaDe(fn);
@@ -236,7 +236,7 @@ async function iniciar(opts = {}) {
       if (f.filas) { const r = await c.query('select * from ' + llamada, valores); return r.rows[0] || null; }
       const r = await c.query('select ' + llamada + ' as r', valores);
       return f.vacia || !r.rows[0] ? null : r.rows[0].r;
-    });
+    }, headers);
   }
 
   // ----- Tablas (GET/POST/PATCH/DELETE simples) -----
@@ -551,7 +551,7 @@ async function iniciar(opts = {}) {
       const mrpc = /^\/rest\/v1\/rpc\/([^/]+)$/.exec(u.pathname);
       if (mrpc) {
         const args = req.method === 'GET' ? Object.fromEntries(u.searchParams) : json();
-        const r = await rpc(mrpc[1], args, who.rol, who.claims);
+        const r = await rpc(mrpc[1], args, who.rol, who.claims, req.headers);
         return responder(res, req, 200, r === undefined ? null : r);
       }
       const mt = /^\/rest\/v1\/([^/]+)$/.exec(u.pathname);

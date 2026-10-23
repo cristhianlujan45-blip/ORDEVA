@@ -1,0 +1,62 @@
+# Pruebas de la app en un navegador real (Chromium sin ventana) con el servidor de pruebas sobre PostgreSQL real.
+#  • En cada publicación de la rama principal que cambia la app: las pruebas CRÍTICAS (pedidos y QR seguros, pagos, caja,
+#    recetas, entrar y recuperar la cuenta…). Si una falla, queda en rojo en GitHub Actions para revisarla de inmediato.
+#  • A mano (Actions → «Pruebas de la app» → Run workflow, «todas»): la batería completa (más de una hora).
+# (1.56.0, auditoría ORDEVA R5.)
+name: Pruebas de la app
+
+on:
+  workflow_dispatch:
+    inputs:
+      todas:
+        description: "Correr TODAS las pruebas (más de una hora)"
+        type: boolean
+        default: false
+  push:
+    branches: [claude/precio-margen-productos-tabla-mioclt]
+    paths:
+      - "*.html"
+      - "lib/**"
+      - "nube/**"
+      - "pruebas/*.test.js"
+      - ".github/workflows/pruebas-app.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pruebas-app-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pruebas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Instalar Playwright (Chromium) y el cliente de PostgreSQL
+        run: |
+          npm install --prefix pruebas --no-save --no-audit --no-fund playwright@1.47.2 pg@8 @supabase/supabase-js@2.117.2 >/dev/null
+          npx --prefix pruebas playwright install --with-deps chromium >/dev/null
+      - name: Pruebas
+        env:
+          VENTO_PG_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres
+          PLAYWRIGHT_PATH: ${{ github.workspace }}/pruebas/node_modules/playwright
+          TODAS: ${{ inputs.todas }}
+        run: |
+          if [ "$TODAS" = "true" ]; then
+            bash pruebas/correr.sh
+          else
+            bash pruebas/correr.sh canalseguro canalvivo qrprivado seguridadqr flujocompleto pagosaviso confirmapago cerrarcaja mejoras recetas practica facil cajapos entrar recuperacion
+          fi
