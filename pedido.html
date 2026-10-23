@@ -43,18 +43,19 @@
 </script>
 <style>html{ -webkit-text-size-adjust:100%; text-size-adjust:100%; } body{ overflow-x:clip; max-width:100vw; }.pcard .pdet{display:block;width:100%;font-size:11.5px;line-height:1.35;color:var(--ink);opacity:.62;margin-top:2px;overflow-wrap:anywhere}
 </style>
-<meta name="theme-color" content="#120d0a">
+<meta name="theme-color" content="#0c0820">
 <title>Mi mesa</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#120d0a; --card:#1c1611; --card2:#251c14;
-  --line:rgba(217,169,79,.24); --line2:rgba(243,233,216,.10);
-  --ink:#f3e9d8; --ink2:rgba(243,233,216,.68);
-  --gold:#d9a94f; --gold-hi:#f2cf86; --gold-lo:#a86f1c;
-  --serif:"Cormorant Garamond",Georgia,"Times New Roman",serif;
+  /* 1.51.0: diseño juvenil (noche con neón magenta, violeta y cian). Vento por dentro no cambia. */
+  --bg:#0c0820; --card:#171033; --card2:#21164a;
+  --line:rgba(192,132,252,.24); --line2:rgba(245,243,255,.10);
+  --ink:#f5f3ff; --ink2:rgba(237,233,254,.74);
+  --gold:#a855f7; --gold-hi:#f472b6; --gold-lo:#7c3aed; --cyan:#22d3ee;
+  --serif:Fredoka,"Baloo 2",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   --sans:Manrope,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -63,8 +64,8 @@ html{background:var(--bg)}
 body{
   margin:0;min-height:100vh;color:var(--ink);font:400 16px/1.45 var(--sans);
   background:
-    radial-gradient(120% 55% at 50% -8%,rgba(217,169,79,.22),transparent 62%),
-    radial-gradient(80% 40% at 100% 100%,rgba(168,111,28,.14),transparent 60%),
+    radial-gradient(120% 55% at 50% -8%,rgba(192,132,252,.22),transparent 62%),
+    radial-gradient(80% 40% at 100% 100%,rgba(34,211,238,.14),transparent 60%),
     var(--bg);
   background-attachment:fixed;
 }
@@ -102,8 +103,8 @@ h1{
 }
 .t svg{width:18px;height:18px;flex:none}
 .t.on{
-  color:#1a1108;background:linear-gradient(180deg,var(--gold-hi),var(--gold-lo));
-  box-shadow:0 6px 18px rgba(201,138,43,.32),inset 0 1px 0 rgba(255,255,255,.35);
+  color:#ffffff;background:linear-gradient(180deg,var(--gold-hi),var(--gold-lo));
+  box-shadow:0 6px 18px rgba(236,72,153,.32),inset 0 1px 0 rgba(255,255,255,.35);
 }
 
 /* Contenido */
@@ -115,8 +116,8 @@ h1{
   width:100%;font:inherit;font-size:17px;padding:14px 16px;border-radius:14px;
   border:1px solid var(--line);background:var(--card);color:var(--ink);outline:none;
 }
-.in::placeholder{color:rgba(243,233,216,.38)}
-.in:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(217,169,79,.18)}
+.in::placeholder{color:rgba(245,243,255,.38)}
+.in:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(192,132,252,.18)}
 .field{display:flex;gap:8px}
 .field .in{flex:1;min-width:0}
 .add{
@@ -128,15 +129,15 @@ h1{
 /* Repetir ronda */
 .ronda{
   display:flex;align-items:center;gap:14px;width:100%;margin-bottom:16px;padding:14px 16px;text-align:left;
-  border-radius:20px;border:1px solid rgba(217,169,79,.55);color:var(--ink);
-  background:linear-gradient(135deg,rgba(217,169,79,.18),rgba(217,169,79,.04)),var(--card);
+  border-radius:20px;border:1px solid rgba(192,132,252,.55);color:var(--ink);
+  background:linear-gradient(135deg,rgba(192,132,252,.18),rgba(192,132,252,.04)),var(--card);
   box-shadow:0 10px 30px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.06);
   transition:transform .12s;
 }
 .ronda:active{transform:scale(.985)}
 .ronda .ic{
-  flex:none;width:46px;height:46px;border-radius:50%;display:grid;place-items:center;color:#1a1108;
-  background:linear-gradient(180deg,#f4d18a,#c98a2b);
+  flex:none;width:46px;height:46px;border-radius:50%;display:grid;place-items:center;color:#ffffff;
+  background:linear-gradient(180deg,#f9a8d4,#c98a2b);
 }
 .ronda .ic svg{width:22px;height:22px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
 .ronda .rt{min-width:0}
@@ -150,7 +151,7 @@ h1{
   border:0;border-top:1px solid var(--line2);background:none;color:var(--ink);font:500 16px var(--sans);text-align:left;
 }
 .row:first-child{border-top:0}
-.row.top{background:rgba(217,169,79,.10)}
+.row.top{background:rgba(192,132,252,.10)}
 .row b{color:var(--gold-hi);font-weight:700}
 .row.free{color:var(--ink2);font-size:14.5px}
 .tag{flex:none;padding:3px 10px;border-radius:999px;border:1px solid var(--line);color:var(--gold-hi);font-size:12px;font-weight:600}
@@ -206,7 +207,7 @@ h1{
 /* Cuenta */
 .cuenta{margin-bottom:14px;padding:16px 18px;border-radius:20px;background:var(--card);border:1px solid var(--line)}
 .l{display:flex;align-items:baseline;gap:8px;padding:6px 0;font-size:16px;font-variant-numeric:tabular-nums}
-.l .fill{flex:1;min-width:12px;border-bottom:1px dotted rgba(243,233,216,.28);transform:translateY(-4px)}
+.l .fill{flex:1;min-width:12px;border-bottom:1px dotted rgba(245,243,255,.28);transform:translateY(-4px)}
 .l.tt{margin-top:8px;padding-top:12px;border-top:1px solid var(--line);font-weight:700}
 .l.g{font:700 28px/1.2 var(--serif);color:var(--gold-hi)}
 .cuenta small{display:block;margin-top:8px;color:var(--ink2)}
@@ -227,16 +228,16 @@ h1{
 /* Botón de enviar: pegado al campo, siempre a la vista */
 .envio{margin:14px 0 4px}
 #m{min-height:22px;margin:10px 0 0;text-align:center;font-size:15px}
-#m.ok{color:var(--gold-hi)}
-#m.err{color:#f0a08f}
+#m.ok{color:#5eead4}
+#m.err{color:#fda4af}
 .cta{
-  width:100%;padding:18px;border:1px solid rgba(255,236,190,.55);border-radius:16px;color:#1a1108;font:700 18px var(--sans);
+  width:100%;padding:18px;border:1px solid rgba(255,255,255,.55);border-radius:16px;color:#ffffff;font:700 18px var(--sans);
   background:linear-gradient(180deg,var(--gold-hi),var(--gold) 55%,var(--gold-lo));
-  box-shadow:0 10px 28px rgba(201,138,43,.38),inset 0 1px 0 rgba(255,255,255,.45);
+  box-shadow:0 10px 28px rgba(236,72,153,.38),inset 0 1px 0 rgba(255,255,255,.45);
   transition:transform .12s,opacity .2s;
 }
 .cta.lista{animation:brilla 2.4s ease-in-out infinite}
-@keyframes brilla{0%,100%{box-shadow:0 10px 28px rgba(201,138,43,.38),inset 0 1px 0 rgba(255,255,255,.45)}50%{box-shadow:0 10px 36px rgba(242,207,134,.7),inset 0 1px 0 rgba(255,255,255,.45)}}
+@keyframes brilla{0%,100%{box-shadow:0 10px 28px rgba(236,72,153,.38),inset 0 1px 0 rgba(255,255,255,.45)}50%{box-shadow:0 10px 36px rgba(244,114,182,.7),inset 0 1px 0 rgba(255,255,255,.45)}}
 .cta:active{transform:scale(.985)}
 .cta:disabled{opacity:.55}
 .estped{margin-top:10px;border:1px solid var(--line);border-radius:14px;padding:10px 12px;font:500 13.5px var(--sans)}
@@ -246,7 +247,7 @@ h1{
 
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 /* Franja de promociones: siempre visible arriba de la carta, no escondida en un acordeón */
-.promo-strip{margin:2px 0 16px;padding:14px 14px 8px;border-radius:18px;border:1px solid rgba(217,169,79,.55);background:linear-gradient(135deg,rgba(217,169,79,.20),rgba(217,169,79,.03)),var(--card2)}
+.promo-strip{margin:2px 0 16px;padding:14px 14px 8px;border-radius:18px;border:1px solid rgba(192,132,252,.55);background:linear-gradient(135deg,rgba(192,132,252,.20),rgba(192,132,252,.03)),var(--card2)}
 .promo-strip h3{margin:0 0 8px;font:700 17px var(--serif);color:var(--gold-hi)}
 .promo-strip .cardgrid{margin-bottom:6px}
 
@@ -254,7 +255,7 @@ h1{
 .cat-tabs{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 12px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
 .cat-tabs::-webkit-scrollbar{display:none}
 .cat-tab{flex:none;display:inline-flex;align-items:center;gap:6px;padding:9px 15px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink2);font:600 13.5px var(--sans);white-space:nowrap}
-.cat-tab.on{background:linear-gradient(180deg,var(--gold-hi),var(--gold-lo));color:#1a1108;border-color:transparent;box-shadow:0 6px 16px rgba(201,138,43,.3)}
+.cat-tab.on{background:linear-gradient(180deg,var(--gold-hi),var(--gold-lo));color:#ffffff;border-color:transparent;box-shadow:0 6px 16px rgba(236,72,153,.3)}
 
 /* Tarjetas de producto en cuadrícula: más visuales y fáciles de tocar que una lista de texto */
 .cardgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(148px,100%),1fr));gap:10px}
@@ -311,7 +312,7 @@ button:active{transform:scale(.97)}button:hover{filter:brightness(1.1)}
 .lang{display:block;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font:inherit;font-size:13px}
 .curNote{margin:6px 0 0;text-align:center;font-size:12px;color:var(--ink2)}
 .prefBtn{display:block;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font:inherit;font-size:13px;cursor:pointer}
-.prefBtn[aria-pressed="true"]{background:var(--gold);color:#1a1108;border-color:var(--gold);font-weight:700}
+.prefBtn[aria-pressed="true"]{background:var(--gold);color:#ffffff;border-color:var(--gold);font-weight:700}
 
 /* ---------- Modo fácil: letra y botones más grandes, sin animaciones.
    Pensado para gente mayor o pantallas táctiles; no cambia el diseño
@@ -321,6 +322,35 @@ body.easy-mode *,body.easy-mode *::before,body.easy-mode *::after{animation:none
 body.easy-mode #fxLayer{display:none!important}
 body.easy-mode button,body.easy-mode input,body.easy-mode select{min-height:48px}
 body.easy-mode .t{min-height:56px}
+
+/* ===== 1.51.0 · Diseño juvenil de la página de pedidos (QR): neón, formas redondas y botones grandes ===== */
+body{background:
+  radial-gradient(90% 45% at 0% -5%,rgba(236,72,153,.30),transparent 60%),
+  radial-gradient(90% 45% at 100% 0%,rgba(34,211,238,.20),transparent 60%),
+  radial-gradient(80% 40% at 50% 110%,rgba(124,58,237,.30),transparent 60%),
+  var(--bg);background-attachment:fixed}
+h1{font-weight:700;letter-spacing:0;background:linear-gradient(90deg,var(--gold-hi),var(--gold) 50%,var(--cyan));-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 4px 18px rgba(236,72,153,.35))}
+.h2{font-weight:700;letter-spacing:-.01em}
+.tabs{border-radius:999px;padding:5px;background:rgba(23,16,51,.85);backdrop-filter:blur(8px)}
+.t{border-radius:999px;font-weight:700}
+.t.on{background:linear-gradient(90deg,var(--gold-hi),var(--gold));box-shadow:0 6px 20px rgba(236,72,153,.40)}
+.in{border-radius:16px}
+.in:focus{border-color:var(--gold-hi);box-shadow:0 0 0 3px rgba(244,114,182,.25)}
+.cta{border-radius:999px;border:0;background:linear-gradient(90deg,var(--gold-hi),var(--gold) 55%,var(--gold-lo));box-shadow:0 10px 30px rgba(236,72,153,.40)}
+.cupos i.on{background:linear-gradient(90deg,var(--gold-hi),var(--cyan))}
+/* Música: géneros con un toque y «▶ Pedir» en cada canción */
+.generos{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 4px}
+.generos .gtit{width:100%;font-size:13px;color:var(--ink2)}
+.gen{border:1px solid rgba(192,132,252,.35);background:rgba(124,58,237,.16);color:var(--ink);border-radius:999px;padding:9px 14px;font:700 14px var(--sans);min-height:42px}
+.gen:active{transform:scale(.96)}
+.gen.on{background:linear-gradient(90deg,var(--gold-hi),var(--gold));border-color:transparent;color:#fff}
+.ytfila{display:flex;align-items:center;border-top:1px solid var(--line2)}
+.ytfila:first-of-type{border-top:0}
+.ytfila .ytrow{border-top:0;flex:1;min-width:0}
+.ytpedir{flex:none;margin-right:10px;min-height:42px;min-width:84px;padding:0 14px;border:0;border-radius:999px;color:#fff;font:800 14px var(--sans);
+  background:linear-gradient(90deg,var(--gold-hi),var(--gold));box-shadow:0 6px 16px rgba(236,72,153,.35)}
+.ytpedir:active{transform:scale(.95)}
+.ytpedir.ok{background:linear-gradient(90deg,#10b981,#22d3ee)}
 </style>
 <style>
 /* Cómoda en cualquier celular, tablet o computador, sin tener que hacer zoom ni alejar:
@@ -451,6 +481,7 @@ img,video,iframe{max-width:100%}
     <input id="s" class="in" type="text" autocomplete="off" placeholder="Ej: Bad Bunny - Titi Me Preguntó">
     <div class="sug" id="sugC" hidden></div>
     <div class="ytprev" id="ytPrev" hidden></div>
+    <div class="generos" id="generos" aria-label="Géneros"></div>
     <div class="cupos" id="cupos" aria-hidden="true"></div>
   </section>
 
@@ -588,6 +619,9 @@ const DICT_SRC={
   quitarUno:["Quitar uno de {n}","Remove one {n}","Remover um de {n}","Retirer un de {n}","移除一份{n}","{n} में से एक हटाएँ"],
   agregarUnoMas:["Agregar uno más de {n}","Add one more {n}","Adicionar mais um de {n}","Ajouter un {n} de plus","再添加一份{n}","{n} में से एक और जोड़ें"],
   quitarProducto:["Quitar {n}","Remove {n}","Remover {n}","Retirer {n}","移除{n}","{n} हटाएँ"],
+  pedirEsta:["▶ Pedir","▶ Request","▶ Pedir","▶ Demander","▶ 点歌","▶ माँगें"],
+  pedida:["✅ Pedida","✅ Requested","✅ Pedida","✅ Demandée","✅ 已点","✅ माँगा"],
+  generosT:["¿No sabes qué pedir? Toca un género:","Not sure? Tap a genre:","Não sabe o que pedir? Toque um gênero:","Pas d’idée ? Touchez un genre :","不知道点什么？点一个类型：","क्या माँगें? एक शैली चुनें:"],
   pideCancion:["Pide tu canción","Request your song","Peça sua música","Demandez votre chanson","点一首歌","अपना गाना चुनें"],
   hintCancion:["Escribe artista y canción; así suena más rápido. Puedes pedir hasta 10; cada cupo se libera a los 15 minutos. Suenan por turnos entre todas las mesas.","Type the artist and song; it plays faster that way. You can request up to 10; each slot frees up after 15 minutes. Songs play in turns between all tables.","Escreva o artista e a música; assim toca mais rápido. Você pode pedir até 10; cada vaga libera após 15 minutos. Tocam por turnos entre todas as mesas.","Écrivez l’artiste et la chanson ; elle passera plus vite. Vous pouvez en demander jusqu’à 10 ; chaque créneau se libère après 15 minutes. Elles passent à tour de rôle entre toutes les tables.","请输入艺人和歌曲名，这样播放更快。最多可点10首；每个名额15分钟后释放。各桌轮流播放。","कलाकार और गाना लिखें; इससे जल्दी बजेगा। आप 10 तक माँग सकते हैं; हर स्लॉट 15 मिनट बाद खाली होता है। सभी मेज़ों के बीच बारी-बारी बजते हैं।"],
   ejemploCancion:["Ej: Bad Bunny - Titi Me Preguntó","E.g. Bad Bunny - Titi Me Preguntó","Ex.: Bad Bunny - Titi Me Preguntó","Ex. : Bad Bunny - Titi Me Preguntó","例如：Bad Bunny - Titi Me Preguntó","जैसे: Bad Bunny - Titi Me Preguntó"],
@@ -862,7 +896,9 @@ const ytSrv=()=>{try{const n=window.VENTO_NUBE_DEFAULT;return n&&n.url?String(n.
 async function ytSrvBuscar(q,tipo){
   const b=ytSrv(); if(!b) return null;
   const ctrl=new AbortController(), tm=setTimeout(()=>ctrl.abort(),7000);
-  try{ const r=await fetch(b+'?tipo='+tipo+'&q='+encodeURIComponent(q),{signal:ctrl.signal}); if(!r.ok) return null; const j=await r.json(); return j&&Array.isArray(j.items)&&j.items.length?j:null; }
+  // 1.51.0: «no hay resultados» también es una respuesta (devuelve la lista vacía). Solo si el servidor NO responde se
+  // devuelve null y se usa la API de YouTube de respaldo: cada búsqueda de la API gasta 100 del cupo diario.
+  try{ const r=await fetch(b+'?tipo='+tipo+'&q='+encodeURIComponent(q),{signal:ctrl.signal}); if(!r.ok) return null; const j=await r.json(); return j&&Array.isArray(j.items)?j:null; }
   catch(e){ return null; } finally{ clearTimeout(tm); }
 }
 let ytTimer=null, ytSeq=0, ytSelArtist=null;
@@ -890,7 +926,20 @@ function ytSongRow(box,q,title,channelTitle,thumb){
     if($('sugC'))$('sugC').hidden=true;
     $('s').focus();
   };
-  return b;
+  // «▶ Pedir»: la canción se pide con un toque (mismas reglas de siempre: cupo de la mesa, turnos, sin repetir).
+  const fila=h('div','ytfila'), pd=h('button','ytpedir',t('pedirEsta'));
+  pd.type='button'; pd.setAttribute('aria-label',t('pedirEsta')+': '+ytUnesc(title||q));
+  pd.onmousedown=e=>e.preventDefault();
+  pd.onclick=async()=>{
+    if(pd.disabled)return; pd.disabled=true;
+    $('s').value=ytUnesc(title||q);
+    if($('sugC'))$('sugC').hidden=true;
+    try{ await $('b').onclick(); }catch(e){}
+    if(!$('s').value){ pd.textContent=t('pedida'); pd.classList.add('ok'); setTimeout(()=>{ if($('ytPrev'))$('ytPrev').hidden=true; },900); }
+    else pd.disabled=false;     // no se pudo (cupo lleno, sin conexión…): el mensaje ya salió abajo
+  };
+  fila.appendChild(b); fila.appendChild(pd);
+  return fila;
 }
 function ytPintarCanciones(wrap,q,songs,titulo){
   wrap.textContent='';
@@ -956,16 +1005,17 @@ async function ytElegirArtista(a,btn,row,songsWrap,q,myId){
   if(ytSeq!==myId||ytSelArtist!==a) return;
   ytPintarCanciones(songsWrap,q,songs,'🔥 Lo más pedido de '+a.name);
 }
-async function ytBuscar(q){
+async function ytBuscar(q,genero){
   const box=$('ytPrev'); if(!box) return;
+  const N=genero?8:4;                   // un género: más canciones para escoger (y sin buscar artistas)
   const myId=++ytSeq;
   ytSelArtist=null;
   ytPintarMsg('Buscando en YouTube…');
   let artistas=[], cancionesJson=null;
   try{
     [artistas,cancionesJson]=await Promise.all([
-      ytBuscarArtistas(q),
-      ytSrvBuscar(q,'video').then(j=>j?{items:j.items.slice(0,4)}:fetch('https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoCategoryId=10&maxResults=4&q='+encodeURIComponent(q)+'&key='+YT_KEY).then(r=>r.ok?r.json():null).catch(()=>null))
+      genero?[]:ytBuscarArtistas(q),
+      ytSrvBuscar(q,'video').then(j=>j?{items:j.items.slice(0,N)}:fetch('https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoCategoryId=10&maxResults='+N+'&q='+encodeURIComponent(q)+'&key='+YT_KEY).then(r=>r.ok?r.json():null).catch(()=>null))
     ]);
   }catch(err){}
   if(myId!==ytSeq) return;
@@ -998,6 +1048,17 @@ $('s').addEventListener('input',()=>{
   ytTimer=setTimeout(()=>ytBuscar(q),600);
 });
 $('s').addEventListener('blur',()=>{ setTimeout(()=>{ if($('ytPrev'))$('ytPrev').hidden=true; },150); });
+// Géneros: un toque y salen canciones para pedir (sin escribir). Buscan por el Servidor Vento: sin cupo de YouTube.
+const GENEROS=[['🔥','Reguetón','reggaeton exitos'],['💃','Salsa','salsa exitos'],['🪗','Vallenato','vallenato exitos'],['💔','Despecho','musica de despecho'],
+  ['🤠','Popular','musica popular colombiana'],['🎤','Pop','pop latino exitos'],['🎸','Rock','rock en español clasicos'],['🎧','Electrónica','musica electronica exitos']];
+function pintarGeneros(){
+  const box=$('generos'); if(!box) return; box.textContent='';
+  box.appendChild(h('div','gtit',t('generosT')));
+  GENEROS.forEach(g=>{ const b=h('button','gen',g[0]+' '+g[1]); b.type='button';
+    b.onclick=()=>{ box.querySelectorAll('.gen').forEach(x=>x.classList.toggle('on',x===b)); $('s').value=''; clearTimeout(ytTimer); ytBuscar(g[2],true); };
+    box.appendChild(b); });
+}
+pintarGeneros();
 
 /* Fichas: lo que ya hay en la mesa, o lo que se pidió antes desde este celular */
 function pintarChips(){
