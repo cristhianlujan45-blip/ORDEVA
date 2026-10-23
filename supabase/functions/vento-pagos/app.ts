@@ -743,7 +743,10 @@ export async function manejar(req: Request, env: Env): Promise<Response> {
       let dianR: Record<string, number> | null = null;
       try { dianR = await repasarDian(env, db, null); } catch (e) { log("warn", "dian_repaso", { error: e instanceof Error ? e.message : String(e) }); }
       try { await db.rpc("srv_limpiar"); } catch { /* no es grave */ }
-      return json(200, { ok: true, ...r, dian: dianR }, cors);
+      // Tablas de reportes (ventas, productos, inventario) a partir del documento de cada negocio que cambió.
+      let proyeccion: Record<string, number> | null = null;
+      try { proyeccion = await db.rpc<Record<string, number>>("proyectar_pendientes", { p_max: 20, p_segundos: 4 }); } catch (e) { log("warn", "proyeccion", { error: e instanceof Error ? e.message : String(e) }); }
+      return json(200, { ok: true, ...r, dian: dianR, proyeccion }, cors);
     }
     const b = await req.json().catch(() => ({})) as Record<string, unknown>;
     if (r0 === "config") return json(200, await config(req, env, b), cors);
