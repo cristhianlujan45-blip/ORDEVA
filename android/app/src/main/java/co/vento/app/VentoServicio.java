@@ -35,9 +35,11 @@ public class VentoServicio extends Service {
         @Override public void run() {
             if (!activo) return;
             VentoApp.js("try{window.ventoLatido&&window.ventoLatido()}catch(e){}");
-            // 1.55.4: cada 10 s (antes cada minuto): si Android soltó la lectura de avisos, se vuelve a conectar 50 s antes.
-            if (++vueltas % 2 == 0) revisarEscucha();                // ¿sigue leyendo los avisos de los bancos?
-            try { VentoEscucha.barrer(); } catch (Throwable ignorado) { }   // cada 5 s (antes 10 s): ¿quedó un pago en la barra sin llegar?
+            // 1.57.1: otra vez como en la 1.55.3 (la que funcionaba). En la 1.55.4 se revisaba cada 10 s y a los 30 s se apagaba y
+            // prendía la lectura de avisos: con el celular bloqueado Android no la reconecta hasta desbloquear, así que la cortaba
+            // una y otra vez y los pagos llegaban al desbloquear.
+            if (++vueltas % 12 == 0) revisarEscucha();               // cada minuto: ¿sigue leyendo los avisos de los bancos?
+            if (vueltas % 2 == 0) try { VentoEscucha.barrer(); } catch (Throwable ignorado) { }   // cada 10 s: ¿quedó un pago en la barra sin llegar?
             // Cada 5 min: ¿hay una versión nueva de la app? (revisa cada 30 min; si ya hay una, la instala cuando no se use Vento)
             if (vueltas % 60 == 30) try { Actualizador.revisar(VentoServicio.this, false); } catch (Throwable ignorado) { }
             // Cada 5 min: el motor de voz de los pagos listo (si Android lo cerró, se vuelve a preparar): el pago suena de una.
@@ -70,7 +72,7 @@ public class VentoServicio extends Service {
             android.content.ComponentName cn = new android.content.ComponentName(this, VentoEscucha.class);
             sinEscucha++;
             if (Build.VERSION.SDK_INT >= 24) android.service.notification.NotificationListenerService.requestRebind(cn);
-            if (sinEscucha >= 3) {                                  // 30 s sin conectar (antes 2 min)
+            if (sinEscucha >= 2) {
                 android.content.pm.PackageManager pm = getPackageManager();
                 pm.setComponentEnabledSetting(cn, android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED, android.content.pm.PackageManager.DONT_KILL_APP);
                 pm.setComponentEnabledSetting(cn, android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED, android.content.pm.PackageManager.DONT_KILL_APP);

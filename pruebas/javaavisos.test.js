@@ -16,6 +16,12 @@ function contar(salida, nombre){
   if(!m){ mal++; console.log('❌ ' + nombre + ' no terminó: ' + String(salida).slice(-400)); return; }
   ok += +m[1]; mal += +m[2]; console.log((+m[2] ? '❌ ' : '✅ ') + nombre + ': ' + m[1] + ' bien, ' + m[2] + ' mal');
 }
+// 1.57.1: el servicio de fondo NO debe cortar la lectura de avisos con el celular bloqueado. En la 1.55.4 se revisaba cada
+// 10 s y a los 30 s se apagaba y prendía: Android no la reconecta hasta desbloquear y los pagos llegaban tarde.
+{ const vs = fs.readFileSync(path.join(src, 'VentoServicio.java'), 'utf8');
+  const c = /\+\+vueltas % 12 == 0\) revisarEscucha\(\)/.test(vs) && /sinEscucha >= 2\)/.test(vs) && /vueltas % 2 == 0\) try \{ VentoEscucha\.barrer\(\)/.test(vs);
+  if(c){ ok++; console.log('✅ Servicio de fondo: revisa la lectura de avisos cada minuto y solo la reinicia a los 2 min (como la 1.55.3)'); }
+  else { mal++; console.log('❌ Servicio de fondo: la revisión de la lectura de avisos cambió (cada minuto, reinicio a los 2 min, barrido cada 10 s)'); } }
 if(correr('javac', ['-version']).status !== 0){ console.log('RESULTADO 0 bien 0 mal (sin Java: se omitió)'); process.exit(0); }
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'vento-java-'));
 let r = correr('javac', ['-encoding', 'UTF-8', '-d', path.join(tmp, 'a'), path.join(src, 'AvisoPago.java'), path.join(src, 'PlanVentana.java'), path.join(src, 'PlanVoz.java'), path.join(__dirname, 'java/AvisoPagoPrueba.java'), path.join(__dirname, 'java/PlanVentanaPrueba.java'), path.join(__dirname, 'java/PlanVozPrueba.java')]);
