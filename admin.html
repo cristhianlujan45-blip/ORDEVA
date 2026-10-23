@@ -1293,7 +1293,7 @@
   /* Entra con la cuenta de Vento Nube y usa el servidor (Edge Function vento-suscripciones, rutas /admin/*).
      El SERVIDOR decide quién es administrador (tabla platform_admins) y hace cada cambio: el panel solo muestra lo que responde.
      La sesión se guarda con una llave propia para no mezclarse con la cuenta del negocio que use Vento en este navegador. */
-  const SX_SDK = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js', SX_SESION = 'vento-admin-nube', SX_SEC = 'vento-admin-sx';
+  const SX_SDK = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.min.js', SX_SESION = 'vento-admin-nube', SX_SEC = 'vento-admin-sx';
   const SX_SECCIONES = ['pagos', 'subs', 'negocios', 'planes', 'config'];
   const SX_EST = { pending_payment: ['Esperando pago', 'soft'], payment_review: ['⏳ Pago en revisión', 'warn'], active: ['✅ Activa', 'ok'], expired: ['⌛ Vencida', 'bad'], canceled: ['⛔ Cancelada', 'bad'], rejected: ['❌ Rechazada', 'bad'] };
   const SX_PAGO = { review: ['⏳ Por revisar', 'warn'], approved: ['✅ Aprobado', 'ok'], rejected: ['❌ Rechazado', 'bad'], canceled: ['↩️ Anulado', 'soft'] };

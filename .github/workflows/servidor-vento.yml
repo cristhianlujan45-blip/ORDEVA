@@ -17,7 +17,7 @@ on:
       - "supabase/**"
       - ".github/workflows/servidor-vento.yml"
   schedule:
-    - cron: "*/10 * * * *"   # repaso de cobros pendientes y vencimiento de suscripciones (además del webhook y de los celulares abiertos)
+    - cron: "17 * * * *"   # respaldo cada hora del repaso (el de verdad corre cada 5 min dentro de Supabase con pg_cron; ORDEVA etapa 9)
 
 permissions:
   contents: write

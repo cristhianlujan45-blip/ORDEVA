@@ -18,7 +18,7 @@
    ===================================================================== */
 (function(){
   'use strict';
-  var SDK = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
+  var SDK = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.min.js';
   var K_CFG = 'vento_nube_cfg', K_ST = 'vento_nube_estado';
   // 1.50.0: sube a los 0,3 s del último cambio (antes 1 s) y revisa cada 3 s (antes 5 s): «cuando agrego cervezas en una
   // mesa, que se sincronice todo muy rápido».

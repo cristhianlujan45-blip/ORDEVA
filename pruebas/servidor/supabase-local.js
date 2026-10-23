@@ -616,7 +616,7 @@ async function iniciar(opts = {}) {
 // desde pruebas/node_modules para la URL del CDN. Uso:  await enrutar(ctx, sb)
 async function enrutar(ctx, sb) {
   const sdk = fs.readFileSync(require.resolve('@supabase/supabase-js/dist/umd/supabase.js'));
-  await ctx.route(/^https:\/\/cdn\.jsdelivr\.net\/npm\/@supabase\/supabase-js@2\//, (r) => r.fulfill({ status: 200, contentType: 'application/javascript; charset=utf-8', body: sdk }));
+  await ctx.route(/^https:\/\/cdn\.jsdelivr\.net\/npm\/@supabase\/supabase-js@2(?:\.\d+\.\d+)?\//, (r) => r.fulfill({ status: 200, contentType: 'application/javascript; charset=utf-8', body: sdk }));
   // La clave pública de nube/config.js (la del proyecto real) se cambia por la de este servidor: la app no se toca.
   const propia = (t) => { const [a, b, c] = String(t || '').split('.'); return !!c && crypto.createHmac('sha256', sb.jwtSecret).update(a + '.' + b).digest('base64url') === c; };
   await ctx.route(/^https:\/\/[\w-]+\.supabase\.co\//, async (r) => {
