@@ -28,7 +28,7 @@ import * as G from "./google.ts";
 import * as F from "./dian.ts";
 import { type Env, ErrorVento, log, sha256 } from "./util.ts";
 
-export const VERSION = "1.22.1";
+export const VERSION = "1.23.0";
 const SITIO = "https://cristhianlujan45-blip.github.io/cuentas/";
 
 type Pago = { id: string; negocio_id?: string; referencia: string; proveedor: string; metodo: string; canal: string; monto: number;
@@ -831,12 +831,13 @@ export async function manejar(req: Request, env: Env): Promise<Response> {
     }
     if (r0 === "estado") {
       const negocio = String(b.negocio || "");
-      await usuario(req, env).rpc("pagos_puedo", { p_negocio: negocio, p_accion: "cobrar" });
+      const quien = await usuario(req, env).rpc<string>("pagos_puedo", { p_negocio: negocio, p_accion: "cobrar" });
       const db = servidor(env);
       const p = await db.rpc<(Pago & { negocio_id: string }) | null>("srv_pago", { p_id: String(b.pago || "") });
       if (!p || p.negocio_id !== negocio) throw new ErrorVento("no_existe", "Ese pago no existe", 404);
       if (p.estado === "pendiente" || p.estado === "error") await consultar(env, db, p);
-      return json(200, { pago: await db.rpc("srv_pago", { p_id: p.id }) }, cors);
+      // 1.55.0: quien pagó y el texto del banco, solo para dueño, administrador o quien creó el cobro.
+      return json(200, { pago: await db.rpc("srv_pago_para", { p_id: p.id, p_usuario: String(quien || "").split(":")[0] }) }, cors);
     }
     return json(404, { ok: false, error: "ruta" }, cors);
   } catch (e) {

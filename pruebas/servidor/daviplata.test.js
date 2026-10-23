@@ -94,7 +94,7 @@ async function pruebas(sb) {
   const cons = await sb.sql("select conname, pg_get_constraintdef(oid) d from pg_constraint where conname in ('pagos_proveedor_check','pagos_canal_check','pago_proveedores_proveedor_check')");
   chk('Migración: proveedor «daviplata» y canal «otp» permitidos (CHECK reales)', cons.length === 3 && cons.every((c) => /daviplata|otp/.test(c.d)) && cons.some((c) => /'otp'/.test(c.d)), cons);
   let r = await api('/salud');
-  chk('GET /salud anuncia «daviplata_api» (v1.18)', r.st === 200 && r.j.integraciones.includes('daviplata_api') && r.j.version === '1.22.1', r.j);
+  chk('GET /salud anuncia «daviplata_api» (v1.18)', r.st === 200 && r.j.integraciones.includes('daviplata_api') && r.j.version === '1.23.0', r.j);
 
   // Celular del dueño con avisos push activos
   const cel = await celularPush();
@@ -178,7 +178,10 @@ async function pruebas(sb) {
   chk('Se registra en la cuenta UNA sola vez (aplicar_pago: el primero true, el segundo false)', ap1.j === true && ap2.j === false, [ap1, ap2]);
   r = await rpc('pagos_desde', { p_negocio: NEG, p_desde: null }, mesero.token);
   const visto = (r.j || []).find((x) => x.id === P.id) || {};
-  chk('Los celulares lo ven por pagos_desde con aprobación y documento enmascarado', visto.estado === 'aprobado' && visto.aprobacion === P.aprobacion && visto.documento === 'CC •••8019', visto);
+  chk('El mesero lo ve por pagos_desde con la aprobación, pero SIN el documento ni quién pagó (1.55.0: solo dueño y administrador)', visto.estado === 'aprobado' && visto.aprobacion === P.aprobacion && visto.documento === null && !visto.pagador, visto);
+  r = await rpc('pagos_desde', { p_negocio: NEG, p_desde: null }, dueno.token);
+  const vistoD = (r.j || []).find((x) => x.id === P.id) || {};
+  chk('El dueño lo ve con el documento enmascarado', vistoD.aprobacion === P.aprobacion && vistoD.documento === 'CC •••8019', vistoD);
 
   // ----- Tres códigos equivocados → rechazado -----
   r = await cobrar({ monto: 5000, mesa: '4' });

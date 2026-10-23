@@ -128,6 +128,7 @@
   var oyentes = [];                        // ventanas de cobro abiertas
   function guardarCache(){ var ks = Object.keys(cache); if(ks.length > 150){ ks.sort(function(a, b){ return String(cache[a].actualizado_en).localeCompare(String(cache[b].actualizado_en)); }).slice(0, ks.length - 150).forEach(function(k){ delete cache[k]; }); } lsSet(K_CACHE, cache); }
   function puedeCaja(){ var n = negocio(); return n && ['dueno', 'admin', 'cajero'].indexOf(n.rol) >= 0; }
+  function esJefePagos(){ var n = negocio(); return !!n && (n.rol === 'dueno' || n.rol === 'admin'); }
 
   function regLocal(p){
     if(typeof data === 'undefined' || !data) return null;
@@ -138,7 +139,9 @@
     if(p.proveedor === 'dispositivo' && !(x && leidoAqui(x))){
       var tp = Date.parse(p.creado_en || p.actualizado_en) || Date.now();
       // Un SMS se enlaza con el SMS y un aviso de la app con el de la app (el mismo pago puede llegar por los dos).
-      var smsP = /\bSMS\b/.test(String(p.detalle || '')), smsY = function(y){ return !!y.sms || /\bSMS\b/.test(String(y.fuente || '')); };
+      // 1.55.0: a quien no es dueño ni administrador el servidor no le da el texto del banco, solo si fue SMS («sms»).
+      var smsP = p.sms != null ? !!p.sms : /\bSMS\b/.test(String(p.detalle || '')),
+        smsY = function(y){ return y.sms != null ? !!y.sms : /\bSMS\b/.test(String((window.pagoDet ? window.pagoDet(y).fuente : y.fuente) || '')); };
       // 1.50.0: la copia «srv-…» que bajó de la nube (la registró la tablet o el computador) NO es de este celular; si
       // este celular tiene su propio registro de ese pago (lo leyó y ya sonó aquí), vale el suyo y la copia sobra.
       // Antes el celular que leyó el pago a veces lo volvía a anunciar como si viniera de otro equipo.
@@ -151,6 +154,7 @@
     if(!x){
       x = { id: id, srv: p.id, t: Date.parse(p.aprobado_en || p.actualizado_en || p.creado_en) || Date.now(), monto: Number(p.monto), app: nombreMetodo(p.metodo), de: p.pagador || '', mesa: p.mesa ? (isNaN(+p.mesa) ? p.mesa : +p.mesa) : null,
         estado: p.confianza === 'revisar' ? 'revisar' : p.confianza === 'falso' ? 'falso' : 'app', fuente: fuente, txt: (p.referencia || '').slice(0, 60) };
+      if(p.proveedor === 'dispositivo') x.sms = p.sms != null ? !!p.sms : /\bSMS\b/.test(String(p.detalle || ''));
       g.lista.unshift(x); g.lista = g.lista.slice(0, 200);
     } else if(x.estado === 'revisar' && p.confianza === 'ok'){ x.estado = 'ok'; }
     if(p.aplicado_en && !x.aplicado) x.aplicado = p.aplicado_mesa ? (isNaN(+p.aplicado_mesa) ? p.aplicado_mesa : +p.aplicado_mesa) : true;
@@ -359,7 +363,9 @@
     // También con Vento de fondo o el celular bloqueado: si el tiempo real se cayó (Android lo corta cuando duerme), se
     // pregunta cada 6 s (1.50.0; antes 20 s); y aunque diga que está vivo, cada 20 s (antes cada minuto), por si quedó
     // colgado sin avisar. «Que llegue en todo, siempre, y más rápido».
-    if(Date.now() - est.ultimoSync > (est.vivo ? 20000 : 6000)) sincronizar();
+    // 1.55.0: quien no es dueño ni administrador ya no recibe en tiempo real los pagos de otros (sin los datos de quien
+    // paga, el servidor solo se los da al preguntar): para él se pregunta cada 6 s siempre.
+    if(Date.now() - est.ultimoSync > (est.vivo && esJefePagos() ? 20000 : 6000)) sincronizar();
     if(!est.canal && Date.now() - (est.intentoCanal || 0) > 30000){ est.intentoCanal = Date.now(); conectarTiempoReal(); }
   }
   // La app Android despierta la página cada 5 s (window.ventoLatido): con Vento cerrada Android frena los relojes de la

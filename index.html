@@ -29225,6 +29225,42 @@ let fotosListas = false;
    dueño («¡Te llegó plata! JUAN PÉREZ te envió $20.000»). Una app gratis (MacroDroid) la
    reenvía a un canal privado de Vento y Vento la lee aquí: avisa con voz, la guarda y la
    cruza con la mesa que debe ese valor o que dijo «Ya pagué por Nequi». */
+/* 🔒 1.55.0: quién pagó («de»), el texto del banco («txt») y la explicación («fuente») de un aviso de pago ya NO viajan
+   en los datos del negocio: el servidor los saca en cada guardado y solo se los da al dueño y al administrador
+   («solamente el administrador puede ver lo del Nequi»). pagoDet(x) los busca: en el aviso (negocio sin la nube o
+   versión anterior), en ESTE equipo (lo leyó aquí) o en el servidor (dueño y administrador). pagoHuella(texto) junta
+   el mismo aviso que llega por dos caminos sin necesitar el texto. */
+const PAGO_DET_KEY = 'vento-pagos-det';
+let pagoDetSrv = {}, pagoDetPidiendo = false, pagoDetUlt = 0;
+function pagoDetLocal(){ try{ return JSON.parse(localStorage.getItem(PAGO_DET_KEY) || '{}') || {}; }catch(e){ return {}; } }
+function pagoDetGuardar(id, d){
+  if(!id || !d || !(d.de || d.txt || d.fuente)) return;
+  try{
+    const m = pagoDetLocal(); m[id] = { de: String(d.de || '').slice(0, 120), txt: String(d.txt || '').slice(0, 300), fuente: String(d.fuente || '').slice(0, 300), t: Date.now() };
+    const ks = Object.keys(m); if(ks.length > 300) ks.sort((a, b) => (m[a].t || 0) - (m[b].t || 0)).slice(0, ks.length - 300).forEach(k => delete m[k]);
+    localStorage.setItem(PAGO_DET_KEY, JSON.stringify(m));
+  }catch(e){}
+}
+function pagoDetJefe(){ try{ const n = window.ventoNube && window.ventoNube.negocio && window.ventoNube.negocio(); return !!n && (n.rol === 'dueno' || n.rol === 'admin'); }catch(e){ return false; } }
+function pagoDetPedir(){
+  if(pagoDetPidiendo || !pagoDetJefe() || Date.now() - pagoDetUlt < 20000) return;
+  const n = window.ventoNube.negocio(); pagoDetPidiendo = true; pagoDetUlt = Date.now();
+  window.ventoNube.cliente().then(c => c.rpc('pago_avisos_detalle_de', { p_negocio: n.id }))
+    .then(r => { if(r && !r.error && r.data && typeof r.data === 'object'){ pagoDetSrv = r.data; try{ window.pgRepintar && window.pgRepintar(); }catch(e){} } })
+    .catch(() => {}).then(() => { pagoDetPidiendo = false; });
+}
+function pagoDet(x){
+  if(!x) return { de: '', txt: '', fuente: '' };
+  const l = x.id ? (pagoDetLocal()[x.id] || null) : null, s = x.id ? (pagoDetSrv[x.id] || null) : null;
+  let c = null; try{ const pc = x.srv && window.ventoPagos && window.ventoPagos._cache; c = (pc && pc[x.srv]) || null; }catch(e){}
+  if(!x.de && !x.txt && !l && !s && pagoDetJefe()) pagoDetPedir();
+  return { de: x.de || (l && l.de) || (s && s.de) || (c && c.pagador) || '', txt: x.txt || (l && l.txt) || (s && s.txt) || '', fuente: x.fuente || (l && l.fuente) || (s && s.fuente) || (c && c.detalle) || '' };
+}
+function pagoHuella(t){
+  const s = String(t || '').slice(0, 200).replace(/^\s*[^|]*\|/, '').replace(/\s+/g, ' ').trim(); let h = 2166136261;
+  for(let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+  return s ? h.toString(36) : '';
+}
 (function(){
   const $p = id => document.getElementById(id);
   const plata = n => '$' + Math.round(n || 0).toLocaleString('es-CO');
@@ -29342,7 +29378,7 @@ let fotosListas = false;
   const pgConfirmado = x => !x.estado || x.estado === 'app' || x.estado === 'ok';
   // ¿El aviso llegó por SMS? («origen | remitente | texto»)
   const pgEsSms = t => { const pz = String(t || '').split('|').map(y => y.trim()); return PG_APPS_SMS.test(pz[0] || '') || /^sms$/i.test(pz[1] || ''); };
-  const pgEsSmsX = x => x.sms != null ? !!x.sms : pgEsSms(x.txt);
+  const pgEsSmsX = x => x.sms != null ? !!x.sms : pgEsSms(pagoDet(x).txt);
   // op.voz: la app Android ya dijo «Pago confirmado…» y sacó el aviso del celular (aquí no se repite).
   // ---------- 🪟 Ventana emergente de cada pago (dentro de Vento) ----------
   // El valor grande, por qué banco, de quién y el texto, con «✕ Cerrar»; se cierra sola a los 15 s. Fuera de Vento (otra
@@ -29491,7 +29527,8 @@ let fotosListas = false;
     // Una sola vez: el MISMO aviso que llega por dos caminos (la app Vento de este celular y MacroDroid) no se cuenta dos veces.
     // Por el mismo camino cada aviso ya trae su propio ID (dos clientes que pagan lo mismo sí son dos pagos).
     const via = String(id || '').startsWith('and-') ? 'and' : 'canal', mismo = String(txt).slice(0, 200).replace(/^\s*[^|]*\|/, '');
-    if((g.lista || []).some(x => x.via && x.via !== via && Date.now() - (x.t || 0) < 3 * 60e3 && x.monto === p.monto && String(x.txt || '').replace(/^\s*[^|]*\|/, '') === mismo)){ saveData(); return; }
+    const huella = pagoHuella(txt);
+    if((g.lista || []).some(x => x.via && x.via !== via && Date.now() - (x.t || 0) < 3 * 60e3 && x.monto === p.monto && (x.th ? x.th === huella : String(pagoDet(x).txt || '').replace(/^\s*[^|]*\|/, '') === mismo))){ saveData(); return; }
     // ¿Ya llegó este mismo pago por el Servidor Vento (otro celular lo reenvió)? Entonces no se repite.
     // Solo un pago que vino DEL servidor (otro celular lo reenvió): uno propio enlazado al servidor no cuenta. Antes, el
     // segundo pago igual al primero (mismo valor, en 3 min) se tomaba como repetido y no sonaba.
@@ -29523,8 +29560,9 @@ let fotosListas = false;
     if(op.reemplaza){ const i = g.lista.findIndex(x => x.id === 'and-' + op.reemplaza); if(i >= 0) g.lista.splice(i, 1); }
     const mesa = f.nivel === 'falso' ? null : pgMesaPara(p.monto);
     const reg = { id: id || Date.now().toString(36), via, eq: pgEq, t: Date.now(), monto: p.monto, app: p.app, de: p.de, mesa: mesa ? Number(mesa) : null, estado: f.nivel, fuente: f.txt, txt: String(txt).slice(0, 200) };
-    if(sms) reg.sms = true;
+    reg.sms = !!sms; reg.th = huella;
     if(delSms){ reg.par = true; reg.fuente = f.txt + ' (y el mensaje de texto del banco)'; if(delSms.aplicado){ reg.aplicado = delSms.aplicado; reg.mesa = delSms.mesa || reg.mesa; try{ const t = data.tables[delSms.aplicado]; ((t && t.payments) || []).forEach(q => { if(q.pagoDigital && q.pagoDigital.id === delSms.id) q.pagoDigital.id = reg.id; }); }catch(e){} } }
+    pagoDetGuardar(reg.id, reg);                            // quién pagó y el texto quedan en ESTE equipo (el servidor los saca de los datos)
     g.lista.unshift(reg); g.lista = g.lista.slice(0, 200);
     if(mesa && f.nivel === 'app') delete g.espera[mesa];
     saveData();
@@ -30009,6 +30047,7 @@ let fotosListas = false;
   window.ventoPagosDiag = () => { try{ pgDiagPintar(); }catch(e){} };
   // Con Ajustes → Pagos a la vista, el registro de avisos se actualiza solo (cada 4 s).
   setInterval(() => { const b = document.getElementById('pgDiag'); if(b && b.offsetParent) try{ pgDiagPintar(); }catch(e){} }, 4000);
+  window.pgRepintar = () => { try{ pgPintar(); }catch(e){} };
   function pgPintar(){
     if(!data || !pgCrearUI()) return;
     const g = PG();
@@ -30031,12 +30070,12 @@ let fotosListas = false;
       pgDiagPintar();
     }
     const sello = x => x.estado === 'falso' ? '<span style="color:#e5484d;font-weight:800">🚨 FALSO</span>' : x.estado === 'revisar' ? '<span style="color:#f5a524;font-weight:800">⚠️ Revisar</span> <button type="button" class="btn-ghost" data-pgok="' + escp(x.id) + '" style="padding:2px 8px;font-size:12px">✅ Lo vi en la app</button>' : x.estado === 'ok' ? '<span style="color:#30a46c;font-weight:800">✅ Revisado</span>' : '<span style="color:#30a46c;font-weight:800">✅ Confirmado</span>';
-    $p('pgLista').innerHTML = g.lista.length ? g.lista.slice(0, 15).map(x => '<div style="display:flex;gap:8px;padding:6px 0;border-top:1px solid var(--line);font-size:14px' + (x.estado === 'falso' ? ';opacity:.8;text-decoration:line-through' : '') + '"><span style="flex:1;min-width:0">' + escp(x.app) + (x.de ? ' · ' + escp(x.de) : '') + ' ' + sello(x) + '<br><small style="opacity:.7">' + new Date(x.t).toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + (x.mesa ? ' · ' + escp(tableLabel(x.mesa)) : '') + (x.fuente && x.estado !== 'app' ? ' · ' + escp(x.fuente) : '') + '</small></span><b>' + plata(x.monto) + '</b></div>').join('') : '<div class="empty-note">Todavía no ha llegado ningún aviso.</div>';
+    $p('pgLista').innerHTML = g.lista.length ? g.lista.slice(0, 15).map(x => '<div style="display:flex;gap:8px;padding:6px 0;border-top:1px solid var(--line);font-size:14px' + (x.estado === 'falso' ? ';opacity:.8;text-decoration:line-through' : '') + '"><span style="flex:1;min-width:0">' + escp(x.app) + (pagoDet(x).de ? ' · ' + escp(pagoDet(x).de) : '') + ' ' + sello(x) + '<br><small style="opacity:.7">' + new Date(x.t).toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + (x.mesa ? ' · ' + escp(tableLabel(x.mesa)) : '') + (pagoDet(x).fuente && x.estado !== 'app' ? ' · ' + escp(pagoDet(x).fuente) : '') + '</small></span><b>' + plata(x.monto) + '</b></div>').join('') : '<div class="empty-note">Todavía no ha llegado ningún aviso.</div>';
     $p('pgLista').onclick = e => {
       const b = e.target.closest('[data-pgok]'); if(!b) return;
       const x = PG().lista.find(y => y.id === b.dataset.pgok); if(!x) return;
       x.estado = 'ok'; if(x.mesa) delete PG().espera[x.mesa]; saveData(); pgPintar(); try{ window.pagoLlego && window.pagoLlego(x); }catch(e2){}
-      showToast('✅ Listo: ' + plata(x.monto) + ' de ' + (x.de || x.app) + ' quedó como revisado en la app.');
+      showToast('✅ Listo: ' + plata(x.monto) + ' de ' + (pagoDet(x).de || x.app) + ' quedó como revisado en la app.');
     };
   }
   const arr = setInterval(() => { if(typeof data !== 'undefined' && data){ clearInterval(arr); pgPintar(); pgConectar(); pgAvisarWeb(); } }, 1000);
@@ -31778,7 +31817,7 @@ window.mesoraCelebrar = function(emojis){
     }
     // 💜 Pagos digitales confirmados que todavía no se registraron en ninguna mesa
     try{ (((data.pagos || {}).lista) || []).filter(x => (!x.estado || x.estado === 'app' || x.estado === 'ok') && !x.aplicado && !x.ignorado && ahora - x.t < 6 * 36e5).slice(0, 2).forEach(x =>
-      out.push({ id: 'pago-' + x.id, icono: '💜', prio: 6, texto: 'Llegó ' + plata(x.monto) + ' por ' + x.app + (x.de ? ' de ' + x.de : '') + (x.mesa ? ' (coincide con ' + tableLabel(x.mesa) + ')' : '') + ' y no está registrado en ninguna cuenta.', acciones: [{ label: x.mesa ? 'Registrar en ' + tableLabel(x.mesa) : 'Elegir la mesa', op: 'pago', id: x.id }] })); }catch(e){}
+      out.push({ id: 'pago-' + x.id, icono: '💜', prio: 6, texto: 'Llegó ' + plata(x.monto) + ' por ' + x.app + (pagoDet(x).de ? ' de ' + pagoDet(x).de : '') + (x.mesa ? ' (coincide con ' + tableLabel(x.mesa) + ')' : '') + ' y no está registrado en ninguna cuenta.', acciones: [{ label: x.mesa ? 'Registrar en ' + tableLabel(x.mesa) : 'Elegir la mesa', op: 'pago', id: x.id }] })); }catch(e){}
     if(a.mesas){
       Object.keys(data.tables || {}).forEach(k => {
         const t = data.tables[k], its = (t && t.items) || []; if(!its.length) return;
@@ -32056,7 +32095,8 @@ window.mesoraCelebrar = function(emojis){
     if(!x || x.aplicado) return '⚠️ Ese pago ya estaba registrado en ' + (x && x.aplicado ? tableLabel(x.aplicado) : 'una cuenta') + '.';
     const t = data.tables[mesa]; if(!t) return 'No encontré esa cuenta.';
     t.payments = t.payments || [];
-    t.payments.push({ note: '💜 ' + x.app + (x.de ? ' de ' + x.de : '') + ' (verificado)', amount: x.monto, method: 'transferencia', pagoDigital: { id: x.id, app: x.app, de: x.de || '' } });
+    // 1.55.0: sin el nombre de quien pagó (la cuenta queda en el historial, que ve todo el equipo); el dueño lo ve en el pago.
+    t.payments.push({ note: '💜 ' + x.app + ' (verificado)', amount: x.monto, method: 'transferencia', pagoDigital: { id: x.id, app: x.app } });
     x.aplicado = mesa; x.mesa = mesa;
     saveData();
     try{ renderMesas(); }catch(e){}
@@ -32080,7 +32120,7 @@ window.mesoraCelebrar = function(emojis){
     const ov = ventana(), mesas = mesasConSaldo(), sug = x.mesa && data.tables[x.mesa] ? x.mesa : null;
     const op = mesas.map(id => '<option value="' + id + '"' + (id === sug ? ' selected' : '') + '>' + esc(tableLabel(id)) + ' · debe ' + plata(saldoDe(id)) + '</option>').join('');
     ov.innerHTML = '<div class="modal pago-modal"><h2>💜 Llegó un pago</h2>' +
-      '<div class="pago-monto">' + plata(x.monto) + '</div><div class="modal-sub">' + esc(x.app) + (x.de ? ' · de <b>' + esc(x.de) + '</b>' : '') + ' · ✅ verificado por la app del banco</div>' +
+      '<div class="pago-monto">' + plata(x.monto) + '</div><div class="modal-sub">' + esc(x.app) + (pagoDet(x).de ? ' · de <b>' + esc(pagoDet(x).de) + '</b>' : '') + ' · ✅ verificado por la app del banco</div>' +
       (sug ? '<button type="button" class="btn-primary pago-go" data-m="' + sug + '">Registrar en ' + esc(tableLabel(sug)) + ' (debe ' + plata(saldoDe(sug)) + ')</button>' :
         (x.cands || []).filter(id => data.tables[id]).length ? '<div class="modal-sub">¿De cuál cuenta es?</div>' + (x.cands || []).filter(id => data.tables[id]).map(id => '<button type="button" class="btn-primary pago-go" data-m="' + id + '" style="margin-top:6px">' + esc(tableLabel(id)) + ' · debe ' + plata(saldoDe(id)) + '</button>').join('') : '') +
       (mesas.length ? '<div class="pago-otra"><select id="pagoMesaSel" class="mz-in">' + (sug ? '' : '<option value="">¿De qué cuenta es?</option>') + op + '</select><button type="button" class="btn-ghost" id="pagoOtraBtn">' + (sug ? 'Es de otra' : 'Registrar') + '</button></div>' : '<div class="modal-sub">No hay cuentas abiertas con saldo: queda guardado en «💜 Pagos».</div>') +
@@ -32107,7 +32147,7 @@ window.mesoraCelebrar = function(emojis){
     const ini = pe && pe.ini || new Date().setHours(0, 0, 0, 0), fin = pe && pe.fin || Date.now() + 1, txt = pe && pe.txt || 'hoy';
     if(!(data.pagos && data.pagos.on)) return '💜 Los avisos de Nequi y Daviplata no están activados. Actívalos en Ajustes → 💜 Pagos → «📘 Paso a paso: agregar DaviPlata o Nequi».';
     if(mesa){ const l = lista().filter(x => x.mesa === mesa && Date.now() - x.t < 6 * 36e5 && x.estado !== 'falso');
-      return l.length ? '💜 ' + tableLabel(mesa) + ': ' + l.map(x => plata(x.monto) + ' por ' + x.app + (x.de ? ' de ' + x.de : '') + (confirmado(x) ? ' ✅' : ' ⚠️ revisar') + (x.aplicado ? ' (registrado)' : '')).join('; ') + '.' : '⏳ No ha llegado ningún pago de ' + tableLabel(mesa) + ' en las últimas horas.'; }
+      return l.length ? '💜 ' + tableLabel(mesa) + ': ' + l.map(x => plata(x.monto) + ' por ' + x.app + (pagoDet(x).de ? ' de ' + pagoDet(x).de : '') + (confirmado(x) ? ' ✅' : ' ⚠️ revisar') + (x.aplicado ? ' (registrado)' : '')).join('; ') + '.' : '⏳ No ha llegado ningún pago de ' + tableLabel(mesa) + ' en las últimas horas.'; }
     const l = lista().filter(x => x.t >= ini && x.t < fin);
     const ok = l.filter(confirmado), rev = l.filter(x => x.estado === 'revisar'), fal = l.filter(x => x.estado === 'falso');
     if(!l.length) return '💜 No han llegado pagos por Nequi ni Daviplata ' + txt + '.';
@@ -32136,7 +32176,7 @@ window.mesoraCelebrar = function(emojis){
       ov.innerHTML = '<div class="modal" style="max-width:520px"><h2>💜 Pagos Nequi / Daviplata</h2>' +
         (on ? '<div class="pp-total"><small>Hoy, confirmados</small><b>' + plata(ok.reduce((a, x) => a + x.monto, 0)) + '</b><span>' + (Object.entries(porApp).map(([a, v]) => a + ' ' + plata(v)).join(' · ') || 'Todavía nada hoy') + '</span></div>'
           : '<div class="pp-off"><b>Los avisos de pago no están activados.</b><br>' + (window.VentoAndroid && window.VentoAndroid.pagosAvisosTomar ? 'Prende «Recibir avisos de pagos»: la app de Vento lee directo el aviso de DaviPlata o Nequi de este celular y te dice «Pago confirmado» con el valor y quién te pagó.' : 'Con la app Vento para Android en el celular donde tienes DaviPlata o Nequi, cada pago que te llega sale aquí en un segundo y Vento dice «Pago confirmado».') + '<br><button type="button" class="btn-primary" data-pp="guia" style="margin-top:10px">📘 Paso a paso: agregar DaviPlata o Nequi</button> <button type="button" class="btn-ghost" data-pp="config" style="margin-top:10px">⚙️ Ajustes de pagos</button></div>') +
-        (l.length ? '<div class="pp-lista">' + l.map(x => '<div class="pp-fila' + (x.estado === 'falso' ? ' pp-tach' : '') + '"><span><b>' + plata(x.monto) + '</b> ' + esc(x.app) + (x.de ? ' · ' + esc(x.de) : '') + '<small>' + new Date(x.t).toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) + (x.aplicado ? ' · registrado en ' + esc(tableLabel(x.aplicado)) : x.mesa ? ' · coincide con ' + esc(tableLabel(x.mesa)) : '') + '</small></span>' + sello(x) +
+        (l.length ? '<div class="pp-lista">' + l.map(x => '<div class="pp-fila' + (x.estado === 'falso' ? ' pp-tach' : '') + '"><span><b>' + plata(x.monto) + '</b> ' + esc(x.app) + (pagoDet(x).de ? ' · ' + esc(pagoDet(x).de) : '') + '<small>' + new Date(x.t).toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) + (x.aplicado ? ' · registrado en ' + esc(tableLabel(x.aplicado)) : x.mesa ? ' · coincide con ' + esc(tableLabel(x.mesa)) : '') + '</small></span>' + sello(x) +
           (x.estado === 'revisar' ? '<button type="button" class="btn-ghost" data-vi="' + esc(x.id) + '">Lo vi en la app</button>' : (confirmado(x) && !x.aplicado ? '<button type="button" class="btn-ghost" data-reg="' + esc(x.id) + '">Registrar</button>' : '')) + '</div>').join('') + '</div>' : (on ? '<div class="modal-sub">Aún no ha llegado ningún pago.</div>' : '')) +
         '<div class="modal-actions" style="flex-wrap:wrap;gap:8px">' + (on ? '<button type="button" class="btn-ghost" data-pp="config">⚙️ Configuración</button>' : '') + '<button type="button" class="btn-close" data-pp="cerrar">Cerrar</button></div></div>';
     }
@@ -32427,7 +32467,7 @@ window.mesoraCelebrar = function(emojis){
     const cands = (g.lista || []).filter(x => confirmado(x) && Number(x.monto) === Number(info.monto) && x.t >= desde && x.t <= hasta && !ya.has(x.id));
     cands.sort((a, b) => (a.mesa == mesa ? 0 : 1) - (b.mesa == mesa ? 0 : 1) || Math.abs(a.t - (info.fecha || ahora)) - Math.abs(b.t - (info.fecha || ahora)));
     pago = cands[0] || null;
-    if(pago){ if(nivel === 'ok') motivos.unshift('✅ Coincide con el pago de ' + plata(pago.monto) + ' que llegó por ' + pago.app + (pago.de ? ' de ' + pago.de : '') + ' a las ' + new Date(pago.t).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }).replace(/\.$/, '') + '.'); }
+    if(pago){ if(nivel === 'ok') motivos.unshift('✅ Coincide con el pago de ' + plata(pago.monto) + ' que llegó por ' + pago.app + (pagoDet(pago).de ? ' de ' + pagoDet(pago).de : '') + ' a las ' + new Date(pago.t).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }).replace(/\.$/, '') + '.'); }
     else if(avisosActivos()){ nivel = nivel === 'revisar' ? 'revisar' : 'espera'; motivos.unshift('⏳ Todavía NO ha llegado un pago de ' + plata(info.monto) + '. No entregues nada: te aviso apenas llegue.'); }
     else { nivel = 'revisar'; motivos.unshift('⚠️ Vento no tiene avisos automáticos de pagos activos: confírmalo en tu app ' + (info.app === 'DaviPlata' ? 'DaviPlata' : 'Nequi') + ' antes de entregar. (Actívalos en Ajustes → 💜 Pagos.)'); }
     return { nivel, motivos, info, pago };
@@ -32452,7 +32492,7 @@ window.mesoraCelebrar = function(emojis){
       if(!x) return true;
       const c = (g.comprobantes || []).find(k => k.id === e.id); if(c){ c.pago = x.id; c.nivel = 'ok'; }
       usados.add(x.id);
-      const m = '✅ Ya llegó el pago del comprobante de ' + plata(e.monto) + (e.mesa != null ? ' (' + quien(e) + ')' : '') + ' por ' + x.app + (x.de ? ' de ' + x.de : '') + '. Ya puedes entregar.';
+      const m = '✅ Ya llegó el pago del comprobante de ' + plata(e.monto) + (e.mesa != null ? ' (' + quien(e) + ')' : '') + ' por ' + x.app + (pagoDet(x).de ? ' de ' + pagoDet(x).de : '') + '. Ya puedes entregar.';
       try{ showToast(m, 10000); }catch(er){}
       try{ (window.ventoHablar || window.speakVoice || function(){})(m.replace(/[✅$]/g, '')); }catch(er){}
       return false;
@@ -32509,7 +32549,7 @@ window.mesoraCelebrar = function(emojis){
     const scope = (typeof rcptScope !== 'undefined' && rcptScope) || 'table';
     window.comprobanteVerificar(f, mesa, { alRegistrar: r => {
       const a = document.getElementById('paymentAmount'), m = document.getElementById('paymentMethod'), n = document.getElementById('paymentNote');
-      if(a) a.value = r.info.monto; if(m) m.value = 'transferencia'; if(n && !n.value) n.value = '💜 ' + r.info.app + (r.pago && r.pago.de ? ' de ' + r.pago.de : '') + ' (comprobante verificado)';
+      if(a) a.value = r.info.monto; if(m) m.value = 'transferencia'; if(n && !n.value) n.value = '💜 ' + r.info.app + ' (comprobante verificado)';
       document.getElementById('addPaymentBtn').click();
     } }).then(r => {
       // Un comprobante falso no queda adjunto al pago.
