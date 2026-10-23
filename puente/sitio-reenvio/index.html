@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ORDEVA</title>
+<!-- Reenvío de la dirección vieja de la app. El repositorio pasó de «cuentas» a «ORDEVA» y GitHub Pages no redirige solo:
+     …github.io/cuentas/<lo que sea>?<datos>#<datos> → …github.io/ORDEVA/<lo mismo>, sin perder los datos del QR, de la mesa
+     ni del enlace de recuperación de contraseña. -->
+<script>
+  (function(){
+    var p = location.pathname, n = p.replace(/^\/cuentas(\/|$)/i, '/ORDEVA/');
+    if(n === p && (p === '/' || p === '')) n = '/ORDEVA/';
+    if(n !== p) location.replace(n + location.search + location.hash);
+  })();
+</script>
+<style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif;background:#fff;color:#111;text-align:center;padding:20px}a{color:#111;font-weight:700}</style>
+</head>
+<body><p>ORDEVA cambió de dirección.<br><a href="/ORDEVA/">Abrir ORDEVA</a></p></body>
+</html>
