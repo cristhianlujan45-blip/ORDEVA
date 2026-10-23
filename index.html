@@ -5564,6 +5564,34 @@ function ivaBreakdown(total, rate){
 
 const hasNativeStorage = (typeof window !== 'undefined') && !!window.storage && typeof window.storage.get === 'function';
 
+// ---------- Almacén grande del equipo (IndexedDB) ----------
+// 1.51.0: localStorage tiene unos 5 MB por página y ahí vivían los datos del negocio, 7 copias diarias COMPLETAS y las
+// fotos de los comprobantes. Con unas semanas de ventas se llenaba y Vento dejaba de guardar («la memoria está llena»).
+// Ahora lo pesado vive en IndexedDB (cientos de MB). localStorage sigue con una copia de los datos mientras quepa (la
+// usan las versiones viejas de Vento); si ya no cabe, se queda la última que cupo y manda IndexedDB.
+const ventoAlmacen = (() => {
+  let dbP = null;
+  const abrir = () => dbP || (dbP = new Promise((ok, mal) => {
+    try{
+      const r = indexedDB.open('vento-datos', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('kv');
+      r.onsuccess = () => ok(r.result); r.onerror = () => mal(r.error); r.onblocked = () => mal(new Error('IndexedDB bloqueada'));
+    }catch(e){ mal(e); }
+  }).catch(e => { dbP = null; throw e; }));
+  const op = (modo, fn) => abrir().then(db => new Promise((ok, mal) => {
+    const tx = db.transaction('kv', modo); let res;
+    const q = fn(tx.objectStore('kv')); if(q) q.onsuccess = () => { res = q.result; };
+    tx.oncomplete = () => ok(res); tx.onerror = () => mal(tx.error); tx.onabort = () => mal(tx.error || new Error('IndexedDB: se canceló'));
+  }));
+  return { get: k => op('readonly', s => s.get(k)), set: (k, v) => op('readwrite', s => s.put(v, k)), del: k => op('readwrite', s => s.delete(k)), claves: () => op('readonly', s => s.getAllKeys()) };
+})();
+window.ventoAlmacen = ventoAlmacen;
+// Que el navegador no borre este almacén cuando le falte espacio (si lo permite).
+try{ navigator.storage && navigator.storage.persist && navigator.storage.persisted().then(p => { if(!p) navigator.storage.persist().catch(() => {}); }).catch(() => {}); }catch(e){}
+// Hasta este tamaño también se deja la copia en localStorage (de ahí en adelante solo IndexedDB).
+const LS_DATOS_MAX = 1500000;
+const metaLs = key => { try{ return JSON.parse(localStorage.getItem(key + '@t') || 'null'); }catch(e){ return null; } };
+
 async function storageGet(key){
   if(hasNativeStorage){
     try{
@@ -5572,7 +5600,14 @@ async function storageGet(key){
       return null; // key not present yet, or native storage unavailable for this key
     }
   }
+  let idb = null; try{ idb = await ventoAlmacen.get(key); }catch(e){}
   const raw = localStorage.getItem(key);
+  if(idb && typeof idb.v === 'string'){
+    // Manda IndexedDB, salvo que localStorage tenga algo escrito por fuera y más nuevo: un respaldo recibido (no trae
+    // marca) o una versión vieja de Vento (cambió el texto sin cambiar la marca).
+    const m = metaLs(key), porFuera = !!raw && raw !== idb.v && (!m || m.n !== raw.length || m.t > idb.t);
+    return { key, value: porFuera ? raw : idb.v, shared: false };
+  }
   return raw ? { key, value: raw, shared: false } : null;
 }
 
@@ -5580,7 +5615,13 @@ async function storageSet(key, value){
   if(hasNativeStorage){
     return await window.storage.set(key, value, false);
   }
-  localStorage.setItem(key, value);
+  const t = Date.now();
+  let enIdb = false;
+  try{ await ventoAlmacen.set(key, { v: value, t }); enIdb = true; }catch(e){}
+  if(value.length <= LS_DATOS_MAX || !enIdb){
+    try{ localStorage.setItem(key, value); try{ localStorage.setItem(key + '@t', JSON.stringify({ t, n: value.length })); }catch(e){} }
+    catch(e){ if(!enIdb) throw e; }        // no cupo en localStorage pero quedó en IndexedDB: guardado
+  }
   return { key, value, shared: false };
 }
 
@@ -5695,7 +5736,7 @@ window.ventoAplicarDatosNube = async (obj, respaldarLocal) => {
   try{
     if(respaldarLocal && typeof data !== 'undefined' && data){
       // Antes de cambiar este celular a los datos de la nube, se deja un punto de restauración local.
-      try{ let pts = JSON.parse(localStorage.getItem(AUTOBK_KEY)) || []; pts.unshift({ day: new Date().toISOString().slice(0, 10) + ' (antes de la nube)', at: Date.now(), data: JSON.stringify(data) }); localStorage.setItem(AUTOBK_KEY, JSON.stringify(pts.slice(0, 8))); }catch(e){}
+      await autoBackupAgregar({ day: new Date().toISOString().slice(0, 10) + ' (antes de la nube)', at: Date.now(), data: JSON.stringify(data) }, 8, false);
     }
     await storageSet(STORAGE_KEY, JSON.stringify(obj));
     if(typeof authUser !== 'undefined' && authUser) await loadData();
@@ -5724,18 +5765,37 @@ async function saveData(){
 // de nada. No reemplaza el respaldo manual (Ajustes → Transferir), pero salva
 // si algo se dañó por accidente y no había respaldo reciente.
 const AUTOBK_KEY = 'bar-autobk-points';
-function autoBackupTick(json){
-  try{
-    const today = new Date().toISOString().slice(0, 10);
-    let points; try{ points = JSON.parse(localStorage.getItem(AUTOBK_KEY)) || []; }catch(e){ points = []; }
-    if(points.length && points[0].day === today) return;
-    points.unshift({ day: today, at: Date.now(), data: json });
-    points = points.slice(0, 7);
-    localStorage.setItem(AUTOBK_KEY, JSON.stringify(points));
-  }catch(e){ /* si falla (ej. sin espacio), no interrumpe el guardado normal */ }
+// 1.51.0: los puntos viven en IndexedDB (ventoAlmacen). En localStorage, 7 copias COMPLETAS del negocio llenaban la
+// memoria y Vento dejaba de guardar. Los que había en localStorage se pasan solos la primera vez, sin perder ninguno.
+async function autoBackupPoints(){
+  let pts = null; try{ pts = await ventoAlmacen.get(AUTOBK_KEY); }catch(e){}
+  pts = Array.isArray(pts) ? pts : [];
+  let viejos = null; try{ viejos = JSON.parse(localStorage.getItem(AUTOBK_KEY) || 'null'); }catch(e){}
+  if(Array.isArray(viejos) && viejos.length){
+    const todos = pts.concat(viejos.filter(v => v && !pts.some(p => p.at === v.at))).sort((a, b) => (b.at || 0) - (a.at || 0)).slice(0, 8);
+    try{ await ventoAlmacen.set(AUTOBK_KEY, todos); localStorage.removeItem(AUTOBK_KEY); }catch(e){}
+    return todos;
+  }
+  return pts;
 }
-function autoBackupPoints(){
-  try{ return JSON.parse(localStorage.getItem(AUTOBK_KEY)) || []; }catch(e){ return []; }
+let autoBkDia = null, autoBkCola = Promise.resolve();
+// unoPorDia: el punto automático (uno por día); si no, siempre se agrega (p. ej. «antes de la nube»).
+function autoBackupAgregar(punto, max, unoPorDia){
+  autoBkCola = autoBkCola.then(async () => {
+    try{
+      const points = await autoBackupPoints();
+      if(unoPorDia && points.length && points[0].day === punto.day){ autoBkDia = punto.day; return; }
+      points.unshift(punto);
+      await ventoAlmacen.set(AUTOBK_KEY, points.slice(0, max));
+      if(unoPorDia) autoBkDia = punto.day;
+    }catch(e){ /* si falla, no interrumpe el guardado normal */ }
+  });
+  return autoBkCola;
+}
+function autoBackupTick(json){
+  const today = new Date().toISOString().slice(0, 10);
+  if(autoBkDia === today) return;          // ya hay punto de hoy (no se lee el almacén en cada guardado)
+  autoBackupAgregar({ day: today, at: Date.now(), data: json }, 7, true);
 }
 async function restoreAutoBackupPoint(point){
   if(!point) return;
@@ -5835,8 +5895,8 @@ function wireSedesUI(){
   });
 }
 
-function openAutoBackupDialog(){
-  const points = autoBackupPoints();
+async function openAutoBackupDialog(){
+  const points = await autoBackupPoints();
   const o = document.createElement('div');
   o.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;padding:14px';
   const body = points.length
@@ -18265,6 +18325,7 @@ async function resetAll(){
   const keepTheme = data.theme;
   data = defaultData();
   Object.keys(localStorage).filter(k => k.startsWith('cm-rcpt-')).forEach(k => localStorage.removeItem(k));
+  ventoAlmacen.claves().then(ks => ks.filter(k => /^rcpt\//.test(k)).forEach(k => ventoAlmacen.del(k).catch(() => {}))).catch(() => {});
   if(keepTheme) data.theme = keepTheme;
   await saveData();
   renderAll();
@@ -18811,13 +18872,25 @@ const pendingReceipt = { table: null, person: null };
 let rcptScope = null;
 // Comprobantes de pago: en este equipo y en la nube («rcpt/<id>»), para verlos desde cualquier equipo de la cuenta.
 const rcptNube = () => window.ventoNube && window.ventoNube.enNube && window.ventoNube.enNube() && window.ventoNube.archivos;
+// 1.51.0: la foto se guarda en el almacén grande del celular (IndexedDB), no en localStorage (cada foto pesa ~100 KB y
+// llenaba la memoria). Las que había en localStorage se pasan solas (rcptMudar).
 function saveReceipt(dataUrl){
   const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const n = rcptNube(); if(n) n.subir('rcpt/' + id, dataUrl);
-  try{ localStorage.setItem(RCPT_PREFIX + id, dataUrl); return id; }
-  catch(e){ if(n) return id; showToast('No se pudo guardar el comprobante: el almacenamiento está lleno.'); return null; }
+  ventoAlmacen.set('rcpt/' + id, dataUrl).catch(() => {
+    try{ localStorage.setItem(RCPT_PREFIX + id, dataUrl); }
+    catch(e){ if(!n) showToast('No se pudo guardar el comprobante: el almacenamiento está lleno.'); }
+  });
+  return id;
 }
-const delReceipt = id => { if(!id) return; const n = rcptNube(); if(n) n.borrar('rcpt/' + id); try{ localStorage.removeItem(RCPT_PREFIX + id); }catch(e){} };
+const delReceipt = id => { if(!id) return; const n = rcptNube(); if(n) n.borrar('rcpt/' + id); ventoAlmacen.del('rcpt/' + id).catch(() => {}); try{ localStorage.removeItem(RCPT_PREFIX + id); }catch(e){} };
+async function rcptMudar(){
+  let ks = []; try{ ks = Object.keys(localStorage).filter(k => k.indexOf(RCPT_PREFIX) === 0); }catch(e){ return; }
+  for(const k of ks){
+    try{ const v = localStorage.getItem(k); if(v){ await ventoAlmacen.set('rcpt/' + k.slice(RCPT_PREFIX.length), v); localStorage.removeItem(k); } }catch(e){ return; }
+  }
+}
+setTimeout(() => { rcptMudar(); autoBackupPoints(); }, 4000);   // al abrir: lo viejo de localStorage pasa al almacén grande
 function receiptField(scope){
   const img = pendingReceipt[scope];
   pendingReceipt[scope] = null;
@@ -18847,10 +18920,13 @@ document.addEventListener('click', e => {
   const rid = b.dataset.rid, ver = d => { document.getElementById('rcptImg').src = d; document.getElementById('rcptOverlay').classList.add('show'); };
   const d = localStorage.getItem(RCPT_PREFIX + rid);
   if(d){ ver(d); return; }
-  const n = rcptNube();
-  if(!n){ showToast('Ese comprobante no está en este dispositivo.'); return; }
-  showToast('☁️ Trayendo el comprobante…', 2000);
-  n.bajar('rcpt/' + rid).then(u => { if(u) ver(u); else showToast('Ese comprobante no está en tu cuenta ni en este dispositivo.'); });
+  ventoAlmacen.get('rcpt/' + rid).catch(() => null).then(g => {
+    if(g){ ver(g); return; }
+    const n = rcptNube();
+    if(!n){ showToast('Ese comprobante no está en este dispositivo.'); return; }
+    showToast('☁️ Trayendo el comprobante…', 2000);
+    n.bajar('rcpt/' + rid).then(u => { if(u) ver(u); else showToast('Ese comprobante no está en tu cuenta ni en este dispositivo.'); });
+  });
 }, true);
 document.getElementById('rcptClose').addEventListener('click', () => document.getElementById('rcptOverlay').classList.remove('show'));
 
@@ -20419,16 +20495,26 @@ bootApp();
 <script>
 /* === TRANSFERENCIA / RESPALDO COMPLETO === */
 (function(){
-  function collectAppData(){
+  // 1.51.0: también lo que vive en el almacén grande del celular (IndexedDB): los datos del negocio más nuevos y las
+  // fotos de los comprobantes. Las marcas «@t» no viajan (son de este equipo). El formato del archivo no cambia.
+  async function collectAppData(){
     const keys=[];
     for(let i=0;i<localStorage.length;i++) keys.push(localStorage.key(i));
-    const storage={}; keys.forEach(k=>storage[k]=localStorage.getItem(k));
+    const storage={}; keys.filter(k=>!/@t$/.test(k)).forEach(k=>storage[k]=localStorage.getItem(k));
+    try{
+      const ks=await ventoAlmacen.claves();
+      for(const k of ks){
+        if(k===AUTOBK_KEY) continue;
+        if(/^rcpt\//.test(k)){ const v=await ventoAlmacen.get(k); if(typeof v==='string') storage[RCPT_PREFIX+k.slice(5)]=v; continue; }
+        const r=await storageGet(k); if(r&&typeof r.value==='string') storage[k]=r.value;   // la versión más nueva de esos datos
+      }
+    }catch(e){}
     return {format:'cerveceria-backup',version:1,exportedAt:new Date().toISOString(),localStorage:storage};
   }
   const LAST_BACKUP_KEY='bar-last-backup';
   function markBackedUp(){ try{ localStorage.setItem(LAST_BACKUP_KEY, String(Date.now())); }catch(e){} }
-  function downloadBackup(){
-    const blob=new Blob([JSON.stringify(collectAppData(),null,2)],{type:'application/json'});
+  async function downloadBackup(){
+    const blob=new Blob([JSON.stringify(await collectAppData(),null,2)],{type:'application/json'});
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='respaldo-cerveceria-'+new Date().toISOString().slice(0,10)+'.json'; a.click();
     setTimeout(()=>URL.revokeObjectURL(a.href),1000);
     markBackedUp();
@@ -20441,7 +20527,8 @@ bootApp();
         const b=JSON.parse(rd.result);
         if(!b || b.format!=='cerveceria-backup' || !b.localStorage) throw new Error('Formato no válido');
         if(!confirm('Esto reemplazará los datos actuales de la aplicación por los del respaldo. ¿Continuar?')) return;
-        Object.keys(b.localStorage).forEach(k=>localStorage.setItem(k,b.localStorage[k]));
+        // Lo recibido manda: sin marca «@t», storageGet lo toma aunque el almacén grande tenga otra cosa.
+        Object.keys(b.localStorage).filter(k=>!/@t$/.test(k)).forEach(k=>{ try{ localStorage.removeItem(k+'@t'); }catch(e){} localStorage.setItem(k,b.localStorage[k]); });
         alert('Respaldo recibido correctamente. La aplicación se recargará.'); location.reload();
       }catch(e){ alert('No se pudo importar el respaldo: '+e.message); }
     }; rd.readAsText(file);
@@ -20451,7 +20538,7 @@ bootApp();
   // cuenta local guardada (celular nuevo, datos borrados, etc.).
   window.importBackup = importBackup;
   async function shareBackup(){
-    const blob=new Blob([JSON.stringify(collectAppData(),null,2)],{type:'application/json'});
+    const blob=new Blob([JSON.stringify(await collectAppData(),null,2)],{type:'application/json'});
     const file=new File([blob],'respaldo-cerveceria.json',{type:'application/json'});
     if(navigator.share && navigator.canShare && navigator.canShare({files:[file]})){
       try{await navigator.share({title:'Respaldo Cervecería',text:'Respaldo completo de la aplicación',files:[file]}); markBackedUp(); return;}catch(e){}
@@ -25824,7 +25911,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-22 · v1.50.0';
+const MESORA_VERSION = '2026-10-23 · v1.51.0';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'Vento · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 /* 🔄 La app Android se actualiza SOLA (Actualizador): revisa cada 3 h, baja la versión nueva y la instala cuando no se
@@ -28342,7 +28429,11 @@ function mesoraExplicar(e){
 }
 function mesoraLiberarEspacio(){
   const hecho = [];
-  try{
+  // 1.51.0: los puntos de restauración y los comprobantes se pasan al almacén grande del celular (IndexedDB), sin borrarlos.
+  if(window.indexedDB && typeof autoBackupPoints === 'function'){
+    try{ if(localStorage.getItem('bar-autobk-points')){ autoBackupPoints(); hecho.push('Pasé los puntos de restauración al almacén grande del celular (liberé espacio sin borrar nada).'); } }catch(e){}
+    try{ if(Object.keys(localStorage).some(k => k.indexOf(RCPT_PREFIX) === 0)){ rcptMudar(); hecho.push('Pasé las fotos de los comprobantes al almacén grande del celular.'); } }catch(e){}
+  } else try{
     let pts = JSON.parse(localStorage.getItem('bar-autobk-points') || '[]') || [];
     if(pts.length > 2){ localStorage.setItem('bar-autobk-points', JSON.stringify(pts.slice(0, 2))); hecho.push('Dejé solo los 2 puntos de restauración más recientes (liberé espacio).'); }
   }catch(e){ try{ localStorage.removeItem('bar-autobk-points'); hecho.push('Borré los puntos de restauración automáticos, que estaban dañados.'); }catch(x){} }

@@ -27,8 +27,53 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  desplegar:
+  # Antes de tocar PRODUCCIÓN (1.52.0, auditoría técnica): la corrida manual solo desde la rama principal, ninguna
+  # migración nueva borra datos y todas se aplican sobre un PostgreSQL vacío (pruebas/servidor/revisar-migraciones.js).
+  # Si algo falla, «desplegar» no corre y la base de datos de producción queda como estaba.
+  revisar:
     if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - name: ¿Desde la rama principal?
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/claude/precio-margen-productos-tabla-mioclt" ]; then
+            echo "::error title=Rama equivocada::Producción solo se despliega desde la rama principal (claude/precio-margen-productos-tabla-mioclt). Esta corrida es de ${GITHUB_REF_NAME}: no se toca nada."
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Revisar las migraciones (no borran datos y se aplican completas)
+        env:
+          VENTO_PG_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres
+          ANTES: ${{ github.event.before }}
+        run: |
+          npm install --prefix pruebas --no-save --no-audit --no-fund pg@8 >/dev/null
+          # Las migraciones nuevas de este envío (en una corrida manual o sin «antes»: todas).
+          if [ -n "$ANTES" ] && [ "$ANTES" != "0000000000000000000000000000000000000000" ] && git cat-file -e "$ANTES" 2>/dev/null; then
+            NUEVAS=$(git diff --name-only --diff-filter=AM "$ANTES" "$GITHUB_SHA" -- supabase/migrations | grep '\.sql$' || true)
+          else
+            NUEVAS=$(ls supabase/migrations/*.sql)
+          fi
+          echo "Migraciones a revisar: ${NUEVAS:-ninguna nueva}"
+          NODE_PATH="$PWD/pruebas/node_modules" node pruebas/servidor/revisar-migraciones.js $NUEVAS
+
+  desplegar:
+    needs: revisar
+    if: github.event_name != 'schedule' && github.ref == 'refs/heads/claude/precio-margen-productos-tabla-mioclt'
     runs-on: ubuntu-latest
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
