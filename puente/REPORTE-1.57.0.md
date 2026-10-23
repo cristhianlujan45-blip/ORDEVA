@@ -87,6 +87,11 @@ Ya estaban en el código, pero sin pruebas. Ahora se prueban contra una API simu
 - **README al día:** canales del servidor (sin ntfy), pagos, links `/ORDEVA/` y seguridad.
 - **Pruebas de la app en GitHub:** se agregan `alertaspagos` y `clavelocal` a las críticas.
 
+## Arreglo de la 1.56.0 (antes de publicarla)
+- Al abrir la app se agregaba un campo vacío `qrCodigos` a los datos del negocio aunque no hubiera códigos de mesa
+  que guardar. La prueba `practica` («los datos quedan EXACTAMENTE igual») lo detectó en la batería completa. Ahora el
+  campo solo se crea cuando hay un código que guardar. Por eso la 1.56.0 se publica junto con la 1.57.0.
+
 ## Pruebas
 - **Servidor:** las 20 baterías pasan (814 comprobaciones), con 4 nuevas: aislamiento 9, iacupo 6, wompi 18 y
   nequiconecta 16.
@@ -105,7 +110,8 @@ Ya estaban en el código, pero sin pruebas. Ahora se prueban contra una API simu
   - `recuperacion` 25;
   - `cerrarcaja` 26;
   - `puertabloqueo` 12;
-  - `holaapk` 10.
+  - `holaapk` 10;
+  - `practica` 25, `canalseguro` 16 y `herramientas` 28 (después del arreglo de `qrCodigos`).
 - **No probado aquí:**
   - la función `vento-ia` (corre en Supabase; el arnés local solo corre `vento-pagos` y `vento-suscripciones`);
   - las alertas en un celular real.

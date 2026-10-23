@@ -22106,10 +22106,12 @@ function qCodigosCompartir(){
   try{
     if(typeof data==='undefined'||!data)return;
     const c=LS('vito_qr',{}),v=Object.assign({},(qrFijoDe()||{}).v||{},c.v||{});let cambio=false;
-    data.qrCodigos=data.qrCodigos&&typeof data.qrCodigos==='object'?data.qrCodigos:{};
+    // Solo se crea data.qrCodigos cuando hay un código que guardar (no se cambian los datos del negocio por nada).
+    const qc=data.qrCodigos&&typeof data.qrCodigos==='object'?data.qrCodigos:{};
     Object.keys(v).forEach(id=>{ const k=String(v[id]||'');if(!/^\w{6,40}$/.test(k))return;
-      const a=Array.isArray(data.qrCodigos[id])?data.qrCodigos[id]:(data.qrCodigos[id]?[data.qrCodigos[id]]:[]);
-      if(a.indexOf(k)<0){a.push(k);data.qrCodigos[id]=a.slice(-4);cambio=true;} });
+      const a=Array.isArray(qc[id])?qc[id]:(qc[id]?[qc[id]]:[]);
+      if(a.indexOf(k)<0){a.push(k);qc[id]=a.slice(-4);cambio=true;} });
+    if(cambio)data.qrCodigos=qc;
     if(cambio)saveData();
   }catch(e){}
 }
