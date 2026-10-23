@@ -1,4 +1,4 @@
-# Vento 1.51.0 · Que no se pierdan ventas por memoria llena, y producción protegida al desplegar
+# Vento 1.51.0 · Que no se pierdan ventas por memoria llena, producción protegida al desplegar y página de pedidos juvenil
 
 Son los pasos 2 y 3 del plan de la auditoría técnica: el hallazgo crítico C1 y el alto A3.
 
@@ -55,6 +55,29 @@ Archivos: `.github/workflows/servidor-vento.yml` y `pruebas/servidor/revisar-mig
   - el respaldo de datos antes de migrar: no se puede subir a GitHub porque los archivos de un repositorio público
     quedarían a la vista. Se hará con los respaldos propios de Supabase.
 
+## 🎵 Página de pedidos por QR: diseño juvenil y música más fácil
+El dueño: «Rectifica que la gente pueda pedir música por el QR, dale un diseño más fácil y juvenil a la app de pedidos
+(Vento déjala como está) y que no haya límite de la API de YouTube. El límite de 10 canciones déjalo así».
+- **Revisado en producción:** el buscador del Servidor Vento responde en menos de 1 s con 10 canciones de youtube.com,
+  sin usar la API de YouTube ni su cupo.
+- **Diseño juvenil, solo en `pedido.html`** (la página que abre el cliente con el QR); Vento queda igual:
+  - fondo de noche con brillos magenta, violeta y cian;
+  - títulos con letra redondeada (Fredoka);
+  - pestañas y botones en forma de píldora, con degradado rosado y violeta;
+  - mensaje de «enviado» en verde-cian.
+- **Pedir música más fácil:**
+  - **«▶ Pedir» en cada canción:** la pide con un toque y el botón queda «✅ Pedida». Pasa por las mismas reglas de
+    siempre: cupo de la mesa, turnos y guardado si no hay señal.
+  - **Géneros de un toque:** Reguetón, Salsa, Vallenato, Despecho, Popular, Pop, Rock y Electrónica. Salen 8
+    canciones para escoger, sin escribir.
+  - Todo en los 6 idiomas de la página.
+- **Sin límite de la API de YouTube:**
+  - antes, cuando el servidor no encontraba un artista, la página buscaba en la API de YouTube, y cada búsqueda gastaba
+    100 de las 10.000 unidades diarias;
+  - ahora «no hay resultados» es una respuesta válida y la API solo se usa si el servidor no responde;
+  - en la app del local ya era así: primero la búsqueda de la app Android, luego el servidor y la API solo de respaldo.
+- **El límite de 10 canciones por mesa queda igual.**
+
 ## Lo que no cambia
 - La nube, la sincronización entre equipos, el formato de los datos y de los respaldos, y los QR.
 - Ninguna función se quitó y ningún dato se borra en la mudanza: lo de `localStorage` se borra **solo después** de
@@ -70,7 +93,17 @@ Archivos: `.github/workflows/servidor-vento.yml` y `pruebas/servidor/revisar-mig
   5. El respaldo lleva los datos más nuevos y los comprobantes, y al recibirlo en otro celular manda lo recibido.
   6. Un cambio de una versión vieja de Vento no se pierde.
   7. «Restablecer todo» no deja comprobantes escondidos.
-- **Suite completa:** ver el resultado de la corrida de esta versión.
+- **Nueva, `pedidomusica`:** 14 comprobaciones.
+  - Géneros de un toque que buscan por el servidor sin tocar la API.
+  - «▶ Pedir» manda la canción al local y queda «✅ Pedida».
+  - Al escribir, si el servidor no encuentra artistas, no se gasta cupo.
+  - Con 10 canciones pedidas no deja pedir más y avisa.
+  - En un celular de 320 px nada se sale y los botones son de dedo.
+  - Los 6 idiomas.
+- **También pasan:** `cancionesmesa`, `youtubesincupo`, `canalvivo`, `seguridadqr` y `erroresreal`.
+- **Suite completa:** 77 de 80 a la primera; las 3 restantes:
+  - `cuentas` y `dian` fallan solo con la máquina cargada y pasan solas (43 de 43 y 29 de 29);
+  - `appoweb` falla igual en la 1.50 publicada (se cuelga al cargar una dirección), así que no es de esta versión.
 
 ## Lo que sigue (plan de la auditoría)
 - **Ya, sin código:** restringir la clave de YouTube al dominio de Vento en Google Cloud.
