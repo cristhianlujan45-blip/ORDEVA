@@ -1,6 +1,31 @@
-# Vento 1.54.0 · Con el QR de una mesa ya no se pueden leer los pedidos del negocio
+# Vento 1.54.0 · Con el QR de una mesa ya no se pueden leer los pedidos del negocio (+ arreglo de permisos urgente)
 
-Es la parte **D8** de la Fase 3 · Seguridad.
+Es la parte **D8** de la Fase 3 · Seguridad. Además trae un **arreglo de seguridad urgente** que se encontró al
+probar los respaldos (ver abajo).
+
+## ⚠️ Arreglo urgente: tres permisos dejaban pasar a alguien de afuera
+- **El problema (comprobado con una prueba contra PostgreSQL real):**
+  - `rol_en(negocio)` devuelve «nada» (NULL) para quien no es del negocio, y en SQL «nada no está en (dueño, admin)»
+    no es verdadero, así que el «si no es dueño → error» no saltaba.
+  - Cualquier cuenta de Vento con sesión que conociera el id de un negocio podía:
+    - **sacar un código de invitación, incluso de administrador, y unirse a ese negocio** (`crear_invitacion`);
+    - **cambiarle el rol a los miembros**, incluso bajar al dueño (`cambiar_rol`);
+    - **restaurar un respaldo** de ese negocio (`restaurar_respaldo`).
+  - No se sabe que alguien lo haya usado; el id del negocio no se muestra en la app, pero no es secreto.
+- **El arreglo** (`supabase/migrations/20261104100000_permisos_sin_hueco.sql`): las tres funciones piden de verdad
+  ser dueño (o administrador donde aplica). Lo demás queda exactamente igual.
+- **Revisión por si alguien lo usó:**
+  - Cada código de invitación hecho por alguien que hoy no es dueño ni administrador de ese negocio queda en la
+    **auditoría del negocio** como `invitacion_sospechosa` (código, rol, quién lo usó y cuándo).
+  - Los que nadie ha usado quedan vencidos. **No se borra nada ni se saca a nadie.**
+  - Si aparece alguno con `usada_por`, el dueño debe revisar su equipo en «👥 Equipo» y sacar a quien no conozca.
+- Las demás funciones con permisos ya revisaban este caso (pagos, integraciones, suscripción, DIAN, clave de IA,
+  dispositivos, actividad); `quitar_miembro` también estaba bien.
+- **Prueba nueva, `servidor/permisos`:** 19 comprobaciones.
+  - Otra cuenta no saca códigos, no cambia roles, no restaura y no saca a nadie.
+  - El dueño y el administrador siguen igual.
+  - Los códigos sospechosos quedan en la auditoría y vencidos, y los buenos no se tocan.
+  - Sin el arreglo, 6 de esas comprobaciones fallan: el hueco era real.
 
 ## El problema (verificado en el código)
 - El QR de cada mesa lleva el nombre del **canal de pedidos** del negocio. Ese nombre era la única llave.
@@ -55,4 +80,9 @@ Archivos:
   pasa.
 - **Todas las pruebas del servidor pasan:** `admin` 142, `avisos` 27, `bloqueos` 18, `daviplata` 101, `dian` 69,
   `errores` 30, `iaclave` 34, `proyeccion` 66, `repasos` 20 y `suscripciones` 154.
-- `revisar-migraciones`: no borra datos y las 29 migraciones se aplican con RLS en todas las tablas.
+- `revisar-migraciones`: no borra datos y las 30 migraciones se aplican con RLS en todas las tablas.
+- **Todas las pruebas de la app (83):** pasan 82.
+  - `cuentas` falla a veces en un paso de cambiar de cuenta en el mismo celular, por tiempos de este computador de
+    pruebas.
+  - Falla igual con la versión 1.53.2 (la que está publicada) y también con la lectura con sesión apagada; en otra
+    corrida pasó completa (43 de 43). No es de este cambio.
