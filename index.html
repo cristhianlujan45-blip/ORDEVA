@@ -21564,7 +21564,7 @@ const qCfg=()=>{
     else{c.topic='vito'+Array.from(crypto.getRandomValues(new Uint8Array(12)),b=>(b%36).toString(36)).join('');c.nuevo=Date.now();}
     SS('vito_qr',c);
   }
-  // Los pedidos van directo a GitHub: si quedó guardada la dirección de Netlify (la de los QR impresos), los
+  // Todo lo hace ORDEVA (Netlify se quitó en la 1.55.5): si en este celular quedó guardada la dirección de Netlify, los
   // links que arma Vento (pedido, WhatsApp, domicilios, ver/imprimir QR) pasan a GitHub. El canal y el código
   // de cada mesa NO cambian, así que los QR ya pegados siguen sirviendo igual.
   // 1.55.2: también la dirección vieja de este mismo sitio (…/cuentas/ → …/ORDEVA/, el repositorio cambió de nombre).
@@ -26006,7 +26006,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-23 · v1.55.4';
+const MESORA_VERSION = '2026-10-23 · v1.55.5';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'Vento · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 /* 🔄 La app Android se actualiza SOLA (Actualizador): revisa cada 3 h, baja la versión nueva y la instala cuando no se

@@ -9,7 +9,7 @@ Son páginas HTML independientes, sin backend ni instalación. Cada una corre en
 ## Arquitectura y flujos
 
 ```
-QR impreso (Netlify) ──► netlify-qr/index.html ──► GitHub Pages /pedido.html?mesa=N&c=CANAL&v=CÓDIGO
+QR impreso (ORDEVA) ─────────────────────────────► GitHub Pages /ORDEVA/pedido.html?mesa=N&c=CANAL&v=CÓDIGO
                                                      │  pedido JSON {id único, mesa, items, total}
                                                      ▼
                                ntfy.sh/CANAL  ──►  index.html (app del local)
@@ -29,7 +29,6 @@ Canción por QR ──► ntfy.sh/CANAL ──► cola de música (sin duplicado
 | `tv.html` | El TV reproduce la cola de canciones sola y muestra el tiempo real, la mesa y la siguiente canción. |
 | `mesero.html` | App de los meseros en su celular, por un canal privado. |
 | `licencias.html` | Códigos para sedes adicionales, firmados con una llave privada que no está en el repositorio. |
-| `netlify-qr/` | Redirección estable para los QR ya impresos (ver más abajo). |
 | `puente/laya-worker.js` | Puente seguro (Cloudflare Worker) hacia el motor de decisiones Laya. |
 | `puente/youtube-tv-worker.js` | Puente para la opción "YouTube del TV" (vincular con código de TV). |
 | `icons/` | Ícono y logo de Vento. |
@@ -178,21 +177,23 @@ Sin Vento Nube sigue el sistema anterior (prueba local + código de activación)
 - Cómo cobrar, aprobar, renovar, cancelar y cambiar planes: [BETA_BILLING.md](BETA_BILLING.md)
 - Qué queda listo para Google Play Billing: [FUTURE_GOOGLE_PLAY.md](FUTURE_GOOGLE_PLAY.md)
 
-## Todo corre en GitHub (y qué queda de Netlify)
+## Todo corre en ORDEVA (sin Netlify)
 
-La app, la página de pedidos, la preparación, el TV, los meseros y los QR nuevos salen de **GitHub Pages**. La app no tiene ninguna referencia a Netlify.
+La app, la página de pedidos, la preparación, el TV, los meseros y los QR salen de **GitHub Pages** en
+`https://cristhianlujan45-blip.github.io/ORDEVA/`. Netlify se quitó por completo en la 1.55.5: no hay ningún archivo
+ni referencia a Netlify.
 
-**Lo único que queda.** Los QR que ya están pegados en las mesas tienen impresa la dirección `joyful-basbousa-0bc49b.netlify.app`. Ese dominio solo se puede atender desde Netlify. Por eso se mantiene, únicamente, una redirección de dos archivos:
-- `netlify-qr/index.html` y `_redirects`: reenvían a `pedido.html` de GitHub con los mismos datos del QR;
-- `netlify.toml`: impide que Netlify vuelva a publicar con cada cambio.
+**Los QR los genera la app:** Ajustes → QR de las mesas → Generar o imprimir. Apuntan a `…/ORDEVA/pedido.html` con
+el canal y el código de cada mesa.
 
-Así el QR físico sigue funcionando sin reimprimirlo.
+**QR pegados viejos:**
+- **Con la dirección de Netlify** (`joyful-basbousa-0bc49b.netlify.app`): **hay que reimprimirlos.** Ese sitio
+  servía una copia vieja con ntfy.sh, que ya no funciona. Al reimprimir, el canal y los códigos de cada mesa siguen
+  iguales. Después se puede borrar el sitio en Netlify.
+- **Con la dirección `…github.io/cuentas/`:** siguen sirviendo con el sitio de reenvío de `puente/sitio-reenvio/`.
 
-**Para quitar Netlify por completo:**
-1. Imprime QR nuevos. La app ya los genera con la dirección de GitHub: Ajustes → QR de las mesas → Generar.
-2. Después de reemplazarlos, borra el sitio en Netlify y la carpeta `netlify-qr/` con `netlify.toml`.
-
-**Si pierdes la configuración.** En la app, Ajustes → QR de las mesas → 📌 «Fijar mis QR impresos» (con la foto de un QR) hace que la app vuelva a escuchar el canal de los QR pegados.
+**Si pierdes la configuración.** En la app, Ajustes → QR de las mesas → 📌 «Fijar mis QR impresos», con la foto de
+un QR, hace que la app vuelva a escuchar el canal de los QR pegados.
 
 ## Links (GitHub Pages)
 
