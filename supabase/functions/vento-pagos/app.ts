@@ -28,7 +28,7 @@ import * as G from "./google.ts";
 import * as F from "./dian.ts";
 import { type Env, ErrorVento, log, sha256 } from "./util.ts";
 
-export const VERSION = "1.23.2";
+export const VERSION = "1.24.0";
 const SITIO = "https://cristhianlujan45-blip.github.io/ORDEVA/";
 
 type Pago = { id: string; negocio_id?: string; referencia: string; proveedor: string; metodo: string; canal: string; monto: number;
