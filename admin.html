@@ -4,13 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<title>Vento Admin</title>
+<title>ORDEVA Admin</title>
 <link rel="icon" type="image/png" href="icons/ordeva-64.png">
 <link rel="apple-touch-icon" href="icons/ordeva-180.png">
 <meta name="theme-color" content="#0f0f16">
 <style>
   /* ============================================================
-     Vento Admin — panel del PROVEEDOR de Vento.
+     ORDEVA Admin — panel del PROVEEDOR de ORDEVA.
      Clientes, suscripciones (licencias firmadas), pagos, resumen del negocio y la configuración
      que la app de todos los negocios lee (precio, días de prueba, anuncio, negocios suspendidos).
      Los datos de los clientes quedan SOLO en este equipo (con respaldo descargable). La llave privada
@@ -102,7 +102,7 @@
   .guia ul, .guia ol{ margin:0; padding-left:20px; font-size:14px; }
   .guia li{ margin:4px 0; }
 
-  /* ---------- 💳 Suscripciones (Vento Nube) ---------- */
+  /* ---------- 💳 Suscripciones (ORDEVA Nube) ---------- */
   nav button .nb{ display:inline-block; min-width:18px; margin-left:6px; padding:0 6px; border-radius:999px; background:var(--warn); color:#1b1830; font-size:11.5px; font-weight:800; line-height:18px; text-align:center; }
   .pill.acc{ color:var(--acc2); }
   .sx-login{ max-width:440px; margin:8px auto 0; }
@@ -208,8 +208,8 @@
 <div class="lock" id="lock" hidden>
   <div class="card">
     <img src="icons/ordeva-180.png" alt="" style="width:64px;height:64px;border-radius:16px">
-    <h2 id="lockTit" style="margin-top:10px">Vento Admin</h2>
-    <p class="soft" id="lockTxt">Solo para el administrador de Vento. Entra con tu correo y tu contraseña de administrador.</p>
+    <h2 id="lockTit" style="margin-top:10px">ORDEVA Admin</h2>
+    <p class="soft" id="lockTxt">Solo para el administrador de ORDEVA. Entra con tu correo y tu contraseña de administrador.</p>
     <div id="lkEntrar">
       <input id="lkCorreo" type="email" autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false" placeholder="Correo del administrador">
       <input id="lkClave" type="password" autocomplete="current-password" placeholder="Contraseña" style="margin-top:8px">
@@ -217,7 +217,7 @@
       <div class="row" style="margin-top:6px"><button class="b" id="lkOlvide" type="button">¿Olvidaste la contraseña?</button><button class="b" id="lkCrear" type="button">Crear mi cuenta</button></div>
     </div>
     <div id="lkCrearBox" hidden>
-      <p class="soft" style="margin-top:0">La primera vez: crea la cuenta con el correo de administrador y una contraseña de al menos 8 caracteres. <b>Para usar Vento como cliente usa otro correo (o tu correo con «+cliente») y otra contraseña.</b></p>
+      <p class="soft" style="margin-top:0">La primera vez: crea la cuenta con el correo de administrador y una contraseña de al menos 8 caracteres. <b>Para usar ORDEVA como cliente usa otro correo (o tu correo con «+cliente») y otra contraseña.</b></p>
       <input id="lkNCorreo" type="email" autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false" placeholder="Correo del administrador">
       <input id="lkNClave" type="password" autocomplete="new-password" placeholder="Contraseña nueva" style="margin-top:8px">
       <input id="lkNClave2" type="password" autocomplete="new-password" placeholder="Repite la contraseña" style="margin-top:8px">
@@ -247,8 +247,8 @@
 <header>
   <div class="top">
     <img src="icons/ordeva-180.png" alt="">
-    <h1>Vento Admin<small>Panel del proveedor · clientes, suscripciones y la app</small></h1>
-    <a class="b" href="index.html" target="_blank" rel="noopener" title="Abrir Vento">📱 Vento</a>
+    <h1>ORDEVA Admin<small>Panel del proveedor · clientes, suscripciones y la app</small></h1>
+    <a class="b" href="index.html" target="_blank" rel="noopener" title="Abrir ORDEVA">📱 ORDEVA</a>
     <button class="b" id="salir" type="button" title="Cerrar sesión de administrador">🔒</button>
   </div>
   <nav id="tabs">
@@ -308,8 +308,8 @@
     </div>
     <p class="soft" id="usInfo" style="margin-top:0"></p>
     <div class="list" id="usLista"><div class="empty">Cargando…</div></div>
-    <details class="card" style="margin-top:14px"><summary><b>📱 Equipos que usan Vento sin cuenta en la nube</b></summary>
-      <p class="soft">Negocios que abrieron Vento con un usuario de ese equipo (sin correo). Invítalos a crear su cuenta para tener sus datos seguros y en todos sus equipos.</p>
+    <details class="card" style="margin-top:14px"><summary><b>📱 Equipos que usan ORDEVA sin cuenta en la nube</b></summary>
+      <p class="soft">Negocios que abrieron ORDEVA con un usuario de ese equipo (sin correo). Invítalos a crear su cuenta para tener sus datos seguros y en todos sus equipos.</p>
       <div class="list" id="usLocales"></div>
     </details>
   </section>
@@ -334,7 +334,7 @@
 
   <!-- ===================== ERRORES (lo que falla en los equipos de los clientes) ===================== -->
   <section data-tab="errores">
-    <p class="soft" style="margin-top:0">Lo que falla en los equipos de tus clientes llega aquí solo: errores de la app, música que no suena, pedidos por QR que el local no confirma y avisos de pago que Vento no entendió. El mismo error se agrupa (cuántas veces, en cuántos equipos y negocios). Solo llega el error: nunca ventas, productos ni datos de sus clientes.</p>
+    <p class="soft" style="margin-top:0">Lo que falla en los equipos de tus clientes llega aquí solo: errores de la app, música que no suena, pedidos por QR que el local no confirma y avisos de pago que ORDEVA no entendió. El mismo error se agrupa (cuántas veces, en cuántos equipos y negocios). Solo llega el error: nunca ventas, productos ni datos de sus clientes.</p>
     <div class="bar">
       <select id="erEstado" aria-label="Errores">
         <option value="abiertos">🔴 Sin resolver</option>
@@ -352,7 +352,7 @@
     </div>
     <details class="card" id="frBox" style="margin-bottom:12px">
       <summary style="cursor:pointer;font-weight:800">💜 Frases de pago <span class="soft" id="frCuenta"></span></summary>
-      <p class="soft" style="margin:8px 0">Si un banco cambia cómo escribe el aviso de un pago, agrega aquí la frase: le llega <b>al instante</b> a la app de todos los negocios, sin reinstalar nada. <b>Es un pago</b>: Vento lo toma y dice el valor que traiga el aviso. <b>No es un pago</b>: Vento lo ignora (publicidad, saldo…). Solo frases: nunca nombres ni valores.</p>
+      <p class="soft" style="margin:8px 0">Si un banco cambia cómo escribe el aviso de un pago, agrega aquí la frase: le llega <b>al instante</b> a la app de todos los negocios, sin reinstalar nada. <b>Es un pago</b>: ORDEVA lo toma y dice el valor que traiga el aviso. <b>No es un pago</b>: ORDEVA lo ignora (publicidad, saldo…). Solo frases: nunca nombres ni valores.</p>
       <div class="bar">
         <input id="frTexto" type="text" maxlength="120" placeholder="Frase del aviso, ej. Abono a tu DaviPlata" aria-label="Frase del aviso">
         <select id="frTipo" aria-label="Qué es"><option value="pago">💜 Es un pago</option><option value="ignorar">🚫 No es un pago</option></select>
@@ -364,14 +364,14 @@
     <div class="list" id="erLista"><div class="empty">Cargando…</div></div>
   </section>
 
-  <!-- ===================== SUSCRIPCIONES (Vento Nube) ===================== -->
+  <!-- ===================== SUSCRIPCIONES (ORDEVA Nube) ===================== -->
   <section data-tab="subs">
-    <div class="sx-carga" id="sxCargando"><span class="spin"></span> Conectando con Vento Nube…</div>
+    <div class="sx-carga" id="sxCargando"><span class="spin"></span> Conectando con ORDEVA Nube…</div>
 
     <div class="card sx-login" id="sxLogin" hidden>
       <div class="sx-hero">💳</div>
-      <h2>Suscripciones de Vento Nube</h2>
-      <p class="soft">Aprueba los pagos por Nequi y DaviPlata, maneja planes, precios y la prueba gratis. Entra con tu cuenta de Vento Nube: el servidor revisa que sea administradora de Vento.</p>
+      <h2>Suscripciones de ORDEVA Nube</h2>
+      <p class="soft">Aprueba los pagos por Nequi y DaviPlata, maneja planes, precios y la prueba gratis. Entra con tu cuenta de ORDEVA Nube: el servidor revisa que sea administradora de ORDEVA.</p>
       <label for="sxCorreo">Correo</label>
       <input id="sxCorreo" type="email" autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false" placeholder="tucorreo@gmail.com">
       <label for="sxClave">Contraseña</label>
@@ -382,16 +382,16 @@
 
     <div class="card sx-login" id="sxNoAdmin" hidden>
       <div class="sx-hero" style="background:linear-gradient(135deg,#fb7185,#be123c)">⛔</div>
-      <h2>Esta cuenta no es administradora de Vento</h2>
+      <h2>Esta cuenta no es administradora de ORDEVA</h2>
       <p class="soft">Entraste como <b id="sxNoAdminCorreo"></b>, pero el servidor no la tiene en la lista de administradores (<code>platform_admins</code>). Pide que la agreguen, o pon tu correo en el secreto <code>VENTO_ADMIN_EMAILS</code> del servidor y vuelve a entrar.</p>
       <div class="row"><button class="b p" id="sxOtra" type="button">Usar otra cuenta</button></div>
     </div>
 
     <div id="sxPanel" hidden>
       <div class="sx-head">
-        <div class="sx-who"><div class="av">👑</div><div class="t"><b id="sxQuien"></b><small>✓ Administrador de Vento</small></div></div>
+        <div class="sx-who"><div class="av">👑</div><div class="t"><b id="sxQuien"></b><small>✓ Administrador de ORDEVA</small></div></div>
         <button class="b" id="sxRefrescar" type="button" title="Actualizar">🔄</button>
-        <button class="b" id="sxSalir" type="button" title="Salir de la cuenta de Vento Nube">Salir</button>
+        <button class="b" id="sxSalir" type="button" title="Salir de la cuenta de ORDEVA Nube">Salir</button>
       </div>
       <div class="grid" id="sxKpis"></div>
       <div class="subnav" id="sxNav" role="tablist">
@@ -503,7 +503,7 @@
   <section data-tab="licencias">
     <div class="card">
       <h2>🔑 Nueva licencia</h2>
-      <p class="soft">Solo tú puedes crear licencias. Cada licencia es <b>única</b>: un solo cliente y <b>un solo negocio</b> (sirve en todos sus equipos: computador, tablet, celular). Para otra sede u otro negocio, el cliente necesita otra cuenta y otra licencia. Si escribes el correo del cliente, <b>solo esa cuenta</b> la puede usar (se le activa sola al entrar a Vento).</p>
+      <p class="soft">Solo tú puedes crear licencias. Cada licencia es <b>única</b>: un solo cliente y <b>un solo negocio</b> (sirve en todos sus equipos: computador, tablet, celular). Para otra sede u otro negocio, el cliente necesita otra cuenta y otra licencia. Si escribes el correo del cliente, <b>solo esa cuenta</b> la puede usar (se le activa sola al entrar a ORDEVA).</p>
       <div class="f2">
         <div><label for="lsPlan">Plan</label><select id="lsPlan"><option value="pro">PRO</option></select></div>
         <div><label for="lsTipo">Duración</label><select id="lsTipo">
@@ -545,11 +545,11 @@
     <div class="card">
       <h2>👑 Tú como proveedor</h2>
       <p class="soft">Activa TUS celulares como proveedor (control total, sin vencimiento, sin prueba). Sirve en todos los celulares de tu negocio.</p>
-      <label for="provCod">Código de TU negocio (en Vento: Ajustes → Negocio → Plan y suscripción)</label>
+      <label for="provCod">Código de TU negocio (en ORDEVA: Ajustes → Negocio → Plan y suscripción)</label>
       <input id="provCod" placeholder="ABCD-1234" autocapitalize="characters" autocomplete="off">
       <div class="row"><button class="b p" id="provGo" type="button">👑 Crear mi licencia de proveedor</button></div>
       <div id="provRes" hidden><div class="out" id="provLink"></div>
-        <div class="row"><a class="b p" id="provApp" href="#">📲 Abrir en la app Vento</a><a class="b" id="provWeb" href="#" target="_blank" rel="noopener">🌐 Abrir en el navegador</a><button class="b" id="provCopiar" type="button">📋 Copiar</button></div></div>
+        <div class="row"><a class="b p" id="provApp" href="#">📲 Abrir en la app ORDEVA</a><a class="b" id="provWeb" href="#" target="_blank" rel="noopener">🌐 Abrir en el navegador</a><button class="b" id="provCopiar" type="button">📋 Copiar</button></div></div>
     </div>
     <div class="card">
       <h2>🧾 Crear un código suelto</h2>
@@ -572,7 +572,7 @@
     <div class="card">
       <h2>📦 Planes que vendes</h2>
       <p class="soft">Se usan al activar un cliente y se muestran en la app para que el negocio elija y pague (al publicar en «⚙️ Configurar la app»).</p>
-      <p class="soft">Son los planes del sistema de licencias (negocios sin Vento Nube). Los precios de los negocios conectados a Vento Nube se manejan en «💳 Suscripciones → 📦 Planes».</p>
+      <p class="soft">Son los planes del sistema de licencias (negocios sin ORDEVA Nube). Los precios de los negocios conectados a ORDEVA Nube se manejan en «💳 Suscripciones → 📦 Planes».</p>
       <div class="list" id="plLista"></div>
       <div class="row"><button class="b p" id="plNuevo" type="button">➕ Nuevo plan</button></div>
     </div>
@@ -621,11 +621,11 @@
     <div class="card">
       <h2>🔗 Accesos rápidos</h2>
       <div class="row">
-        <a class="b" href="index.html" target="_blank" rel="noopener">📱 Abrir Vento</a>
+        <a class="b" href="index.html" target="_blank" rel="noopener">📱 Abrir ORDEVA</a>
         <a class="b" href="https://github.com/cristhianlujan45-blip/ORDEVA/actions" target="_blank" rel="noopener">⚙️ GitHub Actions</a>
         <a class="b" href="https://github.com/cristhianlujan45-blip/ORDEVA/settings/secrets/actions" target="_blank" rel="noopener">🔑 Secretos (GEMINI_API_KEY)</a>
-        <a class="b" href="https://github.com/cristhianlujan45-blip/ORDEVA/releases/latest/download/vento.apk" target="_blank" rel="noopener">⬇️ APK de Vento</a>
-        <a class="b" href="https://github.com/cristhianlujan45-blip/ORDEVA/releases/latest/download/vento-admin.apk" target="_blank" rel="noopener">👑 APK de Vento Admin</a>
+        <a class="b" href="https://github.com/cristhianlujan45-blip/ORDEVA/releases/latest/download/vento.apk" target="_blank" rel="noopener">⬇️ APK de ORDEVA</a>
+        <a class="b" href="https://github.com/cristhianlujan45-blip/ORDEVA/releases/latest/download/vento-admin.apk" target="_blank" rel="noopener">👑 APK de ORDEVA Admin</a>
         <a class="b" href="https://supabase.com/dashboard" target="_blank" rel="noopener">☁️ Supabase</a>
       </div>
     </div>
@@ -635,7 +635,7 @@
   <section data-tab="equipo">
     <div class="card">
       <h2>🧑‍💻 Equipo que te ayuda con el código</h2>
-      <p class="soft">Invita por su usuario de GitHub a quien te ayude a corregir o mejorar Vento. Recibe una invitación al repositorio <b>cuentas</b> y la acepta desde su correo o GitHub. Solo tú (con tu token) puedes invitar o quitar personas. El panel de administrador y las licencias siguen siendo SOLO tuyos.</p>
+      <p class="soft">Invita por su usuario de GitHub a quien te ayude a corregir o mejorar ORDEVA. Recibe una invitación al repositorio <b>cuentas</b> y la acepta desde su correo o GitHub. Solo tú (con tu token) puedes invitar o quitar personas. El panel de administrador y las licencias siguen siendo SOLO tuyos.</p>
       <div class="f2">
         <div><label for="eqUser">Usuario de GitHub</label><input id="eqUser" placeholder="ej. juanperez" autocapitalize="none" spellcheck="false"></div>
         <div><label for="eqRol">Permiso</label><select id="eqRol"><option value="push">✍️ Escribir código (recomendado)</option><option value="triage">🗂️ Solo organizar reportes</option><option value="pull">👀 Solo ver el código</option><option value="maintain">🛠️ Mantener (más permisos)</option></select></div>
@@ -655,7 +655,7 @@
   <!-- ===================== RESPALDO ===================== -->
   <section data-tab="datos">
     <div class="card">
-      <h2>💾 Respaldo de Vento Admin</h2>
+      <h2>💾 Respaldo de ORDEVA Admin</h2>
       <p class="soft">Tus clientes, pagos, planes y licencias viven en este equipo. Descarga un respaldo seguido (y guárdalo en Drive) o pásalo a otro equipo.</p>
       <div class="row">
         <button class="b p" id="dBajar" type="button">⬇️ Descargar respaldo</button>
@@ -670,34 +670,34 @@
 <!-- ===================== GUÍA ===================== -->
 <template id="tplGuia">
   <div class="card guia">
-    <h2>📘 Cómo funciona Vento como empresa</h2>
-    <p class="soft">Así trabajan los sistemas de punto de venta que se venden por suscripción (Alegra POS, Loyverse, Siigo POS, Square): planes por niveles, prueba gratis, cuenta en la nube por negocio, pago mensual o licencia, soporte y datos protegidos. Vento ya tiene cada pieza:</p>
+    <h2>📘 Cómo funciona ORDEVA como empresa</h2>
+    <p class="soft">Así trabajan los sistemas de punto de venta que se venden por suscripción (Alegra POS, Loyverse, Siigo POS, Square): planes por niveles, prueba gratis, cuenta en la nube por negocio, pago mensual o licencia, soporte y datos protegidos. ORDEVA ya tiene cada pieza:</p>
     <h3>1. La empresa (tú)</h3>
-    <ul><li><b>Vento Admin</b> (este panel): solo tú, con tu código personal. Clientes, planes, pagos, licencias, configuración de la app y equipo.</li>
+    <ul><li><b>ORDEVA Admin</b> (este panel): solo tú, con tu código personal. Clientes, planes, pagos, licencias, configuración de la app y equipo.</li>
       <li><b>Tu equipo técnico</b>: entra al código por GitHub (🧑‍💻 Equipo). No ve tus clientes ni puede crear licencias.</li>
-      <li><b>Tu propio negocio</b> en Vento: actívalo con «👑 Tú como proveedor».</li></ul>
+      <li><b>Tu propio negocio</b> en ORDEVA: actívalo con «👑 Tú como proveedor».</li></ul>
     <h3>2. El cliente (cada negocio)</h3>
-    <ul><li><b>Cuenta</b>: entra con su correo o con <b>Google</b> (Vento Nube). El dueño crea el negocio y invita a su equipo (segundo administrador, empleados, cajero, mesero) con un código.</li>
+    <ul><li><b>Cuenta</b>: entra con su correo o con <b>Google</b> (ORDEVA Nube). El dueño crea el negocio y invita a su equipo (segundo administrador, empleados, cajero, mesero) con un código.</li>
       <li><b>Código del negocio</b> (Ajustes → Negocio → Plan): con él lo identificas para activar, renovar o suspender.</li>
       <li><b>Prueba gratis</b> (días que defines aquí) → paga → queda activo. Si no paga, no pierde datos ni pedidos: solo no puede hacer ventas nuevas.</li></ul>
     <h3>3. Cómo se vende (embudo)</h3>
     <ol><li>Le pasas el link de la app o la APK.</li><li>Se registra y usa la prueba gratis.</li><li>En «💳 Planes y pagos» elige plan y paga (link de tarjeta/PSE/Nequi o transferencia).</li>
       <li>Te llega el comprobante por WhatsApp → en 👥 Clientes tocas «🔑 Activar / renovar» → le mandas el link y queda activo en todos sus celulares.</li></ol>
     <h3>4. Cobro de suscripciones</h3>
-    <ul><li><b>💳 Suscripciones (Vento Nube)</b>: el negocio conectado a la nube paga por Nequi o DaviPlata desde la app y sube el comprobante. Tú lo revisas y lo apruebas en 💳 Suscripciones (con tu cuenta de Vento Nube de administrador) y el servidor activa el plan en todos sus celulares. Los precios y lo que incluye cada plan también se manejan ahí.</li>
+    <ul><li><b>💳 Suscripciones (ORDEVA Nube)</b>: el negocio conectado a la nube paga por Nequi o DaviPlata desde la app y sube el comprobante. Tú lo revisas y lo apruebas en 💳 Suscripciones (con tu cuenta de ORDEVA Nube de administrador) y el servidor activa el plan en todos sus celulares. Los precios y lo que incluye cada plan también se manejan ahí.</li>
       <li><b>Planes</b> (📦 Planes): nombre, precio, qué incluye y link de pago. Se publican en la app.</li>
       <li><b>Links de pago</b>: créalos en Wompi, Mercado Pago o PayU (cobran tarjeta, PSE y Nequi). Pégalos en cada plan.</li>
       <li><b>Licencia</b>: de por vida o por meses. Si es mensual, en 📊 Resumen ves quién vence y le mandas el recordatorio por WhatsApp.</li>
-      <li><b>Factura electrónica</b>: lo que cobras por Vento debe facturarse ante la DIAN (con tu proveedor de facturación).</li></ul>
+      <li><b>Factura electrónica</b>: lo que cobras por ORDEVA debe facturarse ante la DIAN (con tu proveedor de facturación).</li></ul>
     <h3>5. Datos y base de datos</h3>
-    <ul><li><b>Vento Nube (Supabase)</b>: cada negocio tiene sus datos aparte; cada persona solo ve los negocios a los que pertenece (seguridad por filas). Respaldos automáticos en la nube.</li>
+    <ul><li><b>ORDEVA Nube (Supabase)</b>: cada negocio tiene sus datos aparte; cada persona solo ve los negocios a los que pertenece (seguridad por filas). Respaldos automáticos en la nube.</li>
       <li><b>Sin internet</b>: la app sigue funcionando en el celular y sincroniza cuando vuelve la conexión.</li>
       <li><b>Tus datos de empresa</b> (clientes y pagos de este panel) viven en este equipo: descarga el 💾 respaldo cada semana.</li></ul>
     <h3>6. Seguridad</h3>
     <ul><li>Licencias firmadas: nadie puede fabricarlas sin tu código.</li><li>Claves privadas (Gemini, Google, Supabase) solo como secretos de GitHub/servidor, nunca en la app.</li>
       <li>Cierra la sesión del panel (🔒) en equipos que no sean tuyos.</li></ul>
     <h3>7. Lo legal en Colombia (checklist)</h3>
-    <ul><li>Términos y condiciones del servicio y política de tratamiento de datos (Ley 1581 de 2012 – Habeas Data).</li><li>Facturación electrónica DIAN de tus suscripciones.</li><li>Registro de la marca «Vento» ante la SIC (opcional, recomendado).</li></ul>
+    <ul><li>Términos y condiciones del servicio y política de tratamiento de datos (Ley 1581 de 2012 – Habeas Data).</li><li>Facturación electrónica DIAN de tus suscripciones.</li><li>Registro de la marca «ORDEVA» ante la SIC (opcional, recomendado).</li></ul>
     <h3>8. Rutina semanal</h3>
     <ul><li>💳 Suscripciones: aprueba o rechaza los pagos por revisar (mejor todos los días).</li><li>📊 Resumen: cobra a los que vencen.</li><li>💵 Pagos: revisa lo cobrado del mes (descarga CSV para tu contador).</li><li>💾 Respaldo: descárgalo y guárdalo en Drive.</li><li>⚙️ Configurar la app: anuncios para todos (mantenimientos, novedades).</li></ul>
   </div>
@@ -756,7 +756,7 @@
       <div><label for="plPre">Precio mensual</label><input id="plPre" type="number" min="0" step="100"></div>
       <div><label for="plSed">Sedes adicionales incluidas</label><input id="plSed" type="number" min="0" max="50" value="0"></div>
     </div>
-    <label for="plDesc">Qué incluye (lo ven los clientes)</label><textarea id="plDesc" placeholder="Mesas ilimitadas, inventario, Vento IA, música en el TV…"></textarea>
+    <label for="plDesc">Qué incluye (lo ven los clientes)</label><textarea id="plDesc" placeholder="Mesas ilimitadas, inventario, ORDEVA IA, música en el TV…"></textarea>
     <label for="plLink">Link de pago con tarjeta / PSE / Nequi (Wompi, Mercado Pago, PayU…)</label><input id="plLink" type="url" placeholder="https://checkout.wompi.co/l/…">
     <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="plPub" style="width:auto" checked>Mostrar este plan en la app (al pagar o renovar)</label>
     <div class="row"><button class="b p" id="plGuardar" type="button">💾 Guardar</button><button class="b bad" id="plBorrar" type="button">🗑 Borrar</button></div>
@@ -897,7 +897,7 @@
     </div>
     <label class="tog"><input type="checkbox" id="sxPlAct"><span><b>Activo</b> · se ofrece en la app para pagar</span></label>
     <label for="sxPlDesc">Descripción (la ven los negocios)</label>
-    <textarea id="sxPlDesc" maxlength="400" placeholder="Todo lo de Vento sin límites: facturas con cámara, voz, reportes…"></textarea>
+    <textarea id="sxPlDesc" maxlength="400" placeholder="Todo lo de ORDEVA sin límites: facturas con cámara, voz, reportes…"></textarea>
     <label>Funciones que incluye</label>
     <div class="ents" id="sxPlEnts"></div>
     <div class="err" id="sxPlErr" role="alert"></div>
@@ -906,7 +906,7 @@
 </dialog>
 
 <script>
-/* Vento Admin se actualiza SOLO. La app Android (y el navegador) pueden quedarse con la página guardada: cada pocos
+/* ORDEVA Admin se actualiza SOLO. La app Android (y el navegador) pueden quedarse con la página guardada: cada pocos
    minutos, al abrir y al volver a la app se revisa version.txt (unos bytes, sin caché). Si hay una versión nueva:
    • panel bloqueado, recién abierto o volviendo a la app → se recarga sola, sin caché (no se pierde nada);
    • trabajando en el panel → aviso arriba «Actualizar ahora» (para no cortar lo que se está haciendo).
@@ -931,7 +931,7 @@
     if(document.getElementById('adminNuevaVersion') || !document.body) return;
     var b = document.createElement('div'); b.id = 'adminNuevaVersion';
     b.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:99999;background:#2d7d46;color:#fff;padding:10px 14px;display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;font:600 14px system-ui';
-    b.innerHTML = '<span>🔄 Hay una versión nueva de Vento Admin (' + corta(v) + ').</span><button type="button" style="background:#fff;color:#2d7d46;border:0;border-radius:8px;padding:7px 14px;font:700 14px system-ui">Actualizar ahora</button>';
+    b.innerHTML = '<span>🔄 Hay una versión nueva de ORDEVA Admin (' + corta(v) + ').</span><button type="button" style="background:#fff;color:#2d7d46;border:0;border-radius:8px;padding:7px 14px;font:700 14px system-ui">Actualizar ahora</button>';
     b.querySelector('button').onclick = function(){ try{ sessionStorage.removeItem('vento-admin-recargo'); }catch(e){} location.replace(location.pathname + '?v=' + encodeURIComponent(corta(v)) + '&r=' + Date.now() + location.hash); };
     document.body.appendChild(b);
   }
@@ -963,7 +963,7 @@
   const DB_KEY = 'vento-admin-db', KEY_LS = 'mesora-lic-llave', HIST_LS = 'mesora-lic-hist', TOKEN_LS = 'vento-admin-gh';
   const REPO = 'cristhianlujan45-blip/cuentas', CFG_BRANCH = 'vento-config', CFG_FILE = 'vento-config.json', PAGES_BRANCH = 'claude/precio-margen-productos-tabla-mioclt';
   const APP_URL = location.origin + location.pathname.replace(/[^/]*$/, '') + 'index.html';
-  // Llave pública de la app (para avisar si se carga una llave privada que no es la de Vento).
+  // Llave pública de la app (para avisar si se carga una llave privada que no es la de ORDEVA).
   const LIC_PUB_X = '6tWjt1Nt7nzGlVijod0J1_6lSJtXJwEMQ84hG-Jgeko';
   const DIA = 864e5;
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -1070,7 +1070,7 @@
   function recordar(c){
     if(!c || !c.wa){ toast('Ese cliente no tiene WhatsApp.'); return; }
     const e = estado(c);
-    const txt = 'Hola ' + (c.contacto || '') + ' 👋, te escribimos de Vento. ' + (e.k === 'vencida' ? 'Tu suscripción de «' + c.negocio + '» venció el ' + fecha(c.vence) + '.' : 'Tu suscripción de «' + c.negocio + '» vence el ' + fecha(c.vence) + '.') +
+    const txt = 'Hola ' + (c.contacto || '') + ' 👋, te escribimos de ORDEVA. ' + (e.k === 'vencida' ? 'Tu suscripción de «' + c.negocio + '» venció el ' + fecha(c.vence) + '.' : 'Tu suscripción de «' + c.negocio + '» vence el ' + fecha(c.vence) + '.') +
       ' Para renovarla ' + (c.precio ? 'son ' + plata(c.precio) + ' al mes. ' : '') + 'Cuando pagues, mándanos el comprobante y te enviamos tu código de activación. ¡Gracias!';
     window.open('https://wa.me/' + waNum(c.wa) + '?text=' + encodeURIComponent(txt), '_blank');
     (c.hist = c.hist || []).unshift({ t: Date.now(), txt: '⏰ Recordatorio de pago enviado' }); guardar();
@@ -1110,7 +1110,7 @@
     $('rLink').textContent = link; $('rRes').hidden = false; $('dcEstado').innerHTML = '<span class="pill ok">' + esc(estado(actual).txt) + '</span>';
     toast('✅ Pago registrado y código creado.');
   };
-  $('rEnviar').onclick = () => { if(!actual || !ultimoLink) return; const txt = '¡Gracias por tu pago! 🎉 Abre este link en el celular donde usas Vento para activar tu suscripción (vale para todos los celulares del negocio):\n' + ultimoLink; window.open('https://wa.me/' + waNum(actual.wa) + '?text=' + encodeURIComponent(txt), '_blank'); };
+  $('rEnviar').onclick = () => { if(!actual || !ultimoLink) return; const txt = '¡Gracias por tu pago! 🎉 Abre este link en el celular donde usas ORDEVA para activar tu suscripción (vale para todos los celulares del negocio):\n' + ultimoLink; window.open('https://wa.me/' + waNum(actual.wa) + '?text=' + encodeURIComponent(txt), '_blank'); };
   $('rCopiar').onclick = () => copiar(ultimoLink);
   function pintarHistCliente(){
     const h = (actual && actual.hist) || [];
@@ -1150,12 +1150,12 @@
   function b64u(bytes){ let s = ''; bytes = new Uint8Array(bytes); for(let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
   async function cargarJwk(jwk, recordarla){
     try{
-      if(!jwk || jwk.kty !== 'EC' || !jwk.d) throw new Error('Ese archivo no es la llave privada de Vento.');
+      if(!jwk || jwk.kty !== 'EC' || !jwk.d) throw new Error('Ese archivo no es la llave privada de ORDEVA.');
       const clean = { kty: 'EC', crv: 'P-256', x: jwk.x, y: jwk.y, d: jwk.d };
       privKey = await crypto.subtle.importKey('jwk', clean, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
       if(recordarla){ try{ localStorage.setItem(KEY_LS, JSON.stringify(clean)); }catch(e){} }
       usandoBoveda = false;
-      $('keyState').innerHTML = (jwk.x === LIC_PUB_X || jwk.x === BOVEDA.x) ? '<span class="ok-t">✅ Usando la llave antigua (también la acepta la app).</span>' : '<span class="warn-t">⚠️ Esa llave NO es de Vento: los códigos que crees no van a funcionar.</span>';
+      $('keyState').innerHTML = (jwk.x === LIC_PUB_X || jwk.x === BOVEDA.x) ? '<span class="ok-t">✅ Usando la llave antigua (también la acepta la app).</span>' : '<span class="warn-t">⚠️ Esa llave NO es de ORDEVA: los códigos que crees no van a funcionar.</span>';
     }catch(e){ privKey = null; $('keyState').innerHTML = '<span class="bad-t">⚠️ ' + esc(e.message || 'No se pudo leer la llave.') + '</span>'; }
   }
   $('keyFile').onchange = function(){ const f = this.files[0]; if(!f) return; f.text().then(t => { let j; try{ j = JSON.parse(t); }catch(e){ j = null; } cargarJwk(j, $('keyRemember').checked); }); };
@@ -1199,9 +1199,9 @@
     licHist({ eq, tipo: 'prov', v: 0, s: 0, n: 'Mi negocio (proveedor)' });
     $('provLink').textContent = provLink; $('provRes').hidden = false;
     $('provApp').href = 'vento://abrir#licencia=' + code; $('provWeb').href = provLink;
-    // Si Vento está abierto en este mismo navegador, queda activado de una vez.
+    // Si ORDEVA está abierto en este mismo navegador, queda activado de una vez.
     try{ const l = JSON.parse(localStorage.getItem('vento-licencias') || '[]') || []; if(!l.includes(code)) l.push(code); localStorage.setItem('vento-licencias', JSON.stringify(l.slice(-20))); }catch(e){}
-    pintarLicHist(); toast('👑 Listo. Ábrelo en la app Vento (o en el navegador) de tus celulares.', 6000);
+    pintarLicHist(); toast('👑 Listo. Ábrelo en la app ORDEVA (o en el navegador) de tus celulares.', 6000);
   };
   $('provCopiar').onclick = () => copiar(provLink);
 
@@ -1247,9 +1247,9 @@
       try{ await gh('/git/ref/heads/' + CFG_BRANCH); }
       catch(e){ if(e.status !== 404) throw e; const base = await gh('/git/ref/heads/' + encodeURIComponent(PAGES_BRANCH)); await gh('/git/refs', { method: 'POST', body: JSON.stringify({ ref: 'refs/heads/' + CFG_BRANCH, sha: base.object.sha }) }); }
       const act = await cfgTraer();
-      await gh('/contents/' + CFG_FILE, { method: 'PUT', body: JSON.stringify(Object.assign({ message: 'Vento Admin: configuración de la app', content: b64utf8(JSON.stringify(cfg, null, 2) + '\n'), branch: CFG_BRANCH }, act.sha ? { sha: act.sha } : {})) });
+      await gh('/contents/' + CFG_FILE, { method: 'PUT', body: JSON.stringify(Object.assign({ message: 'ORDEVA Admin: configuración de la app', content: b64utf8(JSON.stringify(cfg, null, 2) + '\n'), branch: CFG_BRANCH }, act.sha ? { sha: act.sha } : {})) });
       cfgGuardarCache();
-      $('aEstado').innerHTML = '<span class="ok-t">✅ Publicado. Llega a los celulares en 1 a 5 minutos (al abrir Vento o cada hora).</span>';
+      $('aEstado').innerHTML = '<span class="ok-t">✅ Publicado. Llega a los celulares en 1 a 5 minutos (al abrir ORDEVA o cada hora).</span>';
     }catch(e){ $('aEstado').innerHTML = '<span class="bad-t">⚠️ ' + esc(e.message) + '</span>'; }
   };
 
@@ -1271,13 +1271,13 @@
   $('eqInvitar').onclick = async () => {
     const u = $('eqUser').value.trim().replace(/^@/, '');
     if(!/^[A-Za-z0-9-]{1,39}$/.test(u)){ toast('Escribe un usuario de GitHub válido.'); return; }
-    if(!confirm('¿Invitar a @' + u + ' al código de Vento con permiso «' + ROLES[$('eqRol').value] + '»?')) return;
+    if(!confirm('¿Invitar a @' + u + ' al código de ORDEVA con permiso «' + ROLES[$('eqRol').value] + '»?')) return;
     $('eqEstado').textContent = 'Invitando…';
     try{
       await gh('/collaborators/' + encodeURIComponent(u), { method: 'PUT', body: JSON.stringify({ permission: $('eqRol').value }) });
       db.equipo = db.equipo.filter(x => x.user.toLowerCase() !== u.toLowerCase()).concat([{ user: u, nombre: $('eqNom').value.trim(), wa: $('eqWa').value.trim(), at: Date.now() }]); guardar();
       $('eqEstado').innerHTML = '<span class="ok-t">✅ Invitación enviada a @' + esc(u) + '. Debe aceptarla en GitHub.</span>';
-      if($('eqWa').value.trim()) window.open('https://wa.me/' + waNum($('eqWa').value) + '?text=' + encodeURIComponent('Hola, te invité al código de Vento en GitHub. Acepta la invitación aquí: https://github.com/' + REPO + '/invitations'), '_blank');
+      if($('eqWa').value.trim()) window.open('https://wa.me/' + waNum($('eqWa').value) + '?text=' + encodeURIComponent('Hola, te invité al código de ORDEVA en GitHub. Acepta la invitación aquí: https://github.com/' + REPO + '/invitations'), '_blank');
       $('eqUser').value = ''; $('eqNom').value = ''; $('eqWa').value = '';
       eqCargar();
     }catch(e){ $('eqEstado').innerHTML = '<span class="bad-t">⚠️ ' + esc(e.message) + '</span>'; }
@@ -1289,10 +1289,10 @@
   });
   $('tabs').addEventListener('click', e => { const b = e.target.closest('button[data-t="equipo"]'); if(b && $('aToken').value.trim()) eqCargar(); });
 
-  // ---------------- 💳 Suscripciones (Vento Nube · pago manual por Nequi / DaviPlata) ----------------
-  /* Entra con la cuenta de Vento Nube y usa el servidor (Edge Function vento-suscripciones, rutas /admin/*).
+  // ---------------- 💳 Suscripciones (ORDEVA Nube · pago manual por Nequi / DaviPlata) ----------------
+  /* Entra con la cuenta de ORDEVA Nube y usa el servidor (Edge Function vento-suscripciones, rutas /admin/*).
      El SERVIDOR decide quién es administrador (tabla platform_admins) y hace cada cambio: el panel solo muestra lo que responde.
-     La sesión se guarda con una llave propia para no mezclarse con la cuenta del negocio que use Vento en este navegador. */
+     La sesión se guarda con una llave propia para no mezclarse con la cuenta del negocio que use ORDEVA en este navegador. */
   const SX_SDK = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.min.js', SX_SESION = 'vento-admin-nube', SX_SEC = 'vento-admin-sx';
   const SX_SECCIONES = ['pagos', 'subs', 'negocios', 'planes', 'config'];
   const SX_EST = { pending_payment: ['Esperando pago', 'soft'], payment_review: ['⏳ Pago en revisión', 'warn'], active: ['✅ Activa', 'ok'], expired: ['⌛ Vencida', 'bad'], canceled: ['⛔ Cancelada', 'bad'], rejected: ['❌ Rechazada', 'bad'] };
@@ -1345,14 +1345,14 @@
     if(window.supabase && window.supabase.createClient) return Promise.resolve();
     return sx.sdk || (sx.sdk = new Promise((ok, mal) => {
       const s = document.createElement('script'); s.src = SX_SDK; s.async = true;
-      s.onload = () => ok(); s.onerror = () => { sx.sdk = null; mal(new Error('No se pudo cargar la conexión con Vento Nube. Revisa el internet.')); };
+      s.onload = () => ok(); s.onerror = () => { sx.sdk = null; mal(new Error('No se pudo cargar la conexión con ORDEVA Nube. Revisa el internet.')); };
       document.head.appendChild(s);
     }));
   }
   async function sxCliente(){
     if(sx.sb) return sx.sb;
     const c = sxCfg();
-    if(!/^https:\/\/[\w.-]+$/.test(c.url) || c.key.length < 20) throw new Error('Falta la dirección de Vento Nube (nube/config.js).');
+    if(!/^https:\/\/[\w.-]+$/.test(c.url) || c.key.length < 20) throw new Error('Falta la dirección de ORDEVA Nube (nube/config.js).');
     await sxSdk();
     sx.sb = window.supabase.createClient(c.url, c.key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, storageKey: SX_SESION } });
     return sx.sb;
@@ -1361,11 +1361,11 @@
   // POST /functions/v1/vento-suscripciones/admin/<ruta> con la sesión (apikey + Authorization: Bearer)
   async function sxApi(ruta, cuerpo){
     const s = await sxSesion();
-    if(!s || !s.access_token) throw Object.assign(new Error('Entra con tu cuenta de Vento Nube.'), { codigo: 'sin_sesion', status: 401 });
+    if(!s || !s.access_token) throw Object.assign(new Error('Entra con tu cuenta de ORDEVA Nube.'), { codigo: 'sin_sesion', status: 401 });
     const c = sxCfg();
     let r;
     try{ r = await fetch(c.url + '/functions/v1/vento-suscripciones/admin/' + ruta, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: c.key, Authorization: 'Bearer ' + s.access_token }, body: JSON.stringify(cuerpo || {}) }); }
-    catch(e){ throw Object.assign(new Error('Sin conexión con el servidor de Vento. Revisa el internet.'), { codigo: 'red' }); }
+    catch(e){ throw Object.assign(new Error('Sin conexión con el servidor de ORDEVA. Revisa el internet.'), { codigo: 'red' }); }
     const j = await r.json().catch(() => ({}));
     if(!r.ok || !j || j.ok === false) throw Object.assign(new Error((j && j.mensaje) || ('El servidor respondió ' + r.status)), { codigo: (j && j.error) || ('http_' + r.status), status: r.status });
     return j;
@@ -1375,7 +1375,7 @@
     if(/invalid login credentials/i.test(m)) return 'Correo o contraseña incorrectos.';
     if(/email not confirmed/i.test(m)) return 'Falta confirmar el correo: abre el mensaje que te llegó y vuelve a entrar.';
     if(/rate limit|too many/i.test(m)) return 'Demasiados intentos. Espera un momento y vuelve a intentar.';
-    if(/failed to fetch|networkerror|load failed/i.test(m)) return 'Sin conexión con Vento Nube. Revisa el internet.';
+    if(/failed to fetch|networkerror|load failed/i.test(m)) return 'Sin conexión con ORDEVA Nube. Revisa el internet.';
     return m || 'Algo falló. Intenta otra vez.';
   }
   // «No es admin» y «sesión vencida» cambian la vista; lo demás es un aviso.
@@ -1788,7 +1788,7 @@
         sxStats(r) +
         '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="soft" style="flex:1;font-size:12.5px">' + esc('Creado ' + fCo(n.creado_en) + (r.actualizado_en ? ' · datos del ' + fCo(r.actualizado_en) : ' · sin datos en la nube')) + '</span>' + pillDe(sxEstadoSub(n.suscripcion)) + '</div>' +
         '</article>';
-    }).join('') : '<div class="empty" style="grid-column:1/-1">' + ((sx.negocios || []).length ? 'Ningún negocio coincide.' : 'Todavía no hay negocios en Vento Nube.') + '</div>';
+    }).join('') : '<div class="empty" style="grid-column:1/-1">' + ((sx.negocios || []).length ? 'Ningún negocio coincide.' : 'Todavía no hay negocios en ORDEVA Nube.') + '</div>';
   }
   $('sxNegBuscar').oninput = () => { if(sx.negocios) sxPintarNegocios(); };
   function sxEventoTxt(e){
@@ -1814,7 +1814,7 @@
         pillDe(SX_PAGO[p.status] || [p.status, 'soft']) + (p.comprobante ? '<button class="b" type="button" data-sxa="ver" data-id="' + esc(p.id) + '" title="Ver comprobante">🧾</button>' : '') + '</div>').join('');
       const eventos = (j.eventos || []).map(e => { const t = sxEventoTxt(e); return '<li><b>' + esc(SX_EVENTO[e.type] || e.type) + '</b><small>' + esc(fCoHora(e.created_at) + (t ? ' · ' + t : '')) + '</small></li>'; }).join('');
       // Bloqueado: no funciona en ninguno de sus equipos (se aplica al instante); se desbloquea desde aquí.
-      const bloq = n.bloqueado_en ? '<div class="empty bad-t" style="margin-top:12px;text-align:left">⛔ <b>Negocio bloqueado</b> desde el ' + esc(fCoHora(n.bloqueado_en)) + (n.bloqueo_motivo ? ' · motivo: ' + esc(n.bloqueo_motivo) : '') + '. Vento no funciona en ninguno de sus equipos.</div>' : '';
+      const bloq = n.bloqueado_en ? '<div class="empty bad-t" style="margin-top:12px;text-align:left">⛔ <b>Negocio bloqueado</b> desde el ' + esc(fCoHora(n.bloqueado_en)) + (n.bloqueo_motivo ? ' · motivo: ' + esc(n.bloqueo_motivo) : '') + '. ORDEVA no funciona en ninguno de sus equipos.</div>' : '';
       $('sxNegCuerpo').innerHTML = bloq +
         '<div class="chips" style="margin-top:12px">' + pillDe(sxEstadoSub(s)) + '<span class="pill ' + (j.plan_efectivo && j.plan_efectivo !== 'free' ? 'ok' : 'soft') + '">' + esc('Usa hoy: ' + nomPlan(j.plan_efectivo || 'free')) + '</span></div>' +
         '<dl class="kv" style="margin-top:12px">' + kv('Creado por', n.creado_por_email) + kv('Creado', fCo(n.creado_en)) +
@@ -1964,7 +1964,7 @@
     if(bloquear){
       motivo = prompt('¿Por qué bloqueas «' + nom + '»? (lo verá el cliente en su pantalla; puedes dejarlo vacío)', '');
       if(motivo === null) return;
-      if(!confirm('¿Bloquear «' + nom + '»? Vento deja de funcionar YA en todos sus celulares y equipos hasta que lo desbloquees.')) return;
+      if(!confirm('¿Bloquear «' + nom + '»? ORDEVA deja de funcionar YA en todos sus celulares y equipos hasta que lo desbloquees.')) return;
     }else if(!confirm('¿Desbloquear «' + nom + '»? Vuelve a funcionar al instante en todos sus equipos.')) return;
     if(b) b.disabled = true;
     try{
@@ -1979,7 +1979,7 @@
   $('dlgSxNeg').addEventListener('click', sxClic);
   $('sxKpis').addEventListener('keydown', e => { if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); sxClic(e); } });
 
-  // ================= Vento Admin conectado al servidor: resumen, usuarios, soporte y licencias =================
+  // ================= ORDEVA Admin conectado al servidor: resumen, usuarios, soporte y licencias =================
   /* Todo se lee del servidor (Edge Function vento-suscripciones, rutas /admin/*) con la sesión del administrador:
      así cualquier equipo donde entres ve los mismos usuarios, casos y licencias. */
   const ad = { usuarios: [], locales: null, casos: [], lics: [], resumen: null, us: null, caso: null, cargando: {} };
@@ -2006,7 +2006,7 @@
   async function intentar(fn, caja){
     try{ return await fn(); }
     catch(e){
-      if(e && (e.codigo === 'sin_sesion' || e.status === 401 || e.codigo === 'no_admin')){ bloquear(e.codigo === 'no_admin' ? 'Esta cuenta no es administradora de Vento.' : 'Tu sesión venció. Vuelve a entrar.'); return null; }
+      if(e && (e.codigo === 'sin_sesion' || e.status === 401 || e.codigo === 'no_admin')){ bloquear(e.codigo === 'no_admin' ? 'Esta cuenta no es administradora de ORDEVA.' : 'Tu sesión venció. Vuelve a entrar.'); return null; }
       if(caja) caja.innerHTML = '<div class="empty">⚠️ ' + esc(sxMsgError(e)) + '</div>'; else toast('⚠️ ' + sxMsgError(e), 6000);
       return null;
     }
@@ -2019,7 +2019,7 @@
     const K = [['acc', R.usuarios, 'Usuarios registrados', 'usuarios'], ['ok', R.usuarios_7d, 'Nuevos esta semana', 'usuarios'], ['acc', R.activos_7d, 'Entraron esta semana', 'usuarios'],
       ['acc', R.negocios, 'Negocios', 'usuarios'], ['ok', R.pagadas, 'Planes pagados activos', 'subs'], ['acc', R.prueba, 'En prueba gratis', 'subs'], ['bad', R.vencidas, 'Vencidos', 'subs'],
       ['warn', R.pagos_revision, 'Pagos por revisar', 'subs'], ['bad', R.soporte_abiertos, 'Soporte sin responder', 'soporte'], ['acc', R.licencias_activas, 'Licencias activas', 'licencias'],
-      ['acc', R.equipos_30d, 'Equipos usando Vento (30 días)', 'usuarios'], ['soft', R.equipos_locales, 'Equipos sin cuenta en la nube', 'usuarios']];
+      ['acc', R.equipos_30d, 'Equipos usando ORDEVA (30 días)', 'usuarios'], ['soft', R.equipos_locales, 'Equipos sin cuenta en la nube', 'usuarios']];
     $('rsKpis').innerHTML = K.map(k => '<div class="kpi ' + k[0] + '" data-ir-tab="' + k[3] + '" tabindex="0"><b>' + esc(k[1] == null ? '—' : k[1]) + '</b><span>' + esc(k[2]) + '</span></div>').join('');
     $('rsRecientes').innerHTML = (R.recientes || []).length ? R.recientes.map(u => '<div class="item" data-us="' + esc(u.id) + '"><div class="av">' + inicial(u.email) + '</div><div class="t"><b>' + esc(u.email) + '</b><small>' + esc((u.negocio || 'sin negocio todavía') + ' · ' + hace(u.creado_en)) + '</small></div></div>').join('') : '<div class="empty">Todavía no hay cuentas registradas.</div>';
     spBadge(R.soporte_abiertos); erContar();
@@ -2081,7 +2081,7 @@
       '<dl class="kv">' + kv('Correo', u.email) + kv('Celular', u.telefono || 'no lo ha puesto') + kv('Registrado', fCoHora(u.creado_en)) + kv('Último ingreso', u.ultimo_ingreso ? fCoHora(u.ultimo_ingreso) : 'nunca') +
         kv('Correo confirmado', u.confirmado ? 'Sí' : 'No') + kv('Estado', u.bloqueado ? '⛔ Bloqueada' : 'Activa') + kv('Plan', p[0]) + '</dl>' +
       '<h3>🏪 Negocios</h3>' + (negs || '<div class="soft">Todavía no tiene negocio en la nube.</div>') +
-      '<h3>📱 Equipos donde usa Vento (' + (u.equipos_lista || []).length + ')</h3><div class="hist">' + (eqs || '<div class="soft">Ninguno registrado.</div>') + '</div>' +
+      '<h3>📱 Equipos donde usa ORDEVA (' + (u.equipos_lista || []).length + ')</h3><div class="hist">' + (eqs || '<div class="soft">Ninguno registrado.</div>') + '</div>' +
       '<h3>🔑 Licencias</h3><div class="chips">' + ((u.licencias || []).map(l => '<span class="chip ok">' + esc(l.codigo + ' · ' + nomPlan(l.plan_id) + ' hasta ' + fCo(l.hasta)) + '</span>').join('') +
         (u.licencias_pendientes || []).map(c => '<span class="chip">⏳ ' + esc(c) + ' (se activa al entrar)</span>').join('') || '<span class="soft">Ninguna.</span>') + '</div>' +
       ((u.soporte || []).length ? '<h3>🎧 Soporte</h3>' + u.soporte.map(c => '<div class="item" data-caso="' + esc(c.id) + '"><div class="av">🎧</div><div class="t"><b>' + esc(c.asunto) + '</b><small>' + esc(hace(c.actualizado_en)) + '</small></div><span class="pill ' + (SP_EST[c.estado] || ['', 'soft'])[1] + '">' + esc((SP_EST[c.estado] || [c.estado])[0]) + '</span></div>').join('') : '') +
@@ -2100,17 +2100,17 @@
     const b = e.target.closest('[data-ua]'); if(!b || !ad.us) return;
     const u = ad.us, res = $('usRes'), a = b.dataset.ua;
     if(a === 'lic'){ $('dlgUs').close(); irTab('licencias'); $('lsCorreos').value = u.email; $('lsCorreos').focus(); toast('Elige la duración y toca «Crear licencia».'); return; }
-    if(a === 'bloq' && !confirm(u.bloqueado ? '¿Desbloquear ' + u.email + '?' : '¿Bloquear ' + u.email + '? No va a poder entrar a Vento hasta que la desbloquees.')) return;
+    if(a === 'bloq' && !confirm(u.bloqueado ? '¿Desbloquear ' + u.email + '?' : '¿Bloquear ' + u.email + '? No va a poder entrar a ORDEVA hasta que la desbloquees.')) return;
     if(a === 'temp' && !confirm('¿Poner una contraseña temporal a ' + u.email + '? La que tiene deja de servir.')) return;
     b.disabled = true;
     try{
       if(a === 'temp'){
         const j = await sxApi('usuario_clave_temporal', { usuario: u.id });
-        const txt = 'Hola, soy del soporte de Vento. Tu contraseña temporal es: ' + j.clave + ' — entra con tu correo ' + u.email + ' y la app te pide poner una nueva.';
+        const txt = 'Hola, soy del soporte de ORDEVA. Tu contraseña temporal es: ' + j.clave + ' — entra con tu correo ' + u.email + ' y la app te pide poner una nueva.';
         res.innerHTML = '<div class="card" style="margin-top:12px"><b>Contraseña temporal</b><div class="clave-temp">' + esc(j.clave) + '</div>' +
           '<div class="row">' + (u.telefono ? '<a class="b p" href="sms:' + esc(u.telefono) + '?body=' + encodeURIComponent(txt) + '">📱 Mandar por mensaje de texto</a><a class="b" target="_blank" rel="noopener" href="https://wa.me/' + esc(telWa(u.telefono)) + '?text=' + encodeURIComponent(txt) + '">💬 WhatsApp</a>'
             : '<a class="b p" href="sms:?body=' + encodeURIComponent(txt) + '">📱 Mandar por mensaje de texto</a>') + '<button class="b" type="button" data-copiar="' + esc(txt) + '">📋 Copiar</button></div>' +
-          '<p class="soft">Al entrar con ella, Vento le pide poner su propia contraseña.</p></div>';
+          '<p class="soft">Al entrar con ella, ORDEVA le pide poner su propia contraseña.</p></div>';
       }else if(a === 'enlace'){ await sxApi('usuario_enlace_clave', { email: u.email }); res.innerHTML = '<p class="ok-t">📧 Listo: le llegó un correo a ' + esc(u.email) + ' para cambiar la contraseña.</p>'; }
       else if(a === 'confirmar'){ await sxApi('usuario_confirmar', { usuario: u.id }); toast('✅ Correo confirmado.'); usAbrir(u.id); usCargar(); }
       else if(a === 'bloq'){ await sxApi('usuario_bloquear', { usuario: u.id, bloquear: !u.bloqueado }); toast(u.bloqueado ? '🔓 Cuenta desbloqueada.' : '⛔ Cuenta bloqueada.'); usAbrir(u.id); usCargar(); }
@@ -2129,10 +2129,10 @@
       let lic = null; const L = $('unLic').value;
       if(L){ const r = await sxApi('licencia_crear', { licencia: Object.assign({ plan: 'pro', correos: [email], nota: 'Cuenta creada por el admin' }, L === 's' ? { para_siempre: true } : { dias: Math.round(+L * 30.44) }) }); lic = r.licencia; }
       const tel = $('unTel').value.trim();
-      const txt = '¡Bienvenido a Vento! Entra en ' + appUrl() + ' (o en la app) con tu correo ' + email + ' y la contraseña ' + j.clave + '. La app te pide poner una tuya.' + (lic ? ' Tu plan ' + nomPlan(lic.plan_id) + ' se activa solo al entrar.' : '');
+      const txt = '¡Bienvenido a ORDEVA! Entra en ' + appUrl() + ' (o en la app) con tu correo ' + email + ' y la contraseña ' + j.clave + '. La app te pide poner una tuya.' + (lic ? ' Tu plan ' + nomPlan(lic.plan_id) + ' se activa solo al entrar.' : '');
       $('unRes').innerHTML = '<div class="card"><b>✅ Cuenta creada</b><div class="clave-temp">' + esc(j.clave) + '</div><div class="row">' +
         (tel ? '<a class="b p" href="sms:' + esc(tel) + '?body=' + encodeURIComponent(txt) + '">📱 Mensaje de texto</a><a class="b" target="_blank" rel="noopener" href="https://wa.me/' + esc(telWa(tel)) + '?text=' + encodeURIComponent(txt) + '">💬 WhatsApp</a>' : '') +
-        '<a class="b" href="mailto:' + esc(email) + '?subject=' + encodeURIComponent('Tu cuenta de Vento') + '&body=' + encodeURIComponent(txt) + '">📧 Correo</a><button class="b" type="button" data-copiar="' + esc(txt) + '">📋 Copiar</button></div></div>';
+        '<a class="b" href="mailto:' + esc(email) + '?subject=' + encodeURIComponent('Tu cuenta de ORDEVA') + '&body=' + encodeURIComponent(txt) + '">📧 Correo</a><button class="b" type="button" data-copiar="' + esc(txt) + '">📋 Copiar</button></div></div>';
       $('unRes').hidden = false; $('unGo').hidden = true; usCargar();
     }catch(x){ if(!sxFallo(x)) $('unErr').textContent = sxMsgError(x); }
     finally{ $('unGo').disabled = false; }
@@ -2193,7 +2193,7 @@
     $('frCuenta').textContent = l.length ? '(' + l.length + ')' : '';
     $('frLista').innerHTML = l.length ? l.map(f => '<div class="item" style="cursor:default"><div class="av">' + (f.tipo === 'ignorar' ? '🚫' : '💜') + '</div><div class="t"><b>«' + esc(f.texto) + '»</b><small>' +
       esc([f.tipo === 'ignorar' ? 'No es un pago' : 'Es un pago', f.banco || '', f.activo ? '' : 'pausada', hace(f.actualizado)].filter(Boolean).join(' · ')) + '</small></div>' +
-      '<button class="b no" type="button" data-fr-borrar="' + esc(f.id) + '" title="Borrar">🗑</button></div>').join('') : '<div class="empty">Todavía no hay frases. Vento usa sus reglas de siempre.</div>';
+      '<button class="b no" type="button" data-fr-borrar="' + esc(f.id) + '" title="Borrar">🗑</button></div>').join('') : '<div class="empty">Todavía no hay frases. ORDEVA usa sus reglas de siempre.</div>';
   }
   // Del aviso que no se tomó (viene sin nombres ni valores: NOMBRE, #) se sugiere el pedazo de texto fijo más largo.
   function frSugerir(e){
@@ -2275,7 +2275,7 @@
   $('spEstado').onchange = spCargar; $('spBuscar').oninput = spPintar; $('spRef').onclick = spCargar;
   document.addEventListener('click', e => { const it = e.target.closest('[data-caso]'); if(it && !it.closest('#usCuerpo') && !e.target.closest('button,a')) spAbrir(it.dataset.caso); });
   const RAPIDAS = ['¡Hola! Ya lo reviso y te cuento.', 'Listo, ya quedó solucionado. ¿Me confirmas si te funciona?', 'Te mandé una contraseña temporal por mensaje de texto. Al entrar, la app te pide poner una nueva.',
-    'Actualiza la app: cierra Vento y vuelve a abrirla.', 'Tu licencia ya está activa. Cierra y abre Vento para verla.'];
+    'Actualiza la app: cierra ORDEVA y vuelve a abrirla.', 'Tu licencia ya está activa. Cierra y abre ORDEVA para verla.'];
   async function spAbrir(id){
     let c = ad.casos.find(x => x.id === id);
     if(!c){ const j = await intentar(() => sxApi('soporte', { estado: 'todos' })); if(j){ ad.casos = j.casos || []; c = ad.casos.find(x => x.id === id); } }
@@ -2398,7 +2398,7 @@
       if(!confirm('¿Poner una contraseña temporal a esta cuenta? La que tiene deja de servir.')) return;
       const j = await intentar(() => sxApi('usuario_clave_temporal', { usuario: id })); if(!j) return;
       const tel = c.telefono || c.telefono_perfil || c.telefono_de_la_cuenta || '';
-      const txt = 'Hola, soy del soporte de Vento. Tu contraseña temporal es: ' + j.clave + ' — entra con tu correo y la app te pide poner una nueva.';
+      const txt = 'Hola, soy del soporte de ORDEVA. Tu contraseña temporal es: ' + j.clave + ' — entra con tu correo y la app te pide poner una nueva.';
       $('spAcciones').insertAdjacentHTML('afterend', '<div class="card" style="margin-top:10px"><div class="clave-temp">' + esc(j.clave) + '</div><div class="row">' +
         '<a class="b p" href="sms:' + esc(tel) + '?body=' + encodeURIComponent(txt) + '">📱 Mandar por mensaje de texto</a>' + (tel ? '<a class="b" target="_blank" rel="noopener" href="https://wa.me/' + esc(telWa(tel)) + '?text=' + encodeURIComponent(txt) + '">💬 WhatsApp</a>' : '') +
         '<button class="b" type="button" data-copiar="' + esc(txt) + '">📋 Copiar</button></div></div>');
@@ -2433,15 +2433,15 @@
   $('lsTipo').onchange = () => { const t = $('lsTipo').value; $('lsCantBox').hidden = t === 'f' || t === 's'; $('lsFechaBox').hidden = t !== 'f'; };
   const lsCorreosDe = t => Array.from(new Set(String(t || '').split(/[\s,;]+/).map(x => x.trim().toLowerCase()).filter(x => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x))));
   function lsTexto(x){
-    return '🔑 Tu licencia de Vento ' + nomPlan(x.plan_id) + ' (' + lsDur(x) + '): ' + x.codigo + '\n' +
-      (x.correos.length ? 'Se activa sola al entrar a Vento con tu correo (' + x.correos.map(c => c.email).join(', ') + ').' : 'Actívala en Vento → ⋯ Más → 💳 Mi plan → «Tengo un código».') + '\n' + appUrl() + '#lic=' + x.codigo;
+    return '🔑 Tu licencia de ORDEVA ' + nomPlan(x.plan_id) + ' (' + lsDur(x) + '): ' + x.codigo + '\n' +
+      (x.correos.length ? 'Se activa sola al entrar a ORDEVA con tu correo (' + x.correos.map(c => c.email).join(', ') + ').' : 'Actívala en ORDEVA → ⋯ Más → 💳 Mi plan → «Tengo un código».') + '\n' + appUrl() + '#lic=' + x.codigo;
   }
   let lsUltima = null;
   function lsMostrar(x){
     lsUltima = x; const t = lsTexto(x);
     $('lsRes').textContent = t; $('lsRes').hidden = false; $('lsResBtns').hidden = false;
     $('lsWa').href = 'https://wa.me/?text=' + encodeURIComponent(t);
-    $('lsMail').href = 'mailto:' + encodeURIComponent(x.correos.map(c => c.email).join(',')) + '?subject=' + encodeURIComponent('Tu licencia de Vento') + '&body=' + encodeURIComponent(t);
+    $('lsMail').href = 'mailto:' + encodeURIComponent(x.correos.map(c => c.email).join(',')) + '?subject=' + encodeURIComponent('Tu licencia de ORDEVA') + '&body=' + encodeURIComponent(t);
   }
   $('lsCopiar').onclick = () => lsUltima && copiar(lsTexto(lsUltima));
   $('lsCrear').onclick = async () => {
@@ -2465,7 +2465,7 @@
     if(ch && x.estado === 'activa'){ if(!confirm('¿Quitar ' + ch.dataset.quitar + ' de esta licencia?')) return; const j = await intentar(() => sxApi('licencia_correos', { licencia: x.id, quitar: [ch.dataset.quitar] })); if(j){ Object.assign(x, j.licencia); lsPintar(); } return; }
     const b = e.target.closest('[data-la]'); if(!b) return;
     if(b.dataset.la === 'enviar'){ lsMostrar(x); $('lsRes').scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
-    if(b.dataset.la === 'correo'){ const c = lsCorreosDe(prompt('Correo del cliente (uno solo):') || ''); if(!c.length) return; if(c.length > 1){ toast('Una licencia es para un solo cliente: un solo correo.'); return; } const j = await intentar(() => sxApi('licencia_correos', { licencia: x.id, agregar: c })); if(j){ Object.assign(x, j.licencia); lsPintar(); toast('✅ Agregado. Se le activa sola al entrar a Vento.'); } return; }
+    if(b.dataset.la === 'correo'){ const c = lsCorreosDe(prompt('Correo del cliente (uno solo):') || ''); if(!c.length) return; if(c.length > 1){ toast('Una licencia es para un solo cliente: un solo correo.'); return; } const j = await intentar(() => sxApi('licencia_correos', { licencia: x.id, agregar: c })); if(j){ Object.assign(x, j.licencia); lsPintar(); toast('✅ Agregado. Se le activa sola al entrar a ORDEVA.'); } return; }
     if(b.dataset.la === 'anular'){
       if(!confirm('¿Anular la licencia ' + x.codigo + '? Ya no se podrá activar.')) return;
       const quitar = x.usos > 0 && confirm('¿También quitarle el plan a los negocios que ya la activaron? (Aceptar = sí, Cancelar = que les dure hasta su fecha)');
@@ -2473,9 +2473,9 @@
     }
   });
 
-  // ---------------- Entrar: correo y contraseña del administrador (Vento Nube) ----------------
+  // ---------------- Entrar: correo y contraseña del administrador (ORDEVA Nube) ----------------
   function lkVista(v){ $('lkEntrar').hidden = v !== 'entrar'; $('lkCrearBox').hidden = v !== 'crear'; $('lkOlvBox').hidden = v !== 'olvide'; $('lkOEnlace').hidden = v !== 'enlace'; $('lkMsg').textContent = '';
-    $('lockTxt').textContent = v === 'enlace' ? 'Cambiar la contraseña del administrador.' : 'Solo para el administrador de Vento. Entra con tu correo y tu contraseña de administrador.'; }
+    $('lockTxt').textContent = v === 'enlace' ? 'Cambiar la contraseña del administrador.' : 'Solo para el administrador de ORDEVA. Entra con tu correo y tu contraseña de administrador.'; }
   document.querySelectorAll('[data-lk]').forEach(b => b.onclick = () => lkVista(b.dataset.lk));
   $('lkCrear').onclick = () => { lkVista('crear'); $('lkNCorreo').value = $('lkCorreo').value; $('lkNCorreo').focus(); };
   $('lkOlvide').onclick = () => { lkVista('olvide'); $('lkOCorreo').value = $('lkCorreo').value; $('lkOPaso2').hidden = true; $('lkOCorreo').focus(); };
@@ -2487,7 +2487,7 @@
   async function adminListo(){
     let j; try{ j = await sxApi('yo'); }
     catch(e){
-      if(e && e.codigo === 'no_admin'){ try{ const c = await sxCliente(); await c.auth.signOut({ scope: 'local' }); }catch(x){} lkMsg('⛔ Esa cuenta no es administradora de Vento. Entra con el correo del administrador.', true); return false; }
+      if(e && e.codigo === 'no_admin'){ try{ const c = await sxCliente(); await c.auth.signOut({ scope: 'local' }); }catch(x){} lkMsg('⛔ Esa cuenta no es administradora de ORDEVA. Entra con el correo del administrador.', true); return false; }
       lkMsg(esc(sxMsgError(e)), true); return false;
     }
     sx.yo = j; $('sxQuien').textContent = j.email || '';
@@ -2523,7 +2523,7 @@
     try{
       const c = await sxCliente();
       const es = await c.rpc('es_correo_admin', { p_email: correo });
-      if(!es.error && es.data === false){ lkMsg('Ese correo no es de un administrador de Vento.', true); return; }
+      if(!es.error && es.data === false){ lkMsg('Ese correo no es de un administrador de ORDEVA.', true); return; }
       const r = await c.auth.signUp({ email: correo, password: clave, options: { emailRedirectTo: adminVolver() } });
       if(r && r.error){ if(/already|registered/i.test(r.error.message || '')){ lkMsg('Ese correo ya tiene cuenta: entra con su contraseña o toca «¿Olvidaste la contraseña?».', true); lkVista('entrar'); $('lkCorreo').value = correo; } else throw r.error; return; }
       if(!r.data || !r.data.session){ lkMsg('📧 Te llegó un correo para confirmar la cuenta. Ábrelo y después entra aquí.'); lkVista('entrar'); $('lkCorreo').value = correo; return; }
@@ -2604,7 +2604,7 @@
     const f = this.files[0]; this.value = ''; if(!f) return;
     try{
       const j = JSON.parse(await f.text());
-      if(!j || j.tipo !== 'vento-admin' || !j.db || !Array.isArray(j.db.clientes)) throw new Error('Ese archivo no es un respaldo de Vento Admin.');
+      if(!j || j.tipo !== 'vento-admin' || !j.db || !Array.isArray(j.db.clientes)) throw new Error('Ese archivo no es un respaldo de ORDEVA Admin.');
       if(!confirm('¿Reemplazar los datos de este equipo con el respaldo (' + j.db.clientes.length + ' clientes, ' + (j.db.pagos || []).length + ' pagos)?')) return;
       db = Object.assign(vacio(), j.db); if(Array.isArray(j.licencias)) try{ localStorage.setItem(HIST_LS, JSON.stringify(j.licencias)); }catch(e){}
       if(j.config) cfgPintar(j.config), cfgGuardarCache();
@@ -2646,7 +2646,7 @@
     };
     $('lockGo').onclick = ir; $('lockPin').onkeydown = e => { if(e.key === 'Enter') ir(); };
   })();
-  // Cerrar el panel también cierra (en este equipo) la cuenta de Vento Nube de 💳 Suscripciones.
+  // Cerrar el panel también cierra (en este equipo) la cuenta de ORDEVA Nube de 💳 Suscripciones.
   $('salir').onclick = async () => { try{ const c = await sxCliente(); await c.auth.signOut({ scope: 'local' }); }catch(e){} try{ localStorage.removeItem(SX_SESION); }catch(e){} location.reload(); };
 
   function copiar(t){ if(!t) return; (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => toast('📋 Copiado.'), () => prompt('Copia esto:', t)); }

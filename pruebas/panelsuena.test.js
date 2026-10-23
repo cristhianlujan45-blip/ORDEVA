@@ -1,7 +1,7 @@
-// El panel de YouTube SÍ pone las canciones (como viene el celular: el reproductor de Vento apagado, sin Google ni TV).
+// El panel de YouTube SÍ pone las canciones (como viene el celular: el reproductor de ORDEVA apagado, sin Google ni TV).
 // Antes, «⏭ Que siga» / «▶ Poner» solo dejaban la canción en la cola y no sonaba nada.
 //  1. Llega una canción por QR sin ningún reproductor: queda en la cola y el aviso dice cómo hacer que suene.
-//  2. En el panel: buscar → «⏭ Que siga» → se prende solo el reproductor de Vento y SUENA; avisa que lo prendió.
+//  2. En el panel: buscar → «⏭ Que siga» → se prende solo el reproductor de ORDEVA y SUENA; avisa que lo prendió.
 //  3. Al terminar, suena sola la canción que pidió la mesa por QR (y las siguientes del QR también).
 //  4. Otro equipo nuevo: «📃 Mis listas» → pegar el link → la lista SUENA de fondo.
 //  5. Con el modo TV prendido, el panel NO prende el reproductor del celular (la música va al TV).
@@ -44,7 +44,7 @@ const video = (id, t, c, d) => ({ id: { videoId: id }, snippet: { title: t, chan
   const suena = (p, vid, ms) => p.waitForFunction(v => window.__yt.cargados.slice(-1)[0] === v, vid, { timeout: ms || 12000, polling: 200 }).then(() => true, () => false);
   try{
     const p = await equipo('Uno');
-    chk('Así viene: el reproductor de Vento apagado', await p.evaluate(() => !JSON.parse(localStorage.getItem('vito_auto_play') || '{}').on));
+    chk('Así viene: el reproductor de ORDEVA apagado', await p.evaluate(() => !JSON.parse(localStorage.getItem('vito_auto_play') || '{}').on));
 
     // 1. Canción por QR sin reproductor
     await p.evaluate(() => window.vitoMod.procesar(JSON.stringify({ t: 'cancion', v: 2, id: 'c-qr-1', mesa: 2, s: 'Joe Arroyo La Rebelion', at: Date.now() })));
@@ -57,7 +57,7 @@ const video = (id, t, c, d) => ({ id: { videoId: id }, snippet: { title: t, chan
     await p.fill('#ypQ', 'feid luna'); await p.click('#ypBuscarF button');
     await p.waitForSelector('#ypRes .yp-card');
     await p.click('#ypRes .yp-card .btn-primary');
-    chk('2. «⏭ Que siga» prende solo el reproductor de Vento', await p.evaluate(() => !!JSON.parse(localStorage.getItem('vito_auto_play') || '{}').on));
+    chk('2. «⏭ Que siga» prende solo el reproductor de ORDEVA', await p.evaluate(() => !!JSON.parse(localStorage.getItem('vito_auto_play') || '{}').on));
     chk('2. … y avisa que lo prendió', await p.evaluate(() => window.__toasts.some(t => /Encendí el reproductor de Vento/.test(t))));
     chk('2. La canción elegida SUENA', await suena(p, 'feidlunaxxx'), await p.evaluate(() => [window.__yt.cargados, window.vitoMusica.cola().map(x => [x.song, x.status, x.vid, x.ok])]));
     await p.waitForTimeout(1300);

@@ -1,10 +1,10 @@
-// La clave de IA del negocio ya no viaja a los celulares (Vento 1.53.0), probado en la app contra el «Supabase local» REAL
+// La clave de IA del negocio ya no viaja a los celulares (ORDEVA 1.53.0), probado en la app contra el «Supabase local» REAL
 // y un Gemini de mentiras (Google de verdad está bloqueado en la prueba: si algo llama directo, falla).
 //  1. Un celular que traía la clave copiada (versiones anteriores) la sube al servidor, la borra de su memoria y los
 //     datos del negocio no la llevan.
 //  2. La IA funciona por el servidor con la clave del negocio, también en el celular del mesero (que nunca la recibe).
 //  3. Ajustes → IA: dice que está en el servidor (con el final), «Guardar» con el campo vacío no la borra, una clave
-//     nueva la cambia para todos y «🗑️ Quitar» deja la IA de Vento.
+//     nueva la cambia para todos y «🗑️ Quitar» deja la IA de ORDEVA.
 'use strict';
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const fs = require('fs'), http = require('http');

@@ -3,7 +3,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
  const ctx=await b.newContext({viewport:{width:390,height:844}});
  await ctx.route('**/*', r=>{const u=new URL(r.request().url()); return u.hostname==='localhost'?r.continue():r.abort();});
  await ctx.addInitScript(()=>{
-  try{ if(localStorage.getItem('vento-hola')===null) localStorage.setItem('vento-hola','1'); }catch(e){}   // «Hola Vento» viene apagado de fábrica: esta prueba lo prende
+  try{ if(localStorage.getItem('vento-hola')===null) localStorage.setItem('vento-hola','1'); }catch(e){}   // «Hola ORDEVA» viene apagado de fábrica: esta prueba lo prende
   window.__ini=0; window.__mute=[];
   const V=()=>window.__ventoVoz;
   window.VentoAndroid={ info:()=>'{}', hablar(){}, callar(){}, guardarArchivo(){}, fondo:()=>true, fondoActivar(){}, notificar(){return true;}, avisosEstado:()=>'{"prendidos":true}', buscarTVs(){}, lounge(){}, pararTV(){}, vozPreparar(){},
@@ -23,19 +23,19 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
    data.products=[{id:'pk',name:'Poker',price:3800,stock:50}]; for(let i=1;i<=3;i++) data.tables[i]={items:[],people:[]}; saveData(); });
  await p.waitForTimeout(3500);
  const q=(m)=>p.evaluate(m=>(data.tables[m].items||[]).reduce((s,i)=>s+i.qty,0),m);
- chk('APK: «Hola Vento» abre el micrófono solo', await p.evaluate(()=>window.__ini>=1 && window.ventoHola.estado().corriendo));
+ chk('APK: «Hola ORDEVA» abre el micrófono solo', await p.evaluate(()=>window.__ini>=1 && window.ventoHola.estado().corriendo));
  chk('APK: silencia el pitido mientras escucha', await p.evaluate(()=>window.__mute.includes(true)));
  await p.evaluate(()=>__dice('hola vento mesa 1 dos poker')); await p.waitForTimeout(1500);
  chk('APK: «hola vento mesa 1 dos poker» anota', (await q(1))===2);
  await p.waitForTimeout(800);
  chk('APK: vuelve a escuchar', await p.evaluate(()=>window.ventoHola.estado().corriendo));
- // tocar el botón mientras «Hola Vento» escucha
+ // tocar el botón mientras «Hola ORDEVA» escucha
  await p.evaluate(()=>startVoiceCommand(false)); await p.waitForTimeout(400);
  chk('Botón: su escucha no se corta por el «terminé» de la anterior', await p.evaluate(()=>voiceListening===true));
  await p.evaluate(()=>{ __dice('mesa 2 una poker'); __fin(); }); await p.waitForTimeout(3200);
  chk('Botón: anota en la mesa 2', (await q(2))===1);
  await p.waitForTimeout(2500);
- chk('Después «Hola Vento» vuelve solo', await p.evaluate(()=>window.ventoHola.estado().corriendo));
+ chk('Después «Hola ORDEVA» vuelve solo', await p.evaluate(()=>window.ventoHola.estado().corriendo));
  // permisos
  await p.evaluate(()=>{ try{ iniCast(); }catch(e){} });
  chk('Botón «Permisos del celular» visible con estado', await p.evaluate(()=>{ const b=document.getElementById('apkPermisos'), t=document.getElementById('apkPermisosTxt'); return b && !b.hidden && /Cámara/.test(t.textContent) && /Dar los permisos/.test(b.textContent); }));

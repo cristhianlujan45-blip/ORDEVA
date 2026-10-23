@@ -2,17 +2,17 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<script src="lib/vento-errores.js"></script><!-- errores de este equipo → Vento Admin (🐞 Errores) -->
+<script src="lib/vento-errores.js"></script><!-- errores de este equipo → ORDEVA Admin (🐞 Errores) -->
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex">
 <meta name="theme-color" content="#0a0c1b">
-<title>Vento · Preparación</title>
+<title>ORDEVA · Preparación</title>
 <link rel="icon" type="image/png" href="icons/ordeva-64.png">
 <link rel="apple-touch-icon" href="icons/ordeva-180.png">
 <style>
   /* Pantalla de preparación (cocina, barra, despacho…) para una tablet o un TV.
-     Se abre con preparacion.html#canal.código (el link sale en Vento → Ajustes → Pedidos, QR y caja).
-     Recibe en vivo los pedidos activos que publica Vento y devuelve los cambios de estado.
+     Se abre con preparacion.html#canal.código (el link sale en ORDEVA → Ajustes → Pedidos, QR y caja).
+     Recibe en vivo los pedidos activos que publica ORDEVA y devuelve los cambios de estado.
      Código sencillo a propósito: muchos navegadores de TV y tablets son viejos. */
   :root{ --bg:#0a0c1b; --card:#141832; --line:#262c52; --ink:#f2f4ff; --soft:#9aa3cf; --nuevo:#fb7185; --rec:#60a5fa; --prep:#fbbf24; --listo:#34d399; }
   *{ box-sizing:border-box; }
@@ -42,12 +42,12 @@
 <style>html,button,a,input,select{touch-action:manipulation}input,select,textarea{font-size:max(16px,1em)}</style>
 <script src="nube/config.js"></script>
 <script>window.VENTO_REQUIERE_BD = true;</script>
-<script src="lib/vento-canal.js"></script><!-- canales en vivo por el servidor de Vento -->
+<script src="lib/vento-canal.js"></script><!-- canales en vivo por el servidor de ORDEVA -->
 </head>
 <body>
 <header>
   <h1 id="tit">🍳 Preparación</h1>
-  <div class="st"><span class="dot" id="dot"></span><span id="st">Conectando con Vento…</span></div>
+  <div class="st"><span class="dot" id="dot"></span><span id="st">Conectando con ORDEVA…</span></div>
 </header>
 <div id="err" hidden></div>
 <main id="tablero"></main>
@@ -56,7 +56,7 @@
   var h = (location.hash || '').replace(/^#/, '').split('.');
   var topic = (h[0] || '').replace(/[^\w]/g, ''), code = (h[1] || '').replace(/[^\w]/g, '');
   var $ = function(id){ return document.getElementById(id); };
-  if(!topic || !code){ $('err').hidden = false; $('err').textContent = 'Falta el código del link. Cópialo de nuevo en Vento → Ajustes → Pedidos, QR y caja → Pantalla de preparación.'; return; }
+  if(!topic || !code){ $('err').hidden = false; $('err').textContent = 'Falta el código del link. Cópialo de nuevo en ORDEVA → Ajustes → Pedidos, QR y caja → Pantalla de preparación.'; return; }
   var CANAL = topic + 'p' + code, estado = null, ultimo = 0;
   var SIG = { nuevo: ['✅ Aceptar', 'recibido'], recibido: ['👩‍🍳 En preparación', 'preparacion'], preparacion: ['🔔 Listo', 'listo'], listo: ['🍽️ Entregado', 'entregado'] };
   var COLS = [['nuevo', '🆕 Por aceptar'], ['recibido', '📥 Recibidos'], ['preparacion', '👩‍🍳 En preparación'], ['listo', '🔔 Listos']];
@@ -65,9 +65,9 @@
   function pintar(){
     var vivo = Date.now() - ultimo < 30 * 60000;
     $('dot').className = 'dot ' + (vivo ? 'ok' : 'bad');
-    $('st').textContent = vivo ? 'En vivo con Vento' : 'Sin noticias de Vento: deja la app abierta en el celular o la caja.';
+    $('st').textContent = vivo ? 'En vivo con ORDEVA' : 'Sin noticias de ORDEVA: deja la app abierta en el celular o la caja.';
     if(!estado) return;
-    document.title = 'Vento · ' + estado.n;
+    document.title = 'ORDEVA · ' + estado.n;
     $('tit').textContent = '🍳 ' + estado.n + (estado.b ? ' · ' + estado.b : '');
     var o = estado.o || [], html = '';
     COLS.forEach(function(c){
@@ -87,7 +87,7 @@
   $('tablero').addEventListener('click', function(ev){
     var b = ev.target.closest ? ev.target.closest('button[data-id]') : null; if(!b) return;
     enviar({ k: 'estado', id: b.getAttribute('data-id'), e: b.getAttribute('data-e'), at: Date.now() });
-    // Se mueve de una vez en pantalla; Vento confirma con su próxima publicación.
+    // Se mueve de una vez en pantalla; ORDEVA confirma con su próxima publicación.
     (estado.o || []).forEach(function(p){ if(p.i === b.getAttribute('data-id')) p.e = b.getAttribute('data-e'); });
     estado.o = estado.o.filter(function(p){ return p.e !== 'entregado' && p.e !== 'cancelado'; });
     pintar();
@@ -114,7 +114,7 @@
   }
   conectar();
   enviar({ k: 'hola', at: Date.now() });
-  // Cada 6 h vuelve a avisar que sigue abierta (Vento solo le publica a pantallas que están abiertas).
+  // Cada 6 h vuelve a avisar que sigue abierta (ORDEVA solo le publica a pantallas que están abiertas).
   setInterval(function(){ enviar({ k: 'hola', at: Date.now() }); }, 6 * 3600000);
   setInterval(pintar, 20000);
   pintar();

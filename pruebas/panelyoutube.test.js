@@ -1,5 +1,5 @@
 // ▶️ Panel de YouTube dentro de la app: ver lo que suena, poner canciones y las listas propias.
-// El reproductor de YouTube (IFrame API), el Servidor Vento (/yt/buscar, /yt/lista) y la API de la cuenta de Google se simulan.
+// El reproductor de YouTube (IFrame API), el Servidor ORDEVA (/yt/buscar, /yt/lista) y la API de la cuenta de Google se simulan.
 //  1. Música → «▶️ Abrir el panel de YouTube»: se abre la ventana; sin música dice «No está sonando nada».
 //  2. Buscar «feid» → resultados con portada → «⏭ Que siga» → suena en la app y el VIDEO se ve dentro del panel.
 //  3. «➕ Cola» la deja en su turno; otra con «⏭ Que siga» se pone primero. ⏯ pausa / sigue; ⏭ pasa a la siguiente.

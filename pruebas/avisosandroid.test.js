@@ -1,11 +1,11 @@
-// App Android: los avisos de plata recibida de DaviPlata/Nequi de ESTE celular llegan a Vento sin MacroDroid, y cada pago
-// que llega (de otro celular o de la API de DaviPlata) suena como aviso del celular aunque Vento esté cerrada.
+// App Android: los avisos de plata recibida de DaviPlata/Nequi de ESTE celular llegan a ORDEVA sin MacroDroid, y cada pago
+// que llega (de otro celular o de la API de DaviPlata) suena como aviso del celular aunque ORDEVA esté cerrada.
 // El puente nativo (VentoAndroid: VentoEscucha + notificar) se simula en la página; lo demás es la app de verdad.
 //  1. Ajustes → «Recibir avisos de pagos»: en la app lee DIRECTO los avisos del banco (sin MacroDroid); sin permiso abre «Acceso a notificaciones».
 //  2. Aviso «DaviPlata | ¡Recibiste plata! | JUAN PEREZ te envió $25.000» → pago confirmado, de la mesa que debe $25.000.
 //  3. El mismo aviso otra vez (Android lo vuelve a publicar) → no se repite.
 //  2b. Como el parlante de Bold: suena el sonido de éxito y dice en voz alta «Pago confirmado. 25000 pesos desde DaviPlata, de Juan Perez…».
-//  4. Un pago que llega por el Servidor Vento → aviso del celular «✅ Pago confirmado» y la voz (con N.º de aprobación de DaviPlata).
+//  4. Un pago que llega por el Servidor ORDEVA → aviso del celular «✅ Pago confirmado» y la voz (con N.º de aprobación de DaviPlata).
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 
@@ -35,7 +35,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     await p.click('.ajustes-cat[data-cat="negocio"]');
     await p.waitForSelector('#pgOn', { state: 'attached', timeout: 5000 });
     const desc = await p.textContent('#pgGrupo');
-    chk('1. Explica que la app de Vento lee directamente el aviso del banco y dice «Pago confirmado»', /la app de Vento lee directamente el aviso del banco/.test(desc) && /Pago confirmado/.test(desc), desc.slice(0, 300));
+    chk('1. Explica que la app de ORDEVA lee directamente el aviso del banco y dice «Pago confirmado»', /la app de ORDEVA lee directamente el aviso del banco/.test(desc) && /Pago confirmado/.test(desc), desc.slice(0, 300));
     chk('1. MacroDroid queda solo como «otro método», plegado', await p.evaluate(() => { const d = [...document.querySelectorAll('#pgGrupo details')].find(x => /MacroDroid|NO usas la app/.test(x.querySelector('summary').textContent)); return !!d && !d.open && /NO usas la app Vento/.test(d.querySelector('summary').textContent); }));
     await p.evaluate(() => { const i = document.getElementById('pgOn'); i.checked = true; i.dispatchEvent(new Event('change')); });
     let A = await p.evaluate(() => window.__and);
@@ -67,7 +67,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     await p.evaluate(() => { window.__and.cola.push({ id: 'k2:9', txt: 'Nequi | Nequi | Tu código de seguridad es 123456', t: Date.now() }); window.ventoAvisosNativos(); });
     chk('3. Un aviso que no es plata recibida no cuenta', await p.evaluate(() => data.pagos.lista.length) === 1);
 
-    // 4. Pago por el Servidor Vento (otro celular o la API de DaviPlata)
+    // 4. Pago por el Servidor ORDEVA (otro celular o la API de DaviPlata)
     await p.evaluate(() => window.ventoPagos.recibir({ id: 'srv-77', estado: 'aprobado', confianza: 'ok', verificado: true, proveedor: 'daviplata', metodo: 'DAVIPLATA', monto: 18000, aprobacion: '604107', creado_en: new Date().toISOString(), actualizado_en: new Date().toISOString() }, true));
     A = await p.evaluate(() => window.__and);
     const n = A.notifs.find(y => /Pago confirmado/.test(y.t));

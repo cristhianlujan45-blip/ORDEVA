@@ -60,7 +60,7 @@ const crypto=require('crypto'); const fs=require('fs');
  toasts.length=0; await p.evaluate(()=>{ document.querySelectorAll('.overlay.show').forEach(o=>o.classList.remove('show')); document.getElementById('resetAllBtn').click(); }); await p.waitForTimeout(400);
  chk('El proveedor sí puede «Restablecer todo» (le pide confirmar)', !toasts.some(t=>/Solo el proveedor/.test(t)) && await p.evaluate(()=>!!document.querySelector('.overlay.show')));
  await p.evaluate(()=>document.querySelectorAll('.overlay.show').forEach(o=>o.classList.remove('show')));
- chk('El proveedor ve el enlace a Vento Admin', await p.evaluate(()=>!document.getElementById('subLicLink').hidden));
+ chk('El proveedor ve el enlace a ORDEVA Admin', await p.evaluate(()=>!document.getElementById('subLicLink').hidden));
  // Firma falsificada
  const falso = await p.evaluate(async()=>{ const pl=btoa(JSON.stringify({d:codigoNegocio(),m:1,v:Date.now()+9e10})).replace(/=+$/,''); return await licActivar(pl+'.'+'A'.repeat(86), true); });
  chk('Un código inventado (sin la llave privada) no sirve', falso===false);

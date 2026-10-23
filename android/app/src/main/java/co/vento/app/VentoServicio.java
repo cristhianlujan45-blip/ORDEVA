@@ -151,8 +151,8 @@ public class VentoServicio extends Service {
     private Notification aviso() {
         NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         if (Build.VERSION.SDK_INT >= 26 && nm != null && nm.getNotificationChannel(CANAL) == null) {
-            NotificationChannel ch = new NotificationChannel(CANAL, "Vento trabajando de fondo", NotificationManager.IMPORTANCE_LOW);
-            ch.setDescription("Vento sigue recibiendo pedidos y mandando la música al TV con la app cerrada.");
+            NotificationChannel ch = new NotificationChannel(CANAL, "ORDEVA trabajando de fondo", NotificationManager.IMPORTANCE_LOW);
+            ch.setDescription("ORDEVA sigue recibiendo pedidos y mandando la música al TV con la app cerrada.");
             ch.setShowBadge(false);
             nm.createNotificationChannel(ch);
         }
@@ -162,7 +162,7 @@ public class VentoServicio extends Service {
         PendingIntent parar = PendingIntent.getService(this, 1, new Intent(this, VentoServicio.class).setAction(DETENER), flagsPi);
         Notification.Builder b = Build.VERSION.SDK_INT >= 26 ? new Notification.Builder(this, CANAL) : new Notification.Builder(this);
         b.setSmallIcon(android.R.drawable.stat_notify_sync_noanim)
-                .setContentTitle("Vento está trabajando")
+                .setContentTitle("ORDEVA está trabajando")
                 .setContentText("Recibiendo pedidos y mandando la música al TV, aunque cierres la app.")
                 .setOngoing(true)
                 .setContentIntent(abrir)

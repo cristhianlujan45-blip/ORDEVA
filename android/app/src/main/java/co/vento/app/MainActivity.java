@@ -84,7 +84,7 @@ public class MainActivity extends Activity {
         if (siempre && bloqueado) {
             try {
                 startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName())));
-                VentoApp.aviso("Toca «Permisos» y activa Micrófono, Cámara y Notificaciones para Vento.");
+                VentoApp.aviso("Toca «Permisos» y activa Micrófono, Cámara y Notificaciones para ORDEVA.");
             } catch (Exception ignorado) { }
             return true;
         }

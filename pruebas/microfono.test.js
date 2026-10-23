@@ -1,5 +1,5 @@
 // Micrófono de la app Android, muchas veces seguidas (reconocedor de Android simulado como en la app instalada).
-// Falla que se corrige: se tocaba 🎤, se decía la orden y el micrófono VOLVÍA A SONAR y a abrirse solo: Vento lo reabría
+// Falla que se corrige: se tocaba 🎤, se decía la orden y el micrófono VOLVÍA A SONAR y a abrirse solo: ORDEVA lo reabría
 // para no cortar el pedido en una pausa y, al cerrarlo sin voz, la app nativa lo reabría otra vez (otro pitido y 5–8 s
 // más escuchando antes de anotar, oyendo lo que se hablara cerca).
 // En cada vuelta se revisa: un solo pitido (el del toque), se anota una vez y rápido, el micrófono queda cerrado y no se

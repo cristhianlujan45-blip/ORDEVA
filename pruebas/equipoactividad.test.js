@@ -43,7 +43,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
 
     // ===== Dueño: tienda de ropa =====
     const A = await celular(), pA = A.p;
-    chk('La entrada no ofrece «Vento Nube» aparte (la cuenta de Vento ya guarda todo)', await pA.evaluate(() => !/nube/i.test(document.getElementById('authOverlay').innerText) && /Me invitaron a un negocio/.test(document.getElementById('authNube').textContent)));
+    chk('La entrada no ofrece «ORDEVA Nube» aparte (la cuenta de ORDEVA ya guarda todo)', await pA.evaluate(() => !/nube/i.test(document.getElementById('authOverlay').innerText) && /Me invitaron a un negocio/.test(document.getElementById('authNube').textContent)));
     await pA.evaluate(() => { document.getElementById('authType').value = 'ropa'; });
     await pA.fill('#authBiz', 'Boutique Ana'); await pA.fill('#authUser', 'ana@boutique.co'); await pA.fill('#authPass', 'clave123'); await pA.click('#authBtn');
     chk('El dueño crea su cuenta (y su negocio queda en la cuenta, sin pasos de «nube»)', await esperar(pA, () => document.getElementById('authOverlay').hidden && !!window.ventoNube.negocio() && window.ventoNube.negocio().rol === 'dueno', null, 20000));
@@ -55,7 +55,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     await pA.evaluate(() => window.ventoNube.abrir({}));
     await pA.waitForSelector('#nubeOv.show #nubeRolInv');
     const panel = await pA.evaluate(() => ({ t: document.getElementById('nubeOv').innerText, ops: [...document.querySelectorAll('#nubeRolInv option')].map(o => o.textContent) }));
-    chk('«👥 Mi cuenta y mi equipo»: sin «nube», sin sincronizar ni respaldos (eso es del administrador de Vento)', /Mi cuenta y mi equipo/.test(panel.t) && !/nube|Sincronizar|Respaldos/i.test(panel.t), panel.t);
+    chk('«👥 Mi cuenta y mi equipo»: sin «nube», sin sincronizar ni respaldos (eso es del administrador de ORDEVA)', /Mi cuenta y mi equipo/.test(panel.t) && !/nube|Sincronizar|Respaldos/i.test(panel.t), panel.t);
     chk('Invitar: Asesor de ventas, Mesero, Cajero o Segundo administrador', panel.ops.join('|') === 'Asesor de ventas|Mesero|Cajero|Administrador (segundo administrador)', panel.ops);
     await pA.selectOption('#nubeRolInv', 'empleado'); await pA.click('#nubeInvitar');
     await pA.waitForSelector('#nubeInvRes .nube-cod');

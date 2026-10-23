@@ -1,4 +1,4 @@
-// Panel de Administrador · 💳 Suscripciones (Vento Nube simulada).
+// Panel de Administrador · 💳 Suscripciones (ORDEVA Nube simulada).
 // supabase-js es falso (window.supabase con auth.signInWithPassword/getSession) y el servidor
 // /functions/v1/vento-suscripciones/admin/* se simula con ctx.route.
 // El bloqueo con el código personal se OCULTA desde la prueba (page.evaluate → #lock.hidden = true):
@@ -39,10 +39,10 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
    ],
    planes: [
      { id: 'free', name: 'Gratis', price: 0, currency: 'COP', period_months: 1, active: true, sort: 0, description: 'Lo básico', entitlements: ['pos_basic', 'inventory', 'tables', 'expenses'] },
-     { id: 'pro', name: 'PRO', price: 59900, currency: 'COP', period_months: 1, active: true, sort: 2, description: 'Todo Vento', entitlements: ['pos_basic', 'inventory', 'tables', 'expenses', 'invoices', 'ocr', 'ai_camera', 'voice', 'advanced_reports', 'employee_management'] },
+     { id: 'pro', name: 'PRO', price: 59900, currency: 'COP', period_months: 1, active: true, sort: 2, description: 'Todo ORDEVA', entitlements: ['pos_basic', 'inventory', 'tables', 'expenses', 'invoices', 'ocr', 'ai_camera', 'voice', 'advanced_reports', 'employee_management'] },
      { id: 'premium', name: 'Premium', price: 99900, currency: 'COP', period_months: 1, active: false, sort: 3, description: '<img src=x onerror="window.__xss=2">', entitlements: ENTS }
    ],
-   config: { beta_mode: true, trial_days: 15, renew_notice_days: 7, manual_methods: { NEQUI: { numero: '3000000000', titular: 'Vento' }, DAVIPLATA: { numero: '', titular: '' } }, support_whatsapp: '573000000000', updated_at: iso(-1) }
+   config: { beta_mode: true, trial_days: 15, renew_notice_days: 7, manual_methods: { NEQUI: { numero: '3000000000', titular: 'ORDEVA' }, DAVIPLATA: { numero: '', titular: '' } }, support_whatsapp: '573000000000', updated_at: iso(-1) }
  };
  const detalle = id => {
    const n = S.negocios.find(x => x.id === id), s = S.subs.find(x => x.business_id === id) || null;
@@ -55,9 +55,9 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
      resumen: n.resumen };
  };
  function servidor(accion, body, auth){
-   if(auth === 'Bearer TOK-OTRO') return [403, { ok: false, error: 'no_admin', mensaje: 'Esta cuenta no es administradora de Vento.' }];
+   if(auth === 'Bearer TOK-OTRO') return [403, { ok: false, error: 'no_admin', mensaje: 'Esta cuenta no es administradora de ORDEVA.' }];
    if(auth === 'Bearer TOK-NUEVO') return [403, { ok: false, error: 'correo_sin_confirmar', mensaje: 'Confirma tu correo antes de entrar como administrador.' }];
-   if(auth !== 'Bearer TOK-ADMIN') return [401, { ok: false, error: 'sin_sesion', mensaje: 'Entra con tu cuenta de Vento Nube.' }];
+   if(auth !== 'Bearer TOK-ADMIN') return [401, { ok: false, error: 'sin_sesion', mensaje: 'Entra con tu cuenta de ORDEVA Nube.' }];
    if(S.fallar === accion) return [500, { ok: false, error: 'interno', mensaje: 'Error interno' }];
    const pago = () => S.pagos.find(x => x.id === body.payment), sub = () => S.subs.find(x => x.business_id === body.negocio);
    switch(accion){
@@ -124,7 +124,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
  // Pasar el bloqueo: se oculta desde la prueba (la seguridad de las suscripciones la hace el servidor)
  await p.evaluate(() => { document.getElementById('lock').hidden = true; });
  await p.click('#tabs [data-t="subs"]');
- chk('Pide entrar con la cuenta de Vento Nube', await esperar(() => !document.getElementById('sxLogin').hidden));
+ chk('Pide entrar con la cuenta de ORDEVA Nube', await esperar(() => !document.getElementById('sxLogin').hidden));
  chk('No llama al servidor antes de entrar', S.llamadas.length === 0, JSON.stringify(S.llamadas));
  chk('Sesión aparte de la app (storageKey propia, sin leer el link)', await p.evaluate(() => window.__sb && window.__sb.opts.auth.storageKey === 'vento-admin-nube' && window.__sb.opts.auth.detectSessionInUrl === false));
  chk('Usa la nube de nube/config.js', await p.evaluate(u => window.__sb && window.__sb.url === u, SB));
@@ -269,13 +269,13 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
  await p.click('#sxNav [data-s="config"]');
  chk('Configuración: trae lo del servidor', await p.evaluate(() => document.getElementById('sxBeta').checked && document.getElementById('sxPrueba').value === '15' && document.getElementById('sxNequiNum').value === '3000000000'));
  await p.fill('#sxPrueba', '20'); await p.fill('#sxAvisoDias', '5');
- await p.fill('#sxNequiNum', '300 123 4567'); await p.fill('#sxNequiTit', 'Vento SAS');
- await p.fill('#sxDaviNum', '3109876543'); await p.fill('#sxDaviTit', 'Vento SAS'); await p.fill('#sxWa', '3001112233');
+ await p.fill('#sxNequiNum', '300 123 4567'); await p.fill('#sxNequiTit', 'ORDEVA SAS');
+ await p.fill('#sxDaviNum', '3109876543'); await p.fill('#sxDaviTit', 'ORDEVA SAS'); await p.fill('#sxWa', '3001112233');
  await p.click('#sxCfgGuardar');
  await esperar(() => !document.getElementById('sxCfgGuardar').disabled);
  const cg = ((llamadas('config_guardar')[0] || {}).body || {}).config;
  chk('Guardar config: BETA, prueba, aviso, Nequi/DaviPlata y WhatsApp', JSON.stringify(cg) === JSON.stringify({ beta_mode: true, trial_days: 20, renew_notice_days: 5,
-   manual_methods: { NEQUI: { numero: '3001234567', titular: 'Vento SAS' }, DAVIPLATA: { numero: '3109876543', titular: 'Vento SAS' } }, support_whatsapp: '573001112233' }), JSON.stringify(cg));
+   manual_methods: { NEQUI: { numero: '3001234567', titular: 'ORDEVA SAS' }, DAVIPLATA: { numero: '3109876543', titular: 'ORDEVA SAS' } }, support_whatsapp: '573001112233' }), JSON.stringify(cg));
 
  // Si el servidor falla al cargar, queda un aviso y 🔄 lo vuelve a intentar
  S.fallar = 'suscripciones'; await p.click('#sxRefrescar');

@@ -2,16 +2,16 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<script src="lib/vento-errores.js"></script><!-- errores de este equipo → Vento Admin (🐞 Errores) -->
+<script src="lib/vento-errores.js"></script><!-- errores de este equipo → ORDEVA Admin (🐞 Errores) -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>html{ -webkit-text-size-adjust:100%; text-size-adjust:100%; } body{ overflow-x:clip; max-width:100vw; }</style>
-<title>Vento · Música en el TV</title>
+<title>ORDEVA · Música en el TV</title>
 <link rel="icon" type="image/png" href="icons/ordeva-64.png">
 <link rel="apple-touch-icon" href="icons/ordeva-180.png">
 <style>
   /* Pantalla del TV: se abre en el navegador del televisor (LG webOS, Samsung, Android TV,
-     TV Box) con tv.html#código. Reproduce la cola de canciones que le manda Vento desde
-     el celular por el canal de Vento. Código sencillo a propósito: los navegadores de los TV son viejos. */
+     TV Box) con tv.html#código. Reproduce la cola de canciones que le manda ORDEVA desde
+     el celular por el canal de ORDEVA. Código sencillo a propósito: los navegadores de los TV son viejos. */
   :root{ --bg:#0b0a12; --card:#16151f; --line:#2a2838; --ink:#f4f2fb; --soft:#a19dba; --acc:#8b5cf6; --ok:#34d399; --bad:#fb7185; }
   *{ box-sizing:border-box; }
   html,body{ margin:0; height:100%; background:var(--bg); color:var(--ink); font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif; overflow:hidden; }
@@ -61,7 +61,7 @@
   <div class="side">
     <h2>Siguen</h2>
     <ol id="next"></ol>
-    <div class="state"><span class="dot" id="dot"></span><span id="state">Conectando con Vento…</span></div>
+    <div class="state"><span class="dot" id="dot"></span><span id="state">Conectando con ORDEVA…</span></div>
   </div>
 </div>
 <div id="start">
@@ -76,11 +76,11 @@
   var code = (location.hash || '').replace(/[^a-z0-9]/gi, '');
   var TOPIC = 'mesoratv' + code;
   var $ = function(id){ return document.getElementById(id); };
-  if(!code){ $('err').textContent = 'Falta el código del link. Copia de nuevo el link desde Vento → Música → Pantalla del TV.'; $('go').style.display = 'none'; return; }
+  if(!code){ $('err').textContent = 'Falta el código del link. Copia de nuevo el link desde ORDEVA → Música → Pantalla del TV.'; $('go').style.display = 'none'; return; }
 
   var cola = [], tocadas = {}, actual = null, player = null, listo = false, empezado = false, cargadoEn = 0, ultimoMsg = 0;
   // malos: versiones (video) que no se dejaron reproducir aquí. Se recuerda el VIDEO, no la canción:
-  // así, cuando Vento manda otra versión de la misma canción, sí suena (antes quedaba «tocada» y se perdía).
+  // así, cuando ORDEVA manda otra versión de la misma canción, sí suena (antes quedaba «tocada» y se perdía).
   // intentos / silencio: el navegador del TV a veces no deja sonar solo con audio (no es un video malo).
   var malos = {}, intentos = 0, silencio = false;
   // esperaRed: se cayó el internet del TV; no se culpa a la versión, se reintenta la misma canción.
@@ -91,7 +91,7 @@
     var ks = Object.keys(tocadas); if(ks.length > 300){ ks.sort(function(a, b){ return tocadas[a] - tocadas[b]; }).slice(0, ks.length - 300).forEach(function(k){ delete tocadas[k]; }); }
     try{ localStorage.setItem('tv_tocadas_' + code, JSON.stringify(tocadas)); }catch(e){}
   }
-  // Canal en vivo por el servidor de Vento (funciones canal_publicar / canal_leer). Con XMLHttpRequest: los
+  // Canal en vivo por el servidor de ORDEVA (funciones canal_publicar / canal_leer). Con XMLHttpRequest: los
   // navegadores de los TV son viejos.
   function vcCfg(){ var c = null; try{ c = JSON.parse(localStorage.getItem('vento_nube_cfg') || 'null'); }catch(e){} if(!c || !c.url || !c.key) c = window.VENTO_NUBE_DEFAULT || null; return c && c.url && c.key ? c : null; }
   function vcRpc(fn, args, cb){
@@ -104,7 +104,7 @@
       x.send(JSON.stringify(args));
     }catch(e){ cx(false); if(cb) cb(null); }
   }
-  // El TV solo funciona conectado a la base de datos de Vento: sin respuesta se tapa con «Sin conexión con Vento»
+  // El TV solo funciona conectado a la base de datos de ORDEVA: sin respuesta se tapa con «Sin conexión con ORDEVA»
   // (la música que ya está sonando sigue) y se destapa sola al volver.
   var cxOk = false, cxFallo = 0, cxIni = Date.now(), cxOv = null;
   function cx(bien){ if(bien){ cxOk = true; cxFallo = 0; } else { cxOk = false; if(!cxFallo) cxFallo = Date.now(); } cxPintar(); }
@@ -114,11 +114,11 @@
     if(cxOv || !document.body) return;
     cxOv = document.createElement('div'); cxOv.id = 'vcSinConexion';
     cxOv.style.cssText = 'position:fixed;left:0;top:0;right:0;bottom:0;z-index:2147483000;background:rgba(10,10,10,.96);color:#fff;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;font-family:sans-serif';
-    cxOv.innerHTML = '<div style="max-width:420px"><div style="font-size:60px">📡</div><b style="display:block;font-size:26px;margin:8px 0">Sin conexión con Vento</b><div style="font-size:16px;line-height:1.5;opacity:.85">Este TV solo funciona conectado a la base de datos de Vento. Revisa el internet: apenas vuelva, sigue solo.</div></div>';
+    cxOv.innerHTML = '<div style="max-width:420px"><div style="font-size:60px">📡</div><b style="display:block;font-size:26px;margin:8px 0">Sin conexión con ORDEVA</b><div style="font-size:16px;line-height:1.5;opacity:.85">Este TV solo funciona conectado a la base de datos de ORDEVA. Revisa el internet: apenas vuelva, sigue solo.</div></div>';
     document.body.appendChild(cxOv);
   }
   setInterval(cxPintar, 1500);
-  // El TV nunca se apaga solo mientras Vento está abierto (Screen Wake Lock), y al despertar se pone al día al instante.
+  // El TV nunca se apaga solo mientras ORDEVA está abierto (Screen Wake Lock), y al despertar se pone al día al instante.
   var luz = null;
   function pedirLuz(){
     if(luz || document.hidden || !(navigator.wakeLock && navigator.wakeLock.request)) return;
@@ -141,7 +141,7 @@
     tiempo();
     var vivo = Date.now() - ultimoMsg < 6 * 60000;
     $('dot').className = 'dot ' + (vivo ? 'ok' : 'bad');
-    $('state').textContent = vivo ? 'Conectado con Vento' : 'Sin noticias del celular: deja Vento abierta en la sección Música.';
+    $('state').textContent = vivo ? 'Conectado con ORDEVA' : 'Sin noticias del celular: deja ORDEVA abierta en la sección Música.';
   }
   function mmss(s){ s = Math.max(0, Math.round(s || 0)); var m = Math.floor(s / 60), r = s % 60; return (m < 10 ? '0' : '') + m + ':' + (r < 10 ? '0' : '') + r; }
   function pos(){ var t = 0, d = 0; try{ t = player.getCurrentTime() || 0; d = player.getDuration() || 0; }catch(e){} return { t: t, d: d }; }
@@ -167,7 +167,7 @@
   function mala(){                              // esta versión no se deja reproducir: avisa y sigue
     if(!actual) return;
     // Sin internet (o el YouTube del TV no carga nada): no es culpa de la versión. Antes se avisaba
-    // «versión mala» y Vento descartaba versiones buenas hasta borrar la canción. Se reintenta la
+    // «versión mala» y ORDEVA descartaba versiones buenas hasta borrar la canción. Se reintenta la
     // MISMA canción una vez cuando vuelva la red; si falla otra vez con internet, ahí sí es mala.
     if(!actual.reint && (navigator.onLine === false || Date.now() - ultimaRed < 60000)){
       actual.reint = true; esperaRed = Date.now() + 20000; cargadoEn = 0;
@@ -175,7 +175,7 @@
       return;
     }
     avisar({ b: actual.i, v: actual.v });
-    malos[actual.v] = 1; delete tocadas[actual.i]; guardarTocadas();   // la otra versión que mande Vento sí entra
+    malos[actual.v] = 1; delete tocadas[actual.i]; guardarTocadas();   // la otra versión que mande ORDEVA sí entra
     $('aviso').textContent = 'No se pudo cargar la reproducción. Intente nuevamente.';
     setTimeout(function(){ $('aviso').textContent = ''; }, 8000);
     actual = null; cargadoEn = 0;
@@ -188,7 +188,7 @@
       onError: function(e){ if(e && (e.data === 5 || e.data === 2) && navigator.onLine === false) ultimaRed = Date.now(); mala(); }
     } });
   }
-  // Terminó la canción: avisa a Vento y pone la siguiente.
+  // Terminó la canción: avisa a ORDEVA y pone la siguiente.
   function termino(){
     if(actual){ var x = pos(); avisar({ e: actual.i, t: Math.round(x.d || x.t), d: Math.round(x.d) }); }
     actual = null; cargadoEn = 0; siguiente();
@@ -202,7 +202,7 @@
   // Una canción "cargada" que no arranca:
   //  - quieta sin empezar (-1) o lista (5): el navegador del TV no la dejó sonar sola. Se le da «play»,
   //    y si sigue quieta, se pone sin sonido (eso sí lo dejan) y se pide un toque para el sonido.
-  //    Antes se tomaba como versión mala: Vento la cambiaba una y otra vez y al final la borraba.
+  //    Antes se tomaba como versión mala: ORDEVA la cambiaba una y otra vez y al final la borraba.
   //  - si ni así arranca en ~24 s, ahí sí se da por mala (bloqueo que no avisa) y sigue la próxima.
   // Además, si el reproductor no avisó el final (pasa en algunos TV), se detecta aquí.
   var ultimaRed = 0;
@@ -240,7 +240,7 @@
 
   function recibir(txt){
     var m; try{ m = JSON.parse(txt); }catch(e){ return; }
-    if(m && m.skip){                            // «Saltar» desde Vento
+    if(m && m.skip){                            // «Saltar» desde ORDEVA
       ultimoMsg = Date.now();
       if(actual && actual.i === m.skip){ tocadas[m.skip] = Date.now(); guardarTocadas(); actual = null; try{ player.stopVideo(); }catch(e){} siguiente(); }
       else { tocadas[m.skip] = Date.now(); guardarTocadas(); pintar(); }

@@ -1,5 +1,5 @@
 // Panel de la mesa (buscar y agregar productos primero; acciones secundarias como iconos pequeños; personas plegable)
-// y micrófono rápido (al tocar escucha al instante, también con «Hola Vento» escuchando y en la APK simulada).
+// y micrófono rápido (al tocar escucha al instante, también con «Hola ORDEVA» escuchando y en la APK simulada).
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 (async()=>{ const b=await chromium.launch(); let ok=0,mal=0; const chk=(n,c,x)=>{ if(c){ok++;console.log('✅ '+n);} else {mal++;console.log('❌ '+n+(x?' → '+x:''));} };
@@ -127,10 +127,10 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
   chk('360 px: si los favoritos no caben, el borde se desvanece para deslizar', N.desliza, JSON.stringify(N));
   await ctx.close(); }
 
- // ---------------- 3) Micrófono en la APK simulada con «Hola Vento» escuchando ----------------
+ // ---------------- 3) Micrófono en la APK simulada con «Hola ORDEVA» escuchando ----------------
  { const ctx=await b.newContext({viewport:{width:390,height:844}, hasTouch:true, isMobile:true});
-  await ctx.addInitScript(()=>{ try{ if(localStorage.getItem('vento-hola')===null) localStorage.setItem('vento-hola','1'); }catch(e){}   /* «Hola Vento» viene apagado de fábrica: esta parte lo prueba */
-   // La APK no trae speechSynthesis: Vento habla con la voz de Android (A.hablar / A.callar)
+  await ctx.addInitScript(()=>{ try{ if(localStorage.getItem('vento-hola')===null) localStorage.setItem('vento-hola','1'); }catch(e){}   /* «Hola ORDEVA» viene apagado de fábrica: esta parte lo prueba */
+   // La APK no trae speechSynthesis: ORDEVA habla con la voz de Android (A.hablar / A.callar)
    try{ Object.defineProperty(window,'speechSynthesis',{value:undefined,configurable:true,writable:true}); }catch(e){}
    window.__ini=0; window.__cancel=0; window.__callar=0; window.__hablar=0; window.__ttsLargo=false; window.__iniT=[];
    const V=()=>window.__ventoVoz;
@@ -152,54 +152,54 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
   const q=(m)=>p.evaluate(m=>(data.tables[m].items||[]).reduce((s,i)=>s+i.qty,0),m);
   const listoHola=async()=>{ for(let i=0;i<40;i++){ if(await p.evaluate(()=>window.ventoHola.estado().corriendo && !voiceListening)) { await p.waitForTimeout(150); return true; } await p.waitForTimeout(150); } return false; };
   const tocar=()=>p.evaluate(()=>{ window.__toasts=[]; window.__a={ini:window.__ini,cancel:window.__cancel,callar:window.__callar}; document.getElementById('voiceFab').click(); });
-  chk('APK: «Hola Vento» está escuchando', await listoHola());
-  // a) tocar mientras «Hola Vento» escucha: se toma su micrófono abierto, sin cerrarlo ni volverlo a abrir
+  chk('APK: «Hola ORDEVA» está escuchando', await listoHola());
+  // a) tocar mientras «Hola ORDEVA» escucha: se toma su micrófono abierto, sin cerrarlo ni volverlo a abrir
   await tocar(); await p.waitForTimeout(250);
   const A1=await p.evaluate(()=>{ const h=window.__toasts.find(t=>/Habla ahora/.test(t[1])); return { ms: h ? h[0]-window.__toque : 9999, ini: window.__ini-window.__a.ini, cancel: window.__cancel-window.__a.cancel, escuchando: voiceListening && document.getElementById('voiceFab').classList.contains('listening'), abriendo: window.__toasts.some(t=>/Abriendo/.test(t[1])) }; });
-  chk('APK + «Hola Vento»: escucha al instante (< 150 ms del toque a «Habla ahora»)', A1.ms<150 && A1.escuchando, JSON.stringify(A1));
-  chk('APK + «Hola Vento»: no cierra ni reabre el micrófono de Android y no dice «Abriendo…»', A1.ini===0 && A1.cancel===0 && !A1.abriendo, JSON.stringify(A1));
+  chk('APK + «Hola ORDEVA»: escucha al instante (< 150 ms del toque a «Habla ahora»)', A1.ms<150 && A1.escuchando, JSON.stringify(A1));
+  chk('APK + «Hola ORDEVA»: no cierra ni reabre el micrófono de Android y no dice «Abriendo…»', A1.ini===0 && A1.cancel===0 && !A1.abriendo, JSON.stringify(A1));
   await p.waitForTimeout(250);   // la persona empieza a hablar después de tocar
   await p.evaluate(()=>{ __dice('mesa 2 una poker'); __fin(); }); await p.waitForTimeout(2700);   // el botón anota tras 2 s de silencio (pedidos con pausas)
   chk('APK: lo que se dice después del toque se anota (mesa 2)', (await q(2))===1);
-  // b) «Hola Vento» ya había oído charla: lo de antes del toque no entra al pedido
-  chk('APK: «Hola Vento» vuelve a escuchar solo', await listoHola());
+  // b) «Hola ORDEVA» ya había oído charla: lo de antes del toque no entra al pedido
+  chk('APK: «Hola ORDEVA» vuelve a escuchar solo', await listoHola());
   await p.evaluate(()=>__dice('la mesa 1 está sucia', false)); await p.waitForTimeout(100);
   await tocar(); await p.waitForTimeout(450);
   await p.evaluate(()=>{ __dice('la mesa 1 está sucia mesa 3 dos poker', false); __dice('la mesa 1 está sucia mesa 3 dos poker'); __fin(); }); await p.waitForTimeout(2700);   // el botón anota tras 2 s de silencio (pedidos con pausas)
   chk('APK: la charla de antes del toque se descarta (mesa 3 = 2, mesa 1 nada)', (await q(3))===2 && (await q(1))===0, JSON.stringify(await p.evaluate(()=>[data.tables[1].items,data.tables[3].items])));
   // c) la escucha tomada se cierra por silencio antes de hablar: se reabre sola, sin «No escuché nada»
-  chk('APK: «Hola Vento» otra vez listo', await listoHola());
+  chk('APK: «Hola ORDEVA» otra vez listo', await listoHola());
   await tocar(); await p.waitForTimeout(400);
   await p.evaluate(()=>{ window.__ventoVoz('error',{error:'no-speech'}); window.__ventoVoz('end',{}); }); await p.waitForTimeout(200);
   const C1=await p.evaluate(()=>({ ini: window.__ini-window.__a.ini, escuchando: voiceListening, noEscuche: window.__toasts.some(t=>/No escuché/.test(t[1])) }));
   chk('APK: si Android cierra la escucha antes de hablar, se reabre sola (1 vez) sin «No escuché nada»', C1.ini===1 && C1.escuchando && !C1.noEscuche, JSON.stringify(C1));
   await p.evaluate(()=>{ __dice('mesa 2 una poker'); __fin(); }); await p.waitForTimeout(2700);   // el botón anota tras 2 s de silencio (pedidos con pausas)
   chk('APK: y lo que se dice se anota', (await q(2))===2);
-  // «Producto por voz» (Productos): también toma el micrófono de «Hola Vento» en vez de pelearlo
-  chk('APK: «Hola Vento» listo antes de «Producto por voz»', await listoHola());
+  // «Producto por voz» (Productos): también toma el micrófono de «Hola ORDEVA» en vez de pelearlo
+  chk('APK: «Hola ORDEVA» listo antes de «Producto por voz»', await listoHola());
   await p.evaluate(()=>{ window.__a={ini:window.__ini,cancel:window.__cancel}; startVoiceProductCreation(); }); await p.waitForTimeout(150);
   const P1=await p.evaluate(()=>({ ini: window.__ini-window.__a.ini, cancel: window.__cancel-window.__a.cancel, hola: window.ventoHola.estado().corriendo, escuchando: voiceProductListening }));
-  chk('APK: «Producto por voz» toma el micrófono abierto (sin reabrirlo) y «Hola Vento» se aparta', P1.ini===0 && P1.cancel===0 && !P1.hola && P1.escuchando, JSON.stringify(P1));
+  chk('APK: «Producto por voz» toma el micrófono abierto (sin reabrirlo) y «Hola ORDEVA» se aparta', P1.ini===0 && P1.cancel===0 && !P1.hola && P1.escuchando, JSON.stringify(P1));
   await p.waitForTimeout(250);
   await p.evaluate(()=>{ __dice('agregar producto Club Colombia precio cinco mil'); __fin(); }); await p.waitForTimeout(800);
   chk('APK: «Producto por voz» crea el producto (con el nombre completo)', await p.evaluate(()=>data.products.some(x=>/^club colombia$/i.test(x.name) && x.price===5000)), await p.evaluate(()=>JSON.stringify(data.products.map(x=>x.name+':'+x.price))));
   const PV=await p.evaluate(()=>[['Águila precio cuatro mil','aguila',4000],['corona a 6000','corona',6000],['poker por 3800','poker',3800],['pizza a la carta a 12000','pizza a la carta',12000]].map(([t,n,v])=>{ const r=parseVoiceProductCreation(t); return r.name===n && r.price===v ? '' : t+' → '+JSON.stringify(r); }).filter(Boolean));
   chk('Nombres que terminan en «a» no pierden la letra al dictar el precio', !PV.length, PV.join(' | '));
-  // d) Vento está hablando (sin «Hola Vento»): al tocar se calla y escucha YA, sin esperar ni reintentar
+  // d) ORDEVA está hablando (sin «Hola ORDEVA»): al tocar se calla y escucha YA, sin esperar ni reintentar
   await p.evaluate(()=>window.ventoHola.apagar()); await p.waitForTimeout(300);
   await p.evaluate(()=>{ window.__ttsLargo=true; window.ventoHablar('Listo, te anoté dos poker en la mesa tres y ya va saliendo'); });
-  chk('APK: Vento está hablando', await p.evaluate(()=>window.speechSynthesis.speaking===true));
+  chk('APK: ORDEVA está hablando', await p.evaluate(()=>window.speechSynthesis.speaking===true));
   await tocar(); await p.waitForTimeout(1500);
   const D1=await p.evaluate(()=>{ const h=window.__toasts.find(t=>/Habla ahora/.test(t[1])); return { alStart: window.__iniT.length ? window.__iniT[window.__iniT.length-1]-window.__toque : 9999, ini: window.__ini-window.__a.ini, callar: window.__callar-window.__a.callar, habla: window.speechSynthesis.speaking, ms: h ? h[0]-window.__toque : 9999, abriendo: window.__toasts.some(t=>/Abriendo/.test(t[1])) }; });
-  chk('APK hablando: el micrófono abre al instante (< 150 ms del toque a rec.start) y Vento se calla', D1.alStart<150 && D1.callar>=1 && !D1.habla, JSON.stringify(D1));
+  chk('APK hablando: el micrófono abre al instante (< 150 ms del toque a rec.start) y ORDEVA se calla', D1.alStart<150 && D1.callar>=1 && !D1.habla, JSON.stringify(D1));
   chk('APK hablando: una sola apertura (sin reintentos) y sin «Abriendo…» si abre rápido', D1.ini===1 && !D1.abriendo && D1.ms<400, JSON.stringify(D1));
   await p.evaluate(()=>{ __dice('mesa 1 una poker'); __fin(); }); await p.waitForTimeout(2700);   // el botón anota tras 2 s de silencio (pedidos con pausas)
   chk('APK hablando: el pedido se anota', (await q(1))===1);
   await ctx.close(); }
 
- // ---------------- 4) Navegador con «Hola Vento» escuchando: del toque a rec.start() ----------------
+ // ---------------- 4) Navegador con «Hola ORDEVA» escuchando: del toque a rec.start() ----------------
  { const ctx=await b.newContext({viewport:{width:390,height:844}});
-  await ctx.addInitScript(()=>{ try{ if(localStorage.getItem('vento-hola')===null) localStorage.setItem('vento-hola','1'); }catch(e){}   /* «Hola Vento» viene apagado de fábrica: esta parte lo prueba */
+  await ctx.addInitScript(()=>{ try{ if(localStorage.getItem('vento-hola')===null) localStorage.setItem('vento-hola','1'); }catch(e){}   /* «Hola ORDEVA» viene apagado de fábrica: esta parte lo prueba */
    window.__inst=[]; window.__startT=[];
    function F(){ this.onresult=this.onend=this.onerror=this.onstart=null; this._res=[]; window.__inst.push(this); }
    F.prototype.start=function(){ if(window.__act && window.__act!==this) throw new Error('busy'); window.__act=this; window.__startT.push([performance.now(),this]); this._res=[]; setTimeout(()=>this.onstart&&this.onstart({}),10); };
@@ -211,10 +211,10 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
   await p.evaluate(()=>{ document.querySelectorAll('.overlay.show').forEach(o=>o.classList.remove('show')); data.products=[{id:'pk',name:'Poker',price:4000,stock:50}]; data.tables={1:{items:[],people:[]}}; saveData(); renderMesas();
    document.addEventListener('click',e=>{ if(e.target.closest && e.target.closest('#voiceFab')) window.__toque=performance.now(); },true); });
   await p.mouse.click(200,300); await p.waitForTimeout(2500);
-  chk('Navegador: «Hola Vento» escuchando', await p.evaluate(()=>window.ventoHola.estado().corriendo && !!window.__act));
+  chk('Navegador: «Hola ORDEVA» escuchando', await p.evaluate(()=>window.ventoHola.estado().corriendo && !!window.__act));
   await p.evaluate(()=>document.getElementById('voiceFab').click()); await p.waitForTimeout(200);
   const B1=await p.evaluate(()=>{ const s=window.__startT.find(x=>x[1]===voiceRecognizer); return { ms: s ? s[0]-window.__toque : 9999, toma: window.__act===voiceRecognizer }; });
-  chk('Navegador + «Hola Vento»: del toque a rec.start() < 150 ms', B1.ms<150 && B1.toma, JSON.stringify(B1));
+  chk('Navegador + «Hola ORDEVA»: del toque a rec.start() < 150 ms', B1.ms<150 && B1.toma, JSON.stringify(B1));
   await ctx.close(); }
 
  chk('Sin errores', !errs.length, errs.join('|'));

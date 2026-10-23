@@ -86,7 +86,7 @@ const hoy = () => new Date(Date.now() - 5 * 3600e3).toISOString().slice(0, 10);
     const PAY1 = r1.j.payment && r1.j.payment.id, PAY2 = r2.j.payment && r2.j.payment.id;
     chk('Pagos enviados con comprobante (POST /pago) y en revisión', r1.st === 200 && r2.st === 200 && r1.j.payment.status === 'review' && r2.j.payment.status === 'review', [r1.j, r2.j]);
 
-    // ---------- Otro usuario se vuelve administrador de Vento ----------
+    // ---------- Otro usuario se vuelve administrador de ORDEVA ----------
     const jefe = await sb.usuario('jefe@vento.co');
     await sb.sql('insert into platform_admins(user_id, email) values ($1, $2)', [jefe.id, jefe.email]);
 
@@ -107,7 +107,7 @@ const hoy = () => new Date(Date.now() - 5 * 3600e3).toISOString().slice(0, 10);
     await p.goto(BASE + '/admin.html'); await p.waitForTimeout(800);
     await p.evaluate(() => { document.getElementById('lock').hidden = true; });
     await p.click('#tabs [data-t="subs"]');
-    chk('Pide entrar con la cuenta de Vento Nube (supabase-js real cargado del «CDN»)', await esperar(() => !document.getElementById('sxLogin').hidden) && await p.evaluate(() => !!(window.supabase && window.supabase.createClient)));
+    chk('Pide entrar con la cuenta de ORDEVA Nube (supabase-js real cargado del «CDN»)', await esperar(() => !document.getElementById('sxLogin').hidden) && await p.evaluate(() => !!(window.supabase && window.supabase.createClient)));
     await captura('1-entrar');
 
     // El dueño (no es admin): el servidor responde 403 «no_admin» y el panel lo dice claro
@@ -206,12 +206,12 @@ const hoy = () => new Date(Date.now() - 5 * 3600e3).toISOString().slice(0, 10);
     const plan = await uno("select price, (select count(*) from plan_entitlements where plan_id = 'pro' and entitlement_key = 'multi_branch') as sedes from plans where id = 'pro'");
     chk('Guardar plan: precio y funciones quedan en la base', plan && Number(plan.price) === 64900 && Number(plan.sedes) === 1, plan);
     await p.click('#sxNav [data-s="config"]');
-    await p.fill('#sxNequiNum', '300 555 1234'); await p.fill('#sxNequiTit', 'Vento SAS'); await p.fill('#sxPrueba', '10');
+    await p.fill('#sxNequiNum', '300 555 1234'); await p.fill('#sxNequiTit', 'ORDEVA SAS'); await p.fill('#sxPrueba', '10');
     await p.click('#sxCfgGuardar');
     await esperar(() => /Última modificación/.test(document.getElementById('sxCfgInfo').textContent) && !document.getElementById('sxCfgGuardar').disabled);
     await p.waitForTimeout(300);
     const cfg = await uno('select trial_days, manual_methods, updated_by from billing_config where id = 1');
-    chk('Guardar configuración: Nequi, titular y días de prueba quedan en la base', cfg && cfg.trial_days === 10 && cfg.manual_methods.NEQUI.numero === '3005551234' && cfg.manual_methods.NEQUI.titular === 'Vento SAS' && cfg.updated_by === jefe.id, cfg);
+    chk('Guardar configuración: Nequi, titular y días de prueba quedan en la base', cfg && cfg.trial_days === 10 && cfg.manual_methods.NEQUI.numero === '3005551234' && cfg.manual_methods.NEQUI.titular === 'ORDEVA SAS' && cfg.updated_by === jefe.id, cfg);
 
     // Computador
     await p.setViewportSize({ width: 1280, height: 820 }); await p.click('#sxNav [data-s="pagos"]'); await p.selectOption('#sxPagosEstado', 'all');

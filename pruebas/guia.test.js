@@ -1,4 +1,4 @@
-// Modo fácil para personas mayores: la guía de Vento (lib/vento-guia.js).
+// Modo fácil para personas mayores: la guía de ORDEVA (lib/vento-guia.js).
 //  1. La primera vez: recorrido con señalador (mesas → Hoy → Más → Ayúdame) y voz; no vuelve a salir solo.
 //  2. «🙋 Ayúdame» siempre arriba: se dice o escribe qué se necesita y abre la guía de esa tarea; la voz lo dice.
 //  3. Agregar un producto paso a paso (nombre → precio → cuántas → foto → ✅), contestando también con la voz.
@@ -40,8 +40,8 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 
     // ===== 1. Recorrido de la primera vez =====
     await p.waitForSelector('#gzTour', { timeout: 5000 }).catch(() => {});
-    chk('1. La primera vez sale el recorrido: «¡Hola! Soy Vento»', await p.isVisible('#gzTour') && /Hola! Soy Vento/.test(await p.textContent('#gzTour .gz-gt')));
-    chk('1. … y lo dice en voz alta', await dijo(/Hola.*Soy Vento.*muy fácil/));
+    chk('1. La primera vez sale el recorrido: «¡Hola! Soy ORDEVA»', await p.isVisible('#gzTour') && /Hola! Soy Vento/.test(await p.textContent('#gzTour .gz-gt')));
+    chk('1. … y lo dice en voz alta', await dijo(/Hola.*Soy ORDEVA.*muy fácil/));
     await p.click('#gzTour .gz-gsig'); await p.waitForTimeout(450);
     let hueco = await p.evaluate(() => { const h = document.querySelector('#gzTour .gz-hueco').getBoundingClientRect(), m = document.querySelector('#facilApp .fz-mesa').getBoundingClientRect(); return { dx: Math.abs((h.left + 8) - m.left), dy: Math.abs((h.top + 8) - m.top), t: document.querySelector('#gzTour .gz-gt').textContent }; });
     if(process.env.SHOTS) await p.screenshot({ path: process.env.SHOTS + '/gz-tour.png' });
@@ -162,7 +162,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     await p.click('#facilApp .fz-ayuda'); await p.waitForTimeout(200);
     await p.click('#gzOv [data-a="voz"]'); await limpiarVoz();
     await p.evaluate(() => window.ventoGuia.iniciar('precio')); await p.waitForTimeout(200);
-    chk('7. «Vento me habla: NO» → ya no habla', !(await dijo(/./)));
+    chk('7. «ORDEVA me habla: NO» → ya no habla', !(await dijo(/./)));
     await p.evaluate(() => { localStorage.setItem('vento-guia-voz', '1'); window.ventoGuia.ayudame(); });
     await p.click('#gzOv [data-a="grande"]');
     chk('7. «Letra más grande» agranda la pantalla', await p.evaluate(() => document.body.classList.contains('gz-grande')));

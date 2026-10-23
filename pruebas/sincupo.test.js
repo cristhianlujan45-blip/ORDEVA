@@ -1,8 +1,8 @@
 // Música por QR SIN el límite de YouTube.
 // Con Google conectado, cada canción se metía en la lista de YouTube Music gastando el cupo diario de Google (compartido
-// por todos los negocios de Vento). Al acabarse salía «YouTube no deja agregar más canciones…» y la música se detenía.
+// por todos los negocios de ORDEVA). Al acabarse salía «YouTube no deja agregar más canciones…» y la música se detenía.
 //  1. Google responde «quotaExceeded» → la música NO se detiene: la canción sigue en la cola y suena con el reproductor de
-//     Vento (se prende solo), con un aviso claro.
+//     ORDEVA (se prende solo), con un aviso claro.
 //  2. Ya no se vuelve a gastar el cupo ese día (las siguientes canciones no llaman a Google) y siguen sonando una tras otra.
 //  3. Al día siguiente (pasado el reinicio del cupo) vuelve a usar la lista de YouTube Music.
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
@@ -53,9 +53,9 @@ const video = (id, t) => ({ id: { videoId: id }, snippet: { title: t, channelTit
     cupo = true;
     await p.evaluate(() => window.vitoAddSong(2, 'Segunda cancion'));
     await p.waitForFunction(() => window.vitoSinLimite.activo(), null, { timeout: 8000 }).catch(() => {});
-    chk('1. Google dice «quotaExceeded» → Vento deja de usar ese cupo hasta mañana', await p.evaluate(() => window.vitoSinLimite.activo()));
+    chk('1. Google dice «quotaExceeded» → ORDEVA deja de usar ese cupo hasta mañana', await p.evaluate(() => window.vitoSinLimite.activo()));
     chk('1. Aviso claro: «la música NO se detiene»', await p.evaluate(() => window.__toasts.some(t => /NO se detiene/.test(t))) && !(await p.evaluate(() => window.__toasts.some(t => /no deja agregar más canciones/.test(t)))));
-    chk('1. Se prendió solo el reproductor de Vento', await p.evaluate(() => !!JSON.parse(localStorage.getItem('vito_auto_play') || '{}').on));
+    chk('1. Se prendió solo el reproductor de ORDEVA', await p.evaluate(() => !!JSON.parse(localStorage.getItem('vito_auto_play') || '{}').on));
     chk('1. La canción del QR suena (no se perdió)', await p.waitForFunction(() => window.__yt.cargados.length >= 1, null, { timeout: 10000 }).then(() => true, () => false), await p.evaluate(() => [window.__yt.cargados, window.vitoMusica.cola().map(x => [x.song, x.status])]));
 
     // 2. Más canciones: sin llamar a Google y una tras otra
@@ -77,7 +77,7 @@ const video = (id, t) => ({ id: { videoId: id }, snippet: { title: t, channelTit
     await p.evaluate(() => window.vitoAddSong(2, 'Quinta cancion'));
     await p.waitForTimeout(2500);
     chk('3. Pasado el reinicio del cupo vuelve a usar la lista de YouTube Music', inserts.length === antes + 1, inserts.length - antes);
-    chk('3. … y el reproductor que había prendido Vento por el cupo se apaga solo', await p.evaluate(() => !JSON.parse(localStorage.getItem('vito_auto_play') || '{}').on));
+    chk('3. … y el reproductor que había prendido ORDEVA por el cupo se apaga solo', await p.evaluate(() => !JSON.parse(localStorage.getItem('vito_auto_play') || '{}').on));
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.stack || e)); }
   chk('Sin errores de página', !errs.length, errs);
   await b.close();

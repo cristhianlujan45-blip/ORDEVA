@@ -1,7 +1,7 @@
 // DaviPlata con código (API oficial «Pago con DaviPlata») de punta a punta en la APP contra el «Supabase local» REAL
 // (PostgreSQL 16 + la Edge Function vento-pagos de verdad + supabase-js de verdad). Solo DaviPlata se simula, con el punto
 // de inyección del transporte del servidor (pruebas/servidor/daviplata-simulado.js revisa cabeceras y cuerpos exactos).
-//  1. El dueño crea su negocio, su cuenta de Vento Nube y lo sube.
+//  1. El dueño crea su negocio, su cuenta de ORDEVA Nube y lo sube.
 //  2. Ajustes → 💜 Pagos → Conectar DaviPlata: sin TLS mutuo disponible → mensaje claro de usar el puente; archivo que no es
 //     llave → aviso; certificado .cer BINARIO (DER) → se convierte a PEM; Comprobar → «DaviPlata: 🔵 conectado».
 //  3. Mesa 1 → producto → «💜 Cobrar Nequi / DaviPlata» → «🔐 DaviPlata con código» → CC + número → «Enviar código» →
@@ -69,7 +69,7 @@ const RAIZ = path.resolve(__dirname, '..');
       await p.click('.ajustes-cat[data-cat="' + cat + '"]');
     }
 
-    // ===================== 1. Negocio + Vento Nube =====================
+    // ===================== 1. Negocio + ORDEVA Nube =====================
     await p.goto(BASE + '/index.html');
     await p.waitForSelector('#authOverlay:not([hidden])', { timeout: 15000 });
     await p.waitForFunction(() => window.ventoNube && window.ventoPagos, null, { timeout: 15000 });
@@ -86,14 +86,14 @@ const RAIZ = path.resolve(__dirname, '..');
     await p.click('#nubeSubirEste');
     const subido = await esperar(() => { const x = window.ventoNube.negocio(); return !!x && /quedó en tu cuenta/.test(document.getElementById('nubeMsg').textContent); });
     const NEG = await p.evaluate(() => (window.ventoNube.negocio() || {}).id);
-    chk('1. Negocio subido a Vento Nube (dueña)', subido && /^[0-9a-f-]{36}$/.test(NEG || ''), NEG);
-    // Al volver a abrir Vento arranca el módulo de pagos con el negocio (registra el celular y consulta el servidor).
+    chk('1. Negocio subido a ORDEVA Nube (dueña)', subido && /^[0-9a-f-]{36}$/.test(NEG || ''), NEG);
+    // Al volver a abrir ORDEVA arranca el módulo de pagos con el negocio (registra el celular y consulta el servidor).
     await p.reload();
     await p.waitForFunction(() => window.ventoNube && window.ventoNube.negocio() && window.ventoPagos, null, { timeout: 15000 });
     const listo = await esperar(() => window.ventoPagos.estado().servidor === true && !!document.getElementById('vpCobrarCuenta'), null, 15000);
     await esperar(() => !!localStorage.getItem('vento_pagos_dev'), null, 10000);
     const devs = (await uno('select count(*)::int n from dispositivos where negocio_id = $1', [NEG])).n;
-    chk('1. Servidor Vento de pagos activo y celular autorizado', listo && devs >= 1, { listo, devs, est: await p.evaluate(() => ({ s: window.ventoPagos.estado().servidor, b: !!document.getElementById('vpCobrarCuenta') })) });
+    chk('1. Servidor ORDEVA de pagos activo y celular autorizado', listo && devs >= 1, { listo, devs, est: await p.evaluate(() => ({ s: window.ventoPagos.estado().servidor, b: !!document.getElementById('vpCobrarCuenta') })) });
 
     // ===================== 2. Ajustes → 💜 Pagos → Conectar DaviPlata =====================
     await irAjustes('pagos');

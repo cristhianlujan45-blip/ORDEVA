@@ -1,9 +1,9 @@
 // Un pago de Nequi / DaviPlata / Bre-B que lee UN celular les llega a TODOS los equipos del negocio (otros celulares,
-// tablet, computador), de punta a punta (PostgreSQL REAL + Servidor Vento + la app de verdad):
-//  1. El celular de la caja (app Android) lee el aviso real de la llave Bre-B de Nequi → lo manda al Servidor Vento con
+// tablet, computador), de punta a punta (PostgreSQL REAL + Servidor ORDEVA + la app de verdad):
+//  1. El celular de la caja (app Android) lee el aviso real de la llave Bre-B de Nequi → lo manda al Servidor ORDEVA con
 //     lo que entendió (valor, banco, quién).
 //  2. La tablet (app Android): la notificación de pagos con la 🪟 ventana del valor y la voz «Llegaron 300 pesos por
-//     Nequi», aunque Vento esté de fondo (el latido de la app la despierta).
+//     Nequi», aunque ORDEVA esté de fondo (el latido de la app la despierta).
 //  3. El computador (navegador): la 🪟 ventana con el valor y «Pago confirmado».
 //  4. El celular que lo leyó no lo repite (ni otra notificación ni otra voz).
 //  5. Sin internet en el celular cuando llega el aviso: queda en espera y se manda solo al volver → les llega a los demás.
@@ -87,7 +87,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     const enServidor = async m => (await sb.sql("select monto::int monto, estado, metodo, confianza from pagos where negocio_id = $1 and proveedor = 'dispositivo' and monto = $2", [NEG, m]));
     let llego = false; for(let i = 0; i < 40 && !llego; i++){ llego = (await enServidor(300)).length === 1; if(!llego) await new Promise(r => setTimeout(r, 250)); }
     const s1 = await enServidor(300);
-    chk('1. El aviso llegó al Servidor Vento: $300 por Nequi, aprobado y confiable', llego && s1[0].estado === 'aprobado' && s1[0].metodo === 'NEQUI' && s1[0].confianza === 'app', s1);
+    chk('1. El aviso llegó al Servidor ORDEVA: $300 por Nequi, aprobado y confiable', llego && s1[0].estado === 'aprobado' && s1[0].metodo === 'NEQUI' && s1[0].confianza === 'app', s1);
 
     // ===== 2. La tablet (app Android de fondo): el latido de la app la despierta =====
     const t0 = Date.now();
@@ -96,7 +96,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     for(let i = 0; i < 90; i++){ await latir(TAB); tab = await and(TAB); if(tab.pagos.length) break; await new Promise(r => setTimeout(r, 500)); }
     chk('2. Tablet: notificación de pagos con la 🪟 ventana del valor «$300» por Nequi', tab.pagos.length === 1 && /^💜 Recibiste \$300 por Nequi/.test(tab.pagos[0].t) && tab.pagos[0].v === '$300' && tab.pagos[0].bco === 'Nequi' && tab.pagos[0].tipo === 'ok', tab.pagos);
     chk('2. Tablet: la voz de los pagos dice «Llegaron 300 pesos por Nequi»', tab.decir.some(t => /^Llegaron 300 pesos por Nequi/.test(t)), tab.decir);
-    chk('2. Tablet: llegó en menos de 30 s con Vento de fondo', Date.now() - t0 < 30000, Date.now() - t0);
+    chk('2. Tablet: llegó en menos de 30 s con ORDEVA de fondo', Date.now() - t0 < 30000, Date.now() - t0);
     chk('2. Tablet: sale en el canal de pagos, no como un aviso cualquiera', !tab.notifs.some(n => /\$300/.test(n.t + n.x) && n.c !== 'pagos'), tab.notifs);
 
     // ===== 3. El computador (navegador): la ventana con el valor =====
@@ -190,7 +190,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     await CEL.p.evaluate(() => window.ventoPagosChequeo());
     await esperar(CEL.p, () => /Equipos de la cuenta/.test((document.getElementById('vpChequeo') || {}).innerText || ''), null, 15000);
     const ckCel = await CEL.p.evaluate(() => document.getElementById('vpChequeo').innerText);
-    chk('8. 🩺 Chequeo en el celular (Xiaomi con ahorro de batería): «Vento sin ahorro de batería» en rojo con «Arreglar», servicio de fondo y «Inicio automático» de Xiaomi', /❌\s*🔋 Vento sin ahorro de batería/.test(ckCel) && /Arreglar/.test(ckCel) && /Vento trabajando de fondo/.test(ckCel) && /Xiaomi: inicio automático/.test(ckCel), ckCel.slice(0, 800));
+    chk('8. 🩺 Chequeo en el celular (Xiaomi con ahorro de batería): «ORDEVA sin ahorro de batería» en rojo con «Arreglar», servicio de fondo y «Inicio automático» de Xiaomi', /❌\s*🔋 ORDEVA sin ahorro de batería/.test(ckCel) && /Arreglar/.test(ckCel) && /Vento trabajando de fondo/.test(ckCel) && /Xiaomi: inicio automático/.test(ckCel), ckCel.slice(0, 800));
     await CEL.p.click('#vpChequeo [data-ck="bat"]'); await CEL.p.click('#vpChequeo [data-ck="auto"]');
     chk('8. … «Arreglar» abre el ahorro de batería y «Abrir inicio automático» el de la marca', await CEL.p.evaluate(() => window.__and.abrioBateria === 1 && window.__and.abrioAuto === 1));
     chk('8. 🩺 Chequeo: servidor, este equipo autorizado y los 3 equipos de la cuenta con «escuchando»', ck && /Servidor Vento/.test(ckTxt) && /Este equipo autorizado/.test(ckTxt) && (ckTxt.match(/🟢/g) || []).length >= 3, ckTxt.slice(0, 900));

@@ -22,7 +22,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
  await p.evaluate(()=>{ document.querySelectorAll('.overlay.show').forEach(o=>o.classList.remove('show')); renderMesas(); });
  chk('Usar la voz lo marca (4 de 5)', await p.evaluate(()=>/4 de 5/.test(document.getElementById('primerosPasos').textContent)));
  await p.evaluate(()=>{ data.history=[{t:Date.now(),total:3000,items:[]}]; saveData(); renderMesas(); }); await p.waitForTimeout(300);
- chk('Cobrar → «¡Vento quedó listo!»', await p.evaluate(()=>/quedó listo/.test(document.getElementById('primerosPasos').textContent)));
+ chk('Cobrar → «¡ORDEVA quedó listo!»', await p.evaluate(()=>/quedó listo/.test(document.getElementById('primerosPasos').textContent)));
  await p.click('#primerosPasos .pp-x'); await p.waitForTimeout(300);
  chk('Cerrar la felicitación la oculta', await p.evaluate(()=>document.getElementById('primerosPasos').hidden));
  await p.evaluate(()=>window.ventoPasos.mostrar()); await p.waitForTimeout(300);

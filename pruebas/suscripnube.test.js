@@ -1,8 +1,8 @@
-// Suscripción en Vento Nube (nube/vento-suscripcion.js): el servidor decide el plan con un token firmado.
+// Suscripción en ORDEVA Nube (nube/vento-suscripcion.js): el servidor decide el plan con un token firmado.
 // El servidor «vento-suscripciones» se simula aquí (respuestas según el contrato) y firma con una llave
 // ECDSA P-256 creada en la prueba. No usa internet.
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
-const abrirCampana = pg => pg.evaluate(() => { const m = document.querySelector('.vito-campana-menu'), b = document.querySelector('.vito-campana'); if(b && (!m || m.style.display !== 'flex')) b.click(); });   // los avisos de Vento están en la 🔔 campanita
+const abrirCampana = pg => pg.evaluate(() => { const m = document.querySelector('.vito-campana-menu'), b = document.querySelector('.vito-campana'); if(b && (!m || m.style.display !== 'flex')) b.click(); });   // los avisos de ORDEVA están en la 🔔 campanita
 const { webcrypto } = require('crypto'); const zlib = require('zlib');
 const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 const NEG = '7b0c2a51-4d3e-4f6a-9b1c-2d3e4f5a6b7c';
@@ -11,10 +11,10 @@ const TODOS = ['pos_basic', 'inventory', 'tables', 'expenses', 'invoices', 'ocr'
 const ENTS = { free: ['pos_basic', 'tables', 'inventory', 'expenses'], pro: ['pos_basic', 'inventory', 'tables', 'expenses', 'invoices', 'ocr', 'ai_camera', 'voice', 'advanced_reports', 'employee_management'] };
 const PLANES = [
   { id: 'free', name: 'Gratis', price: 0, currency: 'COP', period_months: 1, active: true, sort: 0, description: 'Para empezar', entitlements: ENTS.free },
-  { id: 'pro', name: 'Pro', price: 59900, currency: 'COP', period_months: 1, active: true, sort: 2, description: 'Todo Vento', entitlements: ENTS.pro }
+  { id: 'pro', name: 'Pro', price: 59900, currency: 'COP', period_months: 1, active: true, sort: 2, description: 'Todo ORDEVA', entitlements: ENTS.pro }
 ];
 const CATALOGO = { ok: true, planes: PLANES, config: { beta_mode: true, trial_days: 15, renew_notice_days: 7, support_whatsapp: '573001112233',
-  manual_methods: { NEQUI: { numero: '3001234567', titular: 'Vento Pruebas SAS' }, DAVIPLATA: { numero: '3109876543', titular: 'Vento Pruebas SAS' } } }, proveedores: ['manual'] };
+  manual_methods: { NEQUI: { numero: '3001234567', titular: 'ORDEVA Pruebas SAS' }, DAVIPLATA: { numero: '3109876543', titular: 'ORDEVA Pruebas SAS' } } }, proveedores: ['manual'] };
 const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization, apikey, content-type, x-client-info', 'access-control-allow-methods': 'GET, POST, OPTIONS' };
 const b64u = b => Buffer.from(b).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const fechaCO = ms => { const d = new Date(ms - 5 * H), p = n => String(n).padStart(2, '0'); return p(d.getUTCDate()) + '/' + p(d.getUTCMonth() + 1) + '/' + d.getUTCFullYear(); };
@@ -84,7 +84,7 @@ function jpegTam(b){ let i = 2; while(i < b.length - 9){ if(b[i] !== 0xFF){ i++;
       return json(404, { ok: false, error: 'no_existe' });
     });
   }
-  // Vento Nube simulada: sesión (token) y negocio en la nube con su rol.
+  // ORDEVA Nube simulada: sesión (token) y negocio en la nube con su rol.
   async function celular(sv, o){
     const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
     await enrutar(ctx, sv);
@@ -310,7 +310,7 @@ function jpegTam(b){ let i = 2; while(i < b.length - 9){ if(b[i] !== 0xFF){ i++;
     chk('Mesero: nunca se llamó a /pago ni a /planes', !sm.pedidos.some(x => x.ruta === 'pago' || x.ruta === 'planes'), sm.pedidos.map(x => x.ruta).join());
     await m.ctx.close();
 
-    // ===================== Sin Vento Nube: todo como siempre =====================
+    // ===================== Sin ORDEVA Nube: todo como siempre =====================
     const s0 = nuevoServidor('dueno', null);
     const l = await celular(s0, { nombre: 'sin nube', rol: 'dueno', email: '', tok: null, nube: false, entrar: false });
     await l.p.waitForTimeout(1000);

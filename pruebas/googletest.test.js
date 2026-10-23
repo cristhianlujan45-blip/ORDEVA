@@ -18,7 +18,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
  chk('En la entrada aparece «Continuar con Google» (el servidor lo tiene activado)', await p.isVisible('#authGoogle'));
  await p.click('#authGoogle'); await p.waitForTimeout(800);
  const o=await p.evaluate(()=>window.__oauth);
- chk('Lleva a Google y vuelve a Vento', o && o.provider==='google' && /\?nubegoogle=1$/.test(o.options.redirectTo), JSON.stringify(o));
+ chk('Lleva a Google y vuelve a ORDEVA', o && o.provider==='google' && /\?nubegoogle=1$/.test(o.options.redirectTo), JSON.stringify(o));
  // Simula la vuelta de Google
  await p.goto((process.env.VENTO_BASE||'http://localhost:8765')+'/index.html?nubegoogle=1#access_token=TOK123&refresh_token=REF456&token_type=bearer&expires_in=3600'); await p.waitForTimeout(4000);
  chk('Al volver, la dirección queda limpia (el permiso no queda a la vista)', !/access_token/.test(p.url()) && !/nubegoogle/.test(p.url()), p.url());

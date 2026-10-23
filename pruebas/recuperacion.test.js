@@ -1,11 +1,11 @@
 // Recuperar la cuenta por correo (antes el enlace del correo abría «404»), contra el «Supabase local» REAL:
-//  • el correo se pide con la dirección de vuelta de Vento (la carpeta de la app, nunca una página que no existe):
+//  • el correo se pide con la dirección de vuelta de ORDEVA (la carpeta de la app, nunca una página que no existe):
 //    clientes → «…/?nubeclave=1» o «…/?recuperar=usuario», administrador → «…/admin.html?adminclave=1»;
 //  • en un celular NUEVO (sin la cuenta guardada) también se puede pedir con el correo;
-//  • al abrir el enlace, Vento pide la contraseña nueva, la cambia en la cuenta y se entra con ella;
+//  • al abrir el enlace, ORDEVA pide la contraseña nueva, la cambia en la cuenta y se entra con ella;
 //  • un enlace vencido o ya usado dice «El enlace no sirvió» (no queda en blanco ni en 404);
 //  • el panel de administrador también recibe el enlace y deja poner la contraseña nueva;
-//  • 404.html: cualquier dirección de Vento que no exista vuelve a la app con lo que traía.
+//  • 404.html: cualquier dirección de ORDEVA que no exista vuelve a la app con lo que traía.
 'use strict';
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const fs = require('fs');
@@ -50,12 +50,12 @@ const ADMIN = 'cristhianwkh@gmail.com';
     await p.fill('#recUser', 'ana@tienda.co'); await p.click('#recMailBtn');
     chk('Celular nuevo: se puede pedir el correo con solo el correo de la cuenta', await esperar(p, () => /^✅/.test(document.getElementById('recMailTxt').textContent), null, 10000), await p.textContent('#recMailTxt'));
     const r1 = ultima();
-    chk('…llega un código temporal y el enlace del mismo correo vuelve a Vento (la carpeta de la app, con «nubeclave=1»), no a una página que no existe', r1.ruta === '/otp' && !!r1.codigo && r1.email === 'ana@tienda.co' && r1.volver === BASE + '/?nubeclave=1', r1);
+    chk('…llega un código temporal y el enlace del mismo correo vuelve a ORDEVA (la carpeta de la app, con «nubeclave=1»), no a una página que no existe', r1.ruta === '/otp' && !!r1.codigo && r1.email === 'ana@tienda.co' && r1.volver === BASE + '/?nubeclave=1', r1);
 
     // Abrir el enlace del correo (Supabase devuelve con #access_token=…&type=recovery)
     const tok = (await entrar('ana@tienda.co', 'vieja123')).j.access_token;
     await p.goto(BASE + '/?nubeclave=1#access_token=' + tok + '&refresh_token=x&expires_in=3600&token_type=bearer&type=recovery');
-    chk('Al abrir el enlace, Vento pide la contraseña nueva (con el correo comprobado)', await esperar(p, () => [...document.querySelectorAll('form b')].some(b => /Contraseña nueva/.test(b.textContent)) && /ana@tienda\.co/.test(document.body.innerText), null, 15000));
+    chk('Al abrir el enlace, ORDEVA pide la contraseña nueva (con el correo comprobado)', await esperar(p, () => [...document.querySelectorAll('form b')].some(b => /Contraseña nueva/.test(b.textContent)) && /ana@tienda\.co/.test(document.body.innerText), null, 15000));
     chk('…y el permiso del enlace se borra de la dirección', !/access_token/.test(p.url()), p.url());
     chk('…sin volver a pedir el correo: solo la contraseña dos veces, cada una con 👁 para verla', await p.evaluate(() => { const f = [...document.querySelectorAll('form')].find(f => f.a && f.b);
       return !!f && !f.querySelector('input[type="email"]') && f.querySelectorAll('.ojo-clave').length === 2; }));
@@ -127,8 +127,8 @@ const ADMIN = 'cristhianwkh@gmail.com';
     chk('404.html del sitio: …/cuentas/lo-que-sea → …/cuentas/ (y lo del panel → admin.html)', /location\.replace\(dest \+ location\.search \+ location\.hash\)/.test(html) && /admin\.html/.test(html));
     await D.ctx.close(); await A.ctx.close();
 
-    // ===== El flujo del servidor deja la dirección del sitio siempre en Vento =====
+    // ===== El flujo del servidor deja la dirección del sitio siempre en ORDEVA =====
     const wf = fs.readFileSync(require('path').join(__dirname, '..', '.github', 'workflows', 'servidor-vento.yml'), 'utf8');
-    chk('«Servidor Vento» pone la dirección del sitio de Supabase siempre en Vento (no solo si estaba vacía)', /\{uri_allow_list:\$l, site_url:\$s\}/.test(wf) && /admin\.html/.test(wf));
+    chk('«Servidor ORDEVA» pone la dirección del sitio de Supabase siempre en ORDEVA (no solo si estaba vacía)', /\{uri_allow_list:\$l, site_url:\$s\}/.test(wf) && /admin\.html/.test(wf));
   }
 })();

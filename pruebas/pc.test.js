@@ -1,10 +1,10 @@
-// Vento para PC (programa de escritorio, carpeta pc/): se abre el programa DE VERDAD (Electron) con la copia local de
-// Vento y se revisa:
-//  1. Abre Vento en su ventana («Vento»), con «VentoPC/<versión>» en el navegador y window.ventoPC para la página.
+// ORDEVA para PC (programa de escritorio, carpeta pc/): se abre el programa DE VERDAD (Electron) con la copia local de
+// ORDEVA y se revisa:
+//  1. Abre ORDEVA en su ventana («ORDEVA»), con «VentoPC/<versión>» en el navegador y window.ventoPC para la página.
 //  2. Los enlaces de afuera (WhatsApp, Google…) no abren ventanas dentro del programa (van al navegador).
 //  3. Pedir la balanza / impresora (puerto serial) pasa por el programa (lista para elegir; sin aparatos: aviso).
 //  4. Cerrar la ventana NO cierra el programa: sigue trabajando junto al reloj (los avisos siguen sonando).
-//  5. Sin conexión con Vento → «📡 Sin conexión con Vento» (y se abre solo al volver).
+//  5. Sin conexión con ORDEVA → «📡 Sin conexión con ORDEVA» (y se abre solo al volver).
 // Necesita Electron (pc/node_modules o ELECTRON_PATH); sin él se omite (como las pruebas con PostgreSQL).
 const { _electron } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const fs = require('fs'), path = require('path');
@@ -36,14 +36,14 @@ if(exe && process.platform === 'linux' && !process.env.DISPLAY && !process.env.V
     chk('1. window.ventoPC: versión, plataforma y «abrir al prender el computador»', pc && /^\d+\.\d+\.\d+$/.test(pc.v) && pc.p && pc.i === 'function', pc);
     chk('1. La página NO tiene acceso a Node (seguro)', await w.evaluate(() => typeof require === 'undefined' && typeof process === 'undefined'));
     const inst = await w.evaluate(() => ({ t: (document.getElementById('instAqui') || {}).textContent || '', pc: getComputedStyle(document.getElementById('instPc')).display, apk: getComputedStyle(document.getElementById('instApk')).display }));
-    chk('1. La app lo reconoce: «✅ Este computador ya tiene Vento para PC» (y no ofrece descargarlo otra vez)', /ya tiene Vento para PC \(versión \d+\.\d+\.\d+\)/.test(inst.t) && inst.pc === 'none' && inst.apk !== 'none', inst);
+    chk('1. La app lo reconoce: «✅ Este computador ya tiene ORDEVA para PC» (y no ofrece descargarlo otra vez)', /ya tiene ORDEVA para PC \(versión \d+\.\d+\.\d+\)/.test(inst.t) && inst.pc === 'none' && inst.apk !== 'none', inst);
 
     // 2. Enlaces de afuera
     await app.evaluate(({ shell }) => { global.__abiertos = []; shell.openExternal = u => { global.__abiertos.push(u); return Promise.resolve(); }; });
     await w.evaluate(() => { window.open('https://wa.me/573001234567?text=hola', '_blank'); });
     await w.waitForTimeout(500);
     const v2 = await app.evaluate(({ BrowserWindow }) => ({ n: BrowserWindow.getAllWindows().length, ab: global.__abiertos }));
-    chk('2. WhatsApp se abre en el navegador del computador (no otra ventana dentro de Vento)', v2.n === 1 && v2.ab.some(u => /wa\.me/.test(u)), v2);
+    chk('2. WhatsApp se abre en el navegador del computador (no otra ventana dentro de ORDEVA)', v2.n === 1 && v2.ab.some(u => /wa\.me/.test(u)), v2);
 
     // 3. Balanza / impresora por puerto serial: la página lo pide y el programa responde (sin aparatos: no hay)
     await app.evaluate(({ dialog }) => { global.__dlg = []; dialog.showMessageBox = (w, o) => { global.__dlg.push((o || w).message); return Promise.resolve({ response: 0 }); }; });
@@ -56,7 +56,7 @@ if(exe && process.platform === 'linux' && !process.env.DISPLAY && !process.env.V
       await app.evaluate(({ dialog }) => { dialog.showMessageBox = (w, o) => { global.__dlg.push((o || w).message); return Promise.resolve({ response: ((o || w).buttons || []).length - 1 }); }; });
       chk('3. «Cancelar» en la lista: la página no recibe ningún aparato', (await w.evaluate(() => navigator.serial.requestPort().then(() => 'puerto', e => e.name))) === 'NotFoundError');
     }
-    chk('3. El permiso del puerto serial y del micrófono es solo para Vento', await w.evaluate(() => navigator.permissions.query({ name: 'microphone' }).then(p => p.state !== 'denied', () => true)));
+    chk('3. El permiso del puerto serial y del micrófono es solo para ORDEVA', await w.evaluate(() => navigator.permissions.query({ name: 'microphone' }).then(p => p.state !== 'denied', () => true)));
 
     // 4. Cerrar la ventana: sigue trabajando
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].close());
@@ -65,7 +65,7 @@ if(exe && process.platform === 'linux' && !process.env.DISPLAY && !process.env.V
     chk('4. Cerrar la ventana NO cierra el programa: queda trabajando junto al reloj (ventana escondida)', v4.n === 1 && v4.visible === false, v4);
     await app.evaluate(({ app }) => app.emit('second-instance'));
     await new Promise(r => setTimeout(r, 500));
-    chk('4. Abrir Vento otra vez trae la misma ventana (una sola copia del programa)', await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length === 1 && BrowserWindow.getAllWindows()[0].isVisible()));
+    chk('4. Abrir ORDEVA otra vez trae la misma ventana (una sola copia del programa)', await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length === 1 && BrowserWindow.getAllWindows()[0].isVisible()));
     await app.evaluate(({ app }) => { app.emit('before-quit'); app.quit(); }).catch(() => {});
     await app.close().catch(() => {}); app = null;
 
@@ -74,7 +74,7 @@ if(exe && process.platform === 'linux' && !process.env.DISPLAY && !process.env.V
     const w5 = await app.firstWindow();
     await w5.waitForTimeout(2500);
     const t5 = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.executeJavaScript('document.title + " | " + document.body.innerText'));
-    chk('5. Sin conexión con Vento → «📡 Sin conexión con Vento» con «Reintentar»', /Sin conexión con Vento/.test(t5) && /Reintentar/.test(t5), t5.slice(0, 160));
+    chk('5. Sin conexión con ORDEVA → «📡 Sin conexión con ORDEVA» con «Reintentar»', /Sin conexión con Vento/.test(t5) && /Reintentar/.test(t5), t5.slice(0, 160));
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.stack || e)); }
   finally{ if(app) await app.close().catch(() => {}); }
   chk('Sin errores de página', !errs.length, errs);

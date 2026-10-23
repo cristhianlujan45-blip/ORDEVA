@@ -1,6 +1,6 @@
-// El QR del cliente ya no deja leer los pedidos del negocio (Vento 1.54.0, D8), en la app contra el «Supabase local»
+// El QR del cliente ya no deja leer los pedidos del negocio (ORDEVA 1.54.0, D8), en la app contra el «Supabase local»
 // REAL y con el canal YA CERRADO (sin los 7 días de gracia):
-//  1. El negocio con cuenta de Vento: su canal de pedidos queda anotado en el servidor.
+//  1. El negocio con cuenta de ORDEVA: su canal de pedidos queda anotado en el servidor.
 //  2. El cliente del QR: le llega la carta, manda su pedido y un domicilio; el estado vuelve a su celular.
 //  3. La app del local (con su sesión) recibe el pedido, el domicilio y la canción.
 //  4. Alguien con el QR (la clave pública y el nombre del canal) intenta leer los pedidos: no recibe nada.
@@ -36,7 +36,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
       return p;
     }
 
-    // ===== 1. El negocio, con cuenta de Vento =====
+    // ===== 1. El negocio, con cuenta de ORDEVA =====
     const A = await pagina('negocio', BASE + '/index.html');
     await A.waitForSelector('#authOverlay:not([hidden])');
     await A.waitForFunction(() => window.ventoNube && window.ventoNube.crearCuenta, null, { timeout: 15000 });

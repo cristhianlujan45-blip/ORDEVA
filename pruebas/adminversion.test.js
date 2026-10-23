@@ -1,4 +1,4 @@
-// Vento Admin se actualiza solo (admin.html): con una versión nueva en version.txt,
+// ORDEVA Admin se actualiza solo (admin.html): con una versión nueva en version.txt,
 //  • recién abierto (o con el panel bloqueado) se recarga solo, sin caché (?v=…);
 //  • si el servidor todavía entrega la página vieja, no se queda recargando: deja el aviso «Actualizar ahora»;
 //  • trabajando (escribiendo en un campo) no se recarga: muestra el aviso.

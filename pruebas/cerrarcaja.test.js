@@ -1,4 +1,4 @@
-// 🔒 Cerrar caja (Vento 1.55.0): el botón está a la vista y antes de cerrar pregunta, con el resumen.
+// 🔒 Cerrar caja (ORDEVA 1.55.0): el botón está a la vista y antes de cerrar pregunta, con el resumen.
 //  1. «🔒 Cerrar caja del día» arriba en Mesas (la pantalla de todo el día), además del de Historial.
 //  2. Sin nada que cerrar: avisa y no pregunta.
 //  3. Pregunta «¿Cerrar la caja del día?» con las ventas desde el último cierre (cuántas, total, efectivo) y las mesas
@@ -8,7 +8,7 @@
 //  6. Quien no tiene permiso de ver el historial no ve el botón.
 //  7. Modo fácil: «🔒 Cerrar caja del día» en «Hoy», con la misma pregunta.
 //  8. 🔑 Clave para cerrar la caja (Ajustes → Negocio): una clave propia (solo se guarda su huella) o la contraseña de
-//     quien usa Vento. Se pide después de la pregunta; clave mala no cierra; «Cancelar» no cierra; el automático no la
+//     quien usa ORDEVA. Se pide después de la pregunta; clave mala no cierra; «Cancelar» no cierra; el automático no la
 //     pide; «Sin clave» la quita.
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html';
@@ -116,10 +116,10 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
     await D(() => closeCashRegister({ auto: true })); await p.waitForTimeout(300);
     chk('8. El cierre automático programado no pide la clave', await D(() => data.closures.length) === n0 + 1 && !(await D(() => (document.getElementById('vfOv') || { classList: { contains: () => false } }).classList.contains('show'))));
     await D(() => document.getElementById('closureOverlay').classList.remove('show'));
-    // La contraseña de quien usa Vento
+    // La contraseña de quien usa ORDEVA
     await D(async () => { await authAddUser('cajera1', 'secreta1', 'admin'); authUser = 'cajera1'; document.querySelector('#cierreClaveBox input[value="usuario"]').click(); });
     await p.waitForTimeout(300);
-    chk('8. «La contraseña de quien está usando Vento» queda activa', await D(() => window.ventoCierreClave.modo() === 'usuario'));
+    chk('8. «La contraseña de quien está usando ORDEVA» queda activa', await D(() => window.ventoCierreClave.modo() === 'usuario'));
     await venta(4000, 'efectivo'); n0 = await D(() => data.closures.length);
     await cerrarCon('4321');
     chk('8. …la clave propia de antes ya no sirve', await D(() => data.closures.length) === n0 && /Clave equivocada/.test(await D(() => document.getElementById('ccErr').textContent)));

@@ -1,8 +1,8 @@
 // Flujo COMPLETO de suscripción, de punta a punta, contra el «Supabase local» REAL: PostgreSQL 16 + la Edge Function
 // vento-suscripciones de verdad + supabase-js de verdad (pruebas/servidor/supabase-local.js). Nada del servidor se
 // simula: cada paso pasa por /estado, /pago, /admin/* y la base de datos. Solo se simula el micrófono (se anota si se
-// abrió) y el administrador de Vento usa las mismas rutas que admin.html (/admin/pagos, /admin/aprobar, /admin/rechazar).
-//  1. Celular A: el dueño crea su negocio en el celular, su cuenta de Vento Nube (Ajustes → Nube) y sube el negocio
+// abrió) y el administrador de ORDEVA usa las mismas rutas que admin.html (/admin/pagos, /admin/aprobar, /admin/rechazar).
+//  1. Celular A: el dueño crea su negocio en el celular, su cuenta de ORDEVA Nube (Ajustes → Nube) y sube el negocio
 //     (billing_config.trial_days = 0: sin prueba gratis; números de Nequi y DaviPlata configurados).
 //  2. Plan Gratis: vende (mesa → producto → cobrar) y el micrófono abre «Función PRO».
 //  3. Planes → PRO (precio del servidor) → NEQUI → instrucciones → YA PAGUÉ → comprobante (PNG real) → «Pago en revisión»
@@ -21,7 +21,7 @@
 // VENTO_DEBUG=1 muestra la pila de los primeros errores de página.
 'use strict';
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
-const abrirCampana = pg => pg.evaluate(() => { const m = document.querySelector('.vito-campana-menu'), b = document.querySelector('.vito-campana'); if(b && (!m || m.style.display !== 'flex')) b.click(); });   // los avisos de Vento están en la 🔔 campanita
+const abrirCampana = pg => pg.evaluate(() => { const m = document.querySelector('.vito-campana-menu'), b = document.querySelector('.vito-campana'); if(b && (!m || m.style.display !== 'flex')) b.click(); });   // los avisos de ORDEVA están en la 🔔 campanita
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
@@ -89,8 +89,8 @@ const b64u = s => Buffer.from(s).toString('base64url');
     const uno = async (q, p) => (await sb.sql(q, p))[0];
     const fotos = neg => [...sb.objetos.keys()].filter(k => k.startsWith('comprobantes/' + neg + '/'));
 
-    // ---------- Configuración del cobro (lo que el proveedor pone en Vento Admin → Configuración / Planes) ----------
-    const NEQUI = { numero: '3001234567', titular: 'Vento Pruebas SAS' }, DAVI = { numero: '3109876543', titular: 'Vento Pruebas SAS' };
+    // ---------- Configuración del cobro (lo que el proveedor pone en ORDEVA Admin → Configuración / Planes) ----------
+    const NEQUI = { numero: '3001234567', titular: 'ORDEVA Pruebas SAS' }, DAVI = { numero: '3109876543', titular: 'ORDEVA Pruebas SAS' };
     await sb.sql('update billing_config set trial_days = 0, manual_methods = $1 where id = 1', [JSON.stringify({ NEQUI, DAVIPLATA: DAVI })]);
     const PRECIO = 62900;   // distinto del precio sembrado (59.900): así se ve que la app usa el precio del SERVIDOR
     await sb.sql("update plans set price = $1 where id = 'pro'", [PRECIO]);
@@ -133,7 +133,7 @@ const b64u = s => Buffer.from(s).toString('base64url');
       await irAjustes(p, 'nube'); await p.click('#nubeAbrirAj');
       await p.waitForSelector('#nubeOv.show #nubeCuerpo');
     }
-    // La pantalla de entrada → «☁️ Entrar con Vento Nube»
+    // La pantalla de entrada → «☁️ Entrar con ORDEVA Nube»
     async function nubeDesdeEntrada(p){ await p.click('#authNube'); await p.waitForSelector('#nubeOv.show #nubeEmail'); }
     async function crearCuenta(p, email, nombre){
       await p.fill('#nubeEmail', email); await p.fill('#nubePass', 'clave123'); await p.fill('#nubeNombre', nombre);
@@ -184,7 +184,7 @@ const b64u = s => Buffer.from(s).toString('base64url');
     const pagosDe = async neg => (await sb.sql('select * from payment_records where business_id = $1 order by created_at', [neg]));
 
     // =====================================================================
-    // 1. Celular A: el dueño crea su negocio, su cuenta de Vento Nube y lo sube a la nube
+    // 1. Celular A: el dueño crea su negocio, su cuenta de ORDEVA Nube y lo sube a la nube
     // =====================================================================
     const A = await celular('celular A'), pA = A.p;
     await pA.fill('#authBiz', 'Bar Real'); await pA.fill('#authUser', 'ana'); await pA.fill('#authPass', 'clave123');
@@ -195,7 +195,7 @@ const b64u = s => Buffer.from(s).toString('base64url');
     await pA.click('#onbSaltar', { timeout: 4000 }).catch(() => {});   // asistente de bienvenida: «Ahora no»
     await abrirNubeAjustes(pA);
     await crearCuenta(pA, 'ana@barreal.co', 'Ana');
-    chk('1. Celular A: cuenta de Vento Nube creada desde Ajustes → Nube (con sesión)', /Conectado como ana@barreal\.co/.test(await pA.textContent('#nubeCuerpo')));
+    chk('1. Celular A: cuenta de ORDEVA Nube creada desde Ajustes → Nube (con sesión)', /Conectado como ana@barreal\.co/.test(await pA.textContent('#nubeCuerpo')));
     chk('1. «Subir el negocio de este celular a la nube» crea el negocio en el servidor', await subirNegocio(A, 'Bar Real'), await pA.textContent('#nubeMsg'));
     const NEG = await negocioId(pA);
     await pA.click('#nubeOv [data-n="cerrar"]');
@@ -288,7 +288,7 @@ const b64u = s => Buffer.from(s).toString('base64url');
     await captura(pA, '4-revision');
 
     // =====================================================================
-    // 5. El administrador de Vento aprueba (POST /admin/aprobar, como admin.html)
+    // 5. El administrador de ORDEVA aprueba (POST /admin/aprobar, como admin.html)
     // =====================================================================
     let r = await api('/admin/pagos', { status: 'review' }, jefe.token);
     const enLista = (r.j.pagos || []).find(x => x.id === P1.id);
@@ -334,7 +334,7 @@ const b64u = s => Buffer.from(s).toString('base64url');
     await pA.selectOption('#nubeRolInv', 'cajero'); await pA.click('#nubeInvitar');
     await pA.waitForSelector('#nubeInvRes .nube-cod');
     const codigo = (await pA.textContent('#nubeInvRes .nube-cod')).trim();
-    chk('6. El dueño (PRO) invita a un cajero desde Vento Nube', /^[A-Z0-9-]{4,}$/.test(codigo), codigo);
+    chk('6. El dueño (PRO) invita a un cajero desde ORDEVA Nube', /^[A-Z0-9-]{4,}$/.test(codigo), codigo);
     await pA.click('#nubeOv [data-n="cerrar"]');
     const C = await celular('cajero'), pC = C.p;
     await nubeDesdeEntrada(pC);

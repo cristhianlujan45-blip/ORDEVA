@@ -1,6 +1,6 @@
 // Seguridad: lo que llega por el canal del QR (cualquiera que vea el QR impreso puede escribir en él) NUNCA ejecuta
 // código ni en la app del negocio ni en la pantalla de preparación. El «atacante» publica directo en el canal del
-// negocio (servidor de Vento REAL: canal_publicar) pedidos, canciones, domicilios y «pide la cuenta» con HTML/JS
+// negocio (servidor de ORDEVA REAL: canal_publicar) pedidos, canciones, domicilios y «pide la cuenta» con HTML/JS
 // malicioso; luego se abren todas las pantallas donde se muestran.
 'use strict';
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');

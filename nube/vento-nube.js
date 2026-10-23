@@ -1,7 +1,7 @@
 /* =====================================================================
-   Vento Nube · usuarios y sincronización entre celulares (Supabase)
+   ORDEVA Nube · usuarios y sincronización entre celulares (Supabase)
    ---------------------------------------------------------------------
-   Es OPCIONAL: si no se configura, Vento funciona igual que siempre (todo en el celular).
+   Es OPCIONAL: si no se configura, ORDEVA funciona igual que siempre (todo en el celular).
    Con la nube:
      • cada persona entra con su correo y contraseña (usuarios reales);
      • varios celulares comparten el mismo negocio (caja, meseros, dueño desde la casa);
@@ -63,8 +63,8 @@
     var m = String((e && (e.message || e.error_description || e.msg)) || e || '');
     var mapa = [
       [/invalid login credentials/i, 'Correo o contraseña incorrectos.'],
-      [/signups? not allowed for (otp|phone)|user not found/i, 'Ese correo o celular no tiene cuenta de Vento. Toca «Crear cuenta», o entra con tu correo y contraseña.'],
-      [/unsupported phone provider|phone.*(provider|disabled|not enabled)|sms.*(provider|disabled)|error sending (sms|otp to phone)/i, 'Entrar con el celular todavía no está activado en Vento. Entra con el código al correo.'],
+      [/signups? not allowed for (otp|phone)|user not found/i, 'Ese correo o celular no tiene cuenta de ORDEVA. Toca «Crear cuenta», o entra con tu correo y contraseña.'],
+      [/unsupported phone provider|phone.*(provider|disabled|not enabled)|sms.*(provider|disabled)|error sending (sms|otp to phone)/i, 'Entrar con el celular todavía no está activado en ORDEVA. Entra con el código al correo.'],
       [/invalid phone|phone.*invalid/i, 'Ese número de celular no está bien escrito (ej. 3001234567).'],
       [/for security purposes.*after (\d+) seconds/i, 'Espera unos segundos para pedir otro código.'],
       [/token has expired|otp.*(expired|invalid)|invalid.*(token|otp)/i, 'Ese código no sirve o ya venció. Pide uno nuevo.'],
@@ -337,7 +337,7 @@
       .then(function(r){ if(r.error) throw r.error; st.email = email; guardarSt(); return true; });
   }
   // ---------- Entrar con Google (Gmail) ----------
-  // ¿El servidor tiene Google activado? (Supabase → Authentication → Providers → Google; lo configura el flujo «Servidor Vento».)
+  // ¿El servidor tiene Google activado? (Supabase → Authentication → Providers → Google; lo configura el flujo «Servidor ORDEVA».)
   var googleOk = null;
   function googleDisponible(){
     if(googleOk !== null) return Promise.resolve(googleOk);
@@ -364,11 +364,11 @@
     });
   }
 
-  // Dirección de la app para los enlaces del correo (siempre la carpeta de Vento, nunca una página que no existe).
+  // Dirección de la app para los enlaces del correo (siempre la carpeta de ORDEVA, nunca una página que no existe).
   function volverBase(){ return location.origin + location.pathname.replace(/[^/]*$/, ''); }
   // ---------- Código por correo (recuperar contraseña) ----------
   // Supabase manda al correo un código de 6 números (plantilla «Magic Link» con {{ .Token }}, la configura el
-  // flujo «Servidor Vento»). Con ese código se comprueba que la persona es dueña del correo.
+  // flujo «Servidor ORDEVA»). Con ese código se comprueba que la persona es dueña del correo.
   function codigoCorreo(email, volverA){
     var o = { shouldCreateUser: true, emailRedirectTo: volverA || volverBase() };
     return cliente().then(function(c){ return c.auth.signInWithOtp({ email: email, options: o }); })
@@ -413,7 +413,7 @@
     if(st.email !== correo){ st = { email: correo }; guardarSt(); }
     return misNegocios().then(function(l){ return { email: correo, negocios: (l || []).slice().sort(function(a, b){ return (a.rol === 'dueno' ? 0 : 1) - (b.rol === 'dueno' ? 0 : 1); }) }; });
   }
-  // ¿El servidor manda mensajes de texto? (Supabase → Auth → Phone, lo activa el flujo «Servidor Vento» con Twilio)
+  // ¿El servidor manda mensajes de texto? (Supabase → Auth → Phone, lo activa el flujo «Servidor ORDEVA» con Twilio)
   var celOk = null;
   function celularDisponible(){
     if(celOk !== null) return Promise.resolve(celOk);
@@ -433,7 +433,7 @@
   function celularDeCuenta(){
     return cliente().then(function(c){ return c.auth.getUser(); }).then(function(r){ var u = r && r.data && r.data.user; return u && u.phone ? '+' + String(u.phone).replace(/^\+/, '') : ''; }).catch(function(){ return ''; });
   }
-  // Cuenta de Vento Nube: enlace para poner contraseña nueva.
+  // Cuenta de ORDEVA Nube: enlace para poner contraseña nueva.
   function enlaceClave(email, volverA){
     return cliente().then(function(c){ return c.auth.resetPasswordForEmail(email, { redirectTo: volverA || (volverBase() + '?nubeclave=1') }); })
       .then(function(r){ if(r.error) throw r.error; return true; });
@@ -455,7 +455,7 @@
   function nuevaClave(pass){
     return cliente().then(function(c){ return c.auth.updateUser({ password: pass }); }).then(function(r){ if(r.error) throw r.error; return true; });
   }
-  // Tras comprobar un correo para recuperar una cuenta del celular: si no se usa Vento Nube, se cierra esa sesión.
+  // Tras comprobar un correo para recuperar una cuenta del celular: si no se usa ORDEVA Nube, se cierra esa sesión.
   function soltarSesion(){ if(st.email) return Promise.resolve(); return cliente().then(function(c){ return c.auth.signOut(); }).catch(function(){}); }
   function salir(){
     clearInterval(tPoll);
@@ -531,7 +531,7 @@
   function restaurar(id){ return rpc('restaurar_respaldo', { p_respaldo: id }).then(function(){ return bajar(); }); }
   function linkConfig(){ var c = cfg(); return location.origin + location.pathname + '#nube=' + encodeURIComponent(btoa(c.url + '|' + c.key)); }
 
-  // ---------- Ventana «Vento Nube» ----------
+  // ---------- Ventana «ORDEVA Nube» ----------
   var esc = function(t){ return String(t == null ? '' : t).replace(/[&<>"']/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
   var ov = null, alEntrar = null;
   function abrir(opts){
@@ -564,7 +564,7 @@
     var c = q('nubeCuerpo'); if(!c) return; msg('');
     if(!configurada()){
       var cf = cfg();
-      c.innerHTML = '<p class="nube-p">Para tener <b>usuarios</b> y usar el mismo negocio en <b>varios celulares</b>, conecta Vento a tu base de datos gratuita de Supabase. Los pasos están en <a href="https://github.com/cristhianlujan45-blip/ORDEVA/blob/claude/nuevo-repo-correcciones-xacdbz/nube/LEEME.md" target="_blank" rel="noopener">nube/LEEME.md</a> (5 minutos).</p>' +
+      c.innerHTML = '<p class="nube-p">Para tener <b>usuarios</b> y usar el mismo negocio en <b>varios celulares</b>, conecta ORDEVA a tu base de datos gratuita de Supabase. Los pasos están en <a href="https://github.com/cristhianlujan45-blip/ORDEVA/blob/claude/nuevo-repo-correcciones-xacdbz/nube/LEEME.md" target="_blank" rel="noopener">nube/LEEME.md</a> (5 minutos).</p>' +
         '<label>Project URL<input id="nubeUrl" placeholder="https://xxxx.supabase.co" value="' + esc(cf.url) + '" autocapitalize="none" spellcheck="false"></label>' +
         '<label>Clave pública (anon / publishable key)<input id="nubeKey" placeholder="eyJhbGciOi… o sb_publishable_…" value="' + esc(cf.key) + '" autocapitalize="none" spellcheck="false"></label>' +
         '<button type="button" class="btn-primary" id="nubeGuardarCfg">Guardar y continuar</button>' +
@@ -580,7 +580,7 @@
     }
     if(!st.email){
       c.innerHTML = '<button type="button" class="nube-google" id="nubeGoogle" hidden><svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>Continuar con Google</button>' +
-        '<p class="nube-p">Entra con el correo de tu cuenta de Vento. ¿Te invitaron a un negocio? Crea tu cuenta aquí y después escribe el código que te dio el dueño.</p>' +
+        '<p class="nube-p">Entra con el correo de tu cuenta de ORDEVA. ¿Te invitaron a un negocio? Crea tu cuenta aquí y después escribe el código que te dio el dueño.</p>' +
         '<label>Correo<input id="nubeEmail" type="email" autocomplete="username" autocapitalize="none"></label>' +
         '<label>Contraseña<input id="nubePass" type="password" autocomplete="current-password"></label>' +
         '<label>Tu nombre (solo para crear la cuenta)<input id="nubeNombre" autocomplete="name" placeholder="Ej: Ana"></label>' +
@@ -596,7 +596,7 @@
         var e = q('nubeEmail').value.trim().toLowerCase();
         if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) return msg('Escribe arriba tu correo y vuelve a tocar aquí.', true);
         accion(this, function(){ return enlaceClave(e, volverBase() + '?nubeclave=1').then(function(){
-          msg('📧 Te mandé un enlace a ' + e + ' (revisa también «Spam»). Ábrelo desde este celular: Vento te pide la contraseña nueva.');
+          msg('📧 Te mandé un enlace a ' + e + ' (revisa también «Spam»). Ábrelo desde este celular: ORDEVA te pide la contraseña nueva.');
         }); });
       };
       return;
@@ -625,15 +625,15 @@
       return;
     }
     var manda = st.negocio.rol === 'dueno' || st.negocio.rol === 'admin';
-    // Sin «nube» a la vista: los datos se guardan solos en la cuenta de Vento. Aquí solo la cuenta y el equipo
-    // (invitar, roles, quitar). Lo técnico (sincronizar, respaldos, base de datos) es del administrador de Vento.
-    c.innerHTML = '<p class="nube-p">🔐 <b>' + esc(st.negocio.nombre) + '</b> · ' + esc(st.email || '') + ' · ' + esc(ROLES[st.negocio.rol]) + '<br><small>Tus datos se guardan solos en tu cuenta de Vento y se ven al instante en todos tus celulares.</small></p>' +
+    // Sin «nube» a la vista: los datos se guardan solos en la cuenta de ORDEVA. Aquí solo la cuenta y el equipo
+    // (invitar, roles, quitar). Lo técnico (sincronizar, respaldos, base de datos) es del administrador de ORDEVA.
+    c.innerHTML = '<p class="nube-p">🔐 <b>' + esc(st.negocio.nombre) + '</b> · ' + esc(st.email || '') + ' · ' + esc(ROLES[st.negocio.rol]) + '<br><small>Tus datos se guardan solos en tu cuenta de ORDEVA y se ven al instante en todos tus celulares.</small></p>' +
       (manda ? '<p class="nube-p"><b>Invitar a alguien de tu equipo:</b></p><div class="nube-fila"><select id="nubeRolInv">' + opcionesRol('empleado', st.negocio.rol === 'dueno') + '</select><button type="button" class="btn-primary" id="nubeInvitar">➕ Invitar</button></div><div id="nubeInvRes"></div>' : '') +
       '<div id="nubeMiembros" class="nube-p">Cargando el equipo…</div>' +
       '<div class="nube-fila"><button type="button" class="btn-ghost" id="nubeSalir">🚪 Cerrar sesión</button></div>';
     if(manda){
       q('nubeInvitar').onclick = function(){ var rol = q('nubeRolInv').value; accion(this, function(){ return invitar(rol).then(function(cod){
-        q('nubeInvRes').innerHTML = '<p class="nube-p">Código para un <b>' + esc(ROLES[rol]) + '</b> (un solo uso, vence en 7 días):</p><div class="nube-cod">' + esc(cod) + '</div><p class="nube-p">La persona abre Vento en su celular → «👥 Me invitaron a un negocio» → crea su cuenta → escribe este código.' +
+        q('nubeInvRes').innerHTML = '<p class="nube-p">Código para un <b>' + esc(ROLES[rol]) + '</b> (un solo uso, vence en 7 días):</p><div class="nube-cod">' + esc(cod) + '</div><p class="nube-p">La persona abre ORDEVA en su celular → «👥 Me invitaron a un negocio» → crea su cuenta → escribe este código.' +
           (rol === 'admin' ? ' Como segundo administrador maneja el negocio, pero TODO lo que haga queda en tu «📜 Actividad del equipo» y no puede verla ni borrarla.' : ' Solo verá lo de su trabajo y lo que tú le permitas en «👥 Permisos del equipo».') + '</p>'; }); }); };
     }
     miembros().then(function(l){

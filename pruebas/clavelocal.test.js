@@ -1,4 +1,4 @@
-// 🔐 Contraseña local con PBKDF2 (Vento 1.57.0, auditoría ORDEVA R8): la contraseña de cada usuario en el celular.
+// 🔐 Contraseña local con PBKDF2 (ORDEVA 1.57.0, auditoría ORDEVA R8): la contraseña de cada usuario en el celular.
 //  • Un usuario nuevo queda guardado con PBKDF2 («p2:…»), nunca la contraseña.
 //  • Uno guardado a la antigua (SHA-256) sigue entrando y se pasa solo a PBKDF2 al entrar bien.
 //  • Una contraseña equivocada no entra (ni con la vieja ni con la nueva forma).

@@ -1,4 +1,4 @@
-// Lectura del texto de las facturas SIN internet (Tesseract dentro de Vento), con fotos simuladas:
+// Lectura del texto de las facturas SIN internet (Tesseract dentro de ORDEVA), con fotos simuladas:
 //  1. Factura derecha: el texto sale tal cual (renglones, números y espacios) y separa los productos.
 //  2. Factura de lado (foto girada 90°): se endereza ANTES de leer → mismo resultado y rápido (sin releer girada).
 //  3. Tiempo: cada lectura en pocos segundos.

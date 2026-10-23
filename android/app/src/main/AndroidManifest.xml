@@ -50,7 +50,7 @@
 
     <application
         android:name=".VentoApp"
-        android:label="Vento"
+        android:label="ORDEVA"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
         android:allowBackup="true"
@@ -101,7 +101,7 @@
         <service
             android:name=".VentoEscucha"
             android:exported="true"
-            android:label="Vento: música que suena y avisos de pagos"
+            android:label="ORDEVA: música que suena y avisos de pagos"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
             <intent-filter>
                 <action android:name="android.service.notification.NotificationListenerService" />

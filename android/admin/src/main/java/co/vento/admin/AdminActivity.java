@@ -36,7 +36,7 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Vento Admin: la app del proveedor. Abre el panel de administración (admin.html), que sigue pidiendo el
+ * ORDEVA Admin: la app del proveedor. Abre el panel de administración (admin.html), que sigue pidiendo el
  * código personal para entrar. Lo que no es el panel (WhatsApp, GitHub, la APK) se abre con su propia app.
  */
 public class AdminActivity extends Activity {
@@ -133,15 +133,15 @@ public class AdminActivity extends Activity {
         pedirPermisoActualizar();
     }
 
-    /** 🔄 Para actualizarse sola, Android pide una vez «Instalar apps desconocidas» para Vento Admin. Se explica y se abre. */
+    /** 🔄 Para actualizarse sola, Android pide una vez «Instalar apps desconocidas» para ORDEVA Admin. Se explica y se abre. */
     private void pedirPermisoActualizar() {
         if (Build.VERSION.SDK_INT < 26 || Actualizador.permiso(this)) return;
         android.content.SharedPreferences p = getSharedPreferences("vento_admin", MODE_PRIVATE);
         if (System.currentTimeMillis() - p.getLong("pidio_actualizar", 0) < 3 * 86400_000L) return;
         p.edit().putLong("pidio_actualizar", System.currentTimeMillis()).apply();
         try {
-            new android.app.AlertDialog.Builder(this).setTitle("🔄 Que Vento Admin se actualice sola")
-                    .setMessage("Dale un permiso una sola vez y Vento Admin se actualiza sola, sin descargar ni instalar a mano.\n\nEn la pantalla que se abre, activa «Permitir de esta fuente» y vuelve.")
+            new android.app.AlertDialog.Builder(this).setTitle("🔄 Que ORDEVA Admin se actualice sola")
+                    .setMessage("Dale un permiso una sola vez y ORDEVA Admin se actualiza sola, sin descargar ni instalar a mano.\n\nEn la pantalla que se abre, activa «Permitir de esta fuente» y vuelve.")
                     .setPositiveButton("Dar el permiso", (d, w) -> { try { startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getPackageName()))); } catch (Exception ignorado) { } })
                     .setNegativeButton("Luego", null).show();
         } catch (Exception ignorado) { }
@@ -218,7 +218,7 @@ public class AdminActivity extends Activity {
                 Intent abrir = new Intent(AdminActivity.this, AdminActivity.class).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
                 PendingIntent pi = PendingIntent.getActivity(AdminActivity.this, 2, abrir, flagsPi);
                 Notification.Builder b = Build.VERSION.SDK_INT >= 26 ? new Notification.Builder(AdminActivity.this, canal) : new Notification.Builder(AdminActivity.this);
-                String t = titulo == null ? "Vento Admin" : (titulo.length() > 80 ? titulo.substring(0, 80) : titulo);
+                String t = titulo == null ? "ORDEVA Admin" : (titulo.length() > 80 ? titulo.substring(0, 80) : titulo);
                 String c = cuerpo == null ? "" : (cuerpo.length() > 300 ? cuerpo.substring(0, 300) : cuerpo);
                 b.setSmallIcon(android.R.drawable.stat_notify_chat).setContentTitle(t).setContentText(c)
                         .setStyle(new Notification.BigTextStyle().bigText(c)).setAutoCancel(true).setContentIntent(pi);

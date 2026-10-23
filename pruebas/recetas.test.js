@@ -1,4 +1,4 @@
-// 🧾 Recetas e insumos (Vento 1.55.0): los insumos se descuentan solos al vender, vuelven al quitar de la cuenta y, si el
+// 🧾 Recetas e insumos (ORDEVA 1.55.0): los insumos se descuentan solos al vender, vuelven al quitar de la cuenta y, si el
 // dueño lo pide, no se vende un plato si falta un ingrediente.
 //  1. Inventario → «🧂 Insumos y recetas»: crear insumos (queso por kg, pan por unidad) con cantidad, aviso y costo.
 //  2. Editar producto → «🧾 Receta»: la hamburguesa lleva 0,1 kg de queso y 1 pan; su costo sale de la receta.

@@ -1,9 +1,9 @@
 /* =====================================================================
-   Vento · Facturación electrónica DIAN (lado de la app)
+   ORDEVA · Facturación electrónica DIAN (lado de la app)
 
    Con «🧾 Facturación electrónica DIAN» prendida (Ajustes → Negocio), CADA venta cobrada sale sola como
    «Documento equivalente electrónico P.O.S.» (o «Factura electrónica de venta» si el cliente la pide con su cédula o
-   NIT y su correo). La valida la DIAN por medio de MATIAS (proveedor tecnológico autorizado) desde el Servidor Vento:
+   NIT y su correo). La valida la DIAN por medio de MATIAS (proveedor tecnológico autorizado) desde el Servidor ORDEVA:
    la app nunca tiene claves de nadie.
    • Cola en este equipo: si la conexión falla, la venta queda «enviando» y se manda sola apenas vuelve (el servidor
      no repite números aunque el mismo documento se mande dos veces o desde dos celulares).
@@ -11,7 +11,7 @@
      el documento nuevo. «🧾 Factura a nombre de…» en el historial: anula el P.O.S. y saca la factura del cliente.
    • El recibo (pantalla, WhatsApp, impresora del navegador y la impresora térmica) lleva el número DIAN, la
      resolución, el CUDE y el código QR de la DIAN.
-   Sin Vento Nube o con la facturación apagada no hace nada: Vento funciona como siempre.
+   Sin ORDEVA Nube o con la facturación apagada no hace nada: ORDEVA funciona como siempre.
    ===================================================================== */
 (function(){
   'use strict';
@@ -39,7 +39,7 @@
   function api(ruta, cuerpo){
     return nube().cliente().then(function(c){ return c.auth.getSession(); }).then(function(r){
       var tok = r && r.data && r.data.session ? r.data.session.access_token : null;
-      if(!tok) throw Object.assign(new Error('Entra a Vento Nube para la facturación electrónica.'), { codigo: 'sin_sesion' });
+      if(!tok) throw Object.assign(new Error('Entra a ORDEVA Nube para la facturación electrónica.'), { codigo: 'sin_sesion' });
       var ctrl = window.AbortController ? new AbortController() : null, t = setTimeout(function(){ ctrl && ctrl.abort(); }, 70000);
       return fetch(base() + '/' + ruta, { method: 'POST', signal: ctrl ? ctrl.signal : undefined, headers: { 'Content-Type': 'application/json', apikey: nube().config().key, Authorization: 'Bearer ' + tok }, body: JSON.stringify(cuerpo || {}) })
         .then(function(x){ clearTimeout(t); return x; }, function(e){ clearTimeout(t); throw Object.assign(new Error('Sin conexión con el servidor'), { codigo: 'red' }); });
@@ -72,7 +72,7 @@
     return c;
   }
 
-  // ---------- De una venta de Vento a lo que se manda ----------
+  // ---------- De una venta de ORDEVA a lo que se manda ----------
   function prod(it){ var d = D(); if(!d || !d.products) return null; return d.products.find(function(p){ return (it.productId && p.id === it.productId) || p.name === it.name; }) || null; }
   function ventaDe(h, id){
     return {
@@ -257,7 +257,7 @@
     if(dn.cude) out.push('CUDE: ' + dn.cude);
     if(dn.nota && dn.nota.documento) out.push('Anulado con ' + dn.nota.documento + (dn.nota.estado === 'aceptado' ? ' (validada)' : ''));
     if((c._ambiente || st.ambiente) === 'pruebas') out.push('AMBIENTE DE PRUEBAS · sin validez fiscal');
-    out.push('Software: Vento POS');
+    out.push('Software: ORDEVA POS');
     return out;
   }
   function reciboTexto(dn){ var l = lineasRecibo(dn); return l ? l.join('\n') : ''; }
@@ -287,13 +287,13 @@
     var caja = $d('dianCaja'); if(!caja) return;
     estilos();
     var n = negocio();
-    if(!n){ caja.innerHTML = '<div class="settings-desc">Para la facturación electrónica entra a <b>Vento Nube</b> con la cuenta del negocio (Ajustes → 👥 Mi cuenta y mi equipo).</div>'; return; }
+    if(!n){ caja.innerHTML = '<div class="settings-desc">Para la facturación electrónica entra a <b>ORDEVA Nube</b> con la cuenta del negocio (Ajustes → 👥 Mi cuenta y mi equipo).</div>'; return; }
     var c = cfg() || {}, puede = c.rol === 'dueno' || c.rol === 'admin' || n.rol === 'dueno' || n.rol === 'admin';
     var amb = c._ambiente || st.ambiente;
-    var estado = !c._servidor && st.servidor === false ? '<div class="vd-est mal">⚠️ El Servidor Vento todavía no tiene la cuenta del proveedor de facturación (MATIAS). Cuando el proveedor de Vento la agregue, esto se prende solo.</div>'
+    var estado = !c._servidor && st.servidor === false ? '<div class="vd-est mal">⚠️ El Servidor ORDEVA todavía no tiene la cuenta del proveedor de facturación (MATIAS). Cuando el proveedor de ORDEVA la agregue, esto se prende solo.</div>'
       : c.activo ? '<div class="vd-est ok">✅ <b>Prendida.</b> Cada venta sale como documento electrónico P.O.S.' + (c.fe_resolucion ? ' (o factura electrónica si el cliente la pide)' : '') + '.' +
           (amb === 'pruebas' ? '<br>🧪 <b>Ambiente de pruebas</b>: los documentos NO tienen validez ante la DIAN todavía.' : '') +
-          (c.conectado ? '' : '<br>ℹ️ Falta que Vento Admin conecte tu empresa (NIT) en el proveedor.') +
+          (c.conectado ? '' : '<br>ℹ️ Falta que ORDEVA Admin conecte tu empresa (NIT) en el proveedor.') +
           '<br>Validados: <b>' + (c.aceptados || 0) + '</b> · por enviar: <b>' + (c.pendientes || 0) + '</b>' + (c.rechazados ? ' · ❌ rechazados: <b>' + c.rechazados + '</b>' : '') + '</div>'
       : '<div class="vd-est">Apagada: las ventas salen con el recibo de siempre (no es factura electrónica).</div>';
     var imp = c.impuesto === 'iva' ? 'iva' + (c.tarifa || 19) : c.impuesto === 'inc' ? 'inc8' : 'ninguno';
@@ -305,7 +305,7 @@
       '<details' + (c.activo ? '' : ' open') + '><summary style="cursor:pointer;font-weight:700;margin:6px 0">📋 Cómo prenderla (una sola vez)</summary><ol class="settings-desc" style="padding-left:18px;margin:6px 0">' +
         '<li>En la DIAN (MUISCA) <b>habilítate como facturador electrónico</b> y escoge «proveedor tecnológico».</li>' +
         '<li>Pide la <b>resolución de numeración</b> para «documento equivalente electrónico P.O.S.» (y, si quieres, otra para factura electrónica). Te dan número, prefijo y rango.</li>' +
-        '<li>Escríbele al proveedor de Vento (Ajustes → 📖 Guía y soporte) para que conecte tu NIT en la facturación.</li>' +
+        '<li>Escríbele al proveedor de ORDEVA (Ajustes → 📖 Guía y soporte) para que conecte tu NIT en la facturación.</li>' +
         '<li>Llena estos datos, toca <b>Guardar</b> y luego prende el interruptor.</li></ol></details>' +
       '<div class="settings-row"><div class="settings-row-text"><strong>Prender facturación electrónica</strong><span>Cada venta cobrada sale sola a la DIAN.</span></div><label class="switch"><input type="checkbox" id="vdOn"' + (c.activo ? ' checked' : '') + dis + '><span class="switch-slider"></span></label></div>' +
       '<div class="settings-desc" style="margin-top:8px"><b>Tu negocio (como está en el RUT)</b></div>' +
@@ -316,7 +316,7 @@
       '<label class="vd-c"><span>Impuesto de tus ventas</span><select id="vdImp" class="mz-in"' + dis + '>' +
         [['ninguno', 'No responsable de IVA (sin impuesto)'], ['iva19', 'IVA 19 %'], ['iva5', 'IVA 5 %'], ['iva0', 'IVA 0 % (exento)'], ['inc8', 'Impuesto al consumo 8 % (restaurantes, bares)']]
           .map(function(o){ return '<option value="' + o[0] + '"' + (o[0] === imp ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></label>' +
-      '<div class="settings-desc" style="font-size:12px">Los precios de Vento traen el impuesto por dentro: Vento separa la base y el impuesto. Si un producto tiene su propio IVA (en el producto), se usa ese.</div>' +
+      '<div class="settings-desc" style="font-size:12px">Los precios de ORDEVA traen el impuesto por dentro: ORDEVA separa la base y el impuesto. Si un producto tiene su propio IVA (en el producto), se usa ese.</div>' +
       '<div class="settings-desc" style="margin-top:10px"><b>Resolución P.O.S. electrónico</b></div>' +
       '<div class="vd-g">' + campo('vdPosRes', 'Número de resolución', c.pos_resolucion, 'inputmode="numeric" maxlength="20"' + dis) + campo('vdPosPre', 'Prefijo', c.pos_prefijo, 'maxlength="4" style="text-transform:uppercase"' + dis) +
         campo('vdPosDesde', 'Desde', c.pos_desde, 'inputmode="numeric"' + dis) + campo('vdPosHasta', 'Hasta', c.pos_hasta, 'inputmode="numeric"' + dis) +

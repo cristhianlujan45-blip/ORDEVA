@@ -1,5 +1,5 @@
 // Buscar canciones en YouTube aunque la API de YouTube esté SIN CUPO («se alcanzó el límite»).
-// El Servidor Vento (vento-ia/yt/buscar → supabase/functions/vento-ia/youtube.ts, el módulo de verdad) lee la página
+// El Servidor ORDEVA (vento-ia/yt/buscar → supabase/functions/vento-ia/youtube.ts, el módulo de verdad) lee la página
 // pública de resultados de youtube.com; aquí youtube.com se simula con una página de resultados con la misma forma.
 //  1. youtube.ts entiende la página (videos con duración, canales con su foto) y no se confunde con «}» o comillas
 //     dentro de los títulos.

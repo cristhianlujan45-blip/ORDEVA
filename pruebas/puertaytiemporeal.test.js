@@ -1,9 +1,9 @@
 // Puerta + tiempo real (lib/vento-puerta.js y nube/vento-suscripcion.js):
-//  • sin cuenta de Vento Nube la app queda tapada («Conecta Vento a tu cuenta»);
+//  • sin cuenta de ORDEVA Nube la app queda tapada («Conecta ORDEVA a tu cuenta»);
 //  • con cuenta y estado firmado por el servidor, la app abre;
 //  • cuando la base de datos avisa un cambio (activar, cambiar plan, cancelar), la app lo toma AL INSTANTE, sin
 //    tocar nada y sin esperar los refrescos de respaldo;
-//  • sin internet se sigue con el último estado firmado; vencido y sin poder renovarlo → «Sin conexión con Vento»;
+//  • sin internet se sigue con el último estado firmado; vencido y sin poder renovarlo → «Sin conexión con ORDEVA»;
 //    al volver la conexión la app abre sola.
 // El servidor y Realtime se simulan (llave ECDSA temporal). No usa internet. La puerta se fuerza con ?puerta=1.
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
@@ -72,20 +72,20 @@ const b64u = b => Buffer.from(b).toString('base64').replace(/\+/g, '-').replace(
   const b = await chromium.launch(); let ok = 0, mal = 0; const errs = [];
   const chk = (n, c, x) => { if(c){ ok++; console.log('✅ ' + n); } else { mal++; console.log('❌ ' + n + (x !== undefined ? ' → ' + x : '')); } };
   try{
-    // ---------- Sin cuenta de Vento Nube ----------
+    // ---------- Sin cuenta de ORDEVA Nube ----------
     { const { ctx, p } = await celular(b, { nube: false });
       const g = await puerta(p);
-      chk('Sin cuenta de Vento Nube: la app queda tapada con «Conecta Vento a tu cuenta»', !!g && g.motivo === 'cuenta' && /Conecta Vento a tu cuenta/.test(g.txt), JSON.stringify(g));
+      chk('Sin cuenta de ORDEVA Nube: la app queda tapada con «Conecta ORDEVA a tu cuenta»', !!g && g.motivo === 'cuenta' && /Conecta ORDEVA a tu cuenta/.test(g.txt), JSON.stringify(g));
       chk('…con el botón para entrar o crear la cuenta', await p.evaluate(() => !!document.querySelector('#vpOv [data-vp="cuenta"]')));
       chk('…y la tapa cubre toda la pantalla, por encima de la app', await p.evaluate(() => { const r = document.getElementById('vpOv').getBoundingClientRect(); return r.width >= innerWidth && r.height >= innerHeight && +getComputedStyle(document.getElementById('vpOv')).zIndex > 9999; }));
       await p.evaluate(() => document.querySelector('#vpOv [data-vp="cuenta"]').click()); await p.waitForTimeout(500);
       chk('El botón abre «Mi cuenta» por encima de la tapa', await p.evaluate(() => { const n = document.getElementById('nubeOv'); return !!n && n.classList.contains('show') && +getComputedStyle(n).zIndex > +getComputedStyle(document.getElementById('vpOv')).zIndex; }));
-      chk('…sin hablar de «la nube» (la cuenta de Vento ya guarda todo)', await p.evaluate(() => !/nube/i.test(document.getElementById('nubeOv').innerText)), await p.evaluate(() => document.getElementById('nubeOv').innerText));
+      chk('…sin hablar de «la nube» (la cuenta de ORDEVA ya guarda todo)', await p.evaluate(() => !/nube/i.test(document.getElementById('nubeOv').innerText)), await p.evaluate(() => document.getElementById('nubeOv').innerText));
       await ctx.close(); }
     { const { ctx, p } = await celular(b, { nube: false, entrada: true });
       await p.waitForTimeout(1700);
       chk('En la pantalla de entrada (sin sesión) la tapa se aparta: ahí se entra o se crea la cuenta', await p.evaluate(() => !document.getElementById('vpOv') && !document.getElementById('authOverlay').hidden));
-      chk('…y la entrada no ofrece «Vento Nube» aparte', await p.evaluate(() => !/nube/i.test(document.getElementById('authOverlay').innerText)), await p.evaluate(() => document.getElementById('authOverlay').innerText));
+      chk('…y la entrada no ofrece «ORDEVA Nube» aparte', await p.evaluate(() => !/nube/i.test(document.getElementById('authOverlay').innerText)), await p.evaluate(() => document.getElementById('authOverlay').innerText));
       await ctx.close(); }
 
     // ---------- Con cuenta: abre, y todo cambia al instante ----------
@@ -170,7 +170,7 @@ const b64u = b => Buffer.from(b).toString('base64').replace(/\+/g, '-').replace(
     await p.waitForTimeout(3000);
     await p.evaluate(() => ventoSuscripcion.refrescar(true)); await p.waitForTimeout(2200);
     const g2 = await puerta(p);
-    chk('Estado firmado vencido y sin poder renovarlo: «Sin conexión con Vento»', !!g2 && g2.motivo === 'sinconexion' && /Sin conexión con Vento/.test(g2.txt), JSON.stringify(g2));
+    chk('Estado firmado vencido y sin poder renovarlo: «Sin conexión con ORDEVA»', !!g2 && g2.motivo === 'sinconexion' && /Sin conexión con Vento/.test(g2.txt), JSON.stringify(g2));
     bd.offline = false; bd.vidaToken = 72 * H;
     await p.evaluate(() => window.dispatchEvent(new Event('online')));
     chk('Vuelve el internet: la app abre sola', await listo(p, () => !document.getElementById('vpOv'), 6000), JSON.stringify(await puerta(p)));

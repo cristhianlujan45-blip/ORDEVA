@@ -84,18 +84,18 @@ public class VentoApp extends Application {
             String[][] cs = {
                 {"vento_pedidos2", "Pedidos y cuentas", "alto"},
                 {"vento_musica2", "Canciones pedidas", "alto"},
-                {"vento_avisos2", "Avisos de Vento (IA y soporte)", "normal"},
+                {"vento_avisos2", "Avisos de ORDEVA (IA y soporte)", "normal"},
                 {"vento_pagos", "💜 Pagos que te llegan", "alto"}};
             for (String[] c : cs) {
                 if (nm.getNotificationChannel(c[0]) != null) continue;
                 android.app.NotificationChannel ch = new android.app.NotificationChannel(c[0], c[1],
                         "alto".equals(c[2]) ? android.app.NotificationManager.IMPORTANCE_HIGH : android.app.NotificationManager.IMPORTANCE_DEFAULT);
-                ch.setDescription("Suena aunque Vento esté cerrada.");
+                ch.setDescription("Suena aunque ORDEVA esté cerrada.");
                 ch.enableVibration("alto".equals(c[2]));
                 ch.setLockscreenVisibility(android.app.Notification.VISIBILITY_PUBLIC);
                 if ("vento_pagos".equals(c[0])) {
                     // Los pagos suenan aunque el celular esté bloqueado o en silencio de notificaciones del resto.
-                    ch.setDescription("«Pago confirmado»: suena aunque la pantalla esté bloqueada o Vento cerrada.");
+                    ch.setDescription("«Pago confirmado»: suena aunque la pantalla esté bloqueada o ORDEVA cerrada.");
                     ch.setVibrationPattern(new long[]{0, 250, 120, 250});
                     ch.setBypassDnd(true);
                 }
@@ -1051,7 +1051,7 @@ public class VentoApp extends Application {
                         new Intent(VentoApp.this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_NEW_TASK), flags);
                 android.app.Notification.Builder b = Build.VERSION.SDK_INT >= 26 ? new android.app.Notification.Builder(VentoApp.this, id) : new android.app.Notification.Builder(VentoApp.this);
                 b.setSmallIcon(android.R.drawable.ic_dialog_info)
-                        .setContentTitle(titulo == null ? "Vento" : titulo)
+                        .setContentTitle(titulo == null ? "ORDEVA" : titulo)
                         .setContentText(texto == null ? "" : texto)
                         .setStyle(new android.app.Notification.BigTextStyle().bigText(texto == null ? "" : texto))
                         .setAutoCancel(true)
@@ -1064,7 +1064,7 @@ public class VentoApp extends Application {
                     b.setVisibility(android.app.Notification.VISIBILITY_PUBLIC);
                     if (Build.VERSION.SDK_INT >= 21) {
                         android.app.Notification.Builder pub = Build.VERSION.SDK_INT >= 26 ? new android.app.Notification.Builder(VentoApp.this, id) : new android.app.Notification.Builder(VentoApp.this);
-                        pub.setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle(titulo == null ? "Vento" : titulo).setContentText(texto == null ? "" : texto)
+                        pub.setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle(titulo == null ? "ORDEVA" : titulo).setContentText(texto == null ? "" : texto)
                                 .setStyle(new android.app.Notification.BigTextStyle().bigText(texto == null ? "" : texto)).setColor(0xFF8B5CF6);
                         b.setPublicVersion(pub.build()).setColor(0xFF8B5CF6);
                     }

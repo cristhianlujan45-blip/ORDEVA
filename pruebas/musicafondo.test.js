@@ -1,10 +1,10 @@
-// Música sola con Vento minimizada (app de Android). El reproductor de YouTube y el servidor se simulan.
+// Música sola con ORDEVA minimizada (app de Android). El reproductor de YouTube y el servidor se simulan.
 //  1. En la app de Android la música automática arranca sin tocar la pantalla (Android deja sonar sola).
-//  2. Prender «Música automática» deja a Vento trabajando de fondo (servicio con aviso fijo).
+//  2. Prender «Música automática» deja a ORDEVA trabajando de fondo (servicio con aviso fijo).
 //  3. Minimizada: si el celular frena el video, el latido del servicio le da play otra vez.
 //  4. Minimizada: al terminar una canción pone la siguiente sola (también si el aviso de «terminó» no llegó).
 //  5. Minimizada: una canción que tarda en arrancar NO se descarta como mala (antes se perdían canciones buenas).
-//  6. Pausa hecha por la persona (con Vento al frente): el latido NO la vuelve a prender.
+//  6. Pausa hecha por la persona (con ORDEVA al frente): el latido NO la vuelve a prender.
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 const video = (id, t, c, d) => ({ id: { videoId: id }, snippet: { title: t, channelTitle: c }, duracion: d });
@@ -45,7 +45,7 @@ const video = (id, t, c, d) => ({ id: { videoId: id }, snippet: { title: t, chan
     chk('1. En la app de Android la música arranca sola, sin tocar la pantalla', await p.waitForFunction(() => window.__yt.cargados.length >= 1, null, { timeout: 15000 }).then(() => true, () => false), await main(() => window.__yt.cargados));
     // 2.
     await p.evaluate(() => { const a = document.getElementById('autoPlay'); a.checked = false; a.dispatchEvent(new Event('change')); a.checked = true; a.dispatchEvent(new Event('change')); });
-    chk('2. Prender «Música automática» deja a Vento trabajando de fondo', await main(() => window.__fondo === true && window.__fondoLlamadas.includes(true)));
+    chk('2. Prender «Música automática» deja a ORDEVA trabajando de fondo', await main(() => window.__fondo === true && window.__fondoLlamadas.includes(true)));
     await p.waitForFunction(() => window.__yt.main && window.__yt.main.st === 1, null, { timeout: 10000 }).catch(() => {});
     const primera = await main(() => window.__yt.cargados.slice(-1)[0]);
     // 3.
@@ -66,7 +66,7 @@ const video = (id, t, c, d) => ({ id: { videoId: id }, snippet: { title: t, chan
     await p.evaluate(() => { window.__atascar = false; });
     // 6.
     await p.evaluate(() => { window.__ventoAlFrente = true; const m = window.__yt.main; m.st = 1; m.o.events.onStateChange({ data: 1 }); m.st = 2; m.o.events.onStateChange({ data: 2 }); window.__yt.play = 0; window.ventoLatido(); });
-    chk('6. Pausa hecha por la persona (Vento al frente): el latido no la prende', await main(() => window.__yt.main.st === 2 && window.__yt.play === 0));
+    chk('6. Pausa hecha por la persona (ORDEVA al frente): el latido no la prende', await main(() => window.__yt.main.st === 2 && window.__yt.play === 0));
     chk('Sin errores de página', !errs.length, errs);
   }catch(e){ mal++; console.log('❌ Error: ' + (e && e.stack || e)); }
   await b.close();

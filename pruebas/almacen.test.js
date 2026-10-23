@@ -4,12 +4,12 @@
 //  1. Un celular que viene de la versión anterior (todo en localStorage): abre con sus datos, y los puntos de
 //     restauración y los comprobantes se pasan solos al almacén grande (sin perder ninguno) y liberan localStorage.
 //  2. Memoria llena: localStorage ya no acepta los datos → igual se guarda (sin «la memoria está llena») y al volver a
-//     abrir Vento está la última venta.
+//     abrir ORDEVA está la última venta.
 //  3. Datos grandes (más de 1,5 millones de letras): van solo al almacén grande y abren bien.
 //  4. Puntos de restauración: se ven y uno se restaura.
 //  5. Respaldo manual (Transferir): lleva los datos más nuevos y los comprobantes; al recibirlo en otro celular, manda
 //     lo recibido aunque ese celular tuviera otra cosa en el almacén grande.
-//  6. Una versión vieja de Vento que escribió en localStorage (sin el almacén): ese cambio no se pierde.
+//  6. Una versión vieja de ORDEVA que escribió en localStorage (sin el almacén): ese cambio no se pierde.
 //  7. «Restablecer todo» no deja los datos viejos escondidos en el almacén grande.
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html';
@@ -52,7 +52,7 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
     chk('2. Memoria llena en localStorage: se guarda igual, sin «la memoria está llena»', !/llena|No se pudo guardar|Error al guardar/i.test(r2.toasts) && r2.enIdb === 2, r2);
     chk('2. … (localStorage se queda con la copia anterior, la que sí cupo)', r2.enLs === 1, r2);
     await p.reload({ waitUntil: 'load' }); await p.waitForTimeout(1200); await entrar(p);
-    chk('2. Al volver a abrir Vento está la última venta ($9.000): no se perdió nada', await p.evaluate(() => data.history.length === 2 && data.history[0].total === 9000));
+    chk('2. Al volver a abrir ORDEVA está la última venta ($9.000): no se perdió nada', await p.evaluate(() => data.history.length === 2 && data.history[0].total === 9000));
     // ---------- 3. Datos grandes ----------
     await p.evaluate(async () => { data.notaGrande = 'x'.repeat(1600000); await saveData(); });
     const r3 = await p.evaluate(() => ({ ls: (localStorage.getItem('bar-data') || '').length }));
@@ -81,11 +81,11 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
     await p2.evaluate(async () => { data.businessName = 'Otro Negocio'; data.history = []; await saveData(); });
     await Promise.all([p2.waitForNavigation({ waitUntil: 'load' }), p2.evaluate(bk => {
       window.confirm = () => true; window.alert = () => {};
-      window.importBackup(new File([JSON.stringify(bk)], 'respaldo.json', { type: 'application/json' }));   // recibe y recarga Vento
+      window.importBackup(new File([JSON.stringify(bk)], 'respaldo.json', { type: 'application/json' }));   // recibe y recarga ORDEVA
     }, bk)]);
     await p2.waitForTimeout(1200); await entrar(p2);
     chk('5. Al recibir el respaldo manda lo recibido («Tienda Nueva», 2 ventas), aunque el almacén grande tuviera otra cosa', await p2.evaluate(() => data.businessName === 'Tienda Nueva' && data.history.length === 2), await p2.evaluate(() => [data.businessName, data.history.length]));
-    // ---------- 6. Una versión vieja de Vento escribió en localStorage ----------
+    // ---------- 6. Una versión vieja de ORDEVA escribió en localStorage ----------
     await p2.evaluate(() => { const d = JSON.parse(localStorage.getItem('bar-data')); d.businessName = 'Cambio de la versión vieja'; localStorage.setItem('bar-data', JSON.stringify(d)); });
     await p2.reload({ waitUntil: 'load' }); await p2.waitForTimeout(1200); await entrar(p2);
     chk('6. Lo que escribió una versión vieja (solo en localStorage) no se pierde', await p2.evaluate(() => data.businessName === 'Cambio de la versión vieja'));

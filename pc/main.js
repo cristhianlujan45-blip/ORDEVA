@@ -45,7 +45,7 @@ function mostrar(){
 
 function crearVentana(){
   ventana = new BrowserWindow({
-    width: 1280, height: 820, minWidth: 360, minHeight: 560, title: 'Vento', show: false,
+    width: 1280, height: 820, minWidth: 360, minHeight: 560, title: 'ORDEVA', show: false,
     icon: path.join(__dirname, 'icono.png'), backgroundColor: '#0b0a12', autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'), contextIsolation: true, sandbox: true, nodeIntegration: false,

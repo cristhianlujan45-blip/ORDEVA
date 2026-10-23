@@ -1,7 +1,7 @@
 /* =====================================================================
-   Vento · Pagos con Nequi y DaviPlata (lado de la app)
+   ORDEVA · Pagos con Nequi y DaviPlata (lado de la app)
 
-   Núcleo:  Nequi / DaviPlata → integración autorizada (Wompi, Nequi Conecta o la API Pago con DaviPlata) → Servidor Vento
+   Núcleo:  Nequi / DaviPlata → integración autorizada (Wompi, Nequi Conecta o la API Pago con DaviPlata) → Servidor ORDEVA
             (Supabase Edge Function «vento-pagos») → base de datos → esta app → celulares autorizados.
 
    Esta parte:
@@ -12,7 +12,7 @@
      lo confirma). Cuando se aprueba, se registra solo en la cuenta (una sola vez aunque haya varios celulares).
    • Registro del celular (id + token seguro), latido, notificaciones push con la app cerrada.
    • Tiempo real (Supabase Realtime) + sincronización al reconectarse (los pagos quedan en el servidor).
-   Sin Vento Nube configurada no hace nada: Vento sigue funcionando igual.
+   Sin ORDEVA Nube configurada no hace nada: ORDEVA sigue funcionando igual.
    ===================================================================== */
 (function(){
   'use strict';
@@ -46,7 +46,7 @@
   }
   function api(ruta, cuerpo){
     return sesion().then(function(s){
-      if(!s.token) throw Object.assign(new Error('Entra a Vento Nube para usar los pagos.'), { codigo: 'sin_sesion' });
+      if(!s.token) throw Object.assign(new Error('Entra a ORDEVA Nube para usar los pagos.'), { codigo: 'sin_sesion' });
       return fetch(base() + '/' + ruta, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: nube().config().key, Authorization: 'Bearer ' + s.token }, body: JSON.stringify(cuerpo || {}) });
     }).then(function(r){
       return r.json().catch(function(){ return {}; }).then(function(j){
@@ -109,7 +109,7 @@
   function pushSoportado(){ return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
   function b64aBytes(s){ var t = s.replace(/-/g, '+').replace(/_/g, '/'); t += '==='.slice((t.length + 3) % 4); var b = atob(t), u = new Uint8Array(b.length); for(var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }
   function activarPush(){
-    if(!pushSoportado()) return Promise.reject(new Error('Este navegador no permite notificaciones push. En iPhone, primero agrega Vento a la pantalla de inicio.'));
+    if(!pushSoportado()) return Promise.reject(new Error('Este navegador no permite notificaciones push. En iPhone, primero agrega ORDEVA a la pantalla de inicio.'));
     return Notification.requestPermission().then(function(p){
       if(p !== 'granted') throw new Error('No diste permiso de notificaciones. Actívalo en los ajustes del navegador para este sitio.');
       return navigator.serviceWorker.register('sw.js');
@@ -162,8 +162,8 @@
     return x;
   }
 
-  // App Android: aviso del celular con sonido aunque Vento esté cerrada o la pantalla apagada (en el navegador
-  // eso lo hace el push). Si la ventana de Vento se está viendo, no hace falta (ya sale en pantalla).
+  // App Android: aviso del celular con sonido aunque ORDEVA esté cerrada o la pantalla apagada (en el navegador
+  // eso lo hace el push). Si la ventana de ORDEVA se está viendo, no hace falta (ya sale en pantalla).
   function avisoCelular(titulo, texto){ try{ window.VentoAndroid && window.VentoAndroid.notificar && window.VentoAndroid.notificar(titulo, texto, 'pedidos', false); }catch(e){} }
   // ¿Este aviso es para quien usa este celular? Solo el dueño, los administradores y quien está cobrando o atiende esa
   // mesa (mesero, empleado o cajero). A los demás no les sale ni les suena (antes les llegaba a todos repetido).
@@ -172,7 +172,7 @@
   }
   // Un pago que leyó OTRO equipo del negocio (o que confirmó el banco) sale aquí igual que uno leído en este celular:
   // en la app Android, la notificación de pagos con la 🪟 ventana del valor (también con el celular bloqueado); en el
-  // computador o la tablet, la ventana en Vento y, con Vento de fondo, la notificación del navegador.
+  // computador o la tablet, la ventana en ORDEVA y, con ORDEVA de fondo, la notificación del navegador.
   function avisoPagoCompleto(p, x, nivel){
     var tit = nivel === 'falso' ? '🚨 Mensaje de pago FALSO: ' + plata(p.monto) : nivel === 'revisar' ? '⚠️ Aviso de ' + plata(p.monto) + ': revísalo' : '💜 Recibiste ' + plata(p.monto) + ' por ' + nombreMetodo(p.metodo);
     var fr = 'Recibiste ' + p.monto + ' pesos por ' + nombreMetodo(p.metodo) + (p.pagador ? ', de ' + p.pagador : '') + '.' + (p.mesa ? ' ' + etiquetaMesa(p.mesa) + '.' : '');
@@ -268,8 +268,8 @@
     else if(nuevoAprobado && enVivo && !leidoAqui(x) && paraMi(p, x)){ try{ window.pagoLlego && window.pagoLlego(x); }catch(e){} }
   }
 
-  // Los avisos que llegan por MacroDroid (canal privado de Vento) también se mandan al Servidor Vento:
-  // quedan guardados en la nube, se cruzan entre celulares sin duplicarse y avisan con push aunque Vento esté cerrada.
+  // Los avisos que llegan por MacroDroid (canal privado de ORDEVA) también se mandan al Servidor ORDEVA:
+  // quedan guardados en la nube, se cruzan entre celulares sin duplicarse y avisan con push aunque ORDEVA esté cerrada.
   // Con el ID del aviso: así dos pagos iguales seguidos (mismo valor y persona) llegan como DOS a los demás celulares.
   // Con lo que entendió la página (pista: valor, banco, quién y si es confiable): el servidor lo usa cuando su propia
   // lectura no entiende el aviso, así le llega a los demás equipos igual que aquí.
@@ -360,7 +360,7 @@
     if(Date.now() - ultimoLatido > 60e3 && (!document.hidden || est.vivo)){ ultimoLatido = Date.now(); latido(null); }
     try{ mandarPendientes(); }catch(e){}
     if(est.servidor && !document.hidden && hayPendientes() && Date.now() - (est.ultimoApiSync || 0) > 10000){ est.ultimoApiSync = Date.now(); api('sync', { negocio: n.id }).then(function(){ return sincronizar(); }).catch(function(){}); return; }
-    // También con Vento de fondo o el celular bloqueado: si el tiempo real se cayó (Android lo corta cuando duerme), se
+    // También con ORDEVA de fondo o el celular bloqueado: si el tiempo real se cayó (Android lo corta cuando duerme), se
     // pregunta cada 6 s (1.50.0; antes 20 s); y aunque diga que está vivo, cada 20 s (antes cada minuto), por si quedó
     // colgado sin avisar. «Que llegue en todo, siempre, y más rápido».
     // 1.55.0: quien no es dueño ni administrador ya no recibe en tiempo real los pagos de otros (sin los datos de quien
@@ -368,7 +368,7 @@
     if(Date.now() - est.ultimoSync > (est.vivo && esJefePagos() ? 20000 : 6000)) sincronizar();
     if(!est.canal && Date.now() - (est.intentoCanal || 0) > 30000){ est.intentoCanal = Date.now(); conectarTiempoReal(); }
   }
-  // La app Android despierta la página cada 5 s (window.ventoLatido): con Vento cerrada Android frena los relojes de la
+  // La app Android despierta la página cada 5 s (window.ventoLatido): con ORDEVA cerrada Android frena los relojes de la
   // página hasta 1 vez por minuto, y los pagos de los otros equipos llegarían tarde.
   var ultimoPulso = 0;
   window.ventoPagosLatido = function(){ if(Date.now() - ultimoPulso < 4500) return; ultimoPulso = Date.now(); try{ vigilar(); }catch(e){} };
@@ -424,7 +424,7 @@
   // ---------- Cobrar desde la cuenta ----------
   function saldoMesa(id){ try{ return Math.max(0, tableTotal(id) - tablePaid(id)); }catch(e){ return 0; } }
   window.ventoPagosCobrar = function(mesa, monto){
-    var n = negocio(); if(!n) return toast('Conecta Vento Nube y los pagos en Ajustes → 💜 Pagos.');
+    var n = negocio(); if(!n) return toast('Conecta ORDEVA Nube y los pagos en Ajustes → 💜 Pagos.');
     var r = est.resumen || {}, por = function(x, v){ return !!(x && x.via && x.via.indexOf(v) >= 0); };
     var wompi = por(r.nequi, 'Wompi') || por(r.daviplata, 'Wompi');
     var nequiDirecto = por(r.nequi, 'Nequi Conecta'), daviApi = por(r.daviplata, 'API DaviPlata');
@@ -581,9 +581,9 @@
   function chequeos(){
     var n = negocio(), cfg = nube() && nube().configurada();
     var l = [
-      [cfg, 'Vento Nube configurada', 'Falta: Ajustes → ☁️ Nube y usuarios.'],
-      [!!n, 'Sesión iniciada en un negocio', 'Entra con tu correo en Vento Nube.'],
-      [est.servidor === true, 'Servidor Vento activo' + (est.version ? ' (v' + est.version + ')' : ''), est.servidor === false ? 'El servidor de pagos aún no está desplegado en tu Supabase (ver abajo).' : 'Comprobando…'],
+      [cfg, 'ORDEVA Nube configurada', 'Falta: Ajustes → ☁️ Nube y usuarios.'],
+      [!!n, 'Sesión iniciada en un negocio', 'Entra con tu correo en ORDEVA Nube.'],
+      [est.servidor === true, 'Servidor ORDEVA activo' + (est.version ? ' (v' + est.version + ')' : ''), est.servidor === false ? 'El servidor de pagos aún no está desplegado en tu Supabase (ver abajo).' : 'Comprobando…'],
       [!!miDispositivo() && !est.revocado, 'Este celular autorizado', est.revocado ? 'Este celular fue retirado. Toca «Autorizar este celular».' : 'Se autoriza solo al entrar.'],
       [pushActivo(), 'Avisos con la app cerrada', 'Opcional: toca «🔔 Activar avisos».']
     ];
@@ -596,18 +596,18 @@
     var pinta = function(){
       var r = est.resumen, info = est.info || {}, admin = n && (n.rol === 'dueno' || n.rol === 'admin');
       var html = '<h2>💜 Pagos: Nequi y DaviPlata</h2>' +
-        '<div class="settings-desc">Los pagos llegan al <b>Servidor Vento</b> por una integración autorizada (Wompi, Nequi Conecta o la API de DaviPlata), quedan guardados en la base de datos y aparecen al instante en todos los celulares del negocio. Vento verifica la firma, evita duplicados y los registra solos en la cuenta.</div>' +
+        '<div class="settings-desc">Los pagos llegan al <b>Servidor ORDEVA</b> por una integración autorizada (Wompi, Nequi Conecta o la API de DaviPlata), quedan guardados en la base de datos y aparecen al instante en todos los celulares del negocio. ORDEVA verifica la firma, evita duplicados y los registra solos en la cuenta.</div>' +
         '<div class="vp-cards">' + estadoHtml('NEQUI', r && r.nequi, '🟢') + estadoHtml('DAVIPLATA', r && r.daviplata, '🔵') + '</div>' +
         (admin && est.servidor ? '<div class="mz-actions" style="flex-wrap:wrap"><button type="button" class="btn-primary" id="vpConNequi">Conectar Nequi</button><button type="button" class="btn-primary" id="vpConDavi">Conectar DaviPlata</button>' + (r && (r.nequi.estado === 'conectado' || r.daviplata.estado === 'conectado') ? '<button type="button" class="btn-ghost" id="vpProbar">🔄 Comprobar</button>' : '') + '</div>' : '') +
         chequeos();
       if(est.servidor === false) html += servidorPendienteHtml();
-      if(!n) html += '<div class="mz-actions"><button type="button" class="btn-primary" id="vpNube">☁️ Abrir Vento Nube</button></div>';
+      if(!n) html += '<div class="mz-actions"><button type="button" class="btn-primary" id="vpNube">☁️ Abrir ORDEVA Nube</button></div>';
       if(n && est.servidor){
-        html += '<div class="mz-actions" style="flex-wrap:wrap">' + (pushActivo() ? '' : '<button type="button" class="btn-ghost" id="vpPush">🔔 Activar avisos aunque Vento esté cerrada</button>') +
+        html += '<div class="mz-actions" style="flex-wrap:wrap">' + (pushActivo() ? '' : '<button type="button" class="btn-ghost" id="vpPush">🔔 Activar avisos aunque ORDEVA esté cerrada</button>') +
           ((!miDispositivo() || est.revocado) ? '<button type="button" class="btn-ghost" id="vpAutorizar">📱 Autorizar este celular</button>' : '') + '</div>';
-        if(admin && info.webhook_wompi) html += '<div class="settings-row" style="flex-direction:column;align-items:stretch;gap:6px"><div class="settings-row-text"><strong>Eventos de Wompi ' + (r.webhook === 'recibiendo' ? '<span class="vp-ok">✅ recibiendo</span>' : '<span class="vp-pend">⏳ esperando el primero</span>') + '</strong><span>Pégala una vez en Wompi → Desarrolladores → «URL de Eventos». Mientras tanto Vento consulta el estado de cada cobro, así que igual funciona.</span></div><input class="mz-in vp-url" readonly id="vpHook" value="' + esc(info.webhook_wompi) + '"><div class="mz-actions"><button type="button" class="btn-ghost" id="vpCopHook">📋 Copiar URL de eventos</button><a class="btn-ghost" href="https://comercios.wompi.co" target="_blank" rel="noopener">Abrir Wompi</a></div></div>';
+        if(admin && info.webhook_wompi) html += '<div class="settings-row" style="flex-direction:column;align-items:stretch;gap:6px"><div class="settings-row-text"><strong>Eventos de Wompi ' + (r.webhook === 'recibiendo' ? '<span class="vp-ok">✅ recibiendo</span>' : '<span class="vp-pend">⏳ esperando el primero</span>') + '</strong><span>Pégala una vez en Wompi → Desarrolladores → «URL de Eventos». Mientras tanto ORDEVA consulta el estado de cada cobro, así que igual funciona.</span></div><input class="mz-in vp-url" readonly id="vpHook" value="' + esc(info.webhook_wompi) + '"><div class="mz-actions"><button type="button" class="btn-ghost" id="vpCopHook">📋 Copiar URL de eventos</button><a class="btn-ghost" href="https://comercios.wompi.co" target="_blank" rel="noopener">Abrir Wompi</a></div></div>';
         html += '<div class="settings-row" style="flex-direction:column;align-items:stretch"><div class="settings-row-text"><strong>Últimos pagos en el servidor</strong></div><div class="vp-hist" id="vpHist"></div></div>';
-        if(admin) html += '<div class="settings-row" style="flex-direction:column;align-items:stretch"><div class="settings-row-text"><strong>📱 Celulares autorizados</strong><span>Cada celular que entra a Vento con tu negocio queda autorizado con su propio token. Puedes retirar uno perdido.</span></div><div class="vp-hist" id="vpDevs">Cargando…</div></div>';
+        if(admin) html += '<div class="settings-row" style="flex-direction:column;align-items:stretch"><div class="settings-row-text"><strong>📱 Celulares autorizados</strong><span>Cada celular que entra a ORDEVA con tu negocio queda autorizado con su propio token. Puedes retirar uno perdido.</span></div><div class="vp-hist" id="vpDevs">Cargando…</div></div>';
         if(puedeCaja() && miDispositivo() && !(window.VentoAndroid && window.VentoAndroid.pagosAvisosTomar)) html += '<details class="settings-desc"><summary><b>Avisos del celular (método auxiliar, MacroDroid)</b></summary><p style="margin:8px 0 0">Si quieres que también cuenten las notificaciones de la app Nequi/DaviPlata de ESTE celular (por ejemplo, transferencias normales a tu número), en MacroDroid crea una macro: disparador <b>Notificación recibida</b> (apps Nequi y DaviPlata) → acción <b>Solicitud HTTP POST</b> a esta dirección, con el cuerpo <b>[app] | [título] | [texto]</b>. Quedan marcadas como «aviso del celular» (no verificadas por la entidad).</p><input class="mz-in vp-url" readonly id="vpAvisoUrl" value="' + esc((info.aviso_url || (base() + '/aviso')) + '/' + miDispositivo().token) + '"><div class="mz-actions"><button type="button" class="btn-ghost" id="vpCopAviso">📋 Copiar dirección</button></div></details>';
       }
       g.innerHTML = html;
@@ -620,10 +620,10 @@
     salud().then(function(){ return refrescarEstado(); }).then(pinta);
   }
   function servidorPendienteHtml(){
-    return '<details class="settings-desc" open><summary><b>Activar el Servidor Vento (una sola vez)</b></summary><p style="margin:8px 0 0">El código del servidor ya está listo en el proyecto (carpeta <b>supabase/</b>) y se despliega solo con GitHub. Solo falta autorizarlo, porque esas llaves son de tu cuenta:</p><ol style="margin:6px 0 0;padding-left:20px;line-height:1.55">' +
+    return '<details class="settings-desc" open><summary><b>Activar el Servidor ORDEVA (una sola vez)</b></summary><p style="margin:8px 0 0">El código del servidor ya está listo en el proyecto (carpeta <b>supabase/</b>) y se despliega solo con GitHub. Solo falta autorizarlo, porque esas llaves son de tu cuenta:</p><ol style="margin:6px 0 0;padding-left:20px;line-height:1.55">' +
       '<li>En Supabase → tu foto → <b>Account → Access Tokens</b> crea un token.</li>' +
-      '<li>En GitHub → el repositorio de Vento → <b>Settings → Secrets and variables → Actions</b> agrega: <b>SUPABASE_ACCESS_TOKEN</b> (el token), <b>SUPABASE_PROJECT_REF</b> (lo que va antes de .supabase.co en tu URL) y <b>SUPABASE_DB_PASSWORD</b> (la contraseña que pusiste al crear el proyecto).</li>' +
-      '<li>En GitHub → <b>Actions → «Servidor Vento» → Run workflow</b>. Crea las tablas, sube el servidor y conecta todos los celulares solo.</li></ol><p style="margin:6px 0 0">Cuando termine, vuelve aquí: esta pantalla lo detecta sola.</p></details>';
+      '<li>En GitHub → el repositorio de ORDEVA → <b>Settings → Secrets and variables → Actions</b> agrega: <b>SUPABASE_ACCESS_TOKEN</b> (el token), <b>SUPABASE_PROJECT_REF</b> (lo que va antes de .supabase.co en tu URL) y <b>SUPABASE_DB_PASSWORD</b> (la contraseña que pusiste al crear el proyecto).</li>' +
+      '<li>En GitHub → <b>Actions → «Servidor ORDEVA» → Run workflow</b>. Crea las tablas, sube el servidor y conecta todos los celulares solo.</li></ol><p style="margin:6px 0 0">Cuando termine, vuelve aquí: esta pantalla lo detecta sola.</p></details>';
   }
   function enlazarAjustes(g){
     var q = function(id){ return g.querySelector('#' + id); };
@@ -635,7 +635,7 @@
       Promise.all(provs.map(function(p){ return api('config', { negocio: n.id, accion: 'probar', proveedor: p }).catch(function(e){ toast('⚠️ ' + p + ': ' + e.message, 8000); }); }))
         .then(function(){ toast('🔄 Comprobado con ' + provs.join(' y ') + '.'); pintarAjustes(); });
     };
-    if(q('vpPush')) q('vpPush').onclick = function(){ activarPush().then(function(){ toast('🔔 Listo: te avisamos de cada pago aunque Vento esté cerrada.'); pintarAjustes(); }).catch(function(e){ toast(e.message, 9000); }); };
+    if(q('vpPush')) q('vpPush').onclick = function(){ activarPush().then(function(){ toast('🔔 Listo: te avisamos de cada pago aunque ORDEVA esté cerrada.'); pintarAjustes(); }).catch(function(e){ toast(e.message, 9000); }); };
     if(q('vpAutorizar')) q('vpAutorizar').onclick = function(){ est.revocado = false; registrarDispositivo(true).then(function(){ toast('📱 Celular autorizado.'); pintarAjustes(); }).catch(function(e){ toast(e.message || String(e)); }); };
     var copiar = function(id, msg){ var el = q(id); try{ navigator.clipboard.writeText(el.value); toast(msg); }catch(e){ el.select(); } };
     if(q('vpCopHook')) q('vpCopHook').onclick = function(){ copiar('vpHook', '📋 Copiada. Pégala en Wompi → Desarrolladores → URL de Eventos.'); };
@@ -676,38 +676,38 @@
       try{ cr = A && A.pagosCruceEstado ? JSON.parse(A.pagosCruceEstado() || '{}') : null; }catch(e){}
       try{ voz = A && A.pagosVozEstado ? !!A.pagosVozEstado() : (window.ventoPagosVozOn ? window.ventoPagosVozOn() : true); }catch(e){}
       if(and) L.push(fila(and.on && and.permiso && and.vivo !== false, '📲 Leer los avisos de Nequi, DaviPlata y Bre-B de este celular',
-        and.on && and.permiso && and.vivo !== false ? 'Conectado.' : !and.permiso ? 'Falta el permiso «Acceso a notificaciones» para Vento.' : !and.on ? 'Apagado (Ajustes → Pagos → «Leer los avisos de ESTE celular»), si en este celular tienes Nequi o DaviPlata.' : 'Android lo desconectó: apaga y prende «Acceso a notificaciones» para Vento.'));
+        and.on && and.permiso && and.vivo !== false ? 'Conectado.' : !and.permiso ? 'Falta el permiso «Acceso a notificaciones» para ORDEVA.' : !and.on ? 'Apagado (Ajustes → Pagos → «Leer los avisos de ESTE celular»), si en este celular tienes Nequi o DaviPlata.' : 'Android lo desconectó: apaga y prende «Acceso a notificaciones» para ORDEVA.'));
       // Con el celular bloqueado: sin ahorro de batería, el servicio de fondo prendido y los pasos de cada marca.
       var pm = null, marca = '';
       try{ pm = A && A.permisos ? JSON.parse(A.permisos() || '{}') : null; }catch(e){}
       try{ marca = A && A.fabricante ? String(A.fabricante() || '').toLowerCase() : ''; }catch(e){}
       if(pm){
-        L.push(fila(pm.avisos !== false, '🔔 Notificaciones de Vento', pm.avisos !== false ? 'Permitidas.' : 'Bloqueadas: los pagos no salen en la barra ni con el celular bloqueado.', pm.avisos !== false ? '' : '<br><button type="button" class="btn-ghost" data-ck="perm" style="margin-top:6px">🔓 Permitir</button>'));
-        L.push(fila(pm.bateria !== false, '🔋 Vento sin ahorro de batería', pm.bateria !== false ? 'Sí: trabaja con el celular bloqueado.' : 'No: con el celular bloqueado Android la frena y los pagos llegan tarde o no suenan. Elige «Sin restricciones».', pm.bateria !== false ? '' : '<br><button type="button" class="btn-ghost" data-ck="bat" style="margin-top:6px">🔋 Arreglar</button>'));
-        L.push(fila(pm.fondo === true, '⚙️ Vento trabajando de fondo', pm.fondo === true ? 'Prendido (aviso fijo de Vento en la barra).' : 'Apagado: los pagos de los otros equipos no van a sonar con el celular bloqueado.'));
+        L.push(fila(pm.avisos !== false, '🔔 Notificaciones de ORDEVA', pm.avisos !== false ? 'Permitidas.' : 'Bloqueadas: los pagos no salen en la barra ni con el celular bloqueado.', pm.avisos !== false ? '' : '<br><button type="button" class="btn-ghost" data-ck="perm" style="margin-top:6px">🔓 Permitir</button>'));
+        L.push(fila(pm.bateria !== false, '🔋 ORDEVA sin ahorro de batería', pm.bateria !== false ? 'Sí: trabaja con el celular bloqueado.' : 'No: con el celular bloqueado Android la frena y los pagos llegan tarde o no suenan. Elige «Sin restricciones».', pm.bateria !== false ? '' : '<br><button type="button" class="btn-ghost" data-ck="bat" style="margin-top:6px">🔋 Arreglar</button>'));
+        L.push(fila(pm.fondo === true, '⚙️ ORDEVA trabajando de fondo', pm.fondo === true ? 'Prendido (aviso fijo de ORDEVA en la barra).' : 'Apagado: los pagos de los otros equipos no van a sonar con el celular bloqueado.'));
         var m = /xiaomi|redmi|poco/.test(marca) ? 'Xiaomi' : /oppo|realme|oneplus/.test(marca) ? 'Oppo / Realme' : /vivo|iqoo/.test(marca) ? 'Vivo' : /huawei|honor/.test(marca) ? 'Huawei / Honor' : /tecno|infinix|itel/.test(marca) ? 'Tecno / Infinix' : /asus/.test(marca) ? 'Asus' : /samsung/.test(marca) ? 'Samsung' : '';
-        if(m === 'Samsung') L.push(fila(null, '📱 Samsung', 'Ajustes → Batería → Límites de uso en segundo plano: que Vento NO esté en «Aplicaciones en suspensión» ni «en suspensión profunda».'));
-        else if(m) L.push(fila(null, '🚀 ' + m + ': inicio automático', 'Prende «Inicio automático» para Vento (y para Nequi y DaviPlata). Sin eso la marca cierra Vento de fondo.', '<br><button type="button" class="btn-ghost" data-ck="auto" style="margin-top:6px">🚀 Abrir inicio automático</button>'));
+        if(m === 'Samsung') L.push(fila(null, '📱 Samsung', 'Ajustes → Batería → Límites de uso en segundo plano: que ORDEVA NO esté en «Aplicaciones en suspensión» ni «en suspensión profunda».'));
+        else if(m) L.push(fila(null, '🚀 ' + m + ': inicio automático', 'Prende «Inicio automático» para ORDEVA (y para Nequi y DaviPlata). Sin eso la marca cierra ORDEVA de fondo.', '<br><button type="button" class="btn-ghost" data-ck="auto" style="margin-top:6px">🚀 Abrir inicio automático</button>'));
       }
       // 1.52.0: qué motor de voz dice los pagos (en Samsung, el de fábrica muchas veces no tiene español).
       var motor = ''; try{ motor = A && A.pagosMotorVoz ? String(A.pagosMotorVoz() || '') : ''; }catch(e){}
       var motorTxt = !motor ? '' : /google/.test(motor) ? ' Motor: Google.' : /samsung/i.test(motor) ? ' Motor: Samsung (si no suena, instala «Servicios de voz de Google» desde la Play Store).' : ' Motor: ' + motor.replace(/^sistema:/, '') + '.';
       L.push(fila(voz ? true : null, '🗣️ Voz de los pagos', (voz ? 'Prendida.' : 'Apagada: los pagos llegan sin voz (Ajustes → Pagos → «Decir los pagos en voz alta»).') + motorTxt, '<br><button type="button" class="btn-ghost" data-ck="voz" style="margin-top:6px">▶ Probar la voz</button>'));
-      if(!n){ L.push(fila(false, '👥 Pagos entre equipos', 'Entra con tu correo (Vento Nube) en cada equipo: así los pagos que lee un celular les llegan a todos.')); }
+      if(!n){ L.push(fila(false, '👥 Pagos entre equipos', 'Entra con tu correo (ORDEVA Nube) en cada equipo: así los pagos que lee un celular les llegan a todos.')); }
       else {
-        L.push(fila(r[0] === true, '🌐 Servidor Vento', r[0] === true ? 'Activo' + (est.version ? ' (v' + est.version + ')' : '') + '.' : 'No responde: sin internet, o el servidor de pagos no está desplegado.'));
+        L.push(fila(r[0] === true, '🌐 Servidor ORDEVA', r[0] === true ? 'Activo' + (est.version ? ' (v' + est.version + ')' : '') + '.' : 'No responde: sin internet, o el servidor de pagos no está desplegado.'));
         var d = miDispositivo(), cola = (lsGet(K_REENV, []) || []).length;
         L.push(fila(!!d && !est.revocado, '🔑 Este equipo autorizado', d && !est.revocado ? 'Sí: lo que lee aquí les llega a los demás.' : 'No: toca «Autorizar».', d && !est.revocado ? '' : '<br><button type="button" class="btn-ghost" data-ck="aut" style="margin-top:6px">📱 Autorizar este equipo</button>'));
         L.push(fila(cola ? null : true, '📤 Avisos por mandar', cola ? cola + ' esperando internet: se mandan solos al volver.' : 'Ninguno: todo salió.'));
         var ahora = Date.now();
-        if(cr && cr.t) L.push(fila(cr.ok && ahora - cr.t < 60e3, '📡 Recibir los pagos de los otros equipos (Android)', cr.ok && ahora - cr.t < 60e3 ? 'Android pregunta cada 2,5 s, también con el celular bloqueado. Última: ' + haceTxt(ahora - cr.t) + '.' : 'Última vez ' + haceTxt(ahora - cr.t) + (cr.error ? ' (' + esc(cr.error) + ')' : '') + '. Revisa que Vento no tenga ahorro de batería.'));
+        if(cr && cr.t) L.push(fila(cr.ok && ahora - cr.t < 60e3, '📡 Recibir los pagos de los otros equipos (Android)', cr.ok && ahora - cr.t < 60e3 ? 'Android pregunta cada 2,5 s, también con el celular bloqueado. Última: ' + haceTxt(ahora - cr.t) + '.' : 'Última vez ' + haceTxt(ahora - cr.t) + (cr.error ? ' (' + esc(cr.error) + ')' : '') + '. Revisa que ORDEVA no tenga ahorro de batería.'));
         else L.push(fila(est.vivo ? true : null, '📡 Recibir los pagos de los otros equipos', est.vivo ? 'En vivo.' : 'Revisa cada 20 s' + (est.ultimoSync ? ' (última ' + haceTxt(ahora - est.ultimoSync) + ')' : '') + '.'));
         var devs = r[1] || [], mio = d && d.id;
-        L.push('<li><span>👥</span><span><b>Equipos de la cuenta</b><br><small>Android pregunta cada 2,5 s; el computador y el navegador, cada minuto mientras Vento esté abierto.</small>' +
+        L.push('<li><span>👥</span><span><b>Equipos de la cuenta</b><br><small>Android pregunta cada 2,5 s; el computador y el navegador, cada minuto mientras ORDEVA esté abierto.</small>' +
           (devs.length ? '<ul class="vp-checks" style="margin:6px 0 0">' + devs.map(function(x){
             var ms = ahora - Date.parse(x.ultimo_visto), oye = ms < 90e3, rato = ms < 15 * 60e3;
             return '<li><span>' + (oye ? '🟢' : rato ? '🟡' : '🔴') + '</span><span>' + esc(x.nombre) + (mio === x.id ? ' <b>(este)</b>' : '') + '<br><small>' + esc((x.usuario || '') + ' · ' + nombreRol(x.rol)) + ' · ' +
-              (oye ? 'escuchando (' + haceTxt(ms) + ')' : rato ? 'visto ' + haceTxt(ms) + ': puede estar dormido' : 'cerrado (visto ' + haceTxt(ms) + '): no le sonará hasta abrir Vento') + '</small></span></li>';
+              (oye ? 'escuchando (' + haceTxt(ms) + ')' : rato ? 'visto ' + haceTxt(ms) + ': puede estar dormido' : 'cerrado (visto ' + haceTxt(ms) + '): no le sonará hasta abrir ORDEVA') + '</small></span></li>';
           }).join('') + '</ul>' : '<br><small>No se pudo cargar la lista.</small>') + '</span></li>');
       }
       ov.innerHTML = '<div class="modal vp-modal" role="dialog" aria-label="Chequeo de pagos"><h2>🩺 Pagos en todos los equipos</h2><ul class="vp-checks">' + L.join('') + '</ul>' +
@@ -730,19 +730,19 @@
   function asistente(cual){
     var n = negocio(), ov = ventana('vpAsisOv');
     var r = est.resumen || {}, wompiYa = (est.info && est.info.proveedores || []).some(function(p){ return p.proveedor === 'wompi' && p.estado === 'conectado'; });
-    // ¿Solo quiere que Vento le avise cuando le pagan? Eso NO necesita la API ni convenio: el paso a paso de los avisos.
-    var soloAvisos = '<div class="vp-guia"><b>¿Solo quieres que Vento te avise «Pagaron $20.000 por ' + (cual === 'daviplata' ? 'DaviPlata' : 'Nequi') + '» cuando te pasan plata?</b> No necesitas esto (ni convenio con el banco).' +
+    // ¿Solo quiere que ORDEVA le avise cuando le pagan? Eso NO necesita la API ni convenio: el paso a paso de los avisos.
+    var soloAvisos = '<div class="vp-guia"><b>¿Solo quieres que ORDEVA te avise «Pagaron $20.000 por ' + (cual === 'daviplata' ? 'DaviPlata' : 'Nequi') + '» cuando te pasan plata?</b> No necesitas esto (ni convenio con el banco).' +
       ' <button type="button" class="btn-primary" data-vp-guia>📘 Paso a paso: agregar ' + (cual === 'daviplata' ? 'DaviPlata' : 'Nequi') + '</button></div>';
     var intro = soloAvisos + (cual === 'daviplata'
       ? '<div class="modal-sub">Para <b>cobrar</b> con la integración oficial hay dos vías. Puedes usar una o las dos: la <b>API Pago con DaviPlata</b> de Davivienda (cobro con código al celular del cliente) o <b>Wompi</b> (link o QR que se paga con DaviPlata, Nequi o tarjeta).</div>'
       : '<div class="modal-sub">Para <b>cobrar</b> con la integración oficial hay dos vías. Puedes usar una o las dos:</div>');
     var provD = (est.info && est.info.proveedores || []).find(function(p){ return p.proveedor === 'daviplata'; }) || null, pubD = provD && provD.publico || {};
     var formD = '<div class="vp-form" id="vpFormD"><h3 style="margin:14px 0 0">Conectar DaviPlata (API oficial de Davivienda)' + (provD && provD.estado === 'conectado' ? ' <span class="vp-ok">· conectada</span>' : provD && provD.estado === 'error' ? ' <span class="vp-mal">· con error</span>' : '') + '</h3>' +
-      '<div class="modal-sub">Cobras con el <b>documento</b> del cliente: a su celular le llega un código y tú lo escribes en Vento; DaviPlata responde «Aprobado» en ese momento (no manda aviso aparte). Necesitas: <b>convenio con Davivienda</b>, tu aplicación en el <a href="https://conectesunegocio.daviplata.com" target="_blank" rel="noopener">Developer Portal</a> (Client ID y Secret), su <b>certificado</b> (.cer + llave .pem) y los códigos de <b>comercio y terminal</b> que asigna Redeban.</div>' +
+      '<div class="modal-sub">Cobras con el <b>documento</b> del cliente: a su celular le llega un código y tú lo escribes en ORDEVA; DaviPlata responde «Aprobado» en ese momento (no manda aviso aparte). Necesitas: <b>convenio con Davivienda</b>, tu aplicación en el <a href="https://conectesunegocio.daviplata.com" target="_blank" rel="noopener">Developer Portal</a> (Client ID y Secret), su <b>certificado</b> (.cer + llave .pem) y los códigos de <b>comercio y terminal</b> que asigna Redeban.</div>' +
       '<label for="vpDamb">Ambiente</label><select class="mz-in" id="vpDamb"><option value="sandbox">Laboratorio (pruebas · lun–vie 8:00–17:00)</option><option value="produccion">Producción (cobros reales)</option></select>' +
       '<label for="vpDcid">Client ID (Consumer Key)</label><input class="mz-in" id="vpDcid" autocomplete="off" autocapitalize="none" spellcheck="false">' +
       '<label for="vpDsec">Client Secret (Consumer Secret)</label><input class="mz-in" id="vpDsec" type="password" autocomplete="off"' + (provD ? ' placeholder="Vacío = conservar el guardado"' : '') + '>' +
-      '<label for="vpDtr">Conexión segura (TLS mutuo)</label><select class="mz-in" id="vpDtr"><option value="directo">Directa desde el Servidor Vento</option><option value="puente">Por mi puente de Cloudflare (Worker)</option></select>' +
+      '<label for="vpDtr">Conexión segura (TLS mutuo)</label><select class="mz-in" id="vpDtr"><option value="directo">Directa desde el Servidor ORDEVA</option><option value="puente">Por mi puente de Cloudflare (Worker)</option></select>' +
       '<div id="vpDdir"><label for="vpDcer">Certificado (.cer, .crt o .pem)</label><input class="mz-in" id="vpDcer" type="file" accept=".cer,.crt,.pem"><small class="vp-ayuda" id="vpDcerOk">' + (provD ? 'Vacío = conservar el guardado' : 'El que descargas en el Developer Portal (paso 4 de la Guía de inicio)') + '</small>' +
       '<label for="vpDkey">Llave privada (.pem o .key)</label><input class="mz-in" id="vpDkey" type="file" accept=".pem,.key"><small class="vp-ayuda" id="vpDkeyOk"></small></div>' +
       '<div id="vpDpte" hidden><label for="vpDurl">Dirección del puente</label><input class="mz-in" id="vpDurl" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="https://vento-daviplata.tu-cuenta.workers.dev">' +
@@ -774,7 +774,7 @@
     q('vpAsisX').onclick = function(){ cerrarVentana(ov); pintarAjustes(); };
     var bg = ov.querySelector('[data-vp-guia]'); if(bg) bg.onclick = function(){ cerrarVentana(ov); try{ window.ventoPagosGuia && window.ventoPagosGuia(); }catch(e){} };
     var enviar = function(btn, cuerpo){
-      if(!n) return msg('Primero entra a Vento Nube.', true);
+      if(!n) return msg('Primero entra a ORDEVA Nube.', true);
       btn.disabled = true; msg('<span class="vp-gira">⏳</span> Comprobando con la entidad…');
       api('config', Object.assign({ negocio: n.id }, cuerpo)).then(function(j){
         est.info = j; est.resumen = j.resumen;
@@ -860,7 +860,7 @@
   var tCat = setInterval(function(){ if(document.getElementById('ajustesCats')){ clearInterval(tCat); crearCategoria(); } }, 1000);
   document.addEventListener('click', function(e){ if(e.target.closest && e.target.closest('.ajustes-cat[data-cat="pagos"]')) setTimeout(pintarAjustes, 30); });
 
-  // Google / YouTube sin vencerse: el Servidor Vento guarda la llave de renovación (ver index.html → yRenovarServidor).
+  // Google / YouTube sin vencerse: el Servidor ORDEVA guarda la llave de renovación (ver index.html → yRenovarServidor).
   window.ventoGoogle = {
     disponible: function(){ return !!(negocio() && est.servidor); },
     // Por qué no está disponible (para decirle a la persona qué falta): sin_sesion | comprobando | sin_servidor | ok
@@ -872,7 +872,7 @@
     olvidar: function(){ return api('google', { negocio: negocio().id, accion: 'olvidar' }); }
   };
 
-  // 🤖 IA con la clave propia del NEGOCIO por el Servidor Vento (1.53.0): la clave vive cifrada allá y ningún celular
+  // 🤖 IA con la clave propia del NEGOCIO por el Servidor ORDEVA (1.53.0): la clave vive cifrada allá y ningún celular
   // la guarda. estado() → { tiene, final }; guardar(clave) / borrar() solo dueño o administrador; pedir(ruta, init)
   // llama a Gemini por el servidor (ruta como «/models/…:generateContent»).
   var ia = {

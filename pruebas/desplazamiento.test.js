@@ -1,4 +1,4 @@
-// «Cuando bajo en un menú, se vuelve a subir arriba solito»: partes de Vento que se refrescan solas rehacían su
+// «Cuando bajo en un menú, se vuelve a subir arriba solito»: partes de ORDEVA que se refrescan solas rehacían su
 // contenido y la lista volvía al principio.
 //  1. Paso a paso de DaviPlata/Nequi (se revisa cada 3 s): bajar y esperar → se queda donde iba; si el estado cambia
 //     (llega el permiso), se repinta SIN volver arriba.

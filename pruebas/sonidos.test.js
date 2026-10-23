@@ -182,10 +182,10 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
  chk('Solo 3 búferes creados una vez y reutilizados en cada toque', r.aud.b===3 && r.st.b===3 && r.aud.f>=r.sonaron && r.aud.f===r.st.f, JSON.stringify(r));
  chk('Sin errores de página', !errs.length, errs.join(' | '));
 
- // ---------- APK (window.VentoAndroid simulado, como en holaapk) con «Hola Vento» prendido ----------
+ // ---------- APK (window.VentoAndroid simulado, como en holaapk) con «Hola ORDEVA» prendido ----------
  const ctx2=await b.newContext({viewport:{width:390,height:844}});
  await ctx2.route('**/*', r=>{const u=new URL(r.request().url()); return u.hostname==='localhost'?r.continue():r.abort();});
- await ctx2.addInitScript(()=>{ try{ if(localStorage.getItem('vento-hola')===null) localStorage.setItem('vento-hola','1'); }catch(e){}   /* «Hola Vento» viene apagado de fábrica: esta parte lo prueba */
+ await ctx2.addInitScript(()=>{ try{ if(localStorage.getItem('vento-hola')===null) localStorage.setItem('vento-hola','1'); }catch(e){}   /* «Hola ORDEVA» viene apagado de fábrica: esta parte lo prueba */
   const V=()=>window.__ventoVoz;
   window.VentoAndroid={ info:()=>'{}', hablar(){}, callar(){}, guardarArchivo(){}, fondo:()=>true, fondoActivar(){}, notificar(){return true;}, avisosEstado:()=>'{"prendidos":true}', buscarTVs(){}, lounge(){}, pararTV(){}, vozPreparar(){},
    permisos:()=>'{"microfono":true,"camara":false,"avisos":true,"bateria":false,"fondo":true}', pedirPermisos(){}, vozSilencio(){},
@@ -204,14 +204,14 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
  const S2=()=>q2.evaluate(()=>({h:ventoSonidos._historial.map(x=>x.tipo), o:Object.assign({},ventoSonidos._stats.omitidos)}));
  const pk=()=>q2.evaluate(()=>data.tables[1].items.reduce((s,i)=>s+i.qty,0));
  r=await q2.evaluate(()=>window.ventoHola.estado());
- chk('APK: «Hola Vento» escucha de fondo (esperando su palabra)', r.corriendo && !r.atento, JSON.stringify(r));
+ chk('APK: «Hola ORDEVA» escucha de fondo (esperando su palabra)', r.corriendo && !r.atento, JSON.stringify(r));
  a=await S2(); await q2.click('#itemsContainer .li-qty-plus'); await q2.waitForTimeout(200); d=await S2();
- chk('APK: con «Hola Vento» solo esperando, tocar + sí suena', (await pk())===2 && JSON.stringify(nuevos(a,d))==='["add"]', JSON.stringify(nuevos(a,d)));
+ chk('APK: con «Hola ORDEVA» solo esperando, tocar + sí suena', (await pk())===2 && JSON.stringify(nuevos(a,d))==='["add"]', JSON.stringify(nuevos(a,d)));
  a=await S2(); await q2.evaluate(()=>__dice('hola vento mesa 1 dos poker')); await q2.waitForTimeout(1500); d=await S2();
  chk('APK: «hola vento mesa 1 dos poker» anota 2 y suena UNA vez', (await pk())===4 && JSON.stringify(nuevos(a,d))==='["add"]', (await pk())+' '+JSON.stringify(nuevos(a,d)));
  r=await q2.evaluate(()=>window.ventoHola.estado());
  a=await S2(); await q2.click('#itemsContainer .li-qty-plus'); await q2.waitForTimeout(200); d=await S2();
- chk('APK: con «Hola Vento» atento y el micrófono abierto, tocar + no suena', r.corriendo && r.atento && (await pk())===5 && nuevos(a,d).length===0 && d.o.microfono===(a.o.microfono||0)+1, JSON.stringify(r)+' '+JSON.stringify(nuevos(a,d)));
+ chk('APK: con «Hola ORDEVA» atento y el micrófono abierto, tocar + no suena', r.corriendo && r.atento && (await pk())===5 && nuevos(a,d).length===0 && d.o.microfono===(a.o.microfono||0)+1, JSON.stringify(r)+' '+JSON.stringify(nuevos(a,d)));
  r=await q2.evaluate(()=>({c:ventoSonidos._stats.contextos, b:ventoSonidos._stats.buferes, e:ventoSonidos._estado()}));
  chk('APK: un solo AudioContext de sonidos y 3 búferes reutilizados', r.c===1 && r.b===3 && r.e.buferes===3, JSON.stringify(r));
  chk('APK: sin errores de página', !errs2.length, errs2.join(' | '));

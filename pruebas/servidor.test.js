@@ -1,5 +1,5 @@
 // Corre dentro de «bash pruebas/correr.sh» las pruebas del SERVIDOR (PostgreSQL 16 real), sin navegador:
-//   pruebas/servidor/suscripciones.test.js   suscripciones de Vento
+//   pruebas/servidor/suscripciones.test.js   suscripciones de ORDEVA
 //   pruebas/servidor/daviplata.test.js       pagos con la API oficial «Pago con DaviPlata» (vento-pagos)
 // Si el equipo no tiene PostgreSQL instalado lo dice y no falla (las pruebas del navegador no lo necesitan).
 const { spawnSync } = require('child_process');

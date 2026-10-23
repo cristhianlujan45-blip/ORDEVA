@@ -1,7 +1,7 @@
 // 10 canciones POR MESA (no por celular), contra el «Supabase local» REAL:
 //  1. Dos celulares en la misma mesa: lo que pide uno cuenta para el otro (la cuenta en vivo lleva el cupo de la mesa).
 //  2. Llegando a 10 entre los dos, ninguno puede pedir la 11.ª: «Esta mesa ya pidió 10 canciones…».
-//  3. Si un celular no alcanzó a ver el cupo (sin cuenta en vivo) y la manda igual, Vento la rechaza y le avisa a ESE
+//  3. Si un celular no alcanzó a ver el cupo (sin cuenta en vivo) y la manda igual, ORDEVA la rechaza y le avisa a ESE
 //     celular (estado «limite»): sale el aviso y su contador no se queda con una canción que no entró.
 //  4. Otra mesa no se ve afectada.
 'use strict';
@@ -71,16 +71,16 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     const msg1 = await C1.p.evaluate(() => document.getElementById('m').textContent);
     chk('2. El primer celular ya no puede pedir la 11.ª: «Esta mesa ya pidió 10 canciones»', /(Esta mesa ya pidió|This table has already requested) 10/.test(msg1), msg1);
     await A.p.waitForTimeout(2500);
-    chk('2. La 11.ª no llegó a Vento', await enCola(1) === 10, await enCola(1));
+    chk('2. La 11.ª no llegó a ORDEVA', await enCola(1) === 10, await enCola(1));
 
-    // ===== 3. Celular sin cuenta en vivo: Vento la rechaza y le avisa =====
+    // ===== 3. Celular sin cuenta en vivo: ORDEVA la rechaza y le avisa =====
     const C3 = await pagina('cliente3', l1);
     await C3.p.evaluate(() => { try{ es && es.close(); }catch(e){} es = { close(){} }; snap = null; });
     await pedir(C3, 'Cancion del tercero');
-    chk('3. Vento la rechaza (la mesa sigue en 10)', await enCola(1) === 10, await enCola(1));
+    chk('3. ORDEVA la rechaza (la mesa sigue en 10)', await enCola(1) === 10, await enCola(1));
     chk('3. … y le avisa a ESE celular: «Esta mesa ya pidió 10 canciones»', await esperar(C3.p, () => /(Esta mesa ya pidió|This table has already requested) 10/.test(document.getElementById('m').textContent), null, 20000), await C3.p.evaluate(() => document.getElementById('m').textContent));
     chk('3. Su contador no se queda con la canción que no entró', await C3.p.evaluate(() => recLocal().length === 0), await C3.p.evaluate(() => recLocal().length));
-    chk('3. En Vento no sale aviso de canción nueva por la rechazada', await A.p.evaluate(() => !window.vitoMod.cola().some(x => /tercero/.test(x.song))));
+    chk('3. En ORDEVA no sale aviso de canción nueva por la rechazada', await A.p.evaluate(() => !window.vitoMod.cola().some(x => /tercero/.test(x.song))));
 
     // ===== 4. Otra mesa =====
     const C4 = await pagina('cliente4', await link(2));

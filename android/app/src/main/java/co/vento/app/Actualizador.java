@@ -174,10 +174,10 @@ final class Actualizador {
         try {
             android.app.NotificationManager nm = (android.app.NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
             if (Build.VERSION.SDK_INT >= 26 && nm.getNotificationChannel("vento_avisos2") == null)
-                nm.createNotificationChannel(new android.app.NotificationChannel("vento_avisos2", "Avisos de Vento (IA y soporte)", android.app.NotificationManager.IMPORTANCE_DEFAULT));
+                nm.createNotificationChannel(new android.app.NotificationChannel("vento_avisos2", "Avisos de ORDEVA (IA y soporte)", android.app.NotificationManager.IMPORTANCE_DEFAULT));
             android.app.Notification.Builder b = Build.VERSION.SDK_INT >= 26 ? new android.app.Notification.Builder(c, "vento_avisos2") : new android.app.Notification.Builder(c);
-            b.setSmallIcon(android.R.drawable.stat_sys_download_done).setContentTitle("🔄 Vento tiene una actualización")
-                    .setContentText("Toca aquí y luego «Actualizar». Vento vuelve sola.").setAutoCancel(true)
+            b.setSmallIcon(android.R.drawable.stat_sys_download_done).setContentTitle("🔄 ORDEVA tiene una actualización")
+                    .setContentText("Toca aquí y luego «Actualizar». ORDEVA vuelve sola.").setAutoCancel(true)
                     .setContentIntent(PendingIntent.getActivity(c, 4402, abrir, PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0)));
             nm.notify(4402, b.build());
         } catch (Throwable ignorado) { }

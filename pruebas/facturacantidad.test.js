@@ -1,4 +1,4 @@
-// Facturas: cantidades que no se leyeron y escribir la cantidad a mano para que Vento DIVIDA el total.
+// Facturas: cantidades que no se leyeron y escribir la cantidad a mano para que ORDEVA DIVIDA el total.
 //  1. Renglón sin cantidad (solo el total, ej. «CAJA AGUILA … $60.000»): sale marcado «⚠️ No se leyó cuántas unidades
 //     son» y con «📦 ¿Viene en cajas?» abierto.
 //  2. Escribir 24 en «Cantidad» → el total ($60.000) se divide: $2.500 cada una, a la vista («÷ 24 unidades»).

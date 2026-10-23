@@ -2,7 +2,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 (async()=>{ const b=await chromium.launch(); const ctx=await b.newContext({viewport:{width:390,height:844}});
  await ctx.route('**/*', r=>{const u=new URL(r.request().url()); return u.hostname==='localhost'?r.continue():r.abort();});
  await ctx.addInitScript(()=>{
-  try{ if(localStorage.getItem('vento-hola')===null) localStorage.setItem('vento-hola','1'); }catch(e){}   // «Hola Vento» viene apagado de fábrica: esta prueba lo prende
+  try{ if(localStorage.getItem('vento-hola')===null) localStorage.setItem('vento-hola','1'); }catch(e){}   // «Hola ORDEVA» viene apagado de fábrica: esta prueba lo prende
    window.__inst=[]; window.__starts=0;
    function F(){ this.onresult=this.onend=this.onerror=this.onstart=null; this._res=[]; window.__inst.push(this); }
    F.prototype.start=function(){ if(window.__act && window.__act!==this) throw new Error('busy'); window.__act=this; window.__starts++; this._res=[]; setTimeout(()=>this.onstart&&this.onstart({}),10); };
@@ -21,17 +21,17 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
  ok('escuchando sola', await p.evaluate(()=>window.ventoHola.estado().corriendo && !!window.__act));
  ok('punto verde', await p.evaluate(()=>document.getElementById('voiceFabWrap').classList.contains('hola-on')));
  await p.evaluate(()=>__say('mesa 1 dos poker')); await p.waitForTimeout(1200);
- ok('sin «Hola Vento» no hace nada', (await qty(1))===0);
- await p.evaluate(()=>__say('Hola Vento, mesa 1 dos poker')); await p.waitForTimeout(1800);
- ok('«Hola Vento, mesa 1 dos poker» anota 2', (await qty(1))===2);
+ ok('sin «Hola ORDEVA» no hace nada', (await qty(1))===0);
+ await p.evaluate(()=>__say('Hola ORDEVA, mesa 1 dos poker')); await p.waitForTimeout(1800);
+ ok('«Hola ORDEVA, mesa 1 dos poker» anota 2', (await qty(1))===2);
  ok('vuelve a escuchar', await p.evaluate(()=>!!window.__act));
  await p.evaluate(()=>__say('mesa 2 una águila')); await p.waitForTimeout(1800);
- ok('seguido sin repetir «Hola Vento» anota', (await qty(2))===1);
+ ok('seguido sin repetir «Hola ORDEVA» anota', (await qty(2))===1);
  await p.waitForTimeout(10000);
  await p.evaluate(()=>__say('mesa 2 una águila')); await p.waitForTimeout(1500);
  ok('pasados los segundos ya no anota charla', (await qty(2))===1);
  await p.evaluate(()=>__say('oye vento')); await p.waitForTimeout(600);
- ok('solo «Oye Vento» queda atenta', await p.evaluate(()=>window.ventoHola.estado().atento));
+ ok('solo «Oye Vento» (el nombre de antes) también queda atenta', await p.evaluate(()=>window.ventoHola.estado().atento));
  await p.evaluate(()=>__say('mesa 2 dos poker')); await p.waitForTimeout(1800);
  ok('y la siguiente frase se anota', (await qty(2))===3);
  await p.evaluate(()=>__say('Bento, mesa 1 una águila')); await p.waitForTimeout(1800);
@@ -45,7 +45,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
  ok('«deja de escuchar» lo apaga', await p.evaluate(()=>!window.ventoHola.activo() && !window.__act && localStorage.getItem('vento-hola')==='0'));
  await p.evaluate(()=>{ document.getElementById('holaVentoToggle').click(); }); await p.waitForTimeout(1500);
  ok('interruptor de Ajustes lo prende', await p.evaluate(()=>window.ventoHola.activo() && !!window.__act));
- // ¿pregunta? (respuesta de Vento)
+ // ¿pregunta? (respuesta de ORDEVA)
  await p.evaluate(()=>__say('hola vento cuánto vendí hoy')); await p.waitForTimeout(1500);
  ok('pregunta responde sin error', errs.length===0);
  console.log(R.map(r=>(r[1]?'✅ ':'❌ ')+r[0]).join('\n')); console.log('errores', errs.slice(0,3));

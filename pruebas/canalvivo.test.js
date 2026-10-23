@@ -1,11 +1,11 @@
 // Canales en vivo por el SERVIDOR DE VENTO (ya no ntfy.sh), contra el «Supabase local» REAL:
 //  1. Ninguna página habla con ntfy.sh.
-//  2. QR de la mesa: la carta llega al cliente; el pedido llega a Vento; el estado («Recibido») vuelve al cliente.
+//  2. QR de la mesa: la carta llega al cliente; el pedido llega a ORDEVA; el estado («Recibido») vuelve al cliente.
 //  3. Canción pedida por QR: llega a la cola de música.
 //  4. App de meseros: recibe las mesas del celular principal y su pedido entra a la mesa.
-//  5. Pantalla de preparación: recibe el pedido y al marcarlo «listo» cambia en Vento.
+//  5. Pantalla de preparación: recibe el pedido y al marcarlo «listo» cambia en ORDEVA.
 //  6. TV de la música: recibe la cola.
-//  7. Avisos de pagos por MacroDroid y puente de WhatsApp: la dirección es la del servidor de Vento y funciona.
+//  7. Avisos de pagos por MacroDroid y puente de WhatsApp: la dirección es la del servidor de ORDEVA y funciona.
 'use strict';
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const fs = require('fs');
@@ -59,12 +59,12 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     const C = await pagina('cliente', info.link);
     chk('2. La carta del negocio le llega al cliente', await esperar(C.p, () => typeof cat !== 'undefined' && cat && Array.isArray(cat.p) && cat.p.some(r => r[0] === 'Águila'), null, 20000));
     await C.p.fill('#p', '2 Águila'); await C.p.click('#b');
-    chk('2. El pedido llega a Vento (mesa 1, 2 Águila)', await esperar(A.p, () => (data.pedidos || []).some(p => p.mesa === 1 && p.items.some(i => i.name === 'Águila' && i.qty === 2)), null, 15000));
+    chk('2. El pedido llega a ORDEVA (mesa 1, 2 Águila)', await esperar(A.p, () => (data.pedidos || []).some(p => p.mesa === 1 && p.items.some(i => i.name === 'Águila' && i.qty === 2)), null, 15000));
     const ped = await A.p.evaluate(() => (data.pedidos || []).find(p => p.mesa === 1));
     if(ped.estado === 'nuevo') await A.p.evaluate(id => pedidoCambiar(id, 'recibido'), ped.id);
     chk('2. El estado «Recibido» vuelve al celular del cliente', await esperar(C.p, () => jget(MISK, []).some(x => x.e === 'recibido' || x.e === 'preparacion' || x.e === 'listo'), null, 15000), await C.p.evaluate(() => jget(MISK, [])));
     const r = await sb.sql("select count(*)::int n from canal_mensajes where canal = $1", [info.topic]);
-    chk('2. Los mensajes pasan por el servidor de Vento (tabla canal_mensajes)', r[0].n >= 1, r);
+    chk('2. Los mensajes pasan por el servidor de ORDEVA (tabla canal_mensajes)', r[0].n >= 1, r);
 
     // ===== 3. Canción =====
     await C.p.click('#tc'); await C.p.fill('#s', 'Karol G - Provenza'); await C.p.click('#b');
@@ -91,7 +91,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
       await A.p.evaluate(() => { (data.pedidos || []).filter(p => p.estado === 'nuevo').forEach(p => pedidoCambiar(p.id, 'recibido')); window.vitoMod.prepPublicar(true); });
       chk('5. La pantalla de preparación recibe el pedido', await esperar(P.p, () => document.querySelectorAll('#tablero button[data-id]').length > 0, null, 25000));
       const idPrep = await P.p.evaluate(() => { const b = document.querySelector('#tablero button[data-id]'); const id = b.getAttribute('data-id'); b.click(); return id; });
-      chk('5. Al tocarlo en la pantalla, cambia en Vento', await esperar(A.p, id => { const p = (data.pedidos || []).find(x => x.id === id); return p && p.estado !== 'recibido'; }, idPrep, 15000));
+      chk('5. Al tocarlo en la pantalla, cambia en ORDEVA', await esperar(A.p, id => { const p = (data.pedidos || []).find(x => x.id === id); return p && p.estado !== 'recibido'; }, idPrep, 15000));
     }else chk('5. Pantalla de preparación disponible', false, 'sin prepUrl');
 
     // ===== 6. TV =====
@@ -105,12 +105,12 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
 
     // ===== 7. MacroDroid y WhatsApp =====
     const ext = await A.p.evaluate(() => window.ventoCanal.url('mesorapagoPRUEBA123'));
-    chk('7. La dirección para MacroDroid y WhatsApp es la del servidor de Vento', /\/functions\/v1\/vento-pagos\/canal\/mesorapagoPRUEBA123$/.test(ext) && !/ntfy/.test(ext), ext);
+    chk('7. La dirección para MacroDroid y WhatsApp es la del servidor de ORDEVA', /\/functions\/v1\/vento-pagos\/canal\/mesorapagoPRUEBA123$/.test(ext) && !/ntfy/.test(ext), ext);
     const rr = await fetch(sb.url + '/functions/v1/vento-pagos/canal/mesorapagoPRUEBA123', { method: 'POST', body: 'Nequi | ¡Te llegó plata! | PRUEBA te envió $1.000' });
     const jj = await rr.json();
     const leido = await A.p.evaluate(() => fetch('https://canal.vento.local/mesorapagoPRUEBA123/json?poll=1&since=5m').then(r => r.text()));
-    chk('7. Publicar desde afuera (MacroDroid / puente) y leerlo en Vento', rr.status === 200 && jj.message && /PRUEBA te envió/.test(leido), { st: rr.status, jj, leido });
+    chk('7. Publicar desde afuera (MacroDroid / puente) y leerlo en ORDEVA', rr.status === 200 && jj.message && /PRUEBA te envió/.test(leido), { st: rr.status, jj, leido });
     const wsrc = await A.p.evaluate(() => document.getElementById('waWorkerSrc').textContent);
-    chk('7. El puente de WhatsApp manda al canal de Vento (VENTO_CANAL), no a ntfy', /env\.VENTO_CANAL/.test(wsrc) && !/ntfy/i.test(wsrc));
+    chk('7. El puente de WhatsApp manda al canal de ORDEVA (VENTO_CANAL), no a ntfy', /env\.VENTO_CANAL/.test(wsrc) && !/ntfy/i.test(wsrc));
   }
 })();

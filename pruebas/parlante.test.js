@@ -52,7 +52,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     const r3 = await p.evaluate(() => {
       window.__parl.dichos = [];
       ventoAvisoCel('🍺 Pedido · Mesa 3', '2 Águila, 1 Papas', 'pedidos');
-      ventoAvisoCel('🧾 Mesa 5 pide la cuenta', 'Toca para abrir Vento.', 'pedidos');
+      ventoAvisoCel('🧾 Mesa 5 pide la cuenta', 'Toca para abrir ORDEVA.', 'pedidos');
       ventoAvisoCel('🛵 Domicilio nuevo de Juan', 'Hamburguesa · Cra 10', 'pedidos');
       ventoAvisoCel('🎵 Canción · Mesa 2', 'Karol G - Provenza', 'musica');
       ventoAvisoCel('💜 Pagaron $20.000 por Nequi', 'Confirmado', 'pagos');

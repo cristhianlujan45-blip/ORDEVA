@@ -3,7 +3,7 @@
 //  2. La ventana explica los 2 pasos y trae «🔑 Sacar mi clave gratis» (aistudio.google.com/apikey).
 //  3. Pegar la clave y «Guardar» = guardar Y comprobar: «✅ Listo…». Desde la 1.53.0 la clave NO va en los datos del
 //     negocio (se comparten con todos los equipos y van a los respaldos): sin la nube queda solo en este equipo, y con
-//     Vento Nube queda cifrada en el servidor (lo prueba iaclave.test.js).
+//     ORDEVA Nube queda cifrada en el servidor (lo prueba iaclave.test.js).
 //  4. El mismo día no se vuelve a preguntar.
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = process.env.VENTO_BASE || 'http://localhost:8765';

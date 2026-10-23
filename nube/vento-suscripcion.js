@@ -1,7 +1,7 @@
 /* =====================================================================
-   Vento · Suscripción del negocio en Vento Nube (lado de la app)
+   ORDEVA · Suscripción del negocio en ORDEVA Nube (lado de la app)
 
-   Vento es un servicio por suscripción. Con el negocio en Vento Nube, el SERVIDOR decide el plan
+   ORDEVA es un servicio por suscripción. Con el negocio en ORDEVA Nube, el SERVIDOR decide el plan
    (Edge Function «vento-suscripciones»); esta parte solo consulta el estado, lo muestra y manda pagos.
    • POST /estado al abrir, AL INSTANTE cuando la base de datos avisa un cambio (el administrador activó, canceló,
      aprobó…: canal «vs-<negocio>» de Realtime), cada minuto como respaldo, al volver a la app y después de enviar un pago.
@@ -14,21 +14,21 @@
    • Pagos con proveedores intercambiables: ManualPaymentProvider (Nequi / DaviPlata + comprobante,
      aprobación humana: BETA) y GooglePlayPaymentProvider (solo arquitectura, todavía no se usa).
      La pantalla de planes no conoce los detalles del medio de pago.
-   • Solo dueño y administrador ven precios y pagos; cajero y mesero no ven nada de cobros de Vento.
-   Sin Vento Nube no hace nada: la app sigue con el sistema de siempre (prueba gratis + licencias).
+   • Solo dueño y administrador ven precios y pagos; cajero y mesero no ven nada de cobros de ORDEVA.
+   Sin ORDEVA Nube no hace nada: la app sigue con el sistema de siempre (prueba gratis + licencias).
    ===================================================================== */
 (function(){
   'use strict';
   var K_CLAVE = 'vento_sub_clave', K_TOKEN = 'vento_sub_token:', K_INFO = 'vento_sub_info:', K_IDEM = 'vento_sub_idem:',
       K_BORRADOR = 'vento_sub_borrador:', K_PAGADOR = 'vento_sub_pagador', K_CAT = 'vento_sub_catalogo', K_BLOQ = 'vento_sub_bloqueo:';
   var REFRESCO_MS = 60e3, H72 = 72 * 3600e3, DIA = 864e5;
-  // Sin poder hablar con la base de datos más de esto → «Sin conexión con Vento». Las pruebas lo acortan (solo en localhost).
+  // Sin poder hablar con la base de datos más de esto → «Sin conexión con ORDEVA». Las pruebas lo acortan (solo en localhost).
   var SIN_RED_MS = (function(){ try{ if(/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname) && +localStorage.getItem('vento_sin_red_ms') > 0) return +localStorage.getItem('vento_sin_red_ms'); }catch(e){} return 60e3; })();
   // Lo mínimo del plan gratis: con el token vencido y sin internet se sigue vendiendo (pero sin funciones PRO).
   var BASE_GRATIS = ['pos_basic', 'tables', 'inventory', 'expenses'];
   var BENEFICIOS = {
     pos_basic: 'Ventas, caja y cuentas', tables: 'Mesas y pedidos', inventory: 'Inventario', expenses: 'Gastos y contabilidad',
-    invoices: 'Facturas de proveedor', ocr: 'Leer facturas con la cámara', ai_camera: 'Cámara con IA', voice: 'Pedidos por voz y «Hola Vento»',
+    invoices: 'Facturas de proveedor', ocr: 'Leer facturas con la cámara', ai_camera: 'Cámara con IA', voice: 'Pedidos por voz y «Hola ORDEVA»',
     advanced_reports: 'Estadísticas avanzadas', multi_branch: 'Varias sedes', employee_management: 'Tu equipo: invitar personas y roles'
   };
   var METODOS = { NEQUI: { nombre: 'Nequi', color: '#da0081' }, DAVIPLATA: { nombre: 'DaviPlata', color: '#ed1c27' } };
@@ -37,7 +37,7 @@
     monto_insuficiente: 'El valor pagado es menor que el precio del plan.', pago_en_revision: 'Ya tienes un pago en revisión. Te avisamos apenas lo revisemos.',
     referencia_usada: 'Esa referencia ya se usó en otro pago. Revísala.', comprobante_repetido: 'Ese comprobante ya se había enviado.',
     comprobante_invalido: 'La foto del comprobante no sirve: debe ser una imagen de menos de 3 MB.', sin_permiso: 'Solo el dueño o el administrador pueden pagar el plan.',
-    sin_sesion: 'Entra a Vento Nube para ver y pagar tu plan.', red: 'Sin conexión con el servidor de Vento. Revisa el internet e inténtalo otra vez.'
+    sin_sesion: 'Entra a ORDEVA Nube para ver y pagar tu plan.', red: 'Sin conexión con el servidor de ORDEVA. Revisa el internet e inténtalo otra vez.'
   };
 
   // ---------- Utilidades ----------
@@ -305,7 +305,7 @@
   }
 
   /* Pago manual (BETA): la persona paga desde su app Nequi o DaviPlata, envía la foto del comprobante y
-     el proveedor de Vento lo aprueba a mano. El servidor evita duplicados (idem, referencia y huella). */
+     el proveedor de ORDEVA lo aprueba a mano. El servidor evita duplicados (idem, referencia y huella). */
   var ManualPaymentProvider = {
     id: 'manual', nombre: 'Nequi o DaviPlata',
     disponible: function(){ return true; },
@@ -343,7 +343,7 @@
     if(ov) return ov;
     ov = document.createElement('div'); ov.id = 'vsOv'; ov.className = 'overlay'; ov.setAttribute('data-novocab', '');
     ov.innerHTML = '<div class="modal vs-modal" role="dialog" aria-modal="true" aria-labelledby="vsTit"><div class="vs-cab">' +
-      '<button type="button" class="vs-ic" id="vsAtras" data-vs="atras" aria-label="Atrás">‹</button><h2 id="vsTit">Tu plan Vento</h2>' +
+      '<button type="button" class="vs-ic" id="vsAtras" data-vs="atras" aria-label="Atrás">‹</button><h2 id="vsTit">Tu plan ORDEVA</h2>' +
       '<button type="button" class="vs-ic" data-vs="cerrar" aria-label="Cerrar">✕</button></div><div id="vsCuerpo"></div><div class="vs-msg" id="vsMsg" role="status" aria-live="polite"></div></div>';
     document.body.appendChild(ov);
     ov.addEventListener('click', function(e){
@@ -379,7 +379,7 @@
 
   // ---------- Pantallas ----------
   function tarjetaEstado(s){
-    if(!s.verificado) return '<div class="vs-estado"><b>Consultando tu plan…</b><small>' + (s.sinInternet ? 'No hay conexión con el servidor de Vento. Inténtalo con internet.' : 'Un momento.') + '</small></div>';
+    if(!s.verificado) return '<div class="vs-estado"><b>Consultando tu plan…</b><small>' + (s.sinInternet ? 'No hay conexión con el servidor de ORDEVA. Inténtalo con internet.' : 'Un momento.') + '</small></div>';
     var P = esc(nombrePlan(s.status === 'active' ? s.plan : s.planSub || s.plan)), f = fecha(s.vence);
     if(s.status === 'active' && s.prueba) return '<div class="vs-estado ok"><span class="vs-chip">' + P + '</span><b>🎁 Prueba gratis del plan ' + P + '</b><small>Te quedan ' + s.dias + ' día' + (s.dias === 1 ? '' : 's') + (f ? ' (hasta el ' + f + ')' : '') + '.</small></div>';
     if(s.status === 'active') return '<div class="vs-estado ok"><span class="vs-chip">' + P + '</span><b>Plan ' + P + ' activo' + (f ? ' · vence el ' + f : '') + '</b><small>' + (s.dias != null ? 'Te quedan ' + s.dias + ' día' + (s.dias === 1 ? '' : 's') + '. ' : '') + 'Sirve en todos los celulares de tu negocio.</small>' +
@@ -433,7 +433,7 @@
         '<div id="vsLicBox" hidden><input id="vsLicIn" class="mz-in" placeholder="VENTO-XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false" style="width:100%;box-sizing:border-box;text-align:center;letter-spacing:1px">' +
         '<div class="vs-acciones"><button type="button" class="btn-primary" id="vsLicGo">✅ Activar licencia</button></div></div>';
       h += salir;
-      pantalla('inicio', 'Tu plan Vento', h, function(c){
+      pantalla('inicio', 'Tu plan ORDEVA', h, function(c){
         var lb = c.querySelector('#vsLicBtn'); if(lb) lb.onclick = function(){ c.querySelector('#vsLicBox').hidden = false; lb.hidden = true; c.querySelector('#vsLicIn').focus(); };
         var lg = c.querySelector('#vsLicGo'); if(lg) lg.onclick = function(){
           lg.disabled = true; msg('Activando…');
@@ -490,7 +490,7 @@
           '<div class="vs-acciones"><button type="button" class="btn-primary vs-grande" id="vsYaPague">✅ YA PAGUÉ · ENVIAR COMPROBANTE</button></div>';
       } else {
         h += '<div class="vs-estado esp"><b>' + esc(m.nombre) + ' todavía no está listo</b><small>Escríbenos y te decimos cómo pagar.' + (wa ? '' : ' Elige otro método.') + '</small></div>' +
-          (wa ? '<div class="vs-acciones"><a class="btn-primary vs-grande vs-link" href="https://wa.me/' + esc(wa) + '?text=' + encodeURIComponent('Hola, quiero pagar el plan ' + plan.nombre + ' de Vento con ' + m.nombre + '.') + '" target="_blank" rel="noopener">💬 Escribir por WhatsApp</a></div>' : '');
+          (wa ? '<div class="vs-acciones"><a class="btn-primary vs-grande vs-link" href="https://wa.me/' + esc(wa) + '?text=' + encodeURIComponent('Hola, quiero pagar el plan ' + plan.nombre + ' de ORDEVA con ' + m.nombre + '.') + '" target="_blank" rel="noopener">💬 Escribir por WhatsApp</a></div>' : '');
       }
       ui.pantalla('instrucciones', 'Paga con ' + m.id, h, function(c){ var b = c.querySelector('#vsYaPague'); if(b) b.onclick = function(){ ui.ir(pComprobante(ui, plan, m)); }; });
     };
@@ -580,12 +580,12 @@
     return function(){
       var s = estado(), nuevo = s.verificado && E.ultimo > ((j && j.t) || 0);
       if(nuevo && !s.pago && (s.status === 'rejected' || s.rechazo)){   // lo rechazaron mientras se miraba esta pantalla
-        pantalla('revision', 'Tu plan Vento', '<div class="vs-grande-ic">❌</div><h3 class="vs-centro">Tu pago no fue aprobado</h3><p class="vs-nota vs-centro">Motivo: ' + esc(s.rechazo || 'no se pudo comprobar el pago') + '</p>' +
+        pantalla('revision', 'Tu plan ORDEVA', '<div class="vs-grande-ic">❌</div><h3 class="vs-centro">Tu pago no fue aprobado</h3><p class="vs-nota vs-centro">Motivo: ' + esc(s.rechazo || 'no se pudo comprobar el pago') + '</p>' +
           '<div class="vs-acciones"><button type="button" class="btn-primary vs-grande" data-vs="reintentar">📸 Enviar otro comprobante</button><button type="button" class="btn-ghost" data-vs="cerrar">Ahora no</button></div>');
         return;
       }
       if(nuevo && s.status === 'active' && !s.pago){   // ya lo aprobaron
-        pantalla('revision', 'Tu plan Vento', '<div class="vs-grande-ic">✅</div><h3 class="vs-centro">¡Tu plan ' + esc(nombrePlan(s.plan)) + ' está activo!</h3><p class="vs-nota vs-centro">Vence el ' + fecha(s.vence) + '.</p><div class="vs-acciones"><button type="button" class="btn-primary vs-grande" data-vs="cerrar">Listo</button></div>');
+        pantalla('revision', 'Tu plan ORDEVA', '<div class="vs-grande-ic">✅</div><h3 class="vs-centro">¡Tu plan ' + esc(nombrePlan(s.plan)) + ' está activo!</h3><p class="vs-nota vs-centro">Vence el ' + fecha(s.vence) + '.</p><div class="vs-acciones"><button type="button" class="btn-primary vs-grande" data-vs="cerrar">Listo</button></div>');
         return;
       }
       var monto = p.amount || (j && j.monto), met = p.method || (j && j.metodo);
@@ -607,11 +607,11 @@
     });
     if(!E.cat && s.manda) cargarCatalogo().catch(function(){});
   }
-  // Licencia que dio el proveedor de Vento (código VENTO-XXXX-XXXX-XXXX): la activa el servidor en este negocio.
+  // Licencia que dio el proveedor de ORDEVA (código VENTO-XXXX-XXXX-XXXX): la activa el servidor en este negocio.
   function canjear(codigo){
     var c = String(codigo || '').toUpperCase().replace(/\s+/g, '');
     if(!/^VENTO-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(c)) return Promise.reject(errorDe('licencia_formato', 'Escribe el código completo: VENTO-XXXX-XXXX-XXXX.'));
-    var id = negId(); if(!id) return Promise.reject(errorDe('sin_nube', 'Para activar una licencia entra con tu cuenta de Vento Nube (correo y contraseña).'));
+    var id = negId(); if(!id) return Promise.reject(errorDe('sin_nube', 'Para activar una licencia entra con tu cuenta de ORDEVA Nube (correo y contraseña).'));
     return api('licencia', { negocio: id, codigo: c }).then(function(r){ return refrescar(true).then(function(){ return r; }); });
   }
   function abrirPlanes(motivo){ abrir(vInicio(motivo || '')); if(!E.cat && manda()) cargarCatalogo().catch(function(){}); }
@@ -706,8 +706,8 @@
   window.addEventListener('online', function(){ if(E.neg) refrescar(); });
   window.addEventListener('offline', function(){ if(E.neg){ E.error = 'red'; avisar(); } });
 
-  /* Puerta: ¿esta app puede funcionar? Solo con la base de datos de Vento:
-       cuenta  → este equipo no está conectado a una cuenta/negocio de Vento Nube;
+  /* Puerta: ¿esta app puede funcionar? Solo con la base de datos de ORDEVA:
+       cuenta  → este equipo no está conectado a una cuenta/negocio de ORDEVA Nube;
        espera  → conectado, pero todavía no llegó el estado firmado del servidor;
        sinconexion → el último estado firmado ya caducó (72 h) y no se pudo renovar.
      Con internet caído se sigue con el último estado firmado hasta su vencimiento («h»: 72 h). */
@@ -716,7 +716,7 @@
     var n = negocio();
     if(!nube() || !nube().configurada || !nube().configurada()) return { ok: false, motivo: 'cuenta', sinServidor: true };
     if(!n) return { ok: false, motivo: 'cuenta' };
-    // Bloqueado por el administrador de Vento: no funciona en ningún equipo (también sin internet, si ya se supo).
+    // Bloqueado por el administrador de ORDEVA: no funciona en ningún equipo (también sin internet, si ya se supo).
     if(E.neg === n.id && E.bloqueo) return { ok: false, motivo: 'bloqueado', tipo: E.bloqueo.tipo === 'usuario' ? 'usuario' : 'negocio', texto: String(E.bloqueo.motivo || '') };
     if(E.neg !== n.id || !E.p) return { ok: false, motivo: 'espera', error: E.error || '', cargando: !!E.cargando };
     if(!vivo(E.p) && E.error) return { ok: false, motivo: 'sinconexion', error: E.error };

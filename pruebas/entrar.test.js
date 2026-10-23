@@ -1,4 +1,4 @@
-// Entrar a Vento (contra el «Supabase local» REAL: PostgreSQL + supabase-js):
+// Entrar a ORDEVA (contra el «Supabase local» REAL: PostgreSQL + supabase-js):
 //  1. Pestañas «🔑 Iniciar sesión | ➕ Crear cuenta» siempre a la vista (en un celular nuevo arranca en «Crear cuenta»).
 //  2. 📲 Entrar fácil con un código al correo (sin contraseña): celular nuevo → baja la cuenta y entra.
 //     Correo sin cuenta → lo dice; código malo → lo dice. Sin SMS en el servidor, «📱 Al celular» avisa y no deja pedir.
@@ -65,7 +65,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     chk('Sin mensajes de texto en el servidor: «📱 Al celular» avisa que no está activado y no deja pedir', await esperar(p, () => /todavía no está activado/.test(document.getElementById('otpHint').textContent) && document.getElementById('otpEnviar').disabled, null, 5000), await p.textContent('#otpHint'));
     await p.click('#otpTabs [data-por="correo"]');
     await p.fill('#otpDest', 'nadie@tienda.co'); await p.click('#otpEnviar');
-    chk('Correo sin cuenta: «no tiene cuenta de Vento»', await esperar(p, () => /no tiene cuenta/.test(document.getElementById('otpErr').textContent), null, 8000), await p.textContent('#otpErr'));
+    chk('Correo sin cuenta: «no tiene cuenta de ORDEVA»', await esperar(p, () => /no tiene cuenta/.test(document.getElementById('otpErr').textContent), null, 8000), await p.textContent('#otpErr'));
     await p.fill('#otpDest', 'ana@tienda.co'); await p.click('#otpEnviar');
     chk('Pide el código: «✅ Te mandamos el código a a***@tienda.co»', await esperar(p, () => !document.getElementById('otpPaso2').hidden && /Te mandamos el código a a\*\*\*@tienda\.co/.test(document.getElementById('otpEnviado').textContent), null, 8000), await p.textContent('#otpEnviado'));
     const c1 = await codigo(x => x.ruta === '/otp' && x.email === 'ana@tienda.co');
@@ -74,7 +74,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     await p.fill('#otpCode', String((Number(c1) + 1) % 1e6).padStart(6, '0'));
     chk('Código malo: «no sirve o ya venció»', await esperar(p, () => /no sirve o ya venció/.test(document.getElementById('otpErr').textContent), null, 8000), await p.textContent('#otpErr'));
     await p.fill('#otpCode', c1 || '');
-    chk('Con el código bueno (6 números, sin tocar «Entrar») entra a Vento', await esperar(p, () => document.getElementById('authOverlay').hidden, null, 20000), await p.textContent('#otpErr'));
+    chk('Con el código bueno (6 números, sin tocar «Entrar») entra a ORDEVA', await esperar(p, () => document.getElementById('authOverlay').hidden, null, 20000), await p.textContent('#otpErr'));
     r = await p.evaluate(() => ({ u: authUser, n: window.ventoNube.negocio(), c: window.ventoNube.correo() }));
     chk('…con la cuenta ana@tienda.co y su negocio en la nube', r.u === 'ana@tienda.co' && r.c === 'ana@tienda.co' && !!(r.n && r.n.id), r);
     chk('Entrar con código no cambia la contraseña de la cuenta', await claveSirve('ana@tienda.co', 'vieja123'));
@@ -103,7 +103,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     await q.click('#recOk');
     chk('Contraseñas distintas: lo dice y no cambia nada', await esperar(q, () => /no son iguales/.test(document.getElementById('recErr').textContent), null, 5000) && await claveSirve('ana@tienda.co', 'vieja123'));
     await q.fill('#recNew2', 'nueva789'); await q.click('#recOk');
-    chk('Código + contraseña nueva: entra de una a Vento', await esperar(q, () => document.getElementById('authOverlay').hidden, null, 20000), await q.textContent('#recErr'));
+    chk('Código + contraseña nueva: entra de una a ORDEVA', await esperar(q, () => document.getElementById('authOverlay').hidden, null, 20000), await q.textContent('#recErr'));
     chk('La contraseña nueva queda en la cuenta y la vieja ya no sirve', await claveSirve('ana@tienda.co', 'nueva789') && !(await claveSirve('ana@tienda.co', 'vieja123')));
     r = await q.evaluate(() => ({ u: authUser, n: !!window.ventoNube.negocio() }));
     chk('…con su cuenta y su negocio', r.u === 'ana@tienda.co' && r.n, r);
@@ -115,7 +115,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     await l.fill('#otpDest', 'ana@tienda.co'); await l.click('#otpEnviar');
     await esperar(l, () => !document.getElementById('otpPaso2').hidden, null, 8000);
     const rl = sb.recuperaciones.filter(x => x.ruta === '/otp').pop() || {};
-    chk('El correo del código trae un enlace que vuelve a Vento con «nubecodigo=1»', rl.volver === BASE + '/?nubecodigo=1', rl);
+    chk('El correo del código trae un enlace que vuelve a ORDEVA con «nubecodigo=1»', rl.volver === BASE + '/?nubecodigo=1', rl);
     const tokL = (await sb.entrar('ana@tienda.co', 'nueva789')).sesion;
     await l.goto(BASE + '/?nubecodigo=1#access_token=' + tokL.access_token + '&refresh_token=' + tokL.refresh_token + '&expires_in=3600&token_type=bearer&type=magiclink');
     chk('Al tocar el enlace entra directo a la cuenta (sin pedir contraseña nueva)', await esperar(l, () => document.getElementById('authOverlay').hidden && authUser === 'ana@tienda.co', null, 20000) && !/access_token/.test(l.url()), l.url());

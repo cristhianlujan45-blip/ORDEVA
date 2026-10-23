@@ -1,5 +1,5 @@
 // ✂️ Ajustar las esquinas de la factura a mano, como CamScanner.
-//  1. «📷 Revisa la foto» tiene «✂️ Ajustar esquinas»: abre la foto original con las 4 esquinas que detectó Vento.
+//  1. «📷 Revisa la foto» tiene «✂️ Ajustar esquinas»: abre la foto original con las 4 esquinas que detectó ORDEVA.
 //  2. Se arrastran las esquinas con el dedo (sale una lupa mientras se arrastra) y los bordes (mueven 2 esquinas).
 //  3. «⬜ Toda la foto», «🔍 Detectar otra vez» y «↻ Girar».
 //  4. «✅ Listo»: la foto se recorta con ESAS esquinas (queda solo la hoja, sin la mesa) y se ve en la revisión.
@@ -38,7 +38,7 @@ const REAL = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sy]) => { const x = 
     await p.waitForFunction(() => { const o = document.getElementById('fiEsqOv'); return o && o.classList.contains('show') && o._prueba && o._prueba.foto(); });
     const det = await p.evaluate(() => document.getElementById('fiEsqOv')._prueba.esquinas());
     const err = (a, b2) => Math.max(...a.map((q, i) => Math.hypot(q[0] - b2[i][0], q[1] - b2[i][1])));
-    chk('1. Abre la foto con las 4 esquinas que detectó Vento (cerca de las de verdad)', err(det, REAL) < 40, { det, REAL });
+    chk('1. Abre la foto con las 4 esquinas que detectó ORDEVA (cerca de las de verdad)', err(det, REAL) < 40, { det, REAL });
     // 3. Toda la foto
     await p.click('#fiEsqOv [data-e="todo"]');
     let q = await p.evaluate(() => document.getElementById('fiEsqOv')._prueba.esquinas());
@@ -67,7 +67,7 @@ const REAL = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sy]) => { const x = 
     chk('2. Las esquinas quedan en orden (arriba-izq, arriba-der, abajo-der, abajo-izq)', q[0][0] < q[1][0] && q[3][0] < q[2][0] && q[0][1] < q[3][1] && q[1][1] < q[2][1], q);
     // 3. Detectar otra vez y girar
     await p.click('#fiEsqOv [data-e="auto"]');
-    chk('3. «🔍 Detectar otra vez» vuelve a las esquinas de Vento', err(await p.evaluate(() => document.getElementById('fiEsqOv')._prueba.esquinas()), det) < 1);
+    chk('3. «🔍 Detectar otra vez» vuelve a las esquinas de ORDEVA', err(await p.evaluate(() => document.getElementById('fiEsqOv')._prueba.esquinas()), det) < 1);
     await p.click('#fiEsqOv [data-e="girar"]'); await p.waitForTimeout(600);
     chk('3. «↻ Girar» gira la foto (ancho y alto cambian)', JSON.stringify(await p.evaluate(() => document.getElementById('fiEsqOv')._prueba.foto())) === JSON.stringify({ w: H, h: W }));
     await p.click('#fiEsqOv [data-e="no"]'); await p.waitForTimeout(200);

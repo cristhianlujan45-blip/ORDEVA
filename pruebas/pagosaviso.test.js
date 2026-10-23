@@ -14,13 +14,13 @@
 // 11. En el navegador, la voz de los pagos sale con el volumen elegido.
 // 12. SMS del banco (los lee la app): del código corto → «⚠️ Revisar»; si el dueño eligió confirmarlos → confirmado; desde un
 //     celular → FALSO. El mismo pago por SMS y por la app → uno solo (confirmado). Interruptor «📩 Confirmar los SMS».
-// 13. «🔎 Este equipo: App Vento para Android» al final del paso a paso.
+// 13. «🔎 Este equipo: App ORDEVA para Android» al final del paso a paso.
 // 14. Bre-B (de otros bancos por la llave) y Nequi con «¿…?» en el aviso: suenan. Solicitudes («te pidió») no.
 // 15. Paso 5 «Que suene siempre»: ahorro de batería, «🚀 Inicio automático» y los pasos de la marca (Xiaomi).
 // 19. Avisos «crudos» (la app no los entendió): la página los revisa y, si son pago, los dice.
 // 26. Pagos que entiende la página: notificación + ventana por la app Android (también bloqueado).
 // 25. La app Android se actualiza sola: estado en Ajustes, permiso (una vez) y «Actualizar ahora».
-// 24. Permisos de la ventana fuera de Vento (encima de otras apps / celular bloqueado): aviso con «🪟 Permitir».
+// 24. Permisos de la ventana fuera de ORDEVA (encima de otras apps / celular bloqueado): aviso con «🪟 Permitir».
 // 23. Ventana emergente de cada pago: valor, banco y texto, «Cerrar» y se cierra sola a los 15 s.
 // 22. Frases de pago del administrador: «es un pago» (con o sin valor) y «no es un pago».
 // 21. DaviPlata y Nequi con ahorro de batería → aviso fijo y botón que abre su ajuste («Sin restricciones»).
@@ -70,7 +70,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     let e = await estado();
     chk('3. Sin voz de Android, la página dice «Llegaron 200 pesos por DaviPlata» (la cantidad, sin el nombre de quién pagó)', e.voz.some(t => /^Llegaron 200 pesos por DaviPlata/.test(t)) && !e.voz.some(t => /Juan/.test(t)), e.voz);
     chk('3. … con el sonido de éxito y la notificación «💜 Recibiste $200 por DaviPlata»', e.sonidos === 1 && e.notifs.some(n => /^💜 Recibiste \$200 por DaviPlata/.test(n.t)), e);
-    chk('3. La notificación del pago sale SIEMPRE (también con Vento abierta), en el canal de pagos, con el texto y lo que dijo el banco', e.notifs.some(n => /^💜 Recibiste \$200/.test(n.t) && n.c === 'pagos' && n.s === true && /^Recibiste 200 pesos por DaviPlata, de Juan Perez\./.test(n.x) && /le pasó \$200 a su DaviPlata/.test(n.x)), e.notifs);
+    chk('3. La notificación del pago sale SIEMPRE (también con ORDEVA abierta), en el canal de pagos, con el texto y lo que dijo el banco', e.notifs.some(n => /^💜 Recibiste \$200/.test(n.t) && n.c === 'pagos' && n.s === true && /^Recibiste 200 pesos por DaviPlata, de Juan Perez\./.test(n.x) && /le pasó \$200 a su DaviPlata/.test(n.x)), e.notifs);
     chk('5. El aviso se reenvía al servidor CON su ID', e.reenvios.length === 1 && e.reenvios[0].id === 'and-k1:1000:-55' && e.reenvios[0].txt === TXT, e.reenvios);
 
     // 1. Segundo pago IGUAL (otro aviso, otro ID) poco después
@@ -171,7 +171,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     // 13. Diagnóstico en el paso a paso
     await p.evaluate(() => window.ventoPagosGuia()); await p.waitForTimeout(300);
     const g13 = await p.evaluate(() => document.getElementById('pgGuiaOv').innerText);
-    chk('13. Paso a paso: «🔎 Este equipo: App Vento para Android» y el paso de los SMS', /Este equipo: App Vento para Android/.test(g13) && /te avisa por SMS/.test(g13), g13.slice(-400));
+    chk('13. Paso a paso: «🔎 Este equipo: App ORDEVA para Android» y el paso de los SMS', /Este equipo: App ORDEVA para Android/.test(g13) && /te avisa por SMS/.test(g13), g13.slice(-400));
     await p.evaluate(() => document.getElementById('pgGuiaOv').classList.remove('show'));
 
     // 14. Bre-B y Nequi
@@ -231,7 +231,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
       const ev = new Event('x'); try{ window.pagosRecibirTexto('Nequi | Nequi | Te llegaron $1 a tu llave', 'z16'); }catch(e){}
       const box = document.getElementById('pgDiag'), t = document.getElementById('pgAndTxt');
       return { diag: box ? box.innerText : '', txt: t ? t.textContent : '', errs: window.__errs16.filter(x => x.a === 'pago').map(x => x.b) }; });
-    chk('16. Ajustes → Pagos: «🔎 Avisos del banco que Vento no tomó» (sin datos) y se reportan para aprender el formato', /Avisos del banco que Vento no tomó/.test(d16.diag) && /Último aviso de un banco/.test(d16.diag) && d16.errs.some(x => /no tomó/.test(x)), d16);
+    chk('16. Ajustes → Pagos: «🔎 Avisos del banco que ORDEVA no tomó» (sin datos) y se reportan para aprender el formato', /Avisos del banco que ORDEVA no tomó/.test(d16.diag) && /Último aviso de un banco/.test(d16.diag) && d16.errs.some(x => /no tomó/.test(x)), d16);
     chk('16. Si Android desconectó la lectura, se dice y se pide reconectar', /desconectó la lectura/.test(d16.txt), d16.txt);
 
     // 15. Paso 5: que suene siempre
@@ -284,9 +284,9 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
       window.__toasts = []; window.ventoAvisosNativos();
       return { tieneTraza, res1, piloto: window.__piloto.slice(), registro: data.pagos.lista.length - antes, toast: window.__toasts.find(t => /Prueba piloto/.test(t)) || '' };
     });
-    chk('18. Ajustes → Pagos: «📋 Últimos avisos del banco y qué hizo Vento» (con el porqué)', r18.tieneTraza, r18);
+    chk('18. Ajustes → Pagos: «📋 Últimos avisos del banco y qué hizo ORDEVA» (con el porqué)', r18.tieneTraza, r18);
     chk('18. «🧪 Prueba piloto»: pasa un aviso de DaviPlata por el mismo camino y muestra lo que dijo', r18.piloto.length === 1 && /JUAN PEREZ le pasó \$1\.000/.test(r18.piloto[0][2]) && /Recibiste 1000 pesos por DaviPlata/.test(r18.res1), r18);
-    chk('18. La prueba piloto NO se registra como pago (solo avisa «🧪 Prueba piloto»)', r18.registro === 0 && /Prueba piloto: Vento entendió \$1\.000 por DaviPlata/.test(r18.toast), r18);
+    chk('18. La prueba piloto NO se registra como pago (solo avisa «🧪 Prueba piloto»)', r18.registro === 0 && /Prueba piloto: ORDEVA entendió \$1\.000 por DaviPlata/.test(r18.toast), r18);
 
     // 19. Avisos «crudos»: la app Android no entendió el aviso del banco y se lo pasa a la página, que lo revisa con sus
     //     reglas (siempre al día) y, si es plata recibida, lo dice. Si tampoco lo entiende, lo reporta (sin datos).
@@ -322,12 +322,12 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     });
     chk('20. La lectura apagada (se reinstaló la app) se vuelve a prender sola, sin aviso', r20.prendio && r20.k1 === '' && !r20.b1, r20);
     chk('20. Sin el permiso «Acceso a notificaciones»: aviso fijo «Los pagos no van a sonar» con «🔓 Dar el permiso»', r20.k2 === 'permiso' && /no van a sonar/.test(r20.b2) && /Dar el permiso/.test(r20.b2), r20);
-    chk('20. App Android vieja: aviso fijo con «⬇️ Instalar la nueva» (vento.apk)', r20.k3 === 'vieja' && /Instala la app Vento nueva una última vez/.test(r20.b3) && r20.apk, r20);
+    chk('20. App Android vieja: aviso fijo con «⬇️ Instalar la nueva» (vento.apk)', r20.k3 === 'vieja' && /Instala la app ORDEVA nueva una última vez/.test(r20.b3) && r20.apk, r20);
     chk('20. Android desconectó la lectura (dos revisiones seguidas): «🔄 Reconectar»', r20.k4 === 'desconectada' && /Reconectar/.test(r20.b4), r20);
     chk('20. Si el dueño la apagó a propósito, no se prende sola', r20.k5 === '' && r20.siguioApagada, r20);
     chk('20. En el celular de un mesero no se prende sola ni sale el aviso', r20.k6 === '' && !r20.mesero.on && !r20.mesero.ban && !r20.fin, r20);
 
-    // 21. 🔋 DaviPlata y Nequi con ahorro de batería: Android retrasa sus avisos de pago. Vento lo detecta, lo dice con un
+    // 21. 🔋 DaviPlata y Nequi con ahorro de batería: Android retrasa sus avisos de pago. ORDEVA lo detecta, lo dice con un
     //     aviso fijo y abre el ajuste de esa app para elegir «Sin restricciones».
     const r21 = await p.evaluate(async () => {
       const A = window.VentoAndroid, S = window.__and, ban = () => { const b = document.getElementById('pgSalud'); return b && !b.hidden ? b.innerText : ''; };
@@ -380,8 +380,8 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     chk('22. Frase «Tu saldo es» (no es un pago): el aviso no se registra ni suena', r22.ignorado && !r22.voz.some(x => /50000/.test(x)), r22);
     chk('22. Frase de pago sin valor en el aviso: «Llegó plata por Bancolombia. Mira el valor en la aplicación.»', r22.voz.some(x => /^Llegó plata por Bancolombia/.test(x)) && r22.toasts.some(x => /Llegó plata por Bancolombia/.test(x)), r22);
 
-    // 23. 🪟 Ventana emergente de cada pago (con Vento a la vista): el valor grande, el banco, de quién y el texto, con
-    //     «Cerrar»; se cierra sola a los 15 s. Con Vento minimizada no sale aquí (la muestra la app Android).
+    // 23. 🪟 Ventana emergente de cada pago (con ORDEVA a la vista): el valor grande, el banco, de quién y el texto, con
+    //     «Cerrar»; se cierra sola a los 15 s. Con ORDEVA minimizada no sale aquí (la muestra la app Android).
     const r23 = await p.evaluate(async () => {
       const A = window.VentoAndroid; window.ventoPagoVentanaCerrar();
       A.alFrente = () => true;
@@ -405,7 +405,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     });
     chk('23. Ventana emergente: «💜 Recibiste $23.500 por Nequi de Ana Ruiz» con el texto del banco y «Se cierra sola en 15 s»', /Recibiste/.test(r23.t1) && /\$23\.500/.test(r23.t1) && /por Nequi/.test(r23.t1) && /de Ana Ruiz/.test(r23.t1) && /te envió/.test(r23.t1) && /Se cierra sola en 1[45] s/.test(r23.t1) && /Cerrar/.test(r23.t1), r23.t1);
     chk('23. «✕ Cerrar» la cierra', r23.cerrada, r23);
-    chk('23. Con Vento minimizada no sale aquí (la muestra la app Android encima de todo)', r23.minimizada, r23);
+    chk('23. Con ORDEVA minimizada no sale aquí (la muestra la app Android encima de todo)', r23.minimizada, r23);
     chk('23. Apagada en Ajustes → Pagos: no sale', r23.apagada, r23);
     chk('23. Se cierra sola a los 15 s', r23.sola >= 14000 && r23.sola <= 16500, r23.sola);
     const r23b = await p.evaluate(() => {
@@ -473,13 +473,13 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
       return { vieja, sinPermiso, alDia, hay, banNueva, act: window.__act.slice() };
     });
     chk('25. App Android sin el actualizador: Ajustes dice «todavía no se actualiza sola · Instálala una última vez»', /todavía no se actualiza sola/.test(r25.vieja) && /una última vez/.test(r25.vieja), r25);
-    chk('25. Falta el permiso de Android: aviso «Que Vento se actualice sola» y «🔓 Dar el permiso» lo abre', /se actualice sola/.test(r25.sinPermiso.ban) && /falta el permiso/.test(r25.sinPermiso.aj) && r25.act[0] === 'permiso', r25);
+    chk('25. Falta el permiso de Android: aviso «Que ORDEVA se actualice sola» y «🔓 Dar el permiso» lo abre', /se actualice sola/.test(r25.sinPermiso.ban) && /falta el permiso/.test(r25.sinPermiso.aj) && r25.act[0] === 'permiso', r25);
     chk('25. Con el permiso: Ajustes dice «App Android 1.0.36 · ✅ se actualiza sola» y el aviso se va', !r25.alDia.ban && /1\.0\.36 · ✅ se actualiza sola/.test(r25.alDia.aj), r25);
-    chk('25. Hay una nueva: «se instala sola cuando no estés usando Vento» y «Actualizar ahora»', /hay una nueva \(1\.0\.37\)/.test(r25.hay) && r25.act[1] === 'ahora', r25);
-    chk('25. Hay una nueva: aviso «🔄 Hay una versión nueva de Vento (1.0.37)» con «Actualizar ahora»', /Hay una versión nueva de Vento \(1\.0\.37\)/.test(r25.banNueva) && r25.act[2] === 'ahora', r25);
+    chk('25. Hay una nueva: «se instala sola cuando no estés usando ORDEVA» y «Actualizar ahora»', /hay una nueva \(1\.0\.37\)/.test(r25.hay) && r25.act[1] === 'ahora', r25);
+    chk('25. Hay una nueva: aviso «🔄 Hay una versión nueva de ORDEVA (1.0.37)» con «Actualizar ahora»', /Hay una versión nueva de ORDEVA \(1\.0\.37\)/.test(r25.banNueva) && r25.act[2] === 'ahora', r25);
 
     // 26. Un pago que entiende la PÁGINA (como el Nequi «te envió 1500» con la app de antes) va por el MISMO camino que los
-    //     de la app Android: notificación + 🪟 ventana fuera de Vento (también bloqueado). Antes solo salía la notificación.
+    //     de la app Android: notificación + 🪟 ventana fuera de ORDEVA (también bloqueado). Antes solo salía la notificación.
     const r26 = await p.evaluate(() => {
       const A = window.VentoAndroid; window.__pn = []; window.__and.notifs = [];
       A.pagoNotificar = (t, f, o, v, b, tipo) => window.__pn.push({ t, f, o, v, b, tipo });
@@ -500,7 +500,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
       window.ventoError = (a, b, c, d) => { window.__e27.push({ a, b, c }); };
       A.pagosAvisosDiag = () => JSON.stringify({ ultimo: Date.now(), vivo: true, lista: [], traza: [
         { t: Date.now() - 2000, app: 'Nequi', txt: 'Envío NOMBRE te envió #, ¡lo mejor!', r: '🔊 Recibiste 1500 pesos por Nequi.' },
-        { t: Date.now(), app: 'Vento', txt: '💜 Recibiste $# por Nequi', r: '🪟 la ventana no se abrió (celular bloqueado, samsung Android 14, falta el permiso: completa)' } ] });
+        { t: Date.now(), app: 'ORDEVA', txt: '💜 Recibiste $# por Nequi', r: '🪟 la ventana no se abrió (celular bloqueado, samsung Android 14, falta el permiso: completa)' } ] });
       window.ventoPagosDiag();
       window.ventoError = e0;
       return window.__e27;
@@ -524,7 +524,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     chk('11. En el navegador: «Pago confirmado. 5000 pesos desde Nequi» al 50 %', r11.voces.some(x => /^Llegaron 5000 pesos por Nequi/.test(x.t) && x.vol === 0.5), r11);
     chk('11. En el navegador el volumen llega hasta 100 % (más de eso es en la app Android)', r11.max === '100', r11.max);
     await p2.evaluate(() => window.ventoPagosGuia()); await p2.waitForTimeout(300);
-    chk('13. En el computador: «🔎 Este equipo: Vento Web en …»', /Este equipo: Vento Web en (Chrome|navegador)/.test(await p2.evaluate(() => document.getElementById('pgGuiaOv').innerText)));
+    chk('13. En el computador: «🔎 Este equipo: ORDEVA Web en …»', /Este equipo: ORDEVA Web en (Chrome|navegador)/.test(await p2.evaluate(() => document.getElementById('pgGuiaOv').innerText)));
     await ctx2.close();
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.stack || e)); }
   chk('Sin errores de página', !errs.length, errs);

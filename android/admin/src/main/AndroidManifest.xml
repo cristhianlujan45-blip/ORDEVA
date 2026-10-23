@@ -22,7 +22,7 @@
     </queries>
 
     <application
-        android:label="Vento Admin"
+        android:label="ORDEVA Admin"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
         android:allowBackup="false"

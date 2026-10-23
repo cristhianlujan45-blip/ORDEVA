@@ -1,8 +1,8 @@
-// Herramientas según el negocio y avisos de Vento en la 🔔 campanita (1.43.2):
+// Herramientas según el negocio y avisos de ORDEVA en la 🔔 campanita (1.43.2):
 //  • «🧾 Caja (POS)» en tiendas, comidas, bares y restaurantes; NO en servicios (barbería, hotel, consultorio…).
 //  • En las tiendas NO va «⚡ Venta rápida»: en su lugar «📒 Fiados» (abre la libreta «Me deben»). También en un
 //    negocio sin tipo que se llama «Tienda…».
-//  • Los avisos fijos de Vento (prueba gratis, versión nueva, pagos que no van a sonar) quedan en la campanita.
+//  • Los avisos fijos de ORDEVA (prueba gratis, versión nueva, pagos que no van a sonar) quedan en la campanita.
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html';
 (async()=>{ const b=await chromium.launch(); let ok=0,mal=0; const chk=(n,c,x)=>{ if(c){ok++;console.log('✅ '+n);} else {mal++;console.log('❌ '+n+(x!==undefined?' → '+JSON.stringify(x):''));} };
@@ -43,12 +43,12 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
  chk('«Mostrar todas las funciones»: la barbería también ve «Caja (POS)»', await vis('#posCajaBtn'));
  await p.evaluate(()=>{ data.modoCompleto=false; data.businessType='bar'; saveData(); aplicarVocabulario(); });
 
- // ---------- Avisos de Vento en la campanita ----------
+ // ---------- Avisos de ORDEVA en la campanita ----------
  await p.waitForTimeout(1500);
  r=await p.evaluate(()=>{ const s=document.getElementById('subBar'); return { en: !!(s&&s.closest('#vcAvisos')), vis: !!(s&&s.checkVisibility()), badge: document.querySelector('.vito-campana-badge').textContent }; });
  chk('«🎁 Prueba gratis» ya no sale en la pantalla principal: está en la campanita, que lo cuenta', r.en && !r.vis && r.badge==='1', r);
  await p.click('.vito-campana'); await p.waitForTimeout(300);
- chk('Al abrir la campanita: «📣 Avisos de Vento» con la prueba gratis', await vis('#vcAvisos .vc-avisos-tit') && await vis('#vcAvisos #subBar') && /Prueba gratis/.test(await p.textContent('#vcAvisos')));
+ chk('Al abrir la campanita: «📣 Avisos de ORDEVA» con la prueba gratis', await vis('#vcAvisos .vc-avisos-tit') && await vis('#vcAvisos #subBar') && /Prueba gratis/.test(await p.textContent('#vcAvisos')));
  // Un aviso de pagos (permiso) también va a la campanita
  await p.evaluate(()=>{ const b=document.createElement('div'); b.id='pgSalud'; b.innerHTML='⚠️ <b>Los pagos no van a sonar</b> <button type="button" data-x2>🔓 Dar el permiso</button>'; document.body.appendChild(b); });
  await p.waitForTimeout(1300);
@@ -82,7 +82,7 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
  await p.click('.vito-campana-menu [data-pedido="pq1"]'); await p.waitForTimeout(400);
  chk('Tocar un pedido abre la cuenta de esa mesa', await p.evaluate(()=>document.querySelector('.vito-campana-menu').style.display==='none' && typeof currentTable!=='undefined' && Number(currentTable)===1));
 
- // ---------- 1.43.8: la tarjeta «🧠 Vento» (pago sin registrar) va a la campanita, no a la pantalla principal ----------
+ // ---------- 1.43.8: la tarjeta «🧠 ORDEVA» (pago sin registrar) va a la campanita, no a la pantalla principal ----------
  await p.evaluate(()=>{ document.querySelector('.vito-campana-menu').style.display='none'; document.querySelectorAll('.overlay.show').forEach(o=>o.classList.remove('show'));
    data.pagos=Object.assign({on:true},data.pagos||{}); window.pagosRecibirTexto && window.pagosRecibirTexto('Nequi | Envío | MODESTA CARRILLO te envió 200, ¡lo mejor!', 'and-x1', {voz:true});
    window.layaPintarTarjeta && window.layaPintarTarjeta(); });
@@ -90,11 +90,11 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
  await p.evaluate(()=>document.querySelectorAll('.overlay.show').forEach(o=>o.classList.remove('show')));   // la ventana «Registrar en la mesa» del pago de prueba
  r=await p.evaluate(()=>{ const c=document.getElementById('layaHome'); return { hay: !!c && !c.hidden, enCampana: !!(c && c.closest('#vcAvisos')), enInicio: !!(c && c.closest('#view-mesas')), txt: c ? c.textContent : '' }; });
  if(r.hay){
-   chk('Tarjeta «🧠 Vento» (pago que no está en ninguna cuenta): está en la campanita, no en la pantalla principal', r.enCampana && !r.enInicio, r);
+   chk('Tarjeta «🧠 ORDEVA» (pago que no está en ninguna cuenta): está en la campanita, no en la pantalla principal', r.enCampana && !r.enInicio, r);
    await p.click('.vito-campana'); await p.waitForTimeout(300);
    chk('…y al abrir la campanita se ve con su botón', await vis('#vcAvisos #layaHome') && /no está registrado|Elegir|Registrar/.test(await p.textContent('#vcAvisos #layaHome')));
    await p.evaluate(()=>{ document.querySelector('.vito-campana-menu').style.display='none'; });
- } else chk('Tarjeta «🧠 Vento»: si no hay nada que avisar, no sale en la pantalla principal', !r.enInicio, r);
+ } else chk('Tarjeta «🧠 ORDEVA»: si no hay nada que avisar, no sale en la pantalla principal', !r.enInicio, r);
  // ---------- 1.43.8: «🧓 Modo fácil» con su propio botón en Ajustes ----------
  await p.evaluate(()=>{ const b=document.querySelector('nav button[data-view="ajustes"]'); if(b) b.click(); else { const m=document.querySelector('.more-tile[data-go="ajustes"]'); if(m) m.click(); } }); await p.waitForTimeout(400);
  r=await p.evaluate(()=>{ const t=[...document.querySelectorAll('#ajustesCats .ajustes-cat')].filter(b=>b.checkVisibility()); const i=t.findIndex(b=>b.dataset.cat==='facil'); return { i, txt: i>=0 ? t[i].textContent : '' }; });

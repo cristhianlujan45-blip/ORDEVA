@@ -5,7 +5,7 @@
 // en una pausa); sin guion, solo escucha en silencio.
 //  1. «mesa 1 dos águilas» · pausa · «tres póker» · pausa · «ocho póker cinco águilas» → 7 Águila y 11 Póker, UNA vez.
 //  2. Cantidades grandes con pausa: «mesa 2 veinte póker» · pausa · «y quince águilas» → 20 Póker y 15 Águila.
-//  3. «Hola Vento» viene apagado: el micrófono NO se abre solo (antes se prendía y apagaba todo el tiempo).
+//  3. «Hola ORDEVA» viene apagado: el micrófono NO se abre solo (antes se prendía y apagaba todo el tiempo).
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 
@@ -35,7 +35,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
       data.products = [{ id: 'ag', name: 'Águila', price: 3300, stock: 500 }, { id: 'pk', name: 'Póker', price: 3500, stock: 500 }];
       for(let i = 1; i <= 3; i++) data.tables[i] = { items: [], people: [] }; saveData(); });
     await p.waitForTimeout(3500);
-    chk('3. «Hola Vento» viene apagado: el micrófono no se abre solo', await p.evaluate(() => window.__aperturas === 0 && !window.ventoHola.activo()), await p.evaluate(() => window.__aperturas));
+    chk('3. «Hola ORDEVA» viene apagado: el micrófono no se abre solo', await p.evaluate(() => window.__aperturas === 0 && !window.ventoHola.activo()), await p.evaluate(() => window.__aperturas));
     const mesa = m => p.evaluate(m => (data.tables[m].items || []).map(i => i.qty + '×' + i.name).sort().join(', '), m);
 
     // 1. Pedido largo con pausas

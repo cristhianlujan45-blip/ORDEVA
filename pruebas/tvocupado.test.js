@@ -1,5 +1,5 @@
 // De punta a punta, como en el negocio (app de Android, SIN canal en vivo): se conecta el TV (tocándolo en la lista),
-// un cliente pide una canción por el QR, Vento la recibe, le busca el video y la manda al TV. Y otra más, y otra.
+// un cliente pide una canción por el QR, ORDEVA la recibe, le busca el video y la manda al TV. Y otra más, y otra.
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const mock = require('./ntfymock.js')();
 (async () => {
@@ -39,13 +39,13 @@ const mock = require('./ntfymock.js')();
   await p.click('#tvTransmitir'); await p.waitForTimeout(1000);
   await p.evaluate(() => [...document.querySelectorAll('#tvApkLista > button')].find(x => /webOS/.test(x.innerText)).click());
   await p.waitForTimeout(9000);
-  chk('TV con YouTube abierto y OTRO celular conectado: Vento se conecta igual', await p.evaluate(() => !!lng.sid && lngOn()) && tv.binds >= 1, await p.evaluate(() => lng.error));
+  chk('TV con YouTube abierto y OTRO celular conectado: ORDEVA se conecta igual', await p.evaluate(() => !!lng.sid && lngOn()) && tv.binds >= 1, await p.evaluate(() => lng.error));
   chk('Sin volver a abrir YouTube en el TV (no interrumpe al otro)', tv.abrir === 0, String(tv.abrir));
   chk('No se usa el canal en vivo (sistema de la 1.22)', !(await p.evaluate(() => window.__escuchas || 0)));
   // Clientes piden canciones por el QR
   const pedir = async (mesa, s, id) => { mock.msgs.push({ id: 'n' + id, time: Math.floor(Date.now() / 1000), event: 'message', topic, message: JSON.stringify({ t: 'cancion', mesa, s, id }) }); await p.evaluate(() => window.dispatchEvent(new Event('online'))); };
   await pedir(1, 'Vivir mi vida Marc Anthony', 'r1'); await p.waitForTimeout(9000);
-  chk('La canción del QR llegó a Vento', await p.evaluate(() => window.vitoMusica.cola().concat(window.vitoMusica.hist()).some(x => /Vivir mi vida/i.test(x.song))));
+  chk('La canción del QR llegó a ORDEVA', await p.evaluate(() => window.vitoMusica.cola().concat(window.vitoMusica.hist()).some(x => /Vivir mi vida/i.test(x.song))));
   chk('Y llegó al TV', tv.cola.some(v => /Vivirmi/.test(v)), JSON.stringify(tv.cmds));
   await pedir(2, 'Depende Jarabe de Palo', 'r2'); await p.waitForTimeout(9000);
   chk('La segunda entra al TV detrás (addVideo, sin cortar)', tv.cmds.some(c => /^addVideo:v_Depende/i.test(c)), JSON.stringify(tv.cmds));

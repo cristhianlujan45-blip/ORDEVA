@@ -1,6 +1,6 @@
 // Música → «📃 Mis playlists de YouTube»: poner tu propia playlist como música de fondo, fácil.
 // YouTube se simula con páginas del formato NUEVO (lockupViewModel, datos en <script id="yt-initial-data">) y pasan por el
-// módulo de verdad del Servidor Vento (supabase/functions/vento-ia/youtube.ts).
+// módulo de verdad del Servidor ORDEVA (supabase/functions/vento-ia/youtube.ts).
 //  1. youtube.ts: busca playlists por nombre y lee una playlist completa (primera página + «continuación»).
 //  2. App: escribir «salsa baul» → 🔎 Buscar → resultados con «▶ Poner» → suena de fondo; queda guardada en el negocio.
 //  3. La canción que pide una mesa va PRIMERO; la playlist sigue después. Entran de a 2 (no las 30 de una).

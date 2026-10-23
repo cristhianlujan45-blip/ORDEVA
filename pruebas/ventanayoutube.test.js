@@ -1,5 +1,5 @@
 // ▶️ Ventana de YouTube grande, como YouTube normal (computador y celular).
-// El reproductor (IFrame API), el Servidor Vento (/yt/buscar, /yt/lista) y la API de la cuenta de Google se simulan.
+// El reproductor (IFrame API), el Servidor ORDEVA (/yt/buscar, /yt/lista) y la API de la cuenta de Google se simulan.
 //  1. En el computador ocupa casi toda la pantalla: secciones a la izquierda, contenido en el centro y lo que suena con
 //     «A continuación» a la derecha. El buscador está arriba, como en YouTube.
 //  2. Buscar → tarjetas con portada grande y duración; tocar la portada = «Que siga».

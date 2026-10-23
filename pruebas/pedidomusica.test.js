@@ -1,6 +1,6 @@
 // 🎵 Pedir música por el QR (pedido.html), con el diseño juvenil de 1.51.0:
 //  1. La pestaña «Canción» trae los géneros de un toque (Reguetón, Salsa, Vallenato…).
-//  2. Un género busca canciones por el Servidor Vento (sin cupo de la API de YouTube): no se llama a googleapis.
+//  2. Un género busca canciones por el Servidor ORDEVA (sin cupo de la API de YouTube): no se llama a googleapis.
 //  3. «▶ Pedir» en cada canción la pide con un toque: llega al canal del local con el nombre de la canción y la mesa,
 //     y el botón dice «✅ Pedida».
 //  4. El límite de 10 canciones sigue igual: con 10 pedidas, «▶ Pedir» no la manda y avisa.
@@ -35,7 +35,7 @@ const items = n => Array.from({ length: n }, (_, i) => ({ id: { videoId: 'vid' +
     await p.evaluate(() => [...document.querySelectorAll('#generos .gen')].find(x => /Salsa/.test(x.textContent)).click());
     await p.waitForTimeout(900);
     const r2 = await p.evaluate(() => ({ vis: !document.getElementById('ytPrev').hidden, pedir: document.querySelectorAll('#ytPrev .ytpedir').length }));
-    chk('2. Tocar «Salsa» busca por el Servidor Vento (sin buscar artistas) y salen 6 canciones con «▶ Pedir»', r2.vis && r2.pedir === 6 && !reg.buscar.some(u => /tipo=canal/.test(u)) && reg.buscar.some(u => /salsa exitos/.test(u)), { r2, buscar: reg.buscar });
+    chk('2. Tocar «Salsa» busca por el Servidor ORDEVA (sin buscar artistas) y salen 6 canciones con «▶ Pedir»', r2.vis && r2.pedir === 6 && !reg.buscar.some(u => /tipo=canal/.test(u)) && reg.buscar.some(u => /salsa exitos/.test(u)), { r2, buscar: reg.buscar });
     chk('2. … sin llamar a la API de YouTube (no gasta cupo)', reg.google.length === 0, reg.google);
     // Escribir un nombre que el servidor no encuentra como artista: ya NO se busca en la API (gastaba 100 del cupo)
     await p.fill('#s', 'cancion rara'); await p.waitForTimeout(1200);

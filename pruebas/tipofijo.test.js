@@ -1,4 +1,4 @@
-// Tipo de negocio FIJO (cambiarlo necesita permiso del administrador de Vento) y los tipos nuevos de ropa con tragos,
+// Tipo de negocio FIJO (cambiarlo necesita permiso del administrador de ORDEVA) y los tipos nuevos de ropa con tragos,
 // contra el «Supabase local» REAL:
 //  • al registrarse avisa que el tipo después no se cambia sin permiso; los tipos «Segunda Vuelta» (ropa de segunda y
 //    tragos) y la Boutique (ropa nueva), sin tipos repetidos, con música y barra opcionales, se encuentran y siembran su carta;

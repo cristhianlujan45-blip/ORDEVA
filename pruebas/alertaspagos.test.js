@@ -2,11 +2,11 @@
 // suene con el celular bloqueado, cada cosa con su botón para arreglarla, la conexión, el último pago y las pruebas.
 // El puente nativo (VentoAndroid) se simula en la página; lo demás es la app de verdad.
 //  1. App Android con todo mal: dice cuántas cosas faltan y cada botón abre el ajuste que es (permiso, notificaciones,
-//     batería de Vento, trabajar de fondo, batería de Nequi).
+//     batería de ORDEVA, trabajar de fondo, batería de Nequi).
 //  2. Con todo bien: «🟢 Todo listo».
 //  3. Último pago y último aviso del banco; «Probar el sonido» dice la voz; «Probar la alerta completa» pasa un aviso de
 //     prueba por el camino de verdad (no se registra como pago); «Elegir el sonido y la vibración» abre los ajustes de Android.
-//  4. Vento Web (sin la app): explica que la lectura la hace la app y ofrece probar la vibración del navegador.
+//  4. ORDEVA Web (sin la app): explica que la lectura la hace la app y ofrece probar la vibración del navegador.
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 
@@ -75,14 +75,14 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     chk('3. «Elegir el sonido y la vibración» abre los ajustes de avisos de Android', A.abierto.includes('ajustesAvisos'), A.abierto);
     await ctx.close();
 
-    // ---------- 4. Vento Web ----------
+    // ---------- 4. ORDEVA Web ----------
     ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
     await ctx.route('**/*', r => new URL(r.request().url()).hostname === 'localhost' ? r.continue() : r.abort());
     await ctx.addInitScript(base);
     await ctx.addInitScript(() => { window.__vib = []; navigator.vibrate = (x) => { window.__vib.push(x); return true; }; });
     p = await abrir(ctx);
     const web = await p.textContent('#pgAlertas');
-    chk('4. En Vento Web explica que la lectura la hace la app en el celular de Nequi', /Aquí no se leen los avisos del banco/.test(web) && !!(await p.$('#pgAlertas [data-pga="app"]')), web.slice(0, 400));
+    chk('4. En ORDEVA Web explica que la lectura la hace la app en el celular de Nequi', /Aquí no se leen los avisos del banco/.test(web) && !!(await p.$('#pgAlertas [data-pga="app"]')), web.slice(0, 400));
     chk('4. Sin «alerta completa» ni ajustes de Android; sí «Probar la vibración»', !(await p.$('#pgAlertas [data-pga="completa"]')) && !(await p.$('#pgAlertas [data-pga="sonido"]')) && !!(await p.$('#pgAlertas [data-pga="vibrar"]')));
     await pulsar(p, 'vibrar');
     chk('4. «Probar la vibración» hace vibrar el equipo (si puede)', (await p.evaluate(() => window.__vib)).length === 1);

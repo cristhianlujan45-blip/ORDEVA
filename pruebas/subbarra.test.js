@@ -2,7 +2,7 @@
 //  1. La barra «🎁 Prueba gratis…» se cierra con ✕ DE VERDAD (antes quedaba la franja: el «hidden» no ocultaba nada).
 //  2. Sigue cerrada al volver a abrir la app; vuelve a salir si cambia lo que avisa.
 //  3. El menú de la suscripción siempre está en ⋯ Más → «💳 Mi plan» (no solo desde la barra).
-//  4. Con Vento Nube: si no hay nada que avisar, NO queda una franja vacía; «Mi plan» solo para dueño/administrador y
+//  4. Con ORDEVA Nube: si no hay nada que avisar, NO queda una franja vacía; «Mi plan» solo para dueño/administrador y
 //     abre los planes de la nube.
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
@@ -19,7 +19,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     await p.fill('#authBiz', 'Bar Plan'); await p.fill('#authUser', 'ana'); await p.fill('#authPass', 'clave123'); await p.click('#authBtn'); await p.waitForTimeout(1500);
     await p.click('#onbSaltar').catch(() => {});
     await p.evaluate(() => document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')));
-    const abrirCampana = pg => pg.evaluate(() => { const m = document.querySelector('.vito-campana-menu'), b = document.querySelector('.vito-campana'); if(b && (!m || m.style.display !== 'flex')) b.click(); });   // los avisos de Vento están en la 🔔 campanita
+    const abrirCampana = pg => pg.evaluate(() => { const m = document.querySelector('.vito-campana-menu'), b = document.querySelector('.vito-campana'); if(b && (!m || m.style.display !== 'flex')) b.click(); });   // los avisos de ORDEVA están en la 🔔 campanita
     const barra = async () => { await abrirCampana(p); await p.waitForTimeout(80); return p.evaluate(() => { const x = document.getElementById('subBar'); if(!x) return null; const r = x.getBoundingClientRect(); return { h: Math.round(r.height), vis: getComputedStyle(x).display !== 'none', t: x.textContent }; }).then(async r => { await p.evaluate(() => { const m = document.querySelector('.vito-campana-menu'); if(m) m.style.display = 'none'; }); return r; }); };
     let r = await barra();
     chk('1. El aviso está en la 🔔 campanita (no en la pantalla principal) y la campanita lo cuenta', await p.evaluate(() => { const x = document.getElementById('subBar'); return !!x && !!x.closest('.vito-campana-menu') && document.querySelector('.vito-campana-badge').textContent === '1'; }));
@@ -47,7 +47,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     chk('3. Tocarlo abre el menú de la suscripción (planes y pagos)', await p.evaluate(() => !!document.querySelector('#subOverlay.show')));
     await p.evaluate(() => document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')));
 
-    // 4. Vento Nube (suscripción verificada por el servidor, simulada)
+    // 4. ORDEVA Nube (suscripción verificada por el servidor, simulada)
     await p.evaluate(() => {
       window.__planes = 0;
       window.__vs = { manda: true, mostrar: false };

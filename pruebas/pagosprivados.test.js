@@ -1,4 +1,4 @@
-// «Solamente el administrador puede ver lo del Nequi» (Vento 1.55.0, D5), en la app contra el «Supabase local» REAL:
+// «Solamente el administrador puede ver lo del Nequi» (ORDEVA 1.55.0, D5), en la app contra el «Supabase local» REAL:
 //  1. El celular del dueño lee el aviso «ANA RUIZ te envió $45.000»: lo ve completo (con el nombre).
 //  2. Los datos del negocio en el servidor (los que se copian a todos los celulares) NO llevan el nombre ni el texto.
 //  3. Otro equipo del dueño (computador): ve el nombre (se lo da el servidor, solo a dueño y administrador).

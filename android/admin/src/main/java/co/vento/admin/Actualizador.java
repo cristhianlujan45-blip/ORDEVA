@@ -19,7 +19,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 
 /**
- * 🔄 Vento Admin se actualiza SOLA (igual que la app Vento: co.vento.app.Actualizador) (sin descargar ni instalar a mano cada vez).
+ * 🔄 ORDEVA Admin se actualiza SOLA (igual que la app Vento: co.vento.app.Actualizador) (sin descargar ni instalar a mano cada vez).
  *  • Revisa cada 30 min (y al abrir Vento) el archivo version.json de la publicación «android».
  *  • Si hay una versión nueva, baja el APK y lo instala con el instalador de Android. Lo hace cuando Vento NO se está
  *    usando (para no cortar nada); al terminar, Android vuelve a prender Vento de fondo (Arranque, MY_PACKAGE_REPLACED).
@@ -140,7 +140,7 @@ final class Actualizador {
         }
     }
 
-    /** Después de actualizarse, Vento Admin vuelve a quedar conectada de fondo sola (sin abrirla). */
+    /** Después de actualizarse, ORDEVA Admin vuelve a quedar conectada de fondo sola (sin abrirla). */
     public static class Arranque extends BroadcastReceiver {
         @Override
         public void onReceive(Context c, Intent i) {
@@ -163,10 +163,10 @@ final class Actualizador {
                 try {
                     android.app.NotificationManager nm = (android.app.NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
                     if (Build.VERSION.SDK_INT >= 26 && nm.getNotificationChannel("vento_admin_act") == null)
-                        nm.createNotificationChannel(new android.app.NotificationChannel("vento_admin_act", "Actualizaciones de Vento Admin", android.app.NotificationManager.IMPORTANCE_DEFAULT));
+                        nm.createNotificationChannel(new android.app.NotificationChannel("vento_admin_act", "Actualizaciones de ORDEVA Admin", android.app.NotificationManager.IMPORTANCE_DEFAULT));
                     android.app.Notification.Builder b = Build.VERSION.SDK_INT >= 26 ? new android.app.Notification.Builder(c, "vento_admin_act") : new android.app.Notification.Builder(c);
-                    b.setSmallIcon(android.R.drawable.stat_sys_download_done).setContentTitle("🔄 Vento Admin tiene una actualización")
-                            .setContentText("Toca «Actualizar». Después Vento Admin se actualiza sola.").setAutoCancel(true)
+                    b.setSmallIcon(android.R.drawable.stat_sys_download_done).setContentTitle("🔄 ORDEVA Admin tiene una actualización")
+                            .setContentText("Toca «Actualizar». Después ORDEVA Admin se actualiza sola.").setAutoCancel(true)
                             .setContentIntent(PendingIntent.getActivity(c, 4402, confirmar, PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0)));
                     nm.notify(4402, b.build());
                 } catch (Throwable ignorado) { }

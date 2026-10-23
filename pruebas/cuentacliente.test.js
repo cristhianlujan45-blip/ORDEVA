@@ -1,4 +1,4 @@
-// La app del negocio conectada con Vento Admin (contra el «Supabase local» REAL):
+// La app del negocio conectada con ORDEVA Admin (contra el «Supabase local» REAL):
 //  1. Cada equipo avisa al servidor que existe (el administrador ve a todos los usuarios).
 //  2. 🎧 Soporte dentro de la app: escribir, ver la respuesta del administrador (con aviso) y contestar.
 //  3. Licencia del proveedor por link (#lic=…) y con el código en «Mi plan»: se activa en el negocio.
@@ -77,7 +77,7 @@ const ADMIN = 'cristhianwkh@gmail.com';
 
     // ===== 2. Soporte =====
     await irAjustes(A.p, 'ayuda');
-    chk('2. Ajustes → Guía y soporte: «🎧 Soporte de Vento»', await esperar(A.p, () => !!document.getElementById('vcSoporte') && document.getElementById('vcSoporte').offsetParent !== null));
+    chk('2. Ajustes → Guía y soporte: «🎧 Soporte de ORDEVA»', await esperar(A.p, () => !!document.getElementById('vcSoporte') && document.getElementById('vcSoporte').offsetParent !== null));
     // Un error que registró la app en este equipo (el cliente no ve su código)
     const codErr = await A.p.evaluate(() => window.mesoraLogError('imprimir', 'La impresora no respondió (timeout)', 'imprimirCuenta'));
     await A.p.click('#vcNuevo');
@@ -143,7 +143,7 @@ const ADMIN = 'cristhianwkh@gmail.com';
     chk('5. «¿Olvidaste tu contraseña?» → «Otras formas» tiene «📱 Por mensaje de texto»', await esperar(C.p, () => !document.getElementById('recForm').hidden && !!document.getElementById('vcSmsBox')));
     await C.p.evaluate(() => { document.getElementById('recOtras').open = true; });   // está en «Otras formas de recuperarla»
     await C.p.fill('#vcSmsTel', '3001112233'); await C.p.click('#vcSmsBtn');
-    chk('5. Pide la contraseña por SMS: le llega al soporte de Vento', await esperar(C.p, () => /Listo/.test(document.getElementById('vcSmsTxt').textContent)) &&
+    chk('5. Pide la contraseña por SMS: le llega al soporte de ORDEVA', await esperar(C.p, () => /Listo/.test(document.getElementById('vcSmsTxt').textContent)) &&
       (await api('/admin/soporte', {}, adm.token)).j.casos.some(c => c.tipo === 'clave' && c.telefono === '3001112233' && c.email === 'dueno@soporte.co' && c.telefono_de_la_cuenta === '3001112233'));
     await C.ctx.close();
 
@@ -163,7 +163,7 @@ const ADMIN = 'cristhianwkh@gmail.com';
     chk('6. Ve los datos de su negocio (no perdió nada)', await esperar(D.p, () => data.products.some(p => p.name === 'Club Colombia Admin'), null, 15000));
     const m = await sb.sql("select u.email, m.rol from miembros m join auth.users u on u.id = m.usuario_id where m.negocio_id = $1", [negAdm]);
     chk('6. En el servidor: el negocio ahora es de la cuenta de cliente (el administrador ya no está)', m.length === 1 && m[0].email === 'cristhianwkh+cliente@gmail.com' && m[0].rol === 'dueno', m);
-    chk('6. El administrador sigue entrando a Vento Admin con su contraseña', (await api('/admin/yo', {}, (await entrar(ADMIN, 'Clave-Admin-99')).j.access_token)).j.admin === true);
+    chk('6. El administrador sigue entrando a ORDEVA Admin con su contraseña', (await api('/admin/yo', {}, (await entrar(ADMIN, 'Clave-Admin-99')).j.access_token)).j.admin === true);
     await D.ctx.close();
     // Crear la cuenta de cliente con la MISMA contraseña de administrador: no deja
     const E = await equipo('cliente nuevo');

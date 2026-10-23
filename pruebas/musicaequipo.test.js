@@ -53,7 +53,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
         window.__toasts = []; const s = window.showToast; window.showToast = (m, ms) => { window.__toasts.push(String(m)); s(m, ms); }; });
       return p;
     }
-    // Lo que en la vida real sincroniza Vento Nube (los datos del negocio de la cuenta), aquí se copia a mano.
+    // Lo que en la vida real sincroniza ORDEVA Nube (los datos del negocio de la cuenta), aquí se copia a mano.
     const sincronizar = async (de, a) => { const x = await de.evaluate(() => ({ e: data.musicaEquipo || null, c: data.musicaCanal || null })); await a.evaluate(x => { data.musicaEquipo = x.e; data.musicaCanal = x.c; saveData(); }, x); };
     const esperar = (p, fn, arg, ms) => p.waitForFunction(fn, arg, { timeout: ms || 15000, polling: 250 }).then(() => true, () => false);
 

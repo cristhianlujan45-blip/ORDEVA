@@ -1,4 +1,4 @@
-// Facturación electrónica DIAN de punta a punta (PostgreSQL REAL + Servidor Vento + la app de verdad + MATIAS
+// Facturación electrónica DIAN de punta a punta (PostgreSQL REAL + Servidor ORDEVA + la app de verdad + MATIAS
 // simulado, que revisa campos y aritmética como la DIAN):
 //  1. Ajustes → 🧾 Facturación electrónica DIAN: el dueño escribe los datos y la resolución, guarda y la prende.
 //  2. Una venta en la caja (POS) → documento P.O.S. electrónico validado: número, CUDE y QR en el historial, en el
@@ -57,7 +57,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     // ===== Dueño: cuenta y negocio =====
     const { p } = await equipo('dueño');
     await p.fill('#authBiz', 'Tienda La 14'); await p.fill('#authUser', 'dueno@la14.co'); await p.fill('#authPass', 'clave123'); await p.click('#authBtn');
-    chk('El dueño crea la cuenta y entra a Vento Nube', await esperar(p, () => document.getElementById('authOverlay').hidden && !!window.ventoNube.negocio(), null, 20000));
+    chk('El dueño crea la cuenta y entra a ORDEVA Nube', await esperar(p, () => document.getElementById('authOverlay').hidden && !!window.ventoNube.negocio(), null, 20000));
     await p.click('#onbSaltar', { timeout: 4000 }).catch(() => {}); await cerrarTodo(p);
     const NEG = (await p.evaluate(() => window.ventoNube.negocio())).id;
     chk('Apagada al empezar: la venta no sale a la DIAN', await p.evaluate(() => window.ventoDian.activo() === false));
@@ -79,7 +79,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     chk('1. Prender: «está prendida» y el aviso de ambiente de pruebas', await esperar(p, () => /Prendida/.test(document.getElementById('dianCaja').textContent) && /Ambiente de pruebas/i.test(document.getElementById('dianCaja').textContent), null, 10000) &&
       await p.evaluate(() => window.ventoDian.activo() === true));
     await p.click('#vdProbar');
-    chk('1. «Probar conexión»: conectado con MATIAS (falta que Vento Admin conecte el NIT)', await esperar(p, () => /Conexión con MATIAS lista/.test(document.getElementById('vdMsg').textContent), null, 10000));
+    chk('1. «Probar conexión»: conectado con MATIAS (falta que ORDEVA Admin conecte el NIT)', await esperar(p, () => /Conexión con MATIAS lista/.test(document.getElementById('vdMsg').textContent), null, 10000));
 
     // ===== 2. Venta en la caja → P.O.S. electrónico =====
     const vender = (items, pago) => p.evaluate(async ([items, pago]) => {

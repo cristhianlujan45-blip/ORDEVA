@@ -1,4 +1,4 @@
-// Vento Admin conectado al servidor (PostgreSQL REAL + Edge Function + supabase-js de verdad):
+// ORDEVA Admin conectado al servidor (PostgreSQL REAL + Edge Function + supabase-js de verdad):
 //  1. Entrar: crear la cuenta de administrador con su correo (la contraseña la pone él), salir y volver a entrar.
 //     Un cliente no puede entrar al panel.
 //  2. 📊 Resumen: usuarios registrados, negocios, equipos, soporte por responder.

@@ -1,5 +1,5 @@
-/* Vento Nube · conexión por defecto para TODOS los celulares.
-   Si se llenan estos dos datos (Supabase → Project Settings → API), cada celular que abra Vento ya
+/* ORDEVA Nube · conexión por defecto para TODOS los celulares.
+   Si se llenan estos dos datos (Supabase → Project Settings → API), cada celular que abra ORDEVA ya
    queda conectado a la base de datos sin tener que pegarlos a mano.
    Solo va la clave PÚBLICA (anon / publishable). NUNCA la service_role / secret key. */
 window.VENTO_NUBE_DEFAULT = {

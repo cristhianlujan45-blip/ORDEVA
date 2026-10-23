@@ -1,16 +1,16 @@
-// Bloquear desde Vento Admin y «sin base de datos no funciona» (lib/vento-puerta.js y nube/vento-suscripcion.js):
+// Bloquear desde ORDEVA Admin y «sin base de datos no funciona» (lib/vento-puerta.js y nube/vento-suscripcion.js):
 //  • Negocio bloqueado → «🔒 Esta cuenta está bloqueada» con el motivo, AL INSTANTE (aviso en vivo), en todos sus
 //    equipos; sigue bloqueado al volver a abrir sin internet; desbloqueado → abre solo.
 //  • Usuario bloqueado → «🔒 Tu usuario está bloqueado».
-//  • Sin poder hablar con la base de datos más de 60 s (aquí acortado) → «📡 Sin conexión con Vento», aunque el
+//  • Sin poder hablar con la base de datos más de 60 s (aquí acortado) → «📡 Sin conexión con ORDEVA», aunque el
 //    estado firmado siga vigente; vuelve la conexión → abre sola.
 // (Mismo simulador que puertaytiemporeal.)
 // Puerta + tiempo real (lib/vento-puerta.js y nube/vento-suscripcion.js):
-//  • sin cuenta de Vento Nube la app queda tapada («Conecta Vento a tu cuenta»);
+//  • sin cuenta de ORDEVA Nube la app queda tapada («Conecta ORDEVA a tu cuenta»);
 //  • con cuenta y estado firmado por el servidor, la app abre;
 //  • cuando la base de datos avisa un cambio (activar, cambiar plan, cancelar), la app lo toma AL INSTANTE, sin
 //    tocar nada y sin esperar los refrescos de respaldo;
-//  • sin internet se sigue con el último estado firmado; vencido y sin poder renovarlo → «Sin conexión con Vento»;
+//  • sin internet se sigue con el último estado firmado; vencido y sin poder renovarlo → «Sin conexión con ORDEVA»;
 //    al volver la conexión la app abre sola.
 // El servidor y Realtime se simulan (llave ECDSA temporal). No usa internet. La puerta se fuerza con ?puerta=1.
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
@@ -89,7 +89,7 @@ const b64u = b => Buffer.from(b).toString('base64').replace(/\+/g, '-').replace(
     await p.evaluate(n => window.__rtAviso('vs-' + n, 's'), NEG);
     const ok1 = await listo(p, () => document.documentElement.getAttribute('data-vento-puerta') === 'bloqueado', 4000);
     let g = await puerta(p);
-    chk('Vento Admin bloquea el negocio → la app queda tapada AL INSTANTE («🔒 Esta cuenta está bloqueada»)', ok1 && /Esta cuenta está bloqueada/.test(g.txt) && Date.now() - t0 < 3000, JSON.stringify(g));
+    chk('ORDEVA Admin bloquea el negocio → la app queda tapada AL INSTANTE («🔒 Esta cuenta está bloqueada»)', ok1 && /Esta cuenta está bloqueada/.test(g.txt) && Date.now() - t0 < 3000, JSON.stringify(g));
     chk('…con el motivo que escribió el administrador', /Pago pendiente del mes/.test(g.txt), g && g.txt.slice(0, 200));
     chk('…solo «Volver a revisar» y «Cerrar sesión»', await p.evaluate(() => [...document.querySelectorAll('#vpOv [data-vp]')].map(x => x.dataset.vp).sort().join(',') === 'reintentar,salir'));
     chk('…y queda guardado en el equipo (sin token del plan)', await p.evaluate(n => !!localStorage.getItem('vento_sub_bloqueo:' + n) && !localStorage.getItem('vento_sub_token:' + n), NEG));
@@ -113,7 +113,7 @@ const b64u = b => Buffer.from(b).toString('base64').replace(/\+/g, '-').replace(
     chk('Desbloqueado el usuario (aviso en vivo) → abre solo', await listo(p, () => !document.getElementById('vpOv'), 6000));
     // ---------- Sin base de datos, no funciona ----------
     bd.offline = true; await ctx.setOffline(true); await p.evaluate(() => window.dispatchEvent(new Event('offline')));
-    chk('Sin internet (con el estado firmado todavía vigente): al pasar el tiempo sin la base de datos → «📡 Sin conexión con Vento»',
+    chk('Sin internet (con el estado firmado todavía vigente): al pasar el tiempo sin la base de datos → «📡 Sin conexión con ORDEVA»',
       await listo(p, () => document.documentElement.getAttribute('data-vento-puerta') === 'sinconexion' && /necesita estar conectada/.test((document.getElementById('vpOv') || {}).innerText || ''), 9000), JSON.stringify(await puerta(p)));
     bd.offline = false; await ctx.setOffline(false); await p.evaluate(() => window.dispatchEvent(new Event('online')));
     chk('Vuelve el internet → la app abre sola', await listo(p, () => !document.getElementById('vpOv'), 9000), JSON.stringify(await puerta(p)));

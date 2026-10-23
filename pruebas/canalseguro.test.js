@@ -1,4 +1,4 @@
-// 🔒 Canales seguros (ORDEVA etapa 4, Vento 1.56.0): lo que llega por los canales del QR, de meseros y de preparación.
+// 🔒 Canales seguros (ORDEVA etapa 4, ORDEVA 1.56.0): lo que llega por los canales del QR, de meseros y de preparación.
 //  R1. Un pedido del QR con el código de SU mesa entra solo a la cuenta. Sin el código (o con otro) NO entra solo ni
 //      crea mesas: queda «🆕 Por aceptar», marcado «sin el código del QR» y en la actividad del equipo. Al aceptarlo,
 //      se suma (y si la mesa no existía, se crea entonces).

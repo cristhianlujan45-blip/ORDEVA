@@ -1,10 +1,10 @@
-// 🐞 Errores de los equipos → Vento Admin, de punta a punta (PostgreSQL REAL + Edge Function + la app de verdad):
+// 🐞 Errores de los equipos → ORDEVA Admin, de punta a punta (PostgreSQL REAL + Edge Function + la app de verdad):
 //  1. Un error de la app en el equipo de un negocio llega al servidor (con negocio, usuario, versión y la línea).
 //     Nunca va el link secreto (#… de la dirección) ni datos del negocio.
 //  2. Vigía de la música: canciones esperando sin reproductor, y reproductor prendido que no arranca → reporte.
 //  3. Página del QR (celular del cliente): el local no confirmó el pedido en 3 min → reporte.
-//  4. Vento Admin → 🐞 Errores: los ve agrupados, con el globito; el detalle dice dónde pasó; «✅ Ya lo arreglé».
-//  5. 💜 Frases de pago: un aviso que Vento no entiende → «Enseñar esta frase» en el panel → el siguiente aviso igual ya es
+//  4. ORDEVA Admin → 🐞 Errores: los ve agrupados, con el globito; el detalle dice dónde pasó; «✅ Ya lo arreglé».
+//  5. 💜 Frases de pago: un aviso que ORDEVA no entiende → «Enseñar esta frase» en el panel → el siguiente aviso igual ya es
 //     un pago en la app del negocio (sin reinstalar).
 'use strict';
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
@@ -80,7 +80,7 @@ const ADMIN = 'cristhianwkh@gmail.com', CLAVE_ADMIN = 'Clave-de-prueba-77';
     // ===== 3. Página del QR: el local no confirma =====
     await A.p.evaluate(base => { const M = window.vitoMod, c = M.qCfg(); c.url = base + '/pedido.html'; c.live = true; M.SS('vito_qr', c); M.reconectarPedidos(); }, BASE);
     const link = await A.p.evaluate(() => window.vitoMod.linkMesa(window.vitoMod.qCfg(), 1));
-    await A.ctx.close();                                                   // el local cerró Vento: nadie confirma
+    await A.ctx.close();                                                   // el local cerró ORDEVA: nadie confirma
     const C = await pagina('cliente', link);
     await C.p.fill('#p', '2 Águila'); await C.p.click('#b');
     await C.p.waitForTimeout(800);
@@ -90,7 +90,7 @@ const ADMIN = 'cristhianwkh@gmail.com', CLAVE_ADMIN = 'Clave-de-prueba-77';
     chk('3. El celular del cliente reporta que el local no confirmó el pedido', await hasta(async () => (await filas("select 1 from app_errores where huella = 'pedido|sin-confirmar' and pagina = 'pedido' and (detalle->>'mesa') = '1'")).length > 0),
       await filas("select huella, pagina, detalle from app_errores where tipo = 'pedido'"));
 
-    // ===== 4. Vento Admin =====
+    // ===== 4. ORDEVA Admin =====
     await sb.usuario(ADMIN, CLAVE_ADMIN);
     const D = await pagina('admin', BASE + '/admin.html');
     await D.p.waitForFunction(() => !document.getElementById('lock').hidden && !document.getElementById('lkEntrar').hidden, null, { timeout: 12000 });
@@ -121,7 +121,7 @@ const ADMIN = 'cristhianwkh@gmail.com', CLAVE_ADMIN = 'Clave-de-prueba-77';
     await N.p.evaluate(() => document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')));
     const avisar = id => N.p.evaluate(id => { window.pagosRecibirTexto('Bancolombia | Bancolombia | Movimiento en tu cuenta por $4.000 de JUAN PEREZ', id); }, id);
     await avisar('and-frase-1');
-    chk('5. Un aviso que Vento no entiende («Movimiento en tu cuenta por $4.000») no se toma como pago…', await N.p.waitForTimeout(1500).then(() => N.p.evaluate(() => !(data.pagos.lista || []).some(x => x.monto === 4000))));
+    chk('5. Un aviso que ORDEVA no entiende («Movimiento en tu cuenta por $4.000») no se toma como pago…', await N.p.waitForTimeout(1500).then(() => N.p.evaluate(() => !(data.pagos.lista || []).some(x => x.monto === 4000))));
     chk('5. … y le llega al administrador (sin nombres ni valores)', await hasta(async () => (await filas("select 1 from app_errores where tipo = 'pago' and negocio = 'Bar Frases' and detalle->>'texto' like '%Movimiento en tu cuenta por $# de NOMBRE%'")).length > 0),
       await filas("select mensaje, detalle from app_errores where tipo = 'pago'"));
     await D.p.selectOption('#erTipo', 'pago'); await D.p.click('#erRef');

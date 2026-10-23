@@ -1,4 +1,4 @@
-// Agregar DaviPlata (y Nequi) para que Vento avise «Pagaron $X» UNA vez por pago.
+// Agregar DaviPlata (y Nequi) para que ORDEVA avise «Pagaron $X» UNA vez por pago.
 // El puente nativo (VentoAndroid: VentoEscucha + notificar + permisos) se simula; lo demás es la app de verdad.
 //  1. DaviPlata escribe de «usted» («¡Le llegó plata!», «MARIA LOPEZ le pasó $30.000», «Recibió $15.000»): ahora sí se entiende.
 //     Lo que SALE («Usted pasó $10.000 a…») y los códigos no se toman.
@@ -77,7 +77,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     let txt = await p.textContent('#pgGuiaOv');
     chk('4. Explica que NO necesita convenio con Davivienda y que avisa una sola vez', /No necesitas convenio con Davivienda/.test(txt) && /una sola vez/.test(txt), txt.slice(0, 300));
     chk('4. Tiene los 6 pasos (app, prender, permiso, notificaciones de DaviPlata, batería, prueba)', await p.$$eval('#pgGuiaOv .gp-paso', x => x.length) === 6 && /Acceso a notificaciones/.test(txt) && /Aplicaciones → DaviPlata → Notificaciones/.test(txt));
-    chk('4. Paso 1 ya está listo (estás en la app Vento)', /Ya estás en la app Vento/.test(txt));
+    chk('4. Paso 1 ya está listo (estás en la app ORDEVA)', /Ya estás en la app Vento/.test(txt));
     await p.click('#pgGuiaOv [data-gp="prender"]'); await p.waitForTimeout(600);
     let A = await p.evaluate(() => window.__and);
     chk('4. «Prender ahora» prende los avisos y abre el permiso «Acceso a notificaciones»', A.on && A.permisoAbierto >= 1 && await p.evaluate(() => data.pagos.on === true), A);
