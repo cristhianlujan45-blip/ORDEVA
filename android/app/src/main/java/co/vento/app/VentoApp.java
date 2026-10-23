@@ -331,34 +331,88 @@ public class VentoApp extends Application {
         ui.post(() -> { if (ttsPago == null) crearVoz(); });
     }
 
-    private static void crearVoz() {
-        {
-            try {
-                ttsPago = new TextToSpeech(app, st -> ui.post(() -> {
-                    ttsPagoListo = st == TextToSpeech.SUCCESS && ttsPago != null;
-                    ArrayList<String> fila = new ArrayList<>(pagosEnFila);
-                    pagosEnFila.clear();
-                    if (!ttsPagoListo) {                       // sin voz propia: la de siempre
+    // ---------- Qué motor de voz usar (1.52.0) ----------
+    // En Samsung el motor de fábrica («Samsung TTS») muchas veces NO trae la voz en español: el pago se mandaba a decir
+    // y no sonaba nada; el reintento usaba el mismo motor y la voz de respaldo también. En Xiaomi casi siempre está el
+    // de Google y sí sonaba. Ahora: el motor de Google («Servicios de voz de Google», que viene en casi todos los
+    // Android, también en Samsung) y, si no está, no habla español o no responde, el otro. Los reintentos alternan.
+    static final String GOOGLE_TTS = "com.google.android.tts";
+    private static String motorForzado = null;     // null: automático · "": el del celular · paquete: ese
+    static String motorPago = "";                  // el que quedó hablando (para el chequeo)
+    static boolean motorInstalado(Context c, String pkg) {
+        try {
+            for (android.content.pm.ResolveInfo r : c.getPackageManager().queryIntentServices(new Intent(TextToSpeech.Engine.INTENT_ACTION_TTS_SERVICE), 0))
+                if (r.serviceInfo != null && pkg.equals(r.serviceInfo.packageName)) return true;
+        } catch (Throwable ignorado) { }
+        return false;
+    }
+    /** El paquete del motor a usar; null = el del celular. */
+    static String motorElegido(Context c) {
+        if (motorForzado != null) return motorForzado.isEmpty() ? null : motorForzado;
+        return motorInstalado(c, GOOGLE_TTS) ? GOOGLE_TTS : null;
+    }
+    /** El otro motor (para cuando el elegido no sirvió); null si no hay otro. */
+    private static String otroMotor(String usado) {
+        if (usado != null) return "";                                                   // falló Google: el del celular
+        return motorInstalado(app, GOOGLE_TTS) ? GOOGLE_TTS : null;                     // falló el del celular: Google
+    }
+    static TextToSpeech nuevoMotor(Context c, TextToSpeech.OnInitListener l, String motor) {
+        return motor != null ? new TextToSpeech(c, l, motor) : new TextToSpeech(c, l);
+    }
+    /** Pone el español (de Colombia o el que tenga). false si este motor no tiene voz en español. */
+    static boolean ponerEspanol(TextToSpeech t) {
+        try {
+            int r = t.setLanguage(Locale.forLanguageTag("es-CO"));
+            if (r == TextToSpeech.LANG_MISSING_DATA || r == TextToSpeech.LANG_NOT_SUPPORTED) r = t.setLanguage(new Locale("es", "US"));
+            if (r == TextToSpeech.LANG_MISSING_DATA || r == TextToSpeech.LANG_NOT_SUPPORTED) r = t.setLanguage(new Locale("es"));
+            return r != TextToSpeech.LANG_MISSING_DATA && r != TextToSpeech.LANG_NOT_SUPPORTED;
+        } catch (Throwable e) { return false; }
+    }
+
+    private static void crearVoz() { crearVoz(false); }
+    private static void crearVoz(final boolean segundo) {
+        final String motor = motorElegido(app);
+        try {
+            ttsPago = nuevoMotor(app, st -> ui.post(() -> {
+                boolean listo = st == TextToSpeech.SUCCESS && ttsPago != null;
+                boolean espanol = listo && ponerEspanol(ttsPago);
+                if (!(listo && espanol) && !segundo) {
+                    // Este motor no arrancó o no habla español: se prueba el otro (los pagos en fila esperan).
+                    String otro = otroMotor(motor);
+                    if (otro != null) {
+                        VentoEscucha.traza(app.getSharedPreferences("vento", MODE_PRIVATE), "Vento", "Voz de los pagos",
+                                "🔇 el motor de voz " + (motor == null ? "del celular" : motor) + (listo ? " no tiene voz en español" : " no arrancó") + ": se usa " + (otro.isEmpty() ? "el del celular" : otro));
                         try { if (ttsPago != null) ttsPago.shutdown(); } catch (Exception ignorado) { }
-                        ttsPago = null;
-                        for (String f : fila) try { app.new Puente().hablar(AvisoPago.pausado(f.startsWith(AL_PARLANTE) ? f.substring(1) : f), "es-CO", AvisoPago.VELOCIDAD); } catch (Exception ignorado) { }
+                        ttsPago = null; ttsPagoListo = false;
+                        motorForzado = otro;
+                        crearVoz(true);
                         return;
                     }
-                    try { ttsPago.setAudioAttributes(atributosPago()); } catch (Exception ignorado) { }
-                    // El idioma se carga de una vez (así el primer pago no espera a que cargue la voz en español).
-                    try { int lr = ttsPago.setLanguage(Locale.forLanguageTag("es-CO")); if (lr == TextToSpeech.LANG_MISSING_DATA || lr == TextToSpeech.LANG_NOT_SUPPORTED) ttsPago.setLanguage(new Locale("es")); ttsPago.setSpeechRate(AvisoPago.VELOCIDAD); } catch (Exception ignorado) { }
-                    ttsPago.setOnUtteranceProgressListener(new UtteranceProgressListener() {
-                        @Override public void onStart(String u) { vozEmpezo = System.currentTimeMillis(); }
-                        @Override public void onDone(String u) { vozEmpezo = System.currentTimeMillis(); ui.post(() -> terminoVoz(u, true)); }
-                        @Override public void onError(String u) { vozEmpezo = System.currentTimeMillis(); ui.post(() -> terminoVoz(u, false)); }
-                    });
-                    for (String f : fila) hablarPago(f);
-                }));
-            } catch (Exception e) {
-                ttsPago = null;
-                for (String f : new ArrayList<>(pagosEnFila)) try { app.new Puente().hablar(AvisoPago.pausado(f.startsWith(AL_PARLANTE) ? f.substring(1) : f), "es-CO", AvisoPago.VELOCIDAD); } catch (Exception ignorado) { }
+                }
+                ttsPagoListo = listo;
+                ArrayList<String> fila = new ArrayList<>(pagosEnFila);
                 pagosEnFila.clear();
-            }
+                if (!ttsPagoListo) {                       // sin voz propia: la de siempre
+                    try { if (ttsPago != null) ttsPago.shutdown(); } catch (Exception ignorado) { }
+                    ttsPago = null;
+                    for (String f : fila) try { app.new Puente().hablar(AvisoPago.pausado(f.startsWith(AL_PARLANTE) ? f.substring(1) : f), "es-CO", AvisoPago.VELOCIDAD); } catch (Exception ignorado) { }
+                    return;
+                }
+                motorPago = motor == null ? "" : motor;
+                try { if (motorPago.isEmpty()) motorPago = "sistema:" + ttsPago.getDefaultEngine(); } catch (Exception ignorado) { }
+                try { ttsPago.setAudioAttributes(atributosPago()); } catch (Exception ignorado) { }
+                try { ttsPago.setSpeechRate(AvisoPago.VELOCIDAD); } catch (Exception ignorado) { }
+                ttsPago.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+                    @Override public void onStart(String u) { vozEmpezo = System.currentTimeMillis(); }
+                    @Override public void onDone(String u) { vozEmpezo = System.currentTimeMillis(); ui.post(() -> terminoVoz(u, true)); }
+                    @Override public void onError(String u) { vozEmpezo = System.currentTimeMillis(); ui.post(() -> terminoVoz(u, false)); }
+                });
+                for (String f : fila) hablarPago(f);
+            }), motor);
+        } catch (Exception e) {
+            ttsPago = null;
+            for (String f : new ArrayList<>(pagosEnFila)) try { app.new Puente().hablar(AvisoPago.pausado(f.startsWith(AL_PARLANTE) ? f.substring(1) : f), "es-CO", AvisoPago.VELOCIDAD); } catch (Exception ignorado) { }
+            pagosEnFila.clear();
         }
     }
 
@@ -367,8 +421,7 @@ public class VentoApp extends Application {
         // Con pausas cortas («Recibiste, 20000 pesos, por Nequi.») y más despacio: que se entienda el valor (1.43.4).
         final String frase = AvisoPago.pausado(frase0 != null && frase0.startsWith(AL_PARLANTE) ? frase0.substring(1) : frase0);
         try {
-            int r = ttsPago.setLanguage(Locale.forLanguageTag("es-CO"));
-            if (r == TextToSpeech.LANG_MISSING_DATA || r == TextToSpeech.LANG_NOT_SUPPORTED) ttsPago.setLanguage(new Locale("es"));
+            ponerEspanol(ttsPago);
             ttsPago.setSpeechRate(AvisoPago.VELOCIDAD);
             // En el parlante de avisos no se toca la música del celular (va por otro lado) ni el volumen de la alarma.
             if (!alParlante) { bajarMusica(); ponerVolumen(); }
@@ -428,6 +481,10 @@ public class VentoApp extends Application {
     private static int realceSesion = 0;
     static android.os.Bundle paramsVoz() {
         android.os.Bundle b = new android.os.Bundle();
+        // Por la alarma y a todo volumen también así: hay motores que no leen setAudioAttributes y salían por la
+        // música (bajita o en silencio en el negocio).
+        b.putInt(TextToSpeech.Engine.KEY_PARAM_STREAM, android.media.AudioManager.STREAM_ALARM);
+        b.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1f);
         int g = AvisoPago.refuerzo(volPagos());
         if (g <= 0 || Build.VERSION.SDK_INT < 21 || app == null) return b;
         try {
@@ -458,7 +515,10 @@ public class VentoApp extends Application {
             return;
         }
         vozReintentada.put(frase, ahora);
-        VentoEscucha.traza(sp, "Vento", frase, "🔇 " + porQue + ": se abrió un motor de voz nuevo y se volvió a decir");
+        // El reintento va con el OTRO motor (Google ↔ el del celular): con el mismo, en Samsung tampoco sonaba.
+        String usado = motorPago.isEmpty() || motorPago.startsWith("sistema:") ? null : motorPago, otro = otroMotor(usado);
+        if (otro != null) motorForzado = otro;
+        VentoEscucha.traza(sp, "Vento", frase, "🔇 " + porQue + ": se volvió a decir con " + (otro == null ? "un motor de voz nuevo" : otro.isEmpty() ? "el motor de voz del celular" : "el motor de voz de Google"));
         try { if (ttsPago != null) ttsPago.shutdown(); } catch (Exception ignorado) { }
         ttsPago = null; ttsPagoListo = false;
         decirVoz(frase);
@@ -1433,7 +1493,8 @@ public class VentoApp extends Application {
             ui.post(() -> {
                 Runnable decir = () -> {
                     try {
-                        tts.setLanguage(Locale.forLanguageTag(idioma == null || idioma.isEmpty() ? "es-CO" : idioma));
+                        if (idioma == null || idioma.isEmpty() || idioma.toLowerCase(Locale.ROOT).startsWith("es")) ponerEspanol(tts);
+                        else tts.setLanguage(Locale.forLanguageTag(idioma));
                         tts.setSpeechRate(velocidad > 0 ? velocidad : 1f);
                         tts.speak(texto, TextToSpeech.QUEUE_ADD, null, "v" + System.nanoTime());
                     } catch (Exception e) { js("window.__ventoHabla&&window.__ventoHabla('end')"); }
@@ -1442,7 +1503,7 @@ public class VentoApp extends Application {
                 // Mientras la voz se prepara, lo que llegue queda en fila (antes se creaba otra voz y lo primero se perdía).
                 hablarFila.add(decir);
                 if (tts != null) return;
-                tts = new TextToSpeech(VentoApp.this, st -> ui.post(() -> {
+                tts = nuevoMotor(VentoApp.this, st -> ui.post(() -> {
                     ttsListo = st == TextToSpeech.SUCCESS;
                     ArrayList<Runnable> fila = new ArrayList<>(hablarFila);
                     hablarFila.clear();
@@ -1453,7 +1514,7 @@ public class VentoApp extends Application {
                         @Override public void onError(String u) { js("window.__ventoHabla&&window.__ventoHabla('end')"); }
                     });
                     for (Runnable r : fila) r.run();
-                }));
+                }), motorElegido(VentoApp.this));
             });
         }
 
@@ -1524,6 +1585,9 @@ public class VentoApp extends Application {
         public void pagosVozOn(boolean on) { getSharedPreferences("vento", MODE_PRIVATE).edit().putBoolean("pagosVoz", on).apply(); }
         @JavascriptInterface
         public boolean pagosVozEstado() { return vozPagosOn(); }
+        /** Para el 🩺 chequeo: el motor de voz que dice los pagos («com.google.android.tts», «sistema:com.samsung.SMT»…). */
+        @JavascriptInterface
+        public String pagosMotorVoz() { return motorPago == null || motorPago.isEmpty() ? (ttsPago == null ? "" : "?") : motorPago; }
 
         /** Los pagos de los otros equipos desde Android (Cruce): dirección, llave pública, token del celular. Vacío = apagar. */
         @JavascriptInterface

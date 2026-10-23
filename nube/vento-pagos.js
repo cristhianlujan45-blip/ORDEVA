@@ -683,7 +683,10 @@
         if(m === 'Samsung') L.push(fila(null, '📱 Samsung', 'Ajustes → Batería → Límites de uso en segundo plano: que Vento NO esté en «Aplicaciones en suspensión» ni «en suspensión profunda».'));
         else if(m) L.push(fila(null, '🚀 ' + m + ': inicio automático', 'Prende «Inicio automático» para Vento (y para Nequi y DaviPlata). Sin eso la marca cierra Vento de fondo.', '<br><button type="button" class="btn-ghost" data-ck="auto" style="margin-top:6px">🚀 Abrir inicio automático</button>'));
       }
-      L.push(fila(voz ? true : null, '🗣️ Voz de los pagos', voz ? 'Prendida.' : 'Apagada: los pagos llegan sin voz (Ajustes → Pagos → «Decir los pagos en voz alta»).', '<br><button type="button" class="btn-ghost" data-ck="voz" style="margin-top:6px">▶ Probar la voz</button>'));
+      // 1.52.0: qué motor de voz dice los pagos (en Samsung, el de fábrica muchas veces no tiene español).
+      var motor = ''; try{ motor = A && A.pagosMotorVoz ? String(A.pagosMotorVoz() || '') : ''; }catch(e){}
+      var motorTxt = !motor ? '' : /google/.test(motor) ? ' Motor: Google.' : /samsung/i.test(motor) ? ' Motor: Samsung (si no suena, instala «Servicios de voz de Google» desde la Play Store).' : ' Motor: ' + motor.replace(/^sistema:/, '') + '.';
+      L.push(fila(voz ? true : null, '🗣️ Voz de los pagos', (voz ? 'Prendida.' : 'Apagada: los pagos llegan sin voz (Ajustes → Pagos → «Decir los pagos en voz alta»).') + motorTxt, '<br><button type="button" class="btn-ghost" data-ck="voz" style="margin-top:6px">▶ Probar la voz</button>'));
       if(!n){ L.push(fila(false, '👥 Pagos entre equipos', 'Entra con tu correo (Vento Nube) en cada equipo: así los pagos que lee un celular les llegan a todos.')); }
       else {
         L.push(fila(r[0] === true, '🌐 Servidor Vento', r[0] === true ? 'Activo' + (est.version ? ' (v' + est.version + ')' : '') + '.' : 'No responde: sin internet, o el servidor de pagos no está desplegado.'));
