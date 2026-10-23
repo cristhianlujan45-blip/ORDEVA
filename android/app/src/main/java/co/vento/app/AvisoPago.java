@@ -49,8 +49,19 @@ public final class AvisoPago {
 
     static boolean esBanco(String app) { return app != null && BANCO.matcher(app).find(); }
 
+    // Plata que llega como RECARGA desde un banco (1.55.1): una transferencia de Bancolombia (u otro banco) a Nequi sale en
+    // Nequi como «Recarga desde Bancolombia» y antes no se avisaba. Nunca la recarga de un celular (minutos, datos,
+    // operador, a un número), una recarga fallida o pendiente, ni la publicidad «Recarga tu Nequi…».
+    static final Pattern RECARGA = Pattern.compile("recarga(?:ste)?\\b[^|\\n]{0,60}?\\b(?:(?:desde|de|por|con)\\s+(?:tu\\s+|su\\s+)?(?:cuenta\\s+(?:de\\s+)?)?)?"
+            + "(?:bancolombia|davivienda|daviplata|bbva|scotiabank|colpatria|av villas|ita[uú]|banco\\s+(?:de\\s+)?\\w+|pse|otr[oa]s?\\s+(?:entidad|banco))\\b"
+            + "|recibiste\\s+una\\s+recarga|(?:te|le)\\s+recargaron", Pattern.CASE_INSENSITIVE);
+    static final Pattern RECARGA_NO = Pattern.compile("\\brecarga\\s+(?:tu|su)\\b|celular|minutos|paquete|recarga(?:ste)?\\s+(?:de\\s+)?(?:datos|plan|m[oó]vil)\\b"
+            + "|\\b(?:claro|tigo|movistar|wom|virgin|etb|avantel|kalley)\\b|(?:a|al|para)\\s+(?:el\\s+)?(?:n[uú]mero\\s+)?(?:\\+?57\\s?)?3\\d{2}\\s?\\d{3}\\s?\\d{4}"
+            + "|fallid|no exitosa|pendiente|compraste|compra de", Pattern.CASE_INSENSITIVE);
+    static boolean esRecarga(String todo) { return todo != null && RECARGA.matcher(todo).find() && !RECARGA_NO.matcher(todo).find(); }
+
     static boolean esRecibido(String todo) {
-        if (todo == null || !RECIBIDO.matcher(todo).find() || NUNCA.matcher(todo).find() || CODIGO.matcher(todo).find()) return false;
+        if (todo == null || !(RECIBIDO.matcher(todo).find() || esRecarga(todo)) || NUNCA.matcher(todo).find() || CODIGO.matcher(todo).find()) return false;
         if (PROMO.matcher(todo).find() && !FUERTE.matcher(todo).find()) return false;
         // Un pago de verdad puede traer «nunca compartas tu clave» o «tu código de transacción»: con una frase fuerte de
         // plata recibida («te envió $…», «a tu llave») sigue siendo pago. Antes esos avisos se descartaban.
@@ -281,7 +292,7 @@ public final class AvisoPago {
     /** ¿Vale la pena guardarlo para revisar? Aviso de una app de banco que habla de plata pero que Vento NO tomó como pago. */
     static boolean pareceDePlata(String todo) {
         return todo != null && Pattern.compile("\\$\\s?\\d|\\bcop\\b|\\d\\s*pesos", Pattern.CASE_INSENSITIVE).matcher(todo).find()
-                && Pattern.compile("recib|lleg|transfer|bre-?b|llave|abon|ingres|acredit|envi|pas[oó]|consign|deposit|pago", Pattern.CASE_INSENSITIVE).matcher(todo).find();
+                && Pattern.compile("recib|lleg|transfer|bre-?b|llave|abon|ingres|acredit|envi|pas[oó]|consign|deposit|pago|recarg", Pattern.CASE_INSENSITIVE).matcher(todo).find();
     }
 
     /**
@@ -310,7 +321,8 @@ public final class AvisoPago {
         if (SALE.matcher(t).find()) return "plata que SALE (pasaste, enviaste, compra…)";
         if (CODIGO.matcher(t).find()) return "código de seguridad";
         if (NUNCA.matcher(t).find()) return "solicitud, rechazado o programado";
-        if (!RECIBIDO.matcher(t).find()) return "no dice que llegó plata";
+        if (RECARGA.matcher(t).find() && RECARGA_NO.matcher(t).find()) return "recarga de celular o que no se hizo";
+        if (!RECIBIDO.matcher(t).find() && !esRecarga(t)) return "no dice que llegó plata";
         if (PROMO.matcher(t).find() && !FUERTE.matcher(t).find()) return "parece publicidad del banco";
         if (PRIVADO.matcher(t).find()) return "mensaje privado (clave o código)";
         if (monto(t) <= 0) return "sin el valor";

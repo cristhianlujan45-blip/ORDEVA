@@ -67,6 +67,12 @@ async function pruebas(sb) {
     ['Nequi | Nequi | PEDRO GOMEZ te mandó $9.000', 9000, 'NEQUI'],
   ];
   for (const [t, m, met] of casos7) { const a = A.leerAviso(t); chk('7. «' + t.split('|').slice(1).join('|').trim() + '» → ' + m, a && a.monto === m && a.metodo === met && a.confianza === 'app', a); }
+  // 7b. 1.55.1: una transferencia de Bancolombia a Nequi llega como «Recarga desde Bancolombia»
+  for (const [t, m] of [['Nequi | Nequi | Recarga desde Bancolombia por $9.000,00', 9000], ['Nequi | Recarga realizada | Recargaste $9.000 desde Bancolombia', 9000], ['Nequi | Nequi | ¡Listo! Recibiste una recarga de $20.000', 20000]]) {
+    const a = A.leerAviso(t); chk('7b. «' + t.split('|').slice(1).join('|').trim() + '» → ' + m + ' por Nequi', a && a.monto === m && a.metodo === 'NEQUI' && a.de === '' && a.confianza === 'app', a);
+  }
+  chk('7b. La recarga de un celular, una fallida o «Recarga tu Nequi…» no son pagos',
+    ['Nequi | Nequi | Recargaste $5.000 a tu celular 3001234567 desde Bancolombia', 'Nequi | Nequi | Recarga fallida desde Bancolombia por $9.000', 'Nequi | Nequi | Recarga tu Nequi desde Bancolombia y gana $5.000', 'Nequi | Nequi | Recarga Claro por $10.000 desde Bancolombia'].every((t) => A.leerAviso(t) === null));
   chk('7. Solicitudes y rechazos no son pagos («te pidió», «solicitud», «rechazada»)', A.leerAviso('Nequi | Nequi | JUAN PEREZ te pidió $20.000') === null && A.leerAviso('Nequi | Nequi | Recibiste una solicitud de plata de $15.000') === null && A.leerAviso('Nequi | Nequi | Tu transferencia Bre-B de $10.000 fue rechazada') === null);
   chk('6. «Usted envió $5.000» (plata que SALE) no es un pago', A.leerAviso('DaviPlata | DaviPlata | Usted envió $5.000 a PEDRO') === null);
   // 8. Lo que entendió la app del celular (pista): su valor manda; «falso» siempre gana; una pista mala no cuenta

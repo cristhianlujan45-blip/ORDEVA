@@ -191,6 +191,27 @@ public class AvisoPagoPrueba {
         for (String x : conCodigo) chk("Pago con código de aprobación: «" + x + "»", AvisoPago.esRecibido(x), x);
         chk("Por qué no: «Pasaste $100…» → plata que SALE", AvisoPago.porQueNo("Pasaste $100 a otro DaviPlata").contains("SALE"), AvisoPago.porQueNo("Pasaste $100 a otro DaviPlata"));
         chk("Por qué no: publicidad", AvisoPago.porQueNo("¿Te llegó la prima? Guárdala").contains("publicidad"), AvisoPago.porQueNo("¿Te llegó la prima? Guárdala"));
+        // 1.55.1: plata que llega a Nequi como «Recarga desde Bancolombia» (una transferencia de Bancolombia a Nequi).
+        String[][] recargas = {
+            {"Recarga desde Bancolombia Recargaste $9.000 desde Bancolombia", "9000"},
+            {"Nequi Recarga desde Bancolombia por $9.000,00", "9000"},
+            {"Recarga realizada Recarga Bancolombia $9.000", "9000"},
+            {"Recargaste $9.000 desde tu cuenta Bancolombia", "9000"},
+            {"¡Listo! Recibiste una recarga de $20.000", "20000"},
+            {"Recarga exitosa desde Davivienda por $15.000", "15000"},
+            {"Recarga desde Bancolombia por $9.000. Mira el comprobante en tu app", "9000"},
+            {"Recarga por PSE desde Banco de Bogotá $50.000", "50000"},
+        };
+        for (String[] r : recargas) {
+            chk("Recarga desde un banco = plata que llegó: «" + r[0] + "»", AvisoPago.esRecibido(r[0]), AvisoPago.porQueNo(r[0]));
+            chk("  … valor " + r[1], AvisoPago.monto(r[0]) == Long.parseLong(r[1]), AvisoPago.monto(r[0]));
+        }
+        String[] recargasNo = { "Recargaste $5.000 a tu celular 3001234567", "Recarga Claro por $10.000 desde Bancolombia", "Recarga tu Nequi desde Bancolombia y gana $5.000",
+                "Haz una recarga desde Bancolombia y participa por $1.000.000", "Tu recarga desde Bancolombia por $9.000 está pendiente", "Recarga fallida desde Bancolombia por $9.000",
+                "Compraste una recarga de minutos por $3.000", "Recarga de datos desde Bancolombia $10.000", "Recargaste $10.000 al 300 123 4567 desde Bancolombia" };
+        for (String rn : recargasNo) chk("Recarga que NO es plata que llegó: «" + rn + "»", !AvisoPago.esRecibido(rn), rn);
+        chk("Por qué no: «recarga de celular o que no se hizo»", AvisoPago.porQueNo("Recarga Claro por $10.000 desde Bancolombia").startsWith("recarga de celular"), AvisoPago.porQueNo("Recarga Claro por $10.000 desde Bancolombia"));
+        chk("Una recarga que no se entendió igual se le pasa a la página (sirveCrudo)", AvisoPago.sirveCrudo("Recarga exitosa por $9.000"), "");
         System.out.println("RESULTADO " + ok + " bien " + mal + " mal");
         System.exit(mal > 0 ? 1 : 0);
     }

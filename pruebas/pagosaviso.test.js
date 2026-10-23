@@ -198,6 +198,15 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
         fuente: window.pagosFuente('Itaú | Itaú | Recibiste $10.000 por Bre-B').nivel };
     });
     chk('16. Pagos que antes no sonaban (con «nunca comparta su clave», transferencia entrante, abono Bre-B, «Recibio» sin tilde…)', !r16.si.length, r16.si);
+    // 16b. 1.55.1: una transferencia de Bancolombia a Nequi llega como «Recarga desde Bancolombia» (antes no sonaba)
+    const rRecarga = await p.evaluate(() => {
+      const si = ['Nequi | Nequi | Recarga desde Bancolombia por $9.000,00', 'Nequi | Recarga realizada | Recargaste $9.000 desde Bancolombia', 'Nequi | Nequi | Recarga desde Bancolombia por $9.000. Mira el comprobante'];
+      const no = ['Nequi | Nequi | Recargaste $5.000 a tu celular 3001234567 desde Bancolombia', 'Nequi | Nequi | Recarga fallida desde Bancolombia por $9.000', 'Nequi | Nequi | Recarga tu Nequi desde Bancolombia y gana $5.000'];
+      const x = window.pagosLeer(si[0]);
+      return { si: si.filter(t => !window.pagosLeer(t)), no: no.filter(t => window.pagosLeer(t)), x };
+    });
+    chk('16b. «Recarga desde Bancolombia por $9.000» → pago de $9.000 por Nequi', !rRecarga.si.length && rRecarga.x && rRecarga.x.monto === 9000 && rRecarga.x.app === 'Nequi', rRecarga);
+    chk('16b. La recarga de un celular, una fallida o «Recarga tu Nequi…» NO son pagos', !rRecarga.no.length, rRecarga.no);
     chk('16. Lo que sale o los códigos NO son pago', !r16.no.length, r16.no);
     const r16b = await p.evaluate(() => ({
       sms1: window.pagosLeer('SMS | 85888 | DaviPlata: recibiste  100,000 en tu DaviPlata. Usalos de forma segura para pagar, comprar y mucho mas!'),
