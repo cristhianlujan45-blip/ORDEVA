@@ -19284,7 +19284,7 @@ function accUsuariosPintar(){
         const np = prompt('Contraseña nueva para ' + u.user + ' (mínimo 6):'); if(np == null) return;
         if(np.length < 6){ showToast('⚠️ La contraseña debe tener al menos 6 caracteres.'); return; }
         const l = authUsers(), x = l.find(y => y.user === u.user); if(!x) return;
-        x.salt = Math.random().toString(36).slice(2) + Date.now().toString(36); x.hash = await authHash(np, x.salt);
+        x.salt = Math.random().toString(36).slice(2) + Date.now().toString(36); x.hash = await authHashClave(np, x.salt);
         localStorage.setItem(AUTH_USERS_KEY, JSON.stringify(l)); showToast('✅ Contraseña de ' + u.user + ' cambiada.');
         // Cuenta con correo: la contraseña es la misma en todos los celulares (se cambia también en la nube).
         const nb = authEsCorreo(u.user) && u.user === authUser ? authNubeCuentas() : null;
@@ -19341,6 +19341,31 @@ async function authHash(pass, salt){
     return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2,'0')).join('');
   }catch(e){ let h = 5381; for(const c of str) h = ((h << 5) + h + c.charCodeAt(0)) >>> 0; return 'x' + h.toString(16); }
 }
+// 1.57.0 (auditoría ORDEVA R8): la contraseña de cada usuario en este celular se guarda con PBKDF2 (100.000 vueltas),
+// no con un solo SHA-256: si alguien copia la memoria del celular, adivinarla por fuerza bruta es miles de veces más lento.
+// Las guardadas antes siguen sirviendo y se pasan solas a PBKDF2 la próxima vez que se entra bien con ellas.
+async function authHashClave(pass, salt){
+  try{
+    const k = await crypto.subtle.importKey('raw', new TextEncoder().encode(String(pass)), 'PBKDF2', false, ['deriveBits']);
+    const b = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: new TextEncoder().encode('vento-clave:' + salt), iterations: 100000, hash: 'SHA-256' }, k, 256);
+    return 'p2:' + [...new Uint8Array(b)].map(x => x.toString(16).padStart(2,'0')).join('');
+  }catch(e){ return authHash(pass, salt); }      // sin crypto.subtle (página sin https): como antes
+}
+// ¿La contraseña es la del usuario u? Si estaba guardada a la antigua y es correcta, se pasa a PBKDF2 (y se guarda).
+async function authClaveOk(u, pass){
+  if(!u || !u.hash) return false;
+  if(String(u.hash).startsWith('p2:')) return (await authHashClave(pass, u.salt)) === u.hash;
+  if((await authHash(pass, u.salt)) !== u.hash) return false;
+  try{
+    const nuevo = await authHashClave(pass, u.salt);
+    if(String(nuevo).startsWith('p2:')){
+      const us = authUsers(), x = us.find(y => y.user === u.user && y.hash === u.hash);
+      if(x){ x.hash = nuevo; localStorage.setItem(AUTH_USERS_KEY, JSON.stringify(us)); }
+      u.hash = nuevo;
+    }
+  }catch(e){}
+  return true;
+}
 async function authAddUser(user, pass, role, cuenta){
   user = (user || '').trim().toLowerCase();
   if(user.length < 3) return 'El usuario debe tener al menos 3 caracteres.';
@@ -19349,7 +19374,7 @@ async function authAddUser(user, pass, role, cuenta){
   if(users.some(u => u.user === user)) return 'Ese usuario ya existe.';
   const salt = Math.random().toString(36).slice(2) + Date.now().toString(36);
   const g = cuenta || ((typeof authUser !== 'undefined' && authUser) ? authGrupoDe(authUser) : 'principal');
-  users.push(Object.assign({ user, salt, hash: await authHash(pass, salt), role: role || 'staff' }, g !== 'principal' ? { cuenta: g } : {}));
+  users.push(Object.assign({ user, salt, hash: await authHashClave(pass, salt), role: role || 'staff' }, g !== 'principal' ? { cuenta: g } : {}));
   localStorage.setItem(AUTH_USERS_KEY, JSON.stringify(users));
   return null;
 }
@@ -19392,7 +19417,7 @@ function authLoginClear(user){
 async function authCrearCodigos(user, passActual){
   const users = authUsers(), u = users.find(x => x.user === user);
   if(!u) return { err: 'Usuario no encontrado.' };
-  if(await authHash(passActual || '', u.salt) !== u.hash) return { err: 'La contraseña actual no es correcta.' };
+  if(!(await authClaveOk(u, passActual || ''))) return { err: 'La contraseña actual no es correcta.' };
   const codigos = Array.from({ length: 8 }, authNewCode);
   u.rc = await Promise.all(codigos.map(async c => ({ h: await authHash(authNormCode(c), u.salt + 'rc'), usado: false })));
   u.rcT = Date.now(); delete u.wa;
@@ -19416,7 +19441,7 @@ async function authRecover(user, code, newPass, newPass2){
     return 'El código no sirve: está mal escrito, ya se usó, o no es de ese usuario.';
   }
   if(cod){ cod.usado = true; cod.cuando = Date.now(); } else delete u.wa;
-  u.hash = await authHash(newPass, u.salt);
+  u.hash = await authHashClave(newPass, u.salt);
   localStorage.setItem(AUTH_USERS_KEY, JSON.stringify(users)); localStorage.removeItem('cm-rec-lock');
   const q = authCodigosQuedan(u);
   return { ok: true, quedan: q };
@@ -19519,7 +19544,7 @@ async function authEnlaceProcesar(){
   if(p && authEsCorreo(u.user) && u.user === correo) try{ await nb.claveConEnlace(L.tok, p); }catch(e){}   // la misma en todos los celulares
   nb.soltarEnlace(L.tok);
   if(!p) return;
-  u.hash = await authHash(p, u.salt); u.claveCambiada = Date.now();
+  u.hash = await authHashClave(p, u.salt); u.claveCambiada = Date.now();
   localStorage.setItem(AUTH_USERS_KEY, JSON.stringify(users)); localStorage.removeItem('cm-rec-lock');
   try{ document.getElementById('authUser').value = u.user; const er = document.getElementById('authErr'); if(er) er.textContent = '✅ Contraseña cambiada con el enlace del correo. Ya puedes entrar.'; }catch(e){}
   showToast('✅ Contraseña cambiada. Ya puedes entrar con la nueva.', 8000);
@@ -19580,7 +19605,7 @@ async function authRecoverCorreo(user, code, newPass, newPass2){
   catch(e){ localStorage.setItem('cm-rec-lock', JSON.stringify({ n: (lock.n || 0) + 1, t: Date.now(), nivel: lock.nivel || 0 })); return 'El código del correo no sirve o ya venció. Pide uno nuevo.'; }
   if(authEsCorreo(u.user) && u.user === String(u.email).toLowerCase()) try{ await nb.nuevaClave(newPass); }catch(e){}   // la misma en todos los celulares
   try{ await nb.soltarSesion(); }catch(e){}
-  u.hash = await authHash(newPass, u.salt); u.claveCambiada = Date.now();
+  u.hash = await authHashClave(newPass, u.salt); u.claveCambiada = Date.now();
   localStorage.setItem(AUTH_USERS_KEY, JSON.stringify(users)); localStorage.removeItem('cm-rec-lock');
   try{ sessionStorage.removeItem('cm-rec-mail'); }catch(e){}
   return { ok: true, correo: true };
@@ -19589,7 +19614,7 @@ async function authRecoverCorreo(user, code, newPass, newPass2){
 async function authCorreoGuardar(){
   const users = authUsers(), u = users.find(x => x.user === authUser); if(!u) return;
   const actual = prompt('Para proteger tu cuenta, escribe tu contraseña actual:'); if(actual == null) return;
-  if(await authHash(actual, u.salt) !== u.hash) return showToast('⚠️ Contraseña incorrecta: no se cambió el correo.');
+  if(!(await authClaveOk(u, actual))) return showToast('⚠️ Contraseña incorrecta: no se cambió el correo.');
   const e = (prompt('Tu correo para recuperar la contraseña:', u.email || '') || '').trim().toLowerCase(); if(!e) return;
   if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) return showToast('⚠️ Ese correo no está bien escrito.');
   u.email = e; u.emailAt = Date.now(); localStorage.setItem(AUTH_USERS_KEY, JSON.stringify(users));
@@ -19876,7 +19901,7 @@ function bloquearApp(){
     e.preventDefault(); err.textContent = '';
     const espera = authLoginLocked(authUser); if(espera){ err.textContent = '🔒 Demasiados intentos. Espera ' + espera + ' min.'; return; }
     const u = authUsers().find(x => x.user === authUser);
-    if(!u || await authHash(inp.value, u.salt) !== u.hash){ authLoginFail(authUser); err.textContent = 'Contraseña incorrecta.'; inp.value = ''; return; }
+    if(!u || !(await authClaveOk(u, inp.value))){ authLoginFail(authUser); err.textContent = 'Contraseña incorrecta.'; inp.value = ''; return; }
     authLoginClear(authUser); ov.remove();
   };
   ov.querySelector('#lockOtro').onclick = () => { try{ saveData(); }catch(e){} localStorage.removeItem(AUTH_SESSION_KEY); location.reload(); };
@@ -19936,7 +19961,7 @@ function authDatosPristinos(d){
 }
 async function authPonerClaveLocal(user, pass){
   const us = authUsers(), u = us.find(x => x.user === user); if(!u) return;
-  u.salt = Math.random().toString(36).slice(2) + Date.now().toString(36); u.hash = await authHash(pass, u.salt);
+  u.salt = Math.random().toString(36).slice(2) + Date.now().toString(36); u.hash = await authHashClave(pass, u.salt);
   localStorage.setItem(AUTH_USERS_KEY, JSON.stringify(us));
 }
 // Deja este celular conectado al negocio de la cuenta (después de entrar). Si la cuenta todavía no tiene
@@ -20240,7 +20265,7 @@ function showAuth(firstRun){
         const waitMin = authLoginLocked(user);
         if(waitMin){ err.textContent = '🔒 Demasiados intentos con "' + user + '". Espera ' + waitMin + ' min. e intenta de nuevo.'; return; }
         const u = authUsers().find(x => x.user === user);
-        if(u && await authHash(pass, u.salt) === u.hash){
+        if(u && await authClaveOk(u, pass)){
           authLoginClear(user);
           document.getElementById('authPass').value = '';
           await enterApp(user, null);
@@ -33066,7 +33091,7 @@ window.mesoraCelebrar = function(emojis){
   async function correcta(c, v){
     if(c.modo === 'propia') return (await window.ventoVentaFix.derivar(v, c.s)) === c.h;
     const u = usuarioLocal();
-    return !!u && (await authHash(v, u.salt)) === u.hash;
+    return !!u && await authClaveOk(u, v);
   }
   // true = puede cerrar (sin clave puesta, o clave correcta); false = canceló o se equivocó 5 veces.
   function pedir(){

@@ -188,6 +188,12 @@ function iaDemasiados(k: string, max = 40): boolean {
   if (iaUsos.size > 5000) iaUsos.clear();
   return l.length > max;
 }
+// 1.57.0 (auditoría ORDEVA R7): el límite de verdad está en la base de datos (srv_ia_cupo), compartido por todas las
+// instancias del servidor y por minuto y por día. Si la base no responde, queda el de memoria (la IA no se cae por eso).
+async function iaCupo(db: Db, k: string, porMin: number, porDia: number): Promise<{ ok: boolean; tope?: string }> {
+  try { return await db.rpc<{ ok: boolean; tope?: string }>("srv_ia_cupo", { p_clave: k, p_max_min: porMin, p_max_dia: porDia }); }
+  catch (e) { log("warn", "ia_cupo", { error: e instanceof Error ? e.message : String(e) }); return { ok: !iaDemasiados(k, porMin) }; }
+}
 type IaGuardada = { publico: Record<string, unknown>; secreto: string | null } | null;
 async function iaClaveDe(env: Env, db: Db, negocio: string): Promise<string | null> {
   const g = await db.rpc<IaGuardada>("srv_integracion", { p_negocio: negocio, p_tipo: "ia" });
@@ -205,7 +211,8 @@ async function iaProxy(req: Request, env: Env, ruta: string[], url: URL, cors: R
   const m = /^\/v1beta\/models(?:\/(gemini-[\w.-]+)(:generateContent|:streamGenerateContent)?)?$/.exec(resto);
   if (!m || !["GET", "POST"].includes(req.method) || (req.method === "POST" && !m[2]) || (req.method === "GET" && m[2])) return json(404, { ok: false, error: "ruta" }, cors);
   await usuario(req, env).rpc("integracion_puedo", { p_negocio: negocio, p_accion: "usar" });       // miembro del negocio
-  if (iaDemasiados("ia:" + negocio)) return json(429, { error: { code: 429, status: "RESOURCE_EXHAUSTED", message: "Demasiadas peticiones seguidas. Espera un momento." } }, cors);
+  const cupo = await iaCupo(servidor(env), "ia:" + negocio, Number(env.VENTO_IA_NEGOCIO_MIN || 40), Number(env.VENTO_IA_NEGOCIO_DIA || 3000));
+  if (!cupo.ok) return json(429, { error: { code: 429, status: "RESOURCE_EXHAUSTED", message: cupo.tope === "dia" ? "Laya llegó al límite de hoy para este negocio. Vuelve a intentarlo mañana." : "Demasiadas peticiones seguidas. Espera un momento." } }, cors);
   const key = await iaClaveDe(env, servidor(env), negocio);
   if (!key) return json(404, { ok: false, error: "sin_clave", mensaje: "Este negocio no tiene clave propia de IA en el servidor" }, cors);
   let cuerpo: string | undefined;

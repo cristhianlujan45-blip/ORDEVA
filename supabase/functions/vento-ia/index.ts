@@ -38,6 +38,28 @@ function cors(origin: string): Record<string, string> {
 const json = (o: unknown, status: number, h: Record<string, string>) =>
   new Response(JSON.stringify(o), { status, headers: { ...h, "content-type": "application/json" } });
 
+// 1.57.0 (auditoría ORDEVA R7): el límite de verdad está en la base de datos (srv_ia_cupo), compartido por todas las
+// instancias: por conexión (minuto y día) y un tope del día para toda la IA de Vento (la clave del proveedor). Si la base
+// no responde, queda el de memoria de abajo (la IA no se cae por eso).
+async function cupo(clave: string, porMin: number, porDia: number): Promise<{ ok: boolean; tope?: string } | null> {
+  const url = Deno.env.get("SUPABASE_URL"), sk = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !sk) return null;
+  try {
+    const r = await fetch(url.replace(/\/+$/, "") + "/rest/v1/rpc/srv_ia_cupo", { method: "POST", headers: { apikey: sk, Authorization: "Bearer " + sk, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_clave: clave, p_max_min: porMin, p_max_dia: porDia }), signal: AbortSignal.timeout(2500) });
+    return r.ok ? await r.json() : null;
+  } catch { return null; }
+}
+async function sinCupo(ip: string): Promise<string | null> {
+  const n = (k: string, d: number) => Number(Deno.env.get(k) || d);
+  const c = await cupo("vento-ia:" + ip, n("VENTO_IA_IP_MIN", POR_MINUTO), n("VENTO_IA_IP_DIA", 600));
+  if (c && !c.ok) return c.tope === "dia" ? "Llegaste al límite de hoy de la IA de Vento en esta conexión. Pon tu propia clave de Gemini en Ajustes → IA, o vuelve mañana." : "Demasiadas peticiones seguidas. Espera un momento.";
+  if (!c && demasiados(ip)) return "Demasiadas peticiones seguidas. Espera un momento.";
+  const g = await cupo("vento-ia:todos", 0, n("VENTO_IA_DIA", 20000));
+  if (g && !g.ok) return "La IA de Vento llegó al límite de hoy. Pon tu propia clave de Gemini en Ajustes → IA, o vuelve mañana.";
+  return null;
+}
+
 function demasiados(ip: string): boolean {
   const ahora = Date.now(), l = (visitas.get(ip) || []).filter((t) => ahora - t < 60000);
   l.push(ahora); visitas.set(ip, l);
@@ -84,7 +106,8 @@ Deno.serve(async (req: Request) => {
   const m = /^\/v1beta\/models(?:\/(gemini-[\w.-]+)(:generateContent|:streamGenerateContent)?)?$/.exec(ruta);
   if (!m || (req.method === "POST" && !m[2]) || (req.method === "GET" && m[2])) return json({ error: { message: "Ruta no permitida." } }, 404, h);
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "?";
-  if (demasiados(ip)) return json({ error: { code: 429, status: "RESOURCE_EXHAUSTED", message: "Demasiadas peticiones seguidas. Espera un momento." } }, 429, h);
+  const no = req.method === "POST" ? await sinCupo(ip) : (demasiados(ip) ? "Demasiadas peticiones seguidas. Espera un momento." : null);   // solo las preguntas (POST) gastan cupo
+  if (no) return json({ error: { code: 429, status: "RESOURCE_EXHAUSTED", message: no } }, 429, h);
   let cuerpo: string | undefined;
   if (req.method === "POST") {
     cuerpo = await req.text();
