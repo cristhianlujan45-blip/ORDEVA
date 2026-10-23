@@ -6,7 +6,7 @@
 //  2. En la app: «Ya estás en la app». La app sin su puente: «ábrela otra vez» + reporte a Vento Admin.
 //  3. «Conectar mi cuenta de YouTube» empezado en la APP: Google vuelve al navegador → de ahí a la app (con el código o
 //     el token) y Vento Web no lo procesa. En la app se termina de conectar.
-//  4. El acceso directo de la web se llama «Vento Web» (ya no se confunde con la app).
+//  4. El acceso directo de la web se llama «ORDEVA Web» (ya no se confunde con la app; ORDEVA etapa 8).
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const fs = require('fs'), path = require('path');
 const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
@@ -130,7 +130,7 @@ const UA_APP = UA_CHROME.replace('Mobile Safari/537.36', 'Mobile Safari/537.36 V
 
     // ---------- 4. Nombre del acceso directo de la web ----------
     const man = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'manifest.webmanifest'), 'utf8'));
-    chk('4. El acceso directo de la web se llama «Vento Web» (no se confunde con la app «Vento»)', man.name === 'Vento Web' && man.short_name === 'Vento Web', man);
+    chk('4. El acceso directo de la web se llama «ORDEVA Web» (no se confunde con la app), con los íconos de ORDEVA', man.name === 'ORDEVA Web' && man.short_name === 'ORDEVA Web' && man.icons.every(i => /^icons\/ordeva/.test(i.src) && fs.existsSync(path.join(__dirname, '..', i.src))), man);
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.stack || e)); }
   chk('Sin errores de página', !errs.length, errs);
   await b.close();

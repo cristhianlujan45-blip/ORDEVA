@@ -9,8 +9,8 @@ self.addEventListener('push', function(e){
   try{ d = e.data ? e.data.json() : {}; }catch(err){ d = { titulo: '💜 Vento', cuerpo: e.data ? e.data.text() : '' }; }
   e.waitUntil(self.registration.showNotification(d.titulo || '💜 Vento', {
     body: d.cuerpo || '',
-    icon: 'icons/vento-192.png',
-    badge: 'icons/vento-64.png',
+    icon: 'icons/ordeva-192.png',
+    badge: 'icons/ordeva-64.png',
     tag: d.tag || 'vento-pago',
     renotify: true,
     vibrate: [150, 80, 150],

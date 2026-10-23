@@ -186,7 +186,7 @@
     try{ if(document.visibilityState === 'visible' && window.ventoPagoVentana) window.ventoPagoVentana({ monto: Number(p.monto), app: nombreMetodo(p.metodo), de: p.pagador || '', mesa: p.mesa ? etiquetaMesa(p.mesa) : '', txt: orig, nivel: nivel }); }catch(e){}
     if(!apagado && document.visibilityState !== 'visible') try{
       if('Notification' in window && Notification.permission === 'granted'){
-        var op = { body: fr, tag: 'pago-' + p.id, renotify: true, icon: 'icons/vento-192.png', badge: 'icons/vento-64.png' };
+        var op = { body: fr, tag: 'pago-' + p.id, renotify: true, icon: 'icons/ordeva-192.png', badge: 'icons/ordeva-64.png' };
         if(navigator.serviceWorker && navigator.serviceWorker.getRegistration) navigator.serviceWorker.getRegistration().then(function(r){ if(r) r.showNotification(tit, op); else new Notification(tit, op); }).catch(function(){ try{ new Notification(tit, op); }catch(e){} });
         else new Notification(tit, op);
       }
