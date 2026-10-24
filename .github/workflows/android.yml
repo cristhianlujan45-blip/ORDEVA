@@ -96,11 +96,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          NOTAS="Vento para Android ${VENTO_VERSION_NAME}. Descarga vento.apk (y vento-admin.apk, solo para el proveedor), ábrelo en el celular y toca Instalar (si pregunta, permite instalar apps de esta fuente). Las versiones nuevas se instalan encima sin borrar nada."
+          NOTAS="ORDEVA para Android ${VENTO_VERSION_NAME}. Descarga vento.apk (y vento-admin.apk = ORDEVA Admin, solo para el proveedor), ábrelo en el celular y toca Instalar (si pregunta, permite instalar apps de esta fuente). Las versiones nuevas se instalan encima sin borrar nada."
           if gh release view android >/dev/null 2>&1; then
-            gh release edit android --title "Vento para Android ${VENTO_VERSION_NAME}" --notes "$NOTAS" --latest
+            gh release edit android --title "ORDEVA para Android ${VENTO_VERSION_NAME}" --notes "$NOTAS" --latest
           else
-            gh release create android --title "Vento para Android ${VENTO_VERSION_NAME}" --notes "$NOTAS" --target "${GITHUB_SHA}" --latest
+            gh release create android --title "ORDEVA para Android ${VENTO_VERSION_NAME}" --notes "$NOTAS" --target "${GITHUB_SHA}" --latest
           fi
           # version.json: la app lo revisa sola y, si hay una versión nueva, la baja e instala (se actualiza sola).
           printf '{"codigo":%s,"nombre":"%s","apk":"vento.apk"}\n' "$VENTO_VERSION_CODE" "$VENTO_VERSION_NAME" > version.json
@@ -108,4 +108,4 @@ jobs:
           cat version.json version-admin.json
           gh release upload android vento.apk vento-admin.apk version.json version-admin.json --clobber
           echo "### ✅ APK publicado: https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/vento.apk" >> "$GITHUB_STEP_SUMMARY"
-          echo "### 👑 Vento Admin: https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/vento-admin.apk" >> "$GITHUB_STEP_SUMMARY"
+          echo "### 👑 ORDEVA Admin: https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/vento-admin.apk" >> "$GITHUB_STEP_SUMMARY"
