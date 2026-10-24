@@ -65,7 +65,7 @@ administrador eligió que en este equipo no suenen los avisos de pago».
 
 **Lo que queda igual:**
 - Al principio suenan todos, como hasta ahora.
-- Sigue la regla de 1.48: a un mesero solo le llega el pago de la mesa que atiende.
+- Sigue la regla de antes: a un mesero solo le llega el pago de la mesa que atiende.
 - Cada cambio queda en la actividad del negocio.
 
 **Pruebas:**
@@ -91,3 +91,6 @@ celular la página respeta la elección, pero el aviso que da Android con ORDEVA
 ## Lo que no se pudo probar aquí
 - **El pantallazo en un iPhone y en la app Android de verdad.** Se probó en Chrome; en Safari lo revisa la prueba de
   compatibilidad de código (`iphone`).
+- **La parte de la app Android (Java) de «dónde suenan»** no se pudo compilar aquí (no hay Android SDK en este equipo).
+  Se compila en GitHub al publicar; en la prueba, la app Android está simulada. Son 3 líneas: «si este equipo no suena,
+  no hablar ni notificar».
