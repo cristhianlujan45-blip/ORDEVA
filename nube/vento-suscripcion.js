@@ -255,6 +255,7 @@
       canal.on('broadcast', { event: 's' }, function(){
         // Varios cambios seguidos (aprobar = pago + suscripción) = una sola consulta.
         clearTimeout(rt.espera); rt.espera = setTimeout(function(){ if(E.neg === id) refrescar(true); }, 150);
+        try{ window.dispatchEvent(new CustomEvent('vento-aviso-vivo')); }catch(e){}   // ej. le cambiaron la contraseña a la cuenta
       }).subscribe(function(st){
         rt.vivo = st === 'SUBSCRIBED';
         if(rt.vivo) refrescar();                              // por si algo cambió mientras no se escuchaba

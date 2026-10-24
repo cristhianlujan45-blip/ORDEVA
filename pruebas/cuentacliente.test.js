@@ -123,6 +123,8 @@ const ADMIN = 'cristhianwkh@gmail.com';
     chk('5. Se guarda en el servidor', await (async () => { for(let i = 0; i < 20; i++){ const r = await uno("select p.telefono from perfiles p join auth.users u on u.id = p.usuario_id where u.email = 'dueno@soporte.co'"); if(r && r.telefono === '3001112233') return true; await new Promise(x => setTimeout(x, 300)); } return false; })());
 
     // ===== 4. Contraseña temporal =====
+    await A.p.evaluate(() => window.ventoCuenta.revisarClave(true));
+    chk('4b. El primer celular anota la hora de la contraseña con la que entró', await A.p.evaluate(() => { try{ return 'dueno@soporte.co' in JSON.parse(localStorage.getItem('vento-clave-vista')); }catch(e){ return false; } }));
     const uid = (await uno("select id from auth.users where email = 'dueno@soporte.co'")).id;
     const temp = (await api('/admin/usuario_clave_temporal', { usuario: uid }, adm.token)).j.clave;
     const B = await equipo('otro celular');
@@ -133,7 +135,17 @@ const ADMIN = 'cristhianwkh@gmail.com';
     await B.p.fill('#vcCl1', 'mi-clave-nueva'); await B.p.fill('#vcCl2', 'mi-clave-nueva'); await B.p.click('#vcClOk');
     chk('4. Queda guardada (ya no la pide) y sirve para entrar', await esperar(B.p, () => !document.getElementById('vcClaveOv'), null, 10000) &&
       (await entrar('dueno@soporte.co', 'mi-clave-nueva')).st === 200 && (await entrar('dueno@soporte.co', temp)).st === 400);
+    chk('4b. El celular donde la cambió NO se saca a sí mismo', (await B.p.evaluate(() => window.ventoCuenta.revisarClave(true))) === false && await B.p.evaluate(() => document.getElementById('authOverlay').hidden));
     await B.ctx.close();
+
+    // ===== 4b. El celular que seguía ADENTRO con la contraseña vieja sale solo (el aviso en vivo lo hace revisar) =====
+    await A.p.evaluate(() => window.dispatchEvent(new CustomEvent('vento-aviso-vivo')));
+    chk('4b. El primer celular, que seguía adentro, sale solo: «La contraseña … cambió»', await esperar(A.p, () => !document.getElementById('authOverlay').hidden && /cambió/.test(document.getElementById('authErr').textContent), null, 20000), await A.p.textContent('#authErr').catch(() => ''));
+    await A.p.fill('#authPass', 'clave123'); await A.p.click('#authBtn');
+    chk('4b. … y la contraseña vieja ya no entra ahí', await esperar(A.p, () => /incorrectos/.test(document.getElementById('authErr').textContent) && !document.getElementById('authBtn').disabled, null, 15000), await A.p.textContent('#authErr'));
+    await A.p.fill('#authPass', 'mi-clave-nueva'); await A.p.click('#authBtn');
+    chk('4b. Entra con la nueva, con sus datos, y ya no lo vuelve a sacar', await dentro(A.p) && await esperar(A.p, () => !!window.ventoNube.negocio(), null, 15000) &&
+      (await A.p.evaluate(() => window.ventoCuenta.revisarClave(true))) === false && await A.p.evaluate(() => document.getElementById('authOverlay').hidden && data.businessName === 'Bar Soporte'), await A.p.evaluate(() => data && data.businessName));
 
     // ===== 4c. El administrador le PONE una contraseña: la vieja deja de servir también donde ya había entrado =====
     const V = await equipo('celular con la vieja');

@@ -166,6 +166,17 @@ async function pruebas(sb) {
   chk('Al cambiarla ya no la pide, y guarda el celular para recuperar la cuenta', r.st === 200 && r.j.cambiar_clave === false && r.j.telefono === '+573001234567', r);
   r = await rpc('perfil_guardar', { p: { telefono: 'abc' } }, dueno.token);
   chk('Un celular inválido se rechaza', r.st >= 400, r);
+  // 1.60.0: hora en que se puso la contraseña (los equipos que la tenían abierta salen al ver que cambió).
+  const hTemp = (await rpc('perfil_yo', {}, dueno.token)).j.clave_puesta_en;
+  chk('La contraseña temporal del soporte deja anotada la hora en que se puso', !!hTemp && !isNaN(Date.parse(hTemp)), hTemp);
+  r = await rpc('perfil_guardar', { p: { clave_nueva: true } }, dueno.token);
+  const hPropia = r.j && r.j.clave_puesta_en;
+  chk('Cuando la persona cambia su contraseña también cambia la hora (y no toca el resto del perfil)', r.st === 200 && hPropia && Date.parse(hPropia) > Date.parse(hTemp) && r.j.telefono === '+573001234567' && r.j.cambiar_clave === false, r);
+  r = await rpc('perfil_guardar', { p: { telefono: '3001234567' } }, dueno.token);
+  chk('Guardar otra cosa del perfil no cambia la hora de la contraseña', r.st === 200 && r.j.clave_puesta_en === hPropia, r);
+  r = await rpc('srv_clave_puesta', { p_usuario: dueno.id }, dueno.token);
+  chk('Un cliente no puede marcar la contraseña de nadie como cambiada', r.st >= 400, r);
+  r = await rpc('perfil_guardar', { p: { telefono: '+57 300 123 4567' } }, dueno.token);
   r = await api('/admin/usuario_enlace_clave', { email: 'dueno@bar.co' }, admin.token);
   chk('Enviar el enlace para cambiar la contraseña al correo', r.st === 200 && sb.recuperaciones.some(x => x.ruta === '/recover' && x.email === 'dueno@bar.co'), r);
   // ===== Ponerle una contraseña (la escribe el administrador) =====
@@ -174,7 +185,9 @@ async function pruebas(sb) {
   r = await api('/admin/usuario_clave_poner', { usuario: dueno.id, clave: 'Puesta-por-admin-1', pedir_cambio: false }, admin.token);
   const rViejaP = await entrar('dueno@bar.co', 'nueva-clave-9'), rNuevaP = await entrar('dueno@bar.co', 'Puesta-por-admin-1');
   chk('Ponerle una contraseña: la vieja deja de servir y entra con la que puso el administrador', r.st === 200 && rViejaP.st === 400 && rNuevaP.st === 200, { r, v: rViejaP.st, n: rNuevaP.st });
-  chk('… sin «pedir que la cambie»: la app no le pide otra', (await rpc('perfil_yo', {}, rNuevaP.j.access_token)).j.cambiar_clave === false);
+  const pPuesta = (await rpc('perfil_yo', {}, rNuevaP.j.access_token)).j;
+  chk('… sin «pedir que la cambie»: la app no le pide otra', pPuesta.cambiar_clave === false);
+  chk('… y la hora de la contraseña cambia: el equipo que estaba adentro con la vieja sale', pPuesta.clave_puesta_en && Date.parse(pPuesta.clave_puesta_en) > Date.parse(hPropia), pPuesta);
   r = await api('/admin/usuario_clave_poner', { usuario: dueno.id, clave: 'Puesta-por-admin-2' }, admin.token);
   chk('… y por defecto la app le pide poner una propia al entrar', r.st === 200 && r.j.pedir_cambio === true && (await rpc('perfil_yo', {}, (await entrar('dueno@bar.co', 'Puesta-por-admin-2')).j.access_token)).j.cambiar_clave === true, r);
   r = await api('/admin/usuario_clave_poner', { usuario: sinNeg.id, clave: 'No-soy-admin-1' }, dueno.token);

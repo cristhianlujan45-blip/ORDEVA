@@ -433,6 +433,7 @@
     var correo = String((u && u.email) || email || '').toLowerCase();
     if(!correo) throw new Error('Ese celular no está unido a una cuenta con correo. Entra con tu correo y contraseña, y únelo en Ajustes → Negocio.');
     if(st.email !== correo){ st = { email: correo }; guardarSt(); }
+    claveVista(correo, undefined);                 // entró con un código: la contraseña que tenga ahora es la que vale
     return misNegocios().then(function(l){ return { email: correo, negocios: (l || []).slice().sort(function(a, b){ return (a.rol === 'dueno' ? 0 : 1) - (b.rol === 'dueno' ? 0 : 1); }) }; });
   }
   // ¿El servidor manda mensajes de texto? (Supabase → Auth → Phone, lo activa el flujo «Servidor ORDEVA» con Twilio)
@@ -468,14 +469,33 @@
       .then(function(r){ return r.text().then(function(t){ var j = {}; try{ j = JSON.parse(t); }catch(e){} if(!r.ok) throw new Error(j.msg || j.message || j.error_description || ('Error ' + r.status)); return j; }); });
   }
   function correoDeEnlace(token){ return api('user', token).then(function(u){ if(!u || !u.email) throw new Error('El enlace no es válido.'); return String(u.email).toLowerCase(); }); }
-  function claveConEnlace(token, pass){ return api('user', token, 'PUT', { password: pass }).then(function(){ return true; }); }
+  function claveConEnlace(token, pass){
+    return api('user', token, 'PUT', { password: pass }).then(function(){
+      // Los equipos que seguían abiertos con esta cuenta cierran la sesión (si falla, la contraseña ya quedó).
+      var c = cfg();
+      return fetch(c.url.replace(/\/+$/, '') + '/rest/v1/rpc/perfil_guardar', { method: 'POST', headers: { apikey: c.key, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ p: { clave_nueva: true } }) }).catch(function(){});
+    }).then(function(){ return true; });
+  }
   function soltarEnlace(token){ return api('logout?scope=local', token, 'POST').catch(function(){}); }
   function verificarCorreo(email, codigo){
     return cliente().then(function(c){ return c.auth.verifyOtp({ email: email, token: String(codigo || '').replace(/\D/g, ''), type: 'email' }); })
       .then(function(r){ if(r.error) throw r.error; return true; });
   }
+  // 1.60.0: al cambiar la contraseña, los OTROS equipos abiertos con esta cuenta cierran la sesión (perfil_guardar
+  // marca la hora y avisa en vivo). Este equipo anota la hora nueva como vista para no sacarse a sí mismo.
+  var K_CLAVE = 'vento-clave-vista', cambiandoClave = 0;
+  function claveVista(email, valor){
+    email = String(email || '').trim().toLowerCase(); var m = lsGet(K_CLAVE, {});
+    if(arguments.length > 1){ if(valor === undefined) delete m[email]; else m[email] = valor || ''; lsSet(K_CLAVE, m); }
+    return m[email];
+  }
   function nuevaClave(pass){
-    return cliente().then(function(c){ return c.auth.updateUser({ password: pass }); }).then(function(r){ if(r.error) throw r.error; return true; });
+    cambiandoClave++;
+    return cliente().then(function(c){ return c.auth.updateUser({ password: pass }); }).then(function(r){
+      if(r.error) throw r.error;
+      return rpc('perfil_guardar', { p: { clave_nueva: true } }).then(function(p){ if(p && st.email) claveVista(st.email, p.clave_puesta_en || ''); }, function(){});
+    }).then(function(){ cambiandoClave--; return true; }, function(e){ cambiandoClave--; throw e; });
   }
   // Tras comprobar un correo para recuperar una cuenta del celular: si no se usa ORDEVA Nube, se cierra esa sesión.
   function soltarSesion(){ if(st.email) return Promise.resolve(); return cliente().then(function(c){ return c.auth.signOut(); }).catch(function(){}); }
@@ -521,7 +541,7 @@
   function verificarClave(email, pass){
     email = String(email || '').trim().toLowerCase();
     return cliente().then(function(c){ return c.auth.signInWithPassword({ email: email, password: pass }); })
-      .then(function(r){ if(r.error){ if(/invalid login credentials/i.test(String(r.error.message || ''))) return false; throw r.error; } return true; });
+      .then(function(r){ if(r.error){ if(/invalid login credentials/i.test(String(r.error.message || ''))) return false; throw r.error; } claveVista(email, undefined); return true; });
   }
   // Entra a la cuenta y devuelve sus negocios (el primero es el que más le conviene: el suyo propio).
   function entrarCuenta(email, pass){
@@ -531,6 +551,7 @@
       .then(function(r){
         if(r.error) throw r.error;
         if(!misma){ st = { email: email }; guardarSt(); }
+        claveVista(email, undefined);              // la contraseña de ahora: lo que diga el servidor desde aquí es lo visto
         return misNegocios();
       })
       .then(function(l){ return (l || []).slice().sort(function(a, b){ return (a.rol === 'dueno' ? 0 : 1) - (b.rol === 'dueno' ? 0 : 1); }); });
@@ -685,6 +706,7 @@
     configurada: configurada, abrir: abrir, cambio: cambio, subir: subir, bajar: bajar, estado: textoEstado,
     correo: function(){ return st.negocio ? st.email : null; },
     rolActivo: function(){ return st.negocio ? st.negocio.rol : null; },
+    sede: function(){ return st.negocio ? (st.sede || 'default') : null; },      // espacio de este equipo donde está ese negocio
     // Para el módulo de pagos (nube/vento-pagos.js): mismo cliente, sesión y negocio.
     negocio: function(){ return st.negocio && configurada() ? { id: st.negocio.id, nombre: st.negocio.nombre, rol: st.negocio.rol } : null; },
     cliente: cliente, config: cfg,
@@ -692,6 +714,7 @@
     crearCuenta: crearCuenta, entrarCuenta: entrarCuenta, verificarClave: verificarClave, vincular: vincular, crearNegocio: crearNegocio, conectado: conectado, salir: salir,
     codigoEntrar: codigoEntrar, entrarConCodigo: entrarConCodigo, entrarConEnlace: entrarConEnlace, celularDisponible: celularDisponible, celularUnir: celularUnir, celularConfirmar: celularConfirmar, celularDeCuenta: celularDeCuenta, celularE164: celularE164,
     msgError: msgError, codigoCorreo: codigoCorreo, enlaceClave: enlaceClave, correoDeEnlace: correoDeEnlace, claveConEnlace: claveConEnlace, soltarEnlace: soltarEnlace, verificarCorreo: verificarCorreo, nuevaClave: nuevaClave, soltarSesion: soltarSesion,
+    claveVista: claveVista, cambiandoClave: function(){ return cambiandoClave > 0; },
     _fusionar: fusionar,
     // Fotos y archivos compartidos entre los equipos de la cuenta
     enNube: enNube,

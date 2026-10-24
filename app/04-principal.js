@@ -14545,11 +14545,31 @@ async function authRevisarClave(email, pass){
   const nb = authNubeCuentas(); if(!nb || !nb.verificarClave || navigator.onLine === false) return;
   let ok; try{ ok = await nb.verificarClave(email, pass); }catch(e){ return; }
   if(ok !== false) return;
-  try{ await authPonerClaveLocal(email, authClaveAzar()); }catch(e){}     // la vieja ya no entra ni sin internet
+  await authSalirPorClave(email);
+}
+// La contraseña de la cuenta cambió (en otro equipo o desde ORDEVA Admin): se guarda todo, la vieja deja de servir
+// en este celular (también sin internet) y vuelve a la entrada con el aviso «La contraseña de X cambió».
+// 1.60.0: también lo llama lib/vento-cuenta.js cuando el servidor avisa que se la cambiaron estando adentro.
+async function authSalirPorClave(email){
+  if(authUser !== email) return;
+  try{ await authPonerClaveLocal(email, authClaveAzar()); }catch(e){}
   try{ saveData(); await guardadoAhora(); }catch(e){}
   try{ localStorage.removeItem(AUTH_SESSION_KEY); sessionStorage.setItem('vento-clave-cambio', email); }catch(e){}
   location.reload();
 }
+window.ventoSalirPorClave = authSalirPorClave;
+// 1.60.0: el dueño cambió en OTRO equipo a quien está usando este (nube/vento-usuarios.js): le quitó el usuario o le
+// cambió la contraseña → se guarda todo y vuelve a la entrada con el aviso. Si solo le cambió el rol, sigue adentro con el nuevo.
+window.ventoSacarUsuario = async function(user, motivo){
+  if(authUser !== user) return;
+  try{ saveData(); await guardadoAhora(); }catch(e){}
+  try{
+    if(motivo !== 'rol'){ localStorage.removeItem(AUTH_SESSION_KEY); sessionStorage.setItem('vento-aviso-entrada', JSON.stringify({ u: motivo === 'clave' ? user : '',
+      m: motivo === 'clave' ? '🔑 El administrador le cambió la contraseña a ' + user + '. Entra con la nueva.' : '👤 El administrador quitó el usuario ' + user + ' de este negocio.' })); }
+  }catch(e){}
+  location.reload();
+};
+window.addEventListener('vento-usuarios', () => { try{ accUsuariosPintar(); }catch(e){} });
 async function authEntrarDesdeNube(email, pass, listaCodigo){
   const nb = authNubeCuentas();
   const lista = listaCodigo || await nb.entrarCuenta(email, pass);
@@ -14647,6 +14667,8 @@ function showAuth(firstRun){
   g('authNueva').onclick = () => ponerModo(!modoNueva);
   g('authTabs').onclick = e => { const b = e.target.closest('[data-tab]'); if(b && (b.dataset.tab === 'crear') !== modoNueva) ponerModo(b.dataset.tab === 'crear'); };
   ponerModo(!!firstRun);
+  try{ const av = JSON.parse(sessionStorage.getItem('vento-aviso-entrada') || 'null'); sessionStorage.removeItem('vento-aviso-entrada');
+    if(av && av.m){ setTimeout(() => { ponerModo(false); if(av.u) g('authUser').value = av.u; g('authErr').textContent = av.m; }, 0); } }catch(e){}
   if(claveCambio){ ponerModo(false); g('authUser').value = claveCambio; g('authErr').textContent = '🔑 La contraseña de ' + claveCambio + ' cambió (en otro equipo o la cambió el soporte de ORDEVA). Entra con la nueva.'; setTimeout(() => { try{ g('authPass').focus(); }catch(e){} }, 50); }
   // Usuarios de este equipo: se tocan para no tener que escribir el nombre.
   let chips = document.getElementById('authUsers');

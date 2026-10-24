@@ -68,6 +68,12 @@ export function claveTemporal(): string {
   return "Vento-" + Array.from(b.slice(0, 4), (x) => a[x % a.length]).join("") + Array.from(b.slice(4), (x) => n[x % n.length]).join("");
 }
 
+// Los equipos que tenían abierta esa cuenta cierran la sesión y piden la contraseña nueva (si esto falla, la
+// contraseña ya quedó cambiada: no se devuelve error).
+async function clavePuesta(db: Db, id: string): Promise<void> {
+  try { await db.rpc("srv_clave_puesta", { p_usuario: id }); } catch { /* la contraseña ya quedó */ }
+}
+
 export async function accionAdmin(env: Env, db: Db, adminId: string, accion: string, b: Record<string, unknown>): Promise<Record<string, unknown> | null> {
   switch (accion) {
     case "resumen":
@@ -85,6 +91,7 @@ export async function accionAdmin(env: Env, db: Db, adminId: string, accion: str
       const id = uuid(b.usuario), clave = claveTemporal();
       await auth(env, "PUT", "/admin/users/" + id, { password: clave });
       await db.rpc("srv_marcar_cambiar_clave", { p_usuario: id, p_si: true });
+      await clavePuesta(db, id);
       return { ok: true, clave };
     }
     case "usuario_clave_poner": {
@@ -100,6 +107,7 @@ export async function accionAdmin(env: Env, db: Db, adminId: string, accion: str
       await auth(env, "PUT", "/admin/users/" + id, { password: clave });
       const pedir = b.pedir_cambio !== false;
       await db.rpc("srv_marcar_cambiar_clave", { p_usuario: id, p_si: pedir });
+      await clavePuesta(db, id);
       return { ok: true, pedir_cambio: pedir };
     }
     case "usuario_enlace_clave": {
