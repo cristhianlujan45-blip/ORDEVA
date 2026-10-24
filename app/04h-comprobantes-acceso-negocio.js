@@ -159,10 +159,10 @@ Object.assign(window, { getServiceUnitName, getServiceUnitNamePlural, serviceUni
    Cada tipo trae en el catálogo las letras de lo que SÍ usa:
      k = pantalla de cocina   p = mapa del local   w = app de meseros   d = dividir cuenta entre personas
      q = QR en las mesas      n = cada cuenta va a nombre de un cliente   v = venta de mostrador de primero
-     b = código de barras (mucho producto)
+     b = código de barras (mucho producto)   r = 🧂 insumos y recetas (1.64.0: solo los que preparan comida)
    Una floristería no ve Cocina ni el mapa de mesas; un restaurante sí. En Ajustes → Negocio se puede
    volver a ver todo con «Mostrar todas las funciones». */
-const MOD_TODO = 'kpwdqvnb';
+const MOD_TODO = 'kpwdqvnbr';
 // modsNegocio(): está al principio del archivo (se usa al abrir la app).
 /* ---------- Pantalla de preparación: nombre configurable por local ----------
    No todos los negocios tienen «cocina»: un bar prepara en la Barra, una cafetería en Preparación,
@@ -758,7 +758,7 @@ function aplicarIconos(){
   document.querySelectorAll('.tk-ic').forEach(e => { e.innerHTML = iconoEsp(); });
 }
 const MOD_NOMBRES = { k: 'pantalla de preparación', p: 'mapa del local', w: 'app de meseros', d: 'dividir la cuenta entre personas',
-  q: 'pedidos por QR en cada puesto', n: 'cada cuenta a nombre del cliente', v: 'venta rápida de mostrador', b: 'código de barras' };
+  q: 'pedidos por QR en cada puesto', n: 'cada cuenta a nombre del cliente', v: 'venta rápida de mostrador', b: 'código de barras', r: 'insumos y recetas' };
 function modsTexto(mod){
   const on = mod.split('').map(c => MOD_NOMBRES[c]).filter(Boolean);
   const off = Object.keys(MOD_NOMBRES).filter(c => !mod.includes(c)).map(c => MOD_NOMBRES[c]);

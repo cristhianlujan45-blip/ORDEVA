@@ -107,6 +107,31 @@ async function pruebas(sb) {
   r = await rpc('datos_proteger_equipo', { p_negocio: NEG, p_rol: 'dueno', p_usuario: mesero.id, p_viejo: {}, p_nuevo: {} }, mesero.token);
   chk('Un cliente no puede llamar la función interna', r.st >= 400, r);
 
+  // ---------- 1.64.0: funciones del negocio y recetas ----------
+  d = clon(await doc()); d.modulos = { r: true }; d.recetasBloquear = true;
+  d.products[0].receta = [{ ref: 'i:harina', qty: 0.2 }]; d.insumos = [{ id: 'harina', name: 'Harina', unidad: 'kg', stock: 10 }];
+  r = await guardar(dueno, d); s = await doc();
+  chk('1.64.0 · Dueño: prende «Insumos y recetas» en ESTE negocio, «no vender si faltan» y pone una receta', r.st === 200 && s.modulos.r === true && s.recetasBloquear === true && s.products[0].receta.length === 1, { m: s.modulos, rb: s.recetasBloquear });
+  d = clon(await doc()); d.modulos = { r: false, b: true }; d.recetasBloquear = false;
+  r = await guardar(mesero, d); s = await doc();
+  chk('1.64.0 · El mesero no puede cambiar las funciones del negocio ni «no vender si faltan» (vuelven a las del dueño)', r.st === 200 && igual(s.modulos, { r: true }) && s.recetasBloquear === true, { m: s.modulos, rb: s.recetasBloquear });
+  const audM = await sb.sql("select 1 from auditoria where negocio_id = $1 and accion = 'modulos_revertidos'", [NEG]);
+  chk('1.64.0 · … y queda en la auditoría', audM.length >= 1);
+  d = clon(await doc()); d.products[0].receta = [{ ref: 'i:harina', qty: 0 }]; d.insumos[0].stock = 9.8;
+  d.products.push({ id: 'p10', name: 'Arepa', price: 3000, receta: [{ ref: 'i:harina', qty: 0.1 }] });
+  r = await guardar(empleado, d); s = await doc();
+  chk('1.64.0 · Empleado sin «productos»: la receta de un producto que ya existe vuelve a la del dueño', r.st === 200 && s.products[0].receta[0].qty === 0.2, s.products[0].receta);
+  chk('1.64.0 · … pero el stock de los insumos sí cambia (vender los descuenta) y un producto nuevo queda con su receta', s.insumos[0].stock === 9.8 && !!s.products.find((p) => p.id === 'p10' && p.receta && p.receta.length === 1), { ins: s.insumos, p10: s.products.find((p) => p.id === 'p10') });
+  d = clon(await doc()); delete d.products[0].receta;
+  r = await guardar(empleado, d); s = await doc();
+  chk('1.64.0 · … y tampoco puede quitarle la receta', s.products[0].receta && s.products[0].receta.length === 1, s.products[0]);
+  d = clon(await doc()); d.modulos = { r: false };
+  r = await guardar(admin, d); s = await doc();
+  chk('1.64.0 · El administrador sí apaga «Insumos y recetas», y los insumos y recetas siguen guardados', r.st === 200 && s.modulos.r === false && s.insumos.length === 1 && s.products[0].receta.length === 1, { m: s.modulos });
+  d = clon(await doc()); d.products[0].receta = [{ ref: 'i:harina', qty: 0.5 }];
+  r = await guardar(cajero, d); s = await doc();
+  chk('1.64.0 · El cajero con el permiso «productos» sí cambia la receta', s.products[0].receta[0].qty === 0.5, s.products[0].receta);
+
   // ---------- Rendimiento: negocio grande ----------
   const grande = clon(await doc());
   grande.history = Array.from({ length: 8000 }, (_, i) => ({ id: 'g' + i, total: 1000, items: [{ name: 'Tinto', qty: 1, price: 1000 }] }));
@@ -120,6 +145,9 @@ async function pruebas(sb) {
   let err = null;
   try { await sb.sql(fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', '20261106000000_equipo_no_reescribe.sql'), 'utf8')); } catch (e) { err = e.message; }
   chk('La migración se vuelve a correr sin errores', !err, err);
+  err = null;
+  try { await sb.sql(fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', '20261117000000_modulos_negocio.sql'), 'utf8')); } catch (e) { err = e.message; }
+  chk('1.64.0 · La migración de las funciones por negocio se vuelve a correr sin errores', !err, err);
 }
 
 (async () => {

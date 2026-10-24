@@ -2066,6 +2066,10 @@ const overlay = document.getElementById('overlay');
 function openTableModal(id){
   payPick.table = null; pendingReceipt.table = null; updatePayPickInfo('table');
   currentTable = id;
+  // 1.64.0: el mismo producto en varios renglones (lo dejaba la mezcla entre celulares) se junta en uno, con la misma
+  // cantidad total y el mismo valor.
+  try{ const t = data.tables[id], J = window.ventoNube && window.ventoNube.juntarRepetidos;
+    if(t && Array.isArray(t.items) && J){ const j = J(t.items); if(j.length !== t.items.length){ t.items = j; saveData(); } } }catch(e){}
   document.getElementById('modalTitle').textContent = tableLabel(id);
   refreshProductSelect();
   renderPeople();

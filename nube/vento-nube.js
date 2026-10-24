@@ -114,16 +114,61 @@
      - Si los dos cambiaron la misma lista (productos, historial, pedidos, los productos de una mesa…),
        se juntan: lo que agregó cada uno se conserva y lo que borró cada uno se borra.
      - Si los dos cambiaron el mismo dato suelto (ej. el nombre del negocio), gana la nube. */
-  function claveDe(x){ return (x && typeof x === 'object' && !Array.isArray(x) && x.id != null) ? 'id:' + x.id : 'v:' + canon(x); }
+  // 1.64.0: un producto de una mesa (sin id: { productId, qty, personId, history… }) se reconoce por su producto, su persona
+  // y su mesa de origen, no por todo su contenido. Antes, si dos celulares agregaban Poker a la misma mesa casi al tiempo,
+  // cada uno quedaba con un «Poker» distinto y la mezcla guardaba los dos: la mesa mostraba Poker ×4, ×1 y ×3 en renglones
+  // separados. Ahora es UN renglón y se suman las cantidades que agregó cada celular.
+  function esItem(x){ return !!(x && typeof x === 'object' && !Array.isArray(x) && x.id == null && x.productId != null && typeof x.qty === 'number'); }
+  function claveDe(x){
+    if(x && typeof x === 'object' && !Array.isArray(x) && x.id != null) return 'id:' + x.id;
+    if(esItem(x)) return 'it:' + x.productId + '|' + (x.personId == null ? '' : x.personId) + '|' + (x.origen == null ? '' : x.origen) + '|' + (x.price == null ? '' : x.price);
+    return 'v:' + canon(x);
+  }
+  // Lo que se agregó a un producto de la mesa desde la base (la parte nueva): cantidad y anotaciones nuevas.
+  function soloLoNuevo(x, base){
+    var q = x.qty - (base ? base.qty : 0); if(!(q > 0)) return null;
+    var y = clonar(x); y.qty = q;
+    if(base && Array.isArray(y.history) && Array.isArray(base.history)){ var vistos = {}; base.history.forEach(function(h){ vistos[canon(h)] = 1; }); y.history = y.history.filter(function(h){ return !vistos[canon(h)]; }); }
+    return y;
+  }
+  function fusionarItem(b, l, r){
+    var out = fusionar(b || {}, l, r);
+    out.qty = r.qty + (l.qty - (b ? b.qty : 0));   // las dos ventas suman (como el stock)
+    return out;
+  }
+  // Renglones repetidos del mismo producto (de antes de 1.64.0) se juntan en uno: misma cantidad total y mismas anotaciones.
+  function juntarRepetidos(lista){
+    if(!Array.isArray(lista) || !lista.some(esItem)) return lista;
+    var out = [], pos = {};
+    lista.forEach(function(x){
+      if(!esItem(x)){ out.push(x); return; }
+      var k = claveDe(x);
+      if(pos[k] == null){ pos[k] = out.length; out.push(x); return; }
+      var y = out[pos[k]] = clonar(out[pos[k]]);
+      y.qty += x.qty; if(Array.isArray(x.history)) y.history = (Array.isArray(y.history) ? y.history : []).concat(x.history);
+    });
+    return out;
+  }
   function unirListas(b, l, r){
-    b = Array.isArray(b) ? b : [];
-    var kb = {}, kl = {}, kr = {};
-    b.forEach(function(x){ kb[claveDe(x)] = 1; }); l.forEach(function(x){ kl[claveDe(x)] = 1; }); r.forEach(function(x){ kr[claveDe(x)] = 1; });
-    var out = r.filter(function(x){ var k = claveDe(x); return !(kb[k] && !kl[k]); });          // lo que borró este celular
-    l.forEach(function(x){ var k = claveDe(x); if(!kb[k] && !kr[k]) out.push(x); });          // lo que agregó este celular
-    // Mismo elemento (mismo id) cambiado en uno o en los dos celulares: se mezcla campo por campo
+    b = juntarRepetidos(Array.isArray(b) ? b : []); l = juntarRepetidos(l); r = juntarRepetidos(r);
+    var kb = {}, kl = {}, kr = {}, mb = {}, ml = {};
+    b.forEach(function(x){ var k = claveDe(x); kb[k] = 1; mb[k] = x; }); l.forEach(function(x){ var k = claveDe(x); kl[k] = 1; ml[k] = x; }); r.forEach(function(x){ kr[claveDe(x)] = 1; });
+    var out = [];
+    r.forEach(function(x){
+      var k = claveDe(x);
+      if(!(kb[k] && !kl[k])){ out.push(x); return; }
+      // Este celular lo quitó (o cerró la cuenta): si allá le agregaron después, esa parte nueva se queda.
+      if(esItem(x) && !igual(x, mb[k])){ var y = soloLoNuevo(x, mb[k]); if(y) out.push(y); }
+    });
+    l.forEach(function(x){
+      var k = claveDe(x);
+      if(!kb[k] && !kr[k]) out.push(x);                                                          // lo que agregó este celular
+      else if(esItem(x) && kb[k] && !kr[k] && !igual(x, mb[k])){ var y = soloLoNuevo(x, mb[k]); if(y) out.push(y); }   // allá lo quitaron; aquí le agregaron
+    });
+    // Mismo elemento cambiado en uno o en los dos celulares: se mezcla campo por campo
     // (así el stock suma las dos ventas y cada cambio se conserva).
     return out.map(function(x){
+      if(esItem(x)){ var k = claveDe(x), ib = mb[k], il = ml[k]; return (il && kr[k] && (ib || !igual(il, x))) ? fusionarItem(ib, il, x) : x; }
       if(!(x && x.id != null)) return x;
       var lb = b.find(function(y){ return y && y.id === x.id; }), ll = l.find(function(y){ return y && y.id === x.id; });
       return (lb && ll) ? fusionar(lb, ll, x) : x;
@@ -724,7 +769,7 @@
     codigoEntrar: codigoEntrar, entrarConCodigo: entrarConCodigo, entrarConEnlace: entrarConEnlace, celularDisponible: celularDisponible, celularUnir: celularUnir, celularConfirmar: celularConfirmar, celularDeCuenta: celularDeCuenta, celularE164: celularE164,
     msgError: msgError, codigoCorreo: codigoCorreo, enlaceClave: enlaceClave, correoDeEnlace: correoDeEnlace, claveConEnlace: claveConEnlace, soltarEnlace: soltarEnlace, verificarCorreo: verificarCorreo, nuevaClave: nuevaClave, soltarSesion: soltarSesion,
     claveVista: claveVista, cambiandoClave: function(){ return cambiandoClave > 0; }, claveMarca: claveMarca, cerrarOtrasSesiones: cerrarOtrasSesiones,
-    _fusionar: fusionar,
+    _fusionar: fusionar, juntarRepetidos: juntarRepetidos,
     // Fotos y archivos compartidos entre los equipos de la cuenta
     enNube: enNube,
     archivos: { subir: archivoSubir, bajar: archivoBajar, borrar: archivoBorrar, alCambiar: alCambiarArchivo, pendientes: function(){ return Object.keys(lsGet(K_PEND, {})).length; } }

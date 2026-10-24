@@ -183,10 +183,16 @@
   ];
   const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   L.sort((a, b) => a[0] === 'otro' ? 1 : b[0] === 'otro' ? -1 : a[1].localeCompare(b[1], 'es'));
+  // 1.64.0 · r = 🧂 Insumos y recetas: de fábrica solo en los negocios que PREPARAN comida (restaurantes, cafeterías,
+  // panaderías, comidas rápidas… y la repostería por encargo). Bares, tiendas, licoreras y los demás no lo traen, pero el
+  // administrador lo puede prender en Ajustes → Negocio → «🧩 Funciones de este negocio» (un bar con cócteles o cocina).
+  const CON_RECETAS = ['pasteleria'];
   const CAT = L.map(([k, nombre, icono, fam, sin, o, necesita, prods]) => {
     const f = F[fam];
-    return Object.assign({ k, nombre, icono, fam, sin, necesita, prods, buscar: norm(nombre + ' ' + k.replace(/_/g, ' ') + ' ' + sin) },
+    const t = Object.assign({ k, nombre, icono, fam, sin, necesita, prods, buscar: norm(nombre + ' ' + k.replace(/_/g, ' ') + ' ' + sin) },
       { esp: f.esp, n: f.n, fun: f.fun, mod: f.mod, prod: f.prod, icE: f.icE, icP: f.icP, campos: f.campos, inv: f.inv, carta: f.carta, icCarta: f.icCarta, gastos: f.gastos, cat: f.cat, vento: f.vento, falta: f.falta }, o);
+    if((fam === 'comida' || CON_RECETAS.includes(k)) && !String(t.mod || '').includes('r')) t.mod = String(t.mod || '') + 'r';
+    return t;
   });
   // Claves viejas que ya pueden estar guardadas en los negocios
   const ALIAS = { cerveceria: 'bar', farmacia: 'drogueria', licorera: 'estanco', medico: 'consultorio', spa: 'estetica', ropa_nueva_bar: 'ropa', ropa_segunda_bar: 'ropa_segunda' };

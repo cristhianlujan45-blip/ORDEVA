@@ -2,11 +2,22 @@
 /* Funciones que se usan al abrir la app. Estaban más abajo; aquí hacen exactamente lo mismo («function» existe
    desde el principio del archivo) y así el archivo se puede partir en partes que cargan una tras otra. */
 function modsNegocio(){
-  const t = tipoNegocio();
-  let m = (typeof data !== 'undefined' && data && data.modoCompleto) ? MOD_TODO : (t ? t.mod : MOD_TODO);   // sin tipo elegido (negocios viejos): se ve todo, como siempre
+  const t = tipoNegocio(), d = typeof data !== 'undefined' && data ? data : null;
+  let m = (d && d.modoCompleto) ? MOD_TODO : (t ? t.mod : MOD_TODO);   // sin tipo elegido (negocios viejos): se ve todo, como siempre
+  // 1.64.0: un negocio que YA usa insumos o recetas los sigue viendo aunque su tipo no los traiga (nada deja de descontarse).
+  if(!m.includes('r') && recetasEnUso()) m += 'r';
   // La pantalla de preparación (k) la decide cada local en Ajustes: activada o desactivada.
-  if(typeof data !== 'undefined' && data && data.prep && typeof data.prep.on === 'boolean'){ m = m.replace('k', ''); if(data.prep.on) m += 'k'; }
+  if(d && d.prep && typeof d.prep.on === 'boolean'){ m = m.replace('k', ''); if(d.prep.on) m += 'k'; }
+  // 1.64.0: lo que el administrador prendió o apagó en «🧩 Funciones de este negocio». Va en los datos de ESTE negocio:
+  // no cambia los otros negocios de la misma cuenta. (La pantalla de preparación sigue en data.prep.)
+  const o = d && d.modulos;
+  if(o && typeof o === 'object') Object.keys(o).forEach(c => { if(c === 'k' || c.length !== 1 || !MOD_TODO.includes(c) || typeof o[c] !== 'boolean') return; m = m.replace(c, ''); if(o[c]) m += c; });
   return m;
+}
+// ¿Este negocio ya tiene insumos o productos con receta? (los datos nunca se borran al apagar el módulo)
+function recetasEnUso(){
+  const d = typeof data !== 'undefined' && data ? data : null; if(!d) return false;
+  return (Array.isArray(d.insumos) && d.insumos.length > 0) || (Array.isArray(d.products) && d.products.some(p => p && Array.isArray(p.receta) && p.receta.length));
 }
 function prepNombreDefecto(){
   const t = tipoNegocio(); if(!t) return 'Pantalla';
