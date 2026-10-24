@@ -78,6 +78,22 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     chk('4. Tocar ⏭ en una canción de abajo: la lista NO vuelve arriba', c2 > 700, { despues: c2 });
     await p.click('#ypOv [data-yp-tab="inicio"]'); await p.click('#ypOv [data-yp-tab="cola"]'); await p.waitForTimeout(200);
     chk('4. Cambiar de pestaña sí empieza arriba (a propósito)', (await p.evaluate(() => document.getElementById('ypCuerpo').scrollTop)) === 0);
+    // ---------- 5. Mesa abierta: UN solo desplazamiento (1.58.2) ----------
+    // Un selector escondido colgaba por fuera de la ventana de la mesa y el fondo también se desplazaba: el dedo pasaba de
+    // un desplazamiento al otro y la pantalla «se devolvía».
+    await p.evaluate(() => {
+      document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show'));
+      data.modoCompleto = true; try{ aplicarModulos(); }catch(e){}
+      data.products = Array.from({ length: 30 }, (_, i) => ({ id: 'q' + i, name: 'Producto ' + i, price: 3000, favorite: i < 6 }));
+      data.tables[1] = { items: Array.from({ length: 25 }, (_, i) => ({ productId: 'q' + i, name: 'Producto ' + i, price: 3000, qty: 1, personId: null })), people: [], payments: [] };
+      saveData(); openTableModal(1);
+    });
+    await p.waitForTimeout(600);
+    const d5 = await p.evaluate(() => {
+      const ov = document.getElementById('overlay'), m = ov.querySelector('.modal');
+      return { fondo: ov.scrollHeight - ov.clientHeight, ventana: m.scrollHeight - m.clientHeight };
+    });
+    chk('5. Mesa abierta con 25 productos: se desplaza solo la ventana de la mesa, el fondo no (sin doble desplazamiento)', d5.ventana > 300 && d5.fondo <= 2, d5);
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.stack || e)); }
   chk('Sin errores de página', !errs.length, errs);
   await b.close();

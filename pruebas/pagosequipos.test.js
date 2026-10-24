@@ -123,6 +123,50 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     tab = null; for(let i = 0; i < 90; i++){ await latir(TAB); tab = await and(TAB); if(tab.pagos.some(x => x.v === '$45.000')) break; await new Promise(r => setTimeout(r, 500)); }
     chk('5. La tablet recibe ese pago: «Llegaron 45000 pesos por DaviPlata» (sin el nombre)', tab.pagos.some(x => x.v === '$45.000' && x.bco === 'DaviPlata') && tab.decir.some(t => /^Llegaron 45000 pesos por DaviPlata/.test(t)) && !tab.decir.some(t => /Maria/.test(t)), tab);
 
+    // ===== 5b. Bre-B por la LLAVE a DaviPlata (1.58.2): el aviso de la app SIN valor y luego el SMS 85888 CON el valor =====
+    // Lo que la app Android deja en la cola: primero el aviso de la llave (sin valor; Android ya dijo «Llegó plata por
+    // Bre-B») y después el SMS juntado con ese aviso (con el valor). El computador debe decirlo y mostrarlo.
+    await PC.p.evaluate(() => { window.__voz = []; const s0 = window.speakVoice; window.speakVoice = (t, o) => { window.__voz.push(String(t)); try{ return s0 && s0(t, o); }catch(e){} }; });
+    await CEL.p.evaluate(() => {
+      window.__and.cola.push({ id: 'kllave:1:1', txt: 'DaviPlata | DaviPlata | Transaccion exitosa: Recibiste Plata de otra entidad usando Llaves, consulta el detalle de tus movimientos desde el app DaviPlata.', t: Date.now(), voz: true });
+      window.ventoAvisosNativos();
+    });
+    await new Promise(r => setTimeout(r, 1500));
+    await CEL.p.evaluate(() => {
+      window.__and.cola.push({ id: 'M:' + Date.now() + ':77', txt: 'DaviPlata | DaviPlata | Recibiste $65.000 por Bre-B · Recibiste  65,000. Para saber mas, consulta tus movimientos.', t: Date.now(), voz: true });
+      window.ventoAvisosNativos();
+    });
+    llego = false; for(let i = 0; i < 40 && !llego; i++){ llego = (await enServidor(65000)).length === 1; if(!llego){ await latir(CEL); await new Promise(r => setTimeout(r, 250)); } }
+    const s5b = await enServidor(65000);
+    chk('5b. Bre-B por la llave a DaviPlata: llega al servidor $65.000 por DaviPlata, confirmado', llego && s5b[0].metodo === 'DAVIPLATA' && s5b[0].confianza === 'app' && s5b[0].estado === 'aprobado', s5b);
+    chk('5b. Computador: sale la 🪟 ventana con «$65.000» y DaviPlata', await esperar(PC.p, () => { const v = document.getElementById('pgVentana'); return !!v && /\$65\.000/.test(v.textContent) && /DaviPlata/.test(v.textContent); }, null, 35000));
+    chk('5b. Computador: lo DICE en voz alta («Llegaron 65000 pesos por DaviPlata»)', await esperar(PC.p, () => (window.__voz || []).some(t => /65000 pesos por DaviPlata/.test(t)), null, 10000), await PC.p.evaluate(() => window.__voz));
+    tab = null; for(let i = 0; i < 60; i++){ await latir(TAB); tab = await and(TAB); if(tab.decir.some(t => /65000/.test(t))) break; await new Promise(r => setTimeout(r, 500)); }
+    chk('5b. Tablet: también lo dice («Llegaron 65000 pesos por DaviPlata»)', tab.decir.some(t => /^Llegaron 65000 pesos por DaviPlata/.test(t)), tab.decir);
+
+    // ===== 5c. Primero el SMS 85888 (con valor) y después el aviso de la llave: también suena en el computador =====
+    await PC.p.evaluate(() => { window.__voz = []; });
+    await CEL.p.evaluate(() => {
+      window.__and.cola.push({ id: 'M:' + Date.now() + ':88', txt: 'SMS | 85888 | DaviPlata: Recibiste  72,000. Para saber mas, consulta tus movimientos.', t: Date.now(), voz: true, smsOk: true });
+      window.ventoAvisosNativos();
+    });
+    llego = false; for(let i = 0; i < 40 && !llego; i++){ llego = (await enServidor(72000)).length === 1; if(!llego){ await latir(CEL); await new Promise(r => setTimeout(r, 250)); } }
+    const s5c = await enServidor(72000);
+    chk('5c. SMS 85888 primero: llega al servidor $72.000 por DaviPlata', llego && s5c[0].metodo === 'DAVIPLATA' && s5c[0].estado === 'aprobado', s5c);
+    chk('5c. … y como CONFIRMADO (85888 es el número oficial de DaviPlata, igual que en el celular)', llego && s5c[0].confianza === 'app', s5c);
+    chk('5c. Computador: lo dice en voz alta (72000 pesos)', await esperar(PC.p, () => (window.__voz || []).some(t => /72000 pesos/.test(t)), null, 35000), await PC.p.evaluate(() => window.__voz));
+    // ===== 5d. Solo el aviso de la llave, SIN SMS: el computador también se entera («Llegó plata por Bre-B en DaviPlata») =====
+    // (con «Recibir avisos de pagos» prendido, como lo tiene el negocio: es un ajuste compartido por todos los equipos)
+    await CEL.p.evaluate(() => { data.pagos = data.pagos || {}; data.pagos.on = true; saveData(); });
+    chk('5d. El ajuste «Recibir avisos de pagos» llega al computador', await esperar(PC.p, () => !!(data.pagos && data.pagos.on), null, 20000));
+    await new Promise(r => setTimeout(r, 17000));              // el computador se conecta al canal de pagos (cada 15 s revisa)
+    await PC.p.evaluate(() => { window.__voz = []; });
+    await CEL.p.evaluate(() => {
+      window.__and.cola.push({ id: 'kllave:2:2', txt: 'DaviPlata | DaviPlata | Transaccion exitosa: Recibiste Plata de otra entidad usando Llaves, consulta el detalle de tus movimientos desde el app DaviPlata.', t: Date.now(), voz: true });
+      window.ventoAvisosNativos();
+    });
+    chk('5d. Solo la llave (sin valor): el computador dice que llegó plata por Bre-B en DaviPlata', await esperar(PC.p, () => (window.__voz || []).some(t => /Bre-?B/i.test(t) && /DaviPlata/i.test(t)), null, 35000), await PC.p.evaluate(() => window.__voz));
+
     // ===== 7. ⏳ El computador espera el pago de la Mesa 4; el celular lo lee =====
     await CEL.p.evaluate(() => { data.pagos = data.pagos || {}; data.pagos.on = true; data.tables[4] = { items: [{ productId: 'p4', name: 'Bandeja', price: 27300, qty: 1 }], payments: [], people: [] }; saveData(); });
     chk('7. La mesa llega al computador', await esperar(PC.p, () => !!(data.tables[4] && data.tables[4].items.length), null, 15000));

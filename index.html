@@ -1616,7 +1616,7 @@ body.neg-tienda #quickSaleBtn, body:not(.neg-tienda) #fiadosBtn, body:not(.neg-t
   #peopleChips .chip{ padding:5px 12px 5px 5px; gap:8px; background:var(--surface); border-color:color-mix(in srgb, var(--amber) 35%, var(--line)); color:var(--ink); font-size:14px; }
   #peopleChips .chip .pc-av{ display:inline-grid; place-items:center; width:28px; height:28px; border-radius:50%; background:linear-gradient(135deg, var(--amber), var(--amber-deep)); color:#fff; font-style:normal; font-weight:800; font-size:13px; }
   #peopleChips .chip small{ color:var(--paid); font-weight:700; }
-  .pay-select-oculto{ position:absolute !important; width:1px !important; height:1px !important; opacity:0 !important; pointer-events:none !important; }
+  .pay-select-oculto{ position:absolute !important; top:0 !important; left:0 !important; width:1px !important; height:1px !important; opacity:0 !important; pointer-events:none !important; }   /* 1.58.2: arriba a la izquierda; donde caía, colgaba fuera de la ventana de la mesa y el fondo también se desplazaba (dos desplazamientos uno dentro del otro: la pantalla «se devolvía»). */
   .persona-add{ display:flex; align-items:center; gap:8px; padding:6px 6px 6px 12px; margin:4px 0 4px; border:1.5px solid var(--line); border-radius:999px; background:var(--bg); }
   .persona-add:focus-within{ border-color:var(--cream-soft); box-shadow:0 0 0 3px color-mix(in srgb, var(--amber) 25%, transparent); }
   .persona-add .persona-ico{ font-size:1.15em; }
@@ -26120,7 +26120,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-23 · v1.58.1';
+const MESORA_VERSION = '2026-10-24 · v1.58.2';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'ORDEVA · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 /* 🔄 La app Android se actualiza SOLA (Actualizador): revisa cada 3 h, baja la versión nueva y la instala cuando no se
@@ -29636,6 +29636,42 @@ function pagoHuella(t){
   // Cada equipo tiene su marca: así se sabe qué pagos leyó ESTE equipo (la lista de pagos se copia a los demás).
   const pgEq = (() => { try{ let v = localStorage.getItem('vento_pagos_eq'); if(!v){ v = Date.now().toString(36) + Math.random().toString(36).slice(2, 8); localStorage.setItem('vento_pagos_eq', v); } return v; }catch(e){ return 'm' + Math.random().toString(36).slice(2, 10); } })();
   window.ventoPagosEquipo = () => pgEq;
+  // ---------- 1.58.2: el aviso SIN valor también llega a los demás equipos ----------
+  // La llave Bre-B a DaviPlata avisa «Recibiste plata de otra entidad usando Llaves» SIN el valor (el valor llega
+  // después por el SMS 85888, o no llega si el celular no lee los SMS). El servidor solo guarda pagos con valor, así que
+  // el computador y las tablets no se enteraban. Ahora el celular que lo leyó (y lo dijo) lo manda por el canal de pagos
+  // del negocio y los demás equipos dicen «Llegó plata por Bre-B, en DaviPlata. Mira el valor en la aplicación.» con su
+  // ventana. Cuando llegue el valor, llega como siempre por el servidor. Cada equipo lo dice una vez; lo de hace más de
+  // 3 min no (al reconectarse el canal repite lo de los últimos 15 min); solo el dueño y los administradores.
+  const pgSvMios = new Set(), PG_SV_VISTOS = 'ordeva-sinvalor-vistos';
+  function pgSinValorCompartir(app, txt, id, op){
+    try{
+      if(!String(id || '').startsWith('and-') || !(op && op.voz) || !PG().topic) return;      // solo lo que este celular leyó y dijo
+      const j = { id: String(id).slice(0, 120), app: String(app || 'el banco').slice(0, 40), txt: String(txt).split('|').slice(1).join(' · ').trim().slice(0, 220), breb: /llaves|bre-?b/i.test(String(txt)), t: Date.now() };
+      pgSvMios.add(j.id);
+      fetch(url(), { method: 'POST', headers: { Title: 'ordeva-sinvalor' }, body: JSON.stringify(j) }).catch(() => {});
+    }catch(e){}
+  }
+  function pgSinValorRemoto(m){
+    if(!m || m.title !== 'ordeva-sinvalor') return false;               // no es de estos: sigue el camino de siempre
+    try{
+      const j = JSON.parse(m.message || '{}');
+      if(!j.id || pgSvMios.has(j.id) || !data || !data.pagos || !data.pagos.on) return true;
+      if(!(Math.abs(Date.now() - (+j.t || 0)) < 180e3)) return true;
+      let vistos = []; try{ vistos = JSON.parse(localStorage.getItem(PG_SV_VISTOS) || '[]'); }catch(e){}
+      if(vistos.includes(j.id)) return true;
+      vistos.push(j.id); try{ localStorage.setItem(PG_SV_VISTOS, JSON.stringify(vistos.slice(-60))); }catch(e){}
+      let jefe = true; try{ jefe = !window.ventoRoles || window.ventoRoles.esJefe(); }catch(e){}
+      if(!jefe) return true;
+      const app = String(j.app || 'el banco'), por = (j.breb ? 'Bre-B, en ' : '') + app;
+      const frase = 'Llegó plata por ' + por + '. Mira el valor en la aplicación.';
+      try{ showToast('💜 Llegó plata por ' + por + ' (el aviso no trae el valor). Mira el valor en la app del banco.', 12000); }catch(e){}
+      try{ const A = window.VentoAndroid; if(A && A.alFrente ? A.alFrente() : document.visibilityState === 'visible') pgVentana({ monto: 0, app, txt: String(j.txt || '').slice(0, 220), nivel: 'app' }); }catch(e){}
+      try{ window.ventoDecirPago(frase); }catch(e){}
+      try{ pgNotificarAndroid('💜 Llegó plata por ' + (j.breb ? 'Bre-B en ' : '') + app, frase, String(j.txt || '').slice(0, 220), '', (j.breb ? 'Bre-B en ' : '') + app, 'sinvalor'); }catch(e){}
+    }catch(e){}
+    return true;
+  }
   function pgRecibir(txt, id, op){
     op = op || {};
     const g = PG();
@@ -29658,6 +29694,7 @@ function pagoHuella(t){
       if(!op.voz) window.ventoDecirPago('Llegó plata por ' + fr.app + '. Mira el valor en la aplicación.');
       if(!op.voz) pgNotificarAndroid('💜 Llegó plata por ' + fr.app, 'Llegó plata por ' + fr.app + '. Mira el valor en la aplicación.', String(txt).split('|').slice(1).join(' · ').trim().slice(0, 220), '', fr.app, 'sinvalor');
       try{ window.ventoConfirma && window.ventoConfirma.sinValor(fr.app, txt); }catch(e){}   // ¿de qué mesa es? poner el valor con un toque
+      pgSinValorCompartir(fr.app, txt, id, op);
       saveData(); return;
     }
     if(!p){
@@ -29671,6 +29708,7 @@ function pagoHuella(t){
           showToast('💜 Llegó plata por ' + app0 + ' (el aviso no trae el valor)' + (esperan.length ? '. Estaba esperando el pago: ' + esperan.map(m => tableLabel(m) + ' (' + plata(tableTotal(m) - tablePaid(m)) + ')').join(', ') + '. Mira el valor en la app del banco y regístralo.' : '. Mira el valor en la app del banco.'), 12000); }catch(e){}
         try{ const A = window.VentoAndroid; if(A && A.alFrente ? A.alFrente() : document.visibilityState === 'visible') pgVentana({ monto: 0, app: (String(txt).split('|')[0] || 'el banco').trim(), txt: String(txt).split('|').slice(1).join(' · ').replace(/\s+/g, ' ').trim().slice(0, 220), nivel: 'app' }); }catch(e){}
         try{ window.ventoConfirma && window.ventoConfirma.sinValor((String(txt).split('|')[0] || 'el banco').trim(), txt); }catch(e){}
+        pgSinValorCompartir((String(txt).split('|')[0] || 'el banco').trim(), txt, id, op);
       }
       if(String(id || '').startsWith('and-') && !/(recibiste|lleg[oó]) (plata|dinero)|usando llaves/i.test(String(txt))) try{ const pz = String(txt).split('|').map(x => x.trim());
         window.ventoError && window.ventoError('pago', 'Aviso de pago que ORDEVA no entendió (' + (pz[0] || 'app') + ')', { app: (pz[0] || '').slice(0, 40), texto: pz.slice(1).join(' | ').replace(/\b[A-ZÁÉÍÓÚÑ]{2,}(?:\s+[A-ZÁÉÍÓÚÑ]{2,})*\b/g, 'NOMBRE').replace(/\d[\d.,]*/g, '#').slice(0, 200) }, 'pago|no-entendido|' + (pz[0] || '').toLowerCase().slice(0, 30)); }catch(e){}
@@ -29918,7 +29956,7 @@ function pagoHuella(t){
     try{ if(es) es.close(); }catch(e){}
     try{ es = new EventSource(url() + '/sse?since=15m'); }catch(e){ return; }
     vivo = Date.now();
-    es.onmessage = ev => { vivo = Date.now(); try{ const m = JSON.parse(ev.data); if(m.event === 'message') pgRecibir((m.title ? m.title + ' | ' : '') + (m.message || ''), m.id); }catch(e){} };
+    es.onmessage = ev => { vivo = Date.now(); try{ const m = JSON.parse(ev.data); if(m.event === 'message' && !pgSinValorRemoto(m)) pgRecibir((m.title ? m.title + ' | ' : '') + (m.message || ''), m.id); }catch(e){} };
     ['open', 'keepalive'].forEach(n => es.addEventListener(n, () => { vivo = Date.now(); }));
     pgPintar();
   }
@@ -29926,7 +29964,7 @@ function pagoHuella(t){
     if(!data || !data.pagos || !data.pagos.on) return;
     try{
       const r = await fetch(url() + '/json?poll=1&since=15m', { cache: 'no-store' });
-      (await r.text()).split('\n').forEach(l => { if(!l.trim()) return; try{ const m = JSON.parse(l); if(m.event === 'message') pgRecibir((m.title ? m.title + ' | ' : '') + (m.message || ''), m.id); }catch(e){} });
+      (await r.text()).split('\n').forEach(l => { if(!l.trim()) return; try{ const m = JSON.parse(l); if(m.event === 'message' && !pgSinValorRemoto(m)) pgRecibir((m.title ? m.title + ' | ' : '') + (m.message || ''), m.id); }catch(e){} });
     }catch(e){}
   }
   setInterval(pgConectar, 15000);
