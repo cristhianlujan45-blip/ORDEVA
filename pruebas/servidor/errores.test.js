@@ -111,6 +111,32 @@ async function pruebas(sb) {
   r = await api('/admin/frase_pago_borrar', { id: saldo.id }, admin.access_token);
   r = await rpc('frases_pago_lista', {});
   chk('Al borrarla, deja de llegarle a la app', r.j.l.length === 1 && !r.j.l.some(x => x.t === 'Tu saldo es'), r);
+
+  // ===== 1.61.0: resumen diario de errores al celular del administrador =====
+  await reportar({ equipo: 'EQ-res-000001', tipo: 'js', huella: 'js|res-uno', mensaje: 'Error de prueba del resumen', negocio: 'Bar Uno' });
+  await reportar({ equipo: 'EQ-res-000002', tipo: 'js', huella: 'js|res-uno', mensaje: 'Error de prueba del resumen', negocio: 'Bar Dos' });
+  r = await api('/admin/errores_resumen', {}, admin.access_token);
+  chk('«📨 Resumen de hoy»: cuántos errores nuevos, cuántos en varios negocios y el más visto', r.st === 200 && r.j.resumen && r.j.resumen.nuevos >= 1 && r.j.resumen.varios_negocios >= 1 &&
+    /errores? nuevos?/.test(r.j.mensaje.titulo) && /varios negocios/.test(r.j.mensaje.cuerpo) && /Error de prueba del resumen/.test(r.j.mensaje.cuerpo), r.j);
+  chk('El resumen no lleva ventas ni datos de clientes: solo el error y cuántos equipos', !/total|venta|cliente/i.test(JSON.stringify(r.j.resumen.top)), r.j.resumen.top);
+  r = await api('/admin/errores_resumen', {}, dueno.access_token);
+  chk('Un cliente no puede pedir el resumen', r.st === 403, r);
+  r = await rpc('srv_resumen_errores', { p_forzar: true }, dueno.access_token);
+  chk('… ni llamando la función directo', r.st >= 400, r);
+  const vencer = () => fetch(F + '/vencer', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-vento-cron': sb.cron }, body: '{}' }).then(x => x.json());
+  await sb.sql("delete from servidor_config where clave = 'resumen_errores'");
+  const horaCo = +new Intl.DateTimeFormat('en-US', { timeZone: 'America/Bogota', hour: 'numeric', hour12: false }).format(new Date()) % 24;
+  const v1 = await vencer(), v2 = await vencer();
+  if (horaCo >= 8) chk('El repaso automático lo manda UNA vez al día (desde las 8 a. m.): el segundo repaso ya no', v1.ok && v1.resumen_errores && v1.resumen_errores.mensaje && v2.ok && v2.resumen_errores === null, { v1, v2 });
+  else chk('Antes de las 8 a. m. (hora de Colombia) el repaso no manda el resumen', v1.ok && v1.resumen_errores === null && v2.resumen_errores === null, { v1, v2 });
+  await sb.sql("delete from servidor_config where clave = 'resumen_errores'");
+  const aLas = async (h) => (await sb.sql('select public.srv_resumen_errores(false, $1::timestamptz) r', [h]))[0].r;
+  const r7 = await aLas('2030-01-10 12:30:00+00'), r8 = await aLas('2030-01-10 13:05:00+00'), r8b = await aLas('2030-01-10 23:00:00+00'), rSig = await aLas('2030-01-11 13:01:00+00');
+  chk('A las 7:30 a. m. de Colombia todavía no; a las 8:05 sí; ese mismo día ya no otra vez; al día siguiente sí', r7 === null && r8 && r8.fecha === '2030-01-10' && r8b === null && rSig && rSig.fecha === '2030-01-11', { r7, r8, r8b, rSig });
+  await sb.sql("update app_errores set resuelto = true, resuelto_en = now()");
+  await sb.sql("delete from servidor_config where clave = 'resumen_errores'");
+  r = await api('/admin/errores_resumen', {}, admin.access_token);
+  chk('Sin errores en las últimas 24 horas no se manda nada', r.st === 200 && r.j.mensaje === null && r.j.enviados === 0, r.j);
 }
 
 (async () => {

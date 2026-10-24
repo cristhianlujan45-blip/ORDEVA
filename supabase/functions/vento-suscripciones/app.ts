@@ -156,6 +156,27 @@ export async function avisarAdmins(env: Env, db: Db, mensaje: Record<string, unk
 }
 const urlAdmin = (env: Env, ancla: string) => (env.VENTO_SITIO || SITIO).replace(/\/?$/, "/") + "admin.html#" + ancla;
 
+// 1.61.0 · Resumen diario de errores (srv_resumen_errores) → texto de la notificación. null = no hubo errores.
+export function resumenErroresMensaje(r: Record<string, unknown> | null): { titulo: string; cuerpo: string } | null {
+  if (!r) return null;
+  const n = (k: string) => Math.max(0, Math.round(Number(r[k]) || 0)), nuevos = n("nuevos"), rep = n("repetidos"), varios = n("varios_negocios"), abiertos = n("abiertos");
+  if (!nuevos && !rep) return null;
+  const pl = (x: number, uno: string, varios: string) => x + " " + (x === 1 ? uno : varios);
+  const titulo = "🐞 ORDEVA: " + (nuevos ? pl(nuevos, "error nuevo", "errores nuevos") : "ningún error nuevo") + (rep ? " y " + pl(rep, "que se repite", "que se repiten") : "") + " (24 h)";
+  const top = Array.isArray(r.top) ? r.top as Array<Record<string, unknown>> : [], t0 = top[0];
+  const partes: string[] = [];
+  if (varios) partes.push(pl(varios, "pasa en varios negocios", "pasan en varios negocios"));
+  if (t0) partes.push("El más visto: «" + String(t0.mensaje || "").slice(0, 90) + "» (" + pl(Math.round(Number(t0.equipos) || 0), "equipo", "equipos") + ")");
+  partes.push(pl(abiertos, "sin resolver en total", "sin resolver en total"));
+  return { titulo, cuerpo: partes.join(" · ") + ". Toca para verlos." };
+}
+async function mandarResumenErrores(env: Env, db: Db, forzar: boolean): Promise<Record<string, unknown>> {
+  const r = await db.rpc<Record<string, unknown> | null>("srv_resumen_errores", { p_forzar: forzar });
+  const m = resumenErroresMensaje(r);
+  const enviados = m ? await avisarAdmins(env, db, { ...m, tag: "vento-errores-dia", url: urlAdmin(env, "errores") }) : 0;
+  return { resumen: r, mensaje: m, enviados };
+}
+
 async function avisarSoporte(env: Env, db: Db, caso: string, uid: string | null, clave: string | null) {
   const d = await db.rpc<Record<string, unknown> | null>("srv_soporte_para_avisar", { p_caso: caso, p_uid: uid, p_clave: clave });
   if (!d) return 0;
@@ -250,6 +271,8 @@ async function admin(req: Request, env: Env, accion: string, b: Record<string, u
   switch (accion) {
     case "yo":
       return { ok: true, admin: true, id: me.id, email: me.email };
+    case "errores_resumen":     // «📨 Mandarme el resumen ahora» (pestaña 🐞 Errores)
+      return { ok: true, ...(await mandarResumenErrores(env, db, true)) };
     case "pagos":
       return { ok: true, pagos: await db.rpc("srv_admin_pagos", { p_status: b.status ? String(b.status) : "review" }) };
     case "comprobante": {
@@ -352,7 +375,11 @@ export async function manejar(req: Request, env: Env): Promise<Response> {
       if (!secreto || !igualesSeguro(req.headers.get("x-vento-cron") || "", secreto)) return json(401, { ok: false, error: "sin_permiso" }, cors);
       const n = await servidor(env).rpc<number>("srv_sub_vencer", { p_negocio: null });
       log("info", "sub_vencer", { vencidas: n });
-      return json(200, { ok: true, vencidas: n }, cors);
+      // Una vez al día (desde las 8 a. m. de Colombia): resumen de errores al celular del administrador. Nunca falla el repaso.
+      let errores: Record<string, unknown> | null = null;
+      try { const x = await mandarResumenErrores(env, servidor(env), false); if (x.resumen) { errores = x; log("info", "resumen_errores", { enviados: x.enviados }); } }
+      catch (e) { log("warn", "resumen_errores", { error: e instanceof Error ? e.message : String(e) }); }
+      return json(200, { ok: true, vencidas: n, resumen_errores: errores ? { enviados: errores.enviados, mensaje: errores.mensaje } : null }, cors);
     }
     const b = await cuerpo(req);
     if (r0 === "estado") return json(200, await estado(req, env, b), cors);

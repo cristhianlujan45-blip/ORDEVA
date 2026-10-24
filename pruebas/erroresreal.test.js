@@ -180,5 +180,10 @@ const ADMIN = 'cristhianwkh@gmail.com', CLAVE_ADMIN = 'Clave-de-prueba-77';
     await D.p.evaluate(() => document.getElementById('dlgEr').close());
     await D.p.selectOption('#erTipo', 'nativo');
     chk('8. Filtro «📲 Del programa / app Android» con el de Mac', /\[Mac\]/.test(await D.p.textContent('#erLista')), await D.p.textContent('#erLista'));
+    // 1.61.0: el resumen de las últimas 24 horas (el mismo que llega solo cada mañana)
+    await D.p.click('#erResumen');
+    await D.p.waitForFunction(() => /errores? nuevos?|Sin errores|⚠️/.test(document.getElementById('erResumenTxt').textContent), null, { timeout: 15000 }).catch(() => {});
+    const res9 = await D.p.textContent('#erResumenTxt');
+    chk('9. «📨 Resumen de hoy»: cuántos errores nuevos y cuál es el más visto', /errores? nuevos?/.test(res9) && /El más visto/.test(res9), res9);
   }
 })();

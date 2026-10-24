@@ -353,7 +353,9 @@
       </select>
       <input id="erBuscar" type="search" placeholder="🔎 Código (E-XXXX), negocio, mensaje o versión">
       <button class="b" id="erRef" type="button" title="Actualizar">🔄</button>
+      <button class="b" id="erResumen" type="button" title="Cada día a las 8 a. m. te llega a este celular (con 🔔 activado en Soporte) el resumen de las últimas 24 horas">📨 Resumen de hoy</button>
     </div>
+    <div id="erResumenTxt" class="soft" style="margin:-4px 0 10px"></div>
     <details class="card" id="frBox" style="margin-bottom:12px">
       <summary style="cursor:pointer;font-weight:800">💜 Frases de pago <span class="soft" id="frCuenta"></span></summary>
       <p class="soft" style="margin:8px 0">Si un banco cambia cómo escribe el aviso de un pago, agrega aquí la frase: le llega <b>al instante</b> a la app de todos los negocios, sin reinstalar nada. <b>Es un pago</b>: ORDEVA lo toma y dice el valor que traiga el aviso. <b>No es un pago</b>: ORDEVA lo ignora (publicidad, saldo…). Solo frases: nunca nombres ni valores.</p>
@@ -2239,6 +2241,16 @@
     const l = (ad.errores || []).filter(e => (!tp || (tp === 'reporte' || tp === 'nativo' ? erClase(e) === tp : erClase(e) === tp || (tp === 'js' && erClase(e) === 'promesa'))) && (!q || JSON.stringify([erCodigo(e), e.mensaje, e.version, e.pagina, (e.casos || []).map(c => [c.negocio, c.usuario, c.version])]).toLowerCase().includes(q)));
     $('erLista').innerHTML = l.length ? l.map(erItem).join('') : '<div class="empty">' + ((ad.errores || []).length ? 'Nada coincide.' : '🎉 No hay errores sin resolver. Todo está funcionando.') + '</div>';
   }
+  // 1.61.0: el resumen de las últimas 24 horas (el mismo que llega solo a las 8 a. m.), y mandarlo ya a este celular.
+  $('erResumen').onclick = async () => {
+    const bt = $('erResumen'), t = $('erResumenTxt'); bt.disabled = true; t.textContent = '⏳ Armando el resumen…';
+    try{
+      const j = await sxApi('errores_resumen', {});
+      t.textContent = j.mensaje ? j.mensaje.titulo + ' — ' + j.mensaje.cuerpo.replace(/ Toca para verlos\.$/, '') + (j.enviados ? ' · 📲 Enviado a ' + j.enviados + ' equipo' + (j.enviados === 1 ? '' : 's') + '.' : ' · Activa 🔔 en Soporte para recibirlo en este celular.')
+        : '✅ Sin errores en las últimas 24 horas.';
+    }catch(x){ if(!sxFallo(x)) t.textContent = '⚠️ ' + sxMsgError(x); }
+    finally{ bt.disabled = false; }
+  };
   $('erEstado').onchange = erCargar; $('erTipo').onchange = erPintar; $('erBuscar').oninput = erPintar; $('erRef').onclick = erCargar;
   document.addEventListener('click', e => { const it = e.target.closest('[data-error]'); if(it && !e.target.closest('button,a')) erAbrir(it.dataset.error); });
   function erAbrir(h){
