@@ -6,7 +6,7 @@
    el canal de fotos de la carta, así lo ven también los QR de mesa ya impresos. */
 (function(){
   const $q = id => document.getElementById(id);
-  const QP = () => (data.qrPago = data.qrPago || null);
+  const QP = () => data.qrPago || null;   // solo leer: antes ponía «qrPago: null» en los datos de todos los negocios sin QR
   const cargarImg = src => new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = src; });
   const leerArchivo = f => new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = no; r.readAsDataURL(f); });
   function canvasDe(img, lado){

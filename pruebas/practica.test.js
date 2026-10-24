@@ -34,6 +34,9 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     chk('1. Sale como tarjeta en «Más» del modo fácil, y abre la práctica', tarjeta && await p.evaluate(() => document.getElementById('gzOv').classList.contains('show') && /practicar una venta/i.test(document.querySelector('#gzOv .gz-preg').textContent)));
     await p.evaluate(() => window.ventoGuia.cerrar());
     await p.waitForTimeout(300);
+    // Al abrir, algunos módulos crean su configuración unos segundos después (pagos, WhatsApp…): se espera a que los
+    // datos dejen de cambiar solos antes de tomar la foto de «antes» (en GitHub, más lento, caían en plena práctica).
+    await p.evaluate(async () => { let ult = JSON.stringify(data), quieto = 0; for(let i = 0; i < 40 && quieto < 6; i++){ await new Promise(z => setTimeout(z, 500)); const a = JSON.stringify(data); if(a === ult) quieto++; else { quieto = 0; ult = a; } } });
     const antes = await p.evaluate(() => JSON.stringify(data));
 
     async function practica(azar, ronda){

@@ -5,12 +5,12 @@
 <meta charset="UTF-8">
 <script src="lib/vento-errores.js"></script><!-- errores de este equipo → ORDEVA Admin (🐞 Errores) -->
 <script src="lib/vento-colormix.js" defer></script><!-- iPhone con iOS 15/16.0: colores mezclados (no hace nada en los demás) -->
-<script src="app/01-menus-saltan-arriba.js?v=1.59.0"></script>
+<script src="app/01-menus-saltan-arriba.js?v=1.59.1"></script>
 <script>
 // Un QR de mesa o link de domicilio que cae en la app del negocio abre la carta del cliente.
 (function(){var q=location.search;if(/[?&]c=\w/.test(q)&&/[?&](mesa=\d|dom=1)/.test(q))location.replace(location.pathname.replace(/[^/]*$/,'')+'pedido.html'+q+location.hash);})();
 </script>
-<script src="app/02-android-apk-dentro.js?v=1.59.0"></script>
+<script src="app/02-android-apk-dentro.js?v=1.59.1"></script>
 <!-- Evita que el navegador (sobre todo en el celular, con la app agregada a la
      pantalla de inicio) se quede pegado con una versión vieja de esta página
      guardada en caché — cada visita revisa que sea la última. -->
@@ -62,7 +62,7 @@
 window.ventoClave = (function(){ let ck = null, cv = ''; return function(k){ try{ const sid = localStorage.getItem('bar-current-sede') || 'default', raw = localStorage.getItem('bar-sedes-list') || '[]'; if(ck !== sid + raw){ ck = sid + raw; const s = (JSON.parse(raw) || []).find(x => x.id === sid); cv = s && s.cuenta && s.cuenta !== 'principal' ? '@' + s.cuenta : ''; } return k + cv; }catch(e){ return k; } }; })();
 window.esAndroid = function(){ var ua = navigator.userAgent || ''; if(/Android/i.test(ua)) return true; try{ if(navigator.userAgentData && /android/i.test(navigator.userAgentData.platform || '')) return true; }catch(e){} return /Linux/i.test(ua) && !/CrOS|Windows|Macintosh/i.test(ua) && (navigator.maxTouchPoints || 0) > 0; };
 </script>
-<script src="app/03-catalogo-tipos-negocio.js?v=1.59.0"></script>
+<script src="app/03-catalogo-tipos-negocio.js?v=1.59.1"></script>
 <script>
 /* Pantalla siempre al ancho del celular: si Chrome abre la página como «sitio para computadoras»
    (o el celular la dibuja más ancha que la pantalla), se agranda sola para no tener que hacer zoom. */
@@ -5047,7 +5047,7 @@ export default {
 <script src="lib/vento-cuenta.js" defer></script><!-- Soporte en la app, licencias del proveedor, recuperar por SMS, cuenta de cliente aparte del administrador -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script><!-- defer: antes frenaba todo lo de abajo (y si el CDN no respondía, ORDEVA se quedaba en blanco); solo se usa al tocar «imagen del recibo» -->
 <script src="lib/vento-sonidos.js"></script>
-<script src="app/04-principal.js?v=1.59.0"></script>
+<script src="app/04-principal.js?v=1.59.1"></script>
 
 <script>
 /* === TRANSFERENCIA / RESPALDO COMPLETO === */
@@ -5117,16 +5117,16 @@ export default {
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',wireBackupUI); else wireBackupUI();
 })();
 </script>
-<script src="app/05-pedidos-canciones-recibidos.js?v=1.59.0"></script>
+<script src="app/05-pedidos-canciones-recibidos.js?v=1.59.1"></script>
 
-<script src="app/06-campana-notificaciones-pedidos.js?v=1.59.0"></script>
+<script src="app/06-campana-notificaciones-pedidos.js?v=1.59.1"></script>
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <!-- qrcodejs 1.0.0 (MIT) incluido aquí mismo: las etiquetas y los QR de mesa funcionan sin internet -->
-<script src="app/07-qrcode-this-mode.js?v=1.59.0"></script>
+<script src="app/07-qrcode-this-mode.js?v=1.59.1"></script>
 <!-- JsBarcode 3.11.5 (MIT) incluido aquí mismo -->
-<script src="app/08-jsbarcode-return-exports.js?v=1.59.0"></script>
-<script src="app/09-cuentas-mesa-modulo.js?v=1.59.0"></script>
+<script src="app/08-jsbarcode-return-exports.js?v=1.59.1"></script>
+<script src="app/09-cuentas-mesa-modulo.js?v=1.59.1"></script>
 <script>
 /* Los motores pesados de lectura (OCR 10 MB y PDF 2 MB) ya no van dentro de esta página: se cargan
    solo cuando se lee una factura. Así ORDEVA abre más rápido y usa mucha menos memoria, y Android
@@ -5154,15 +5154,15 @@ document.addEventListener('click', function(ev){
   if(b) setTimeout(window.ventoPrecargarLibs, 1500);
 }, true);
 </script>
-<script src="app/10-tesseract-ocr-engine.js?v=1.59.0"></script>
+<script src="app/10-tesseract-ocr-engine.js?v=1.59.1"></script>
 <!-- lib/vento-ocr.js: se carga solo al leer una factura (ver ventoCargarLib) -->
 <!-- lib/vento-pdf.js: se carga solo al leer una factura (ver ventoCargarLib) -->
 <!-- lib/vento-pdf-worker.js: se carga solo al leer una factura (ver ventoCargarLib) -->
-<script src="app/11-precios-vito-motor.js?v=1.59.0"></script>
-<script src="app/12-fotos-productos-fondo.js?v=1.59.0"></script>
-<script src="app/13-libreta-abuela-cuaderno.js?v=1.59.0"></script>
-<script src="app/14-verificacion-pagos-nequi.js?v=1.59.0"></script>
-<script src="app/15-whatsapp-recibir-responder.js?v=1.59.0"></script>
+<script src="app/11-precios-vito-motor.js?v=1.59.1"></script>
+<script src="app/12-fotos-productos-fondo.js?v=1.59.1"></script>
+<script src="app/13-libreta-abuela-cuaderno.js?v=1.59.1"></script>
+<script src="app/14-verificacion-pagos-nequi.js?v=1.59.1"></script>
+<script src="app/15-whatsapp-recibir-responder.js?v=1.59.1"></script>
 <script>
 /* Celebración: una explosión de emojis que se desvanece (cobro, pago recibido, pedido enviado).
    No sale si el celular pide menos movimiento ni en el modo fácil. */
@@ -5204,13 +5204,13 @@ window.mesoraCelebrar = function(emojis){
   }, 800);
 })();
 </script>
-<script src="app/16-pago-dueno-sube.js?v=1.59.0"></script>
-<script src="app/17-unidades-combinadas-reinicio.js?v=1.59.0"></script>
-<script src="app/18-laya-asistente-cerebro.js?v=1.59.0"></script>
-<script src="app/19-historial-facturas-movimientos.js?v=1.59.0"></script>
-<script src="app/20-contabilidad-recibos-adjuntos.js?v=1.59.0"></script>
-<script src="app/21-bienvenida-adapta-cada.js?v=1.59.0"></script>
-<script src="app/22-primeros-pasos-tarjeta.js?v=1.59.0"></script>
+<script src="app/16-pago-dueno-sube.js?v=1.59.1"></script>
+<script src="app/17-unidades-combinadas-reinicio.js?v=1.59.1"></script>
+<script src="app/18-laya-asistente-cerebro.js?v=1.59.1"></script>
+<script src="app/19-historial-facturas-movimientos.js?v=1.59.1"></script>
+<script src="app/20-contabilidad-recibos-adjuntos.js?v=1.59.1"></script>
+<script src="app/21-bienvenida-adapta-cada.js?v=1.59.1"></script>
+<script src="app/22-primeros-pasos-tarjeta.js?v=1.59.1"></script>
 <script>
 /* Si Android/Chrome recarga la pestaña (por memoria, al volver de la cámara o de otra app), ORDEVA vuelve
    a la sección donde estabas en vez de dejarte en el inicio. Los datos ya están guardados siempre. */
@@ -5270,7 +5270,7 @@ window.mesoraCelebrar = function(emojis){
   setInterval(pinta, 5000); pinta();
 })();
 </script>
-<script src="app/23-cerebro-app-ventas.js?v=1.59.0"></script>
+<script src="app/23-cerebro-app-ventas.js?v=1.59.1"></script>
 <script>
 /* Ajustes → Voz: lista de voces en español (las más naturales primero) */
 (function(){
@@ -5290,10 +5290,10 @@ window.mesoraCelebrar = function(emojis){
   pintar();
 })();
 </script>
-<script src="app/24-pagos-nequi-daviplata.js?v=1.59.0"></script>
-<script src="app/25-vitrina-pagina-pedidos.js?v=1.59.0"></script>
-<script src="app/26-verificar-comprobantes-nequi.js?v=1.59.0"></script>
-<script src="app/27-roles-equipo-permisos.js?v=1.59.0"></script>
+<script src="app/24-pagos-nequi-daviplata.js?v=1.59.1"></script>
+<script src="app/25-vitrina-pagina-pedidos.js?v=1.59.1"></script>
+<script src="app/26-verificar-comprobantes-nequi.js?v=1.59.1"></script>
+<script src="app/27-roles-equipo-permisos.js?v=1.59.1"></script>
 <script>
 /* ================= ¿A quién le llega el aviso de un PAGO? =================
    Solo al DUEÑO, a los ADMINISTRADORES y a quien está COBRANDO o ATENDIENDO esa mesa (mesero, empleado o cajero).
@@ -5407,8 +5407,8 @@ window.mesoraCelebrar = function(emojis){
   setTimeout(() => { armar(); pintar(); }, 1500);
 })();
 </script>
-<script src="app/28-corregir-liberar-borrar.js?v=1.59.0"></script>
-<script src="app/29-clave-cerrar-caja.js?v=1.59.0"></script>
-<script src="app/30-actividad-equipo-huella.js?v=1.59.0"></script>
+<script src="app/28-corregir-liberar-borrar.js?v=1.59.1"></script>
+<script src="app/29-clave-cerrar-caja.js?v=1.59.1"></script>
+<script src="app/30-actividad-equipo-huella.js?v=1.59.1"></script>
 </body>
 </html>

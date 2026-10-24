@@ -1,4 +1,4 @@
-# ORDEVA 1.59.0 · Reporte de errores al Admin, abrir más rápido, iPhone y Mac afinados, programa de PC al día
+# ORDEVA 1.59.0 – 1.59.1 · Reporte de errores al Admin, abrir más rápido, iPhone y Mac afinados, programa de PC al día
 
 La auditoría completa, con lo que falta y lo que necesita de ti, está en `puente/AUDITORIA-1.59.0.md`.
 
@@ -56,3 +56,10 @@ La auditoría completa, con lo que falta y lo que necesita de ti, está en `puen
 ## 5. Arreglo
 - **ORDEVA Admin tenía su versión atrasada** (1.58.2) y por eso pedía «Actualizar» todo el tiempo.
 - Ahora es 1.59.0, y la prueba de módulos revisa que no vuelva a pasar.
+
+## 1.59.1
+- **El QR de pago ya no agrega «qrPago: null»** a los datos de cada negocio sin QR, solo por mirarlo.
+- **La prueba `practica`** espera a que la app termine de arrancar antes de comparar los datos. En GitHub, más lento,
+  los módulos de pagos y WhatsApp creaban su configuración en plena práctica.
+- **`puente/subir-version.sh`** sube la versión en todos los lugares a la vez: app, archivos de `app/`, `version.txt` y
+  el panel Admin.
