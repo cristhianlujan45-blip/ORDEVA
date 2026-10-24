@@ -8,7 +8,7 @@
 //     un pago en la app del negocio (sin reinstalar).
 'use strict';
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
-const fs = require('fs');
+const fs = require('fs'), path = require('path');
 const { spawnSync } = require('child_process');
 function hayPostgres(){ if(process.env.VENTO_PG_URL || fs.existsSync('/usr/lib/postgresql')) return true; return spawnSync('bash', ['-c', 'command -v psql || command -v pg_ctl'], { stdio: 'ignore' }).status === 0; }
 if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig = console[k].bind(console); console[k] = (...a) => { if(typeof a[0] === 'string' && a[0].startsWith('{"t":"')) return; orig(...a); }; }
@@ -33,6 +33,9 @@ const ADMIN = 'cristhianwkh@gmail.com', CLAVE_ADMIN = 'Clave-de-prueba-77';
       const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
       await ctx.route('**/*', rt => { const u = new URL(rt.request().url()); return (u.hostname === 'localhost' || u.hostname === '127.0.0.1') ? rt.continue() : rt.abort(); });
       await enrutar(ctx, sb);
+      // html2canvas (el pantallazo automático) desde una copia local, como si llegara del CDN
+      const h2c = path.join(__dirname, 'node_modules', 'html2canvas', 'dist', 'html2canvas.min.js');
+      if(fs.existsSync(h2c)) await ctx.route(/cdnjs\.cloudflare\.com\/ajax\/libs\/html2canvas\//, rt => rt.fulfill({ status: 200, contentType: 'application/javascript', body: fs.readFileSync(h2c, 'utf8') }));
       await ctx.addInitScript(() => { try{ localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento-hola', '0'); }catch(e){} });
       const p = await ctx.newPage(); p.on('pageerror', e => { if(!/vamosMal|nada is not a function|reading 'nada'/.test(e.message)) errs.push(nombre + ': ' + e.message); });
       await p.goto(url);
@@ -147,6 +150,10 @@ const ADMIN = 'cristhianwkh@gmail.com', CLAVE_ADMIN = 'Clave-de-prueba-77';
     await N.p.click('#navMoreSheet .more-tile[data-go="reportar"]');
     await N.p.waitForSelector('#vcRepOv.show');
     await N.p.fill('#vcRepMsg', 'Al cobrar la mesa 3 se quedó pegado');
+    // 1.62.0: el pantallazo de lo que se veía se toma solo (sin la ventana del reporte encima)
+    const tieneH2c = await N.p.evaluate(() => typeof window.html2canvas === 'function');
+    chk('6. Toma solo el pantallazo de lo que se veía, con la casilla para quitarlo', tieneH2c && await N.p.waitForFunction(() => !document.getElementById('vcRepAutoBox').hidden && document.getElementById('vcRepAuto').checked && /^blob:/.test(document.getElementById('vcRepAutoImg').src), null, { timeout: 15000 }).then(() => true, () => false), { tieneH2c });
+    if(process.env.VENTO_GUARDAR_PANTALLAZO) fs.writeFileSync(process.env.VENTO_GUARDAR_PANTALLAZO, Buffer.from(await N.p.evaluate(async () => { const b = await (await fetch(document.getElementById('vcRepAutoImg').src)).arrayBuffer(); return Array.from(new Uint8Array(b)); })));
     await N.p.click('#vcRepSi');
     await N.p.evaluate(() => window.ventoErrores.enviar());
     chk('6. «🐞 Reportar un problema» llega al servidor con lo que escribió y los códigos de sus errores', await hasta(async () => (await filas("select 1 from app_errores where negocio = 'Bar Frases' and (detalle->>'reporte') = 'true' and detalle->>'texto' like '%se quedó pegado%' and jsonb_array_length(detalle->'codigos') >= 1")).length > 0),
@@ -154,6 +161,9 @@ const ADMIN = 'cristhianwkh@gmail.com', CLAVE_ADMIN = 'Clave-de-prueba-77';
     const cerro6 = await N.p.waitForFunction(() => !document.getElementById('vcRepOv').classList.contains('show'), null, { timeout: 10000 }).then(() => true, () => false);
     chk('6. Se cierra y le dice que ya llegó', cerro6, await N.p.textContent('#vcRepEstado'));
     chk('6. … y queda como caso de soporte (con los códigos para el administrador)', await hasta(async () => (await filas("select 1 from soporte_casos where asunto like '🐞 Al cobrar%'").catch(() => [])).length > 0), await filas("select table_name from information_schema.tables where table_name like 'soporte%'"));
+
+    chk('6. … con el pantallazo adjunto (JPEG, almacenamiento privado del soporte)', await hasta(async () => (await filas("select m.adjunto_tipo from soporte_mensajes m join soporte_casos c on c.id = m.caso_id where c.asunto like '🐞 Al cobrar%' and m.adjunto is not null").catch(() => [])).some(x => x.adjunto_tipo === 'image/jpeg'), 20000),
+      await filas("select m.texto, m.adjunto, m.adjunto_tipo from soporte_mensajes m join soporte_casos c on c.id = m.caso_id where c.asunto like '🐞 Al cobrar%'").catch(e => e.message));
 
     // ===== 7. La app Android / el programa de PC se cerró por un error suyo: llega al abrir, con su pila =====
     const P = await pagina('programa', 'about:blank');
