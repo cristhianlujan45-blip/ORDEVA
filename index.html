@@ -4590,6 +4590,8 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
       <div class="settings-desc" id="instAqui" style="opacity:.8"></div>
       <a class="btn-primary" id="instPc" href="https://github.com/cristhianlujan45-blip/ORDEVA/releases/download/pc/Vento-Setup.exe" download="ORDEVA-Setup.exe" rel="noopener" style="display:block;text-align:center;box-sizing:border-box;margin-top:8px;text-decoration:none">💻 Descargar ORDEVA para PC (Windows)</a>
       <div class="settings-desc" style="margin-top:6px"><small>Abre <b>ORDEVA-Setup.exe</b> y sigue los pasos. Si Windows dice «Windows protegió su PC», toca <b>Más información → Ejecutar de todas formas</b>. Queda en el escritorio, sigue sonando con la ventana cerrada (icono junto al reloj), usa la balanza, la impresora y el cajón por USB, y se actualiza solo.</small></div>
+      <a class="btn-ghost" id="instMac" href="https://github.com/cristhianlujan45-blip/ORDEVA/releases/download/pc/ORDEVA-Mac.dmg" download="ORDEVA-Mac.dmg" rel="noopener" style="display:block;text-align:center;box-sizing:border-box;margin-top:10px;text-decoration:none">🍎 Descargar ORDEVA para Mac</a>
+      <div class="settings-desc" style="margin-top:6px"><small>Para Mac con chip Apple (M1–M4) o Intel, macOS 11 o más nuevo. Abre <b>ORDEVA-Mac.dmg</b> y arrastra ORDEVA a <b>Aplicaciones</b>. La primera vez: <b>clic derecho en ORDEVA → Abrir → Abrir</b> (o Ajustes del Sistema → Privacidad y seguridad → <b>Abrir igualmente</b>), porque no está firmado por Apple. Lo de adentro se actualiza solo; el programa nuevo se baja de aquí mismo.</small></div>
       <a class="btn-ghost" id="instApk" href="https://github.com/cristhianlujan45-blip/ORDEVA/releases/latest/download/vento.apk" download="vento.apk" rel="noopener" style="display:block;text-align:center;box-sizing:border-box;margin-top:10px;text-decoration:none">📲 Descargar la app para Android (vento.apk)</a>
       <script>
       (function(){
@@ -19012,6 +19014,18 @@ async function rcptMudar(){
   }
 }
 setTimeout(() => { rcptMudar(); autoBackupPoints(); }, 4000);   // al abrir: lo viejo de localStorage pasa al almacén grande
+// El pantallazo se abre y se pasa a JPEG fuera del hilo de la pantalla (createImageBitmap + toBlob): con toDataURL la
+// cuenta se quedaba quieta un rato al adjuntar una captura grande. Si el navegador no lo tiene, queda lo de antes.
+async function rcptAchicar(file, max, calidad){
+  if(!window.createImageBitmap || !HTMLCanvasElement.prototype.toBlob) return resizeBackgroundImage(file, max, calidad);
+  try{
+    const bm = await createImageBitmap(file), k = Math.min(1, max / Math.max(bm.width, bm.height));
+    const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(bm.width * k)); c.height = Math.max(1, Math.round(bm.height * k));
+    c.getContext('2d').drawImage(bm, 0, 0, c.width, c.height); try{ bm.close(); }catch(e){}
+    const blob = await new Promise((ok, mal) => c.toBlob(b => b ? ok(b) : mal(new Error('jpeg')), 'image/jpeg', calidad));
+    return await new Promise((ok, mal) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = () => mal(r.error); r.readAsDataURL(blob); });
+  }catch(e){ return resizeBackgroundImage(file, max, calidad); }
+}
 function receiptField(scope){
   const img = pendingReceipt[scope];
   pendingReceipt[scope] = null;
@@ -19021,6 +19035,7 @@ function receiptField(scope){
 ['table', 'person'].forEach(scope => {
   document.getElementById(scope === 'person' ? 'personRcptBtn' : 'payRcptBtn').addEventListener('click', () => {
     rcptScope = scope;
+    if(window.comprobantePrecalentar) window.comprobantePrecalentar();   // el lector de comprobantes carga mientras se elige la foto
     document.getElementById('rcptInput').click();
   });
 });
@@ -19029,7 +19044,7 @@ document.getElementById('rcptInput').addEventListener('change', async e => {
   e.target.value = '';
   if(!f || !rcptScope) return;
   try{
-    pendingReceipt[rcptScope] = await resizeBackgroundImage(f, 900, 0.6);
+    pendingReceipt[rcptScope] = await rcptAchicar(f, 900, 0.6);
     updatePayPickInfo(rcptScope);
     showToast('📎 Comprobante listo. Toca + para registrar el pago.');
   }catch(err){ showToast('No se pudo leer esa foto.'); }
@@ -24268,6 +24283,7 @@ document.addEventListener('click', function(ev){
   // con el que mejor haya funcionado.
   // ---------- offline OCR (Tesseract.js, embedded, no internet needed) ----------
   var offlineWorkerPromise = null;
+  var colaComprobante = Promise.resolve();   // un comprobante a la vez: cambia el modo de lectura y lo devuelve
 
   function b64ToUint8Array(b64) {
     var bin = atob(b64);
@@ -24528,7 +24544,10 @@ document.addEventListener('click', function(ev){
         throw new Error("El lector de facturas no cargó completo (lib/vento-ocr.js). Revisa la conexión y vuelve a intentarlo.");
       }
       var workerURL = URL.createObjectURL(new Blob([D.workerCombinedSrc], { type: "application/javascript" }));
-      var spaBytes = b64ToUint8Array(D.spaTraineddataB64);
+      // El idioma (2,8 MB en base64) se decodifica con fetch: el bucle de atob trababa la pantalla al primer uso.
+      var spaBytes;
+      try { spaBytes = new Uint8Array(await (await fetch("data:application/octet-stream;base64," + D.spaTraineddataB64)).arrayBuffer()); }
+      catch (eB64) { spaBytes = b64ToUint8Array(D.spaTraineddataB64); }
 
       var worker = await Tesseract.createWorker(
         [{ code: "spa", data: spaBytes }],
@@ -25674,8 +25693,21 @@ document.addEventListener('click', function(ev){
 
   window.VitoOfflineOCR = {
     scanInvoiceFiles: scanInvoiceFiles,
-    // Texto de una imagen (comprobantes de pago): misma lectura sin internet de las facturas.
+    // Texto de una imagen con el arreglo de las fotos de facturas (blanco y negro, enderezado) y en un solo bloque.
     textoDeImagen: async function (file) { var w = await getOfflineWorker(); var c = await fileToOcrCanvas(file); return await recognizeWithWorker(w, c, OCR_RECOGNIZE_TIMEOUT_MS); },
+    // Pantallazo de un comprobante (Nequi, DaviPlata, bancos): el archivo va TAL CUAL al lector, que lo abre en su propio
+    // hilo (la pantalla no se traba), y se lee en columna (PSM 4). En un solo bloque (PSM 6, el de las facturas) Tesseract
+    // se saltaba el renglón grande del valor («$ 65.000») y quedaban solo el saldo y el costo.
+    textoDeComprobante: function (file, psm) {
+      var job = colaComprobante.then(async function () {
+        var w = await withTimeout(getOfflineWorker(), OCR_WORKER_LOAD_TIMEOUT_MS, "El lector de comprobantes está tardando demasiado en cargar. Intenta de nuevo.");
+        await w.setParameters({ tessedit_pageseg_mode: String(psm || 4) });
+        try { return await recognizeWithWorker(w, file, OCR_RECOGNIZE_TIMEOUT_MS); }
+        finally { try { if (offlineWorkerPromise) await w.setParameters({ tessedit_pageseg_mode: (Tesseract.PSM && Tesseract.PSM.SINGLE_BLOCK) || "6" }); } catch (eP) { /* noop */ } }
+      });
+      colaComprobante = job.catch(function () {});
+      return job;
+    },
     // Todo el texto de la foto CON la posición de cada palabra (para el PDF escaneado con texto que se puede buscar y copiar).
     palabrasDeImagen: async function (file) {
       var w = await getOfflineWorker(); var c = await fileToOcrCanvas(file), r;
@@ -26120,7 +26152,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-24 · v1.58.2';
+const MESORA_VERSION = '2026-10-24 · v1.58.3';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'ORDEVA · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 /* 🔄 La app Android se actualiza SOLA (Actualizador): revisa cada 3 h, baja la versión nueva y la instala cuando no se
@@ -32661,17 +32693,22 @@ window.mesoraCelebrar = function(emojis){
     const plano = t.replace(/\n+/g, ' ');
     const app = /daviplata/i.test(plano) ? 'DaviPlata' : /bre-?b|llave/i.test(plano) && !/nequi/i.test(plano) ? 'Bre-B' : /nequi/i.test(plano) ? 'Nequi' : /bancolombia/i.test(plano) ? 'Bancolombia' : 'Transferencia';
     // Valor: el que va junto a «¿Cuánto?», «Valor», «Monto», «Total»; si no, el mayor que no sea costo/saldo.
-    let monto = null;
+    // El valor que va DEBAJO de «Saldo disponible» / «Costo…» es el saldo o el costo, nunca el pago (antes, si el
+    // renglón del valor no se leía, quedaba el saldo: «$ 1.250.300» en vez de «$ 65.000»).
+    let monto = null, porEtiqueta = false;
     const lineas = t.split('\n').map(x => x.trim()).filter(Boolean);
-    const RX_PLATA = /\$\s?(\d{1,3}(?:[.,]\d{3})+(?:,\d{1,2})?|\d+(?:,\d{1,2})?)/;
+    const RX_PLATA = /(?:\$|\bS(?=\s?\d{1,3}[.,]\d{3}))\s?(\d{1,3}(?:[.,]\d{3})+(?:,\d{1,2})?|\d+(?:,\d{1,2})?)/;   // «S 65.000»: el $ mal leído
+    const ETQ = /(cu[aá]nto|valor|monto|total|enviaste|pasaste|pagaste|recibiste|transferiste)/i, NO = /(costo|comisi|saldo|gmf|4x1000|cuota de manejo|disponible)/i;
+    const excluida = i => NO.test(lineas[i]) || (i > 0 && NO.test(lineas[i - 1]) && !RX_PLATA.test(lineas[i - 1]) && !ETQ.test(lineas[i]));
     for(let i = 0; i < lineas.length && monto == null; i++){
-      if(/(cu[aá]nto|valor|monto|total|enviaste|pasaste|pagaste|recibiste|transferiste)/i.test(lineas[i]) && !/(costo|comisi|saldo|gmf|4x1000)/i.test(lineas[i])){
-        const m = lineas[i].match(RX_PLATA) || (lineas[i + 1] || '').match(RX_PLATA) || (lineas[i + 1] || '').match(/^(\d{1,3}(?:[.,]\d{3})+)(?:,\d{1,2})?$/);
-        if(m) monto = num(m[1]);
+      if(ETQ.test(lineas[i]) && !NO.test(lineas[i])){
+        const sig = lineas[i + 1] && !excluida(i + 1) ? lineas[i + 1] : '';
+        const m = lineas[i].match(RX_PLATA) || sig.match(RX_PLATA) || sig.match(/^(\d{1,3}(?:[.,]\d{3})+)(?:,\d{1,2})?$/);
+        if(m && num(m[1]) > 0){ monto = num(m[1]); porEtiqueta = true; }
       }
     }
     if(monto == null){
-      const todos = lineas.filter(l => !/(costo|comisi|saldo|gmf|4x1000)/i.test(l)).map(l => (l.match(RX_PLATA) || [])[1]).filter(Boolean).map(num).filter(v => v > 0);
+      const todos = lineas.map((l, i) => excluida(i) ? null : (l.match(RX_PLATA) || [])[1]).filter(Boolean).map(num).filter(v => v > 0);
       if(todos.length) monto = Math.max.apply(null, todos);
     }
     // Referencia / número de aprobación (identifica la transacción: el mismo número no puede usarse dos veces).
@@ -32700,7 +32737,7 @@ window.mesoraCelebrar = function(emojis){
     if(md) destino = md[3];
     const nombre = (plano.match(/(?:para|nombre|destinatario)\s*:?\s*([A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ.]+(?:\s+[A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ.]+){0,3})/) || [])[1] || '';
     const exito = /(exitos|realizad|aprobad|env[ií]o\s+(exitoso|realizado)|listo|enviaste|pasaste|transferencia exitosa|transacci[oó]n exitosa|pago exitoso)/i.test(plano);
-    return { app, monto, ref, fecha: typeof fecha === 'number' ? fecha : null, dia: fecha && fecha.soloDia ? fecha.t : null, destino, nombre, exito, texto: plano.slice(0, 600) };
+    return { app, monto, porEtiqueta, ref, fecha: typeof fecha === 'number' ? fecha : null, dia: fecha && fecha.soloDia ? fecha.t : null, destino, nombre, exito, texto: plano.slice(0, 600) };
   }
 
   // ---------- Cruzar con lo que llegó ----------
@@ -32718,9 +32755,16 @@ window.mesoraCelebrar = function(emojis){
       if(usado) return { nivel: 'falso', motivos: ['🚨 Este comprobante YA SE USÓ el ' + new Date(usado.t).toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + ' en ' + quien(usado) + ' (misma referencia ' + info.ref + ').'], info };
     }
     const mio = String(data.nequiNumber || '').replace(/\D/g, '');
-    if(info.destino && mio.length === 10 && (info.app === 'Nequi' || info.app === 'Bre-B') && info.destino !== mio.slice(-4))
-      return { nivel: 'falso', motivos: ['🚨 La plata fue a OTRO número (termina en ' + info.destino + '). Tu Nequi termina en ' + mio.slice(-4) + '.'], info };
-    if(info.fecha && info.fecha > ahora + 10 * 60e3) return { nivel: 'falso', motivos: ['🚨 La fecha del comprobante es del futuro: está editado.'], info };
+    if(info.destino && mio.length === 10 && (info.app === 'Nequi' || info.app === 'Bre-B') && info.destino !== mio.slice(-4)){
+      // Un solo número distinto puede ser la lectura del pantallazo (un 8 leído como 3): eso se revisa, no se acusa.
+      const dif = [0, 1, 2, 3].filter(k => info.destino[k] !== mio.slice(-4)[k]).length;
+      if(dif >= 2) return { nivel: 'falso', motivos: ['🚨 La plata fue a OTRO número (termina en ' + info.destino + '). Tu Nequi termina en ' + mio.slice(-4) + '.'], info };
+      nivel = 'revisar'; motivos.push('⚠️ El número del comprobante se leyó como •••' + info.destino + ' y tu Nequi termina en ' + mio.slice(-4) + ': mira en el pantallazo a qué número fue.');
+    }
+    // La hora del equipo puede ir corrida (otra zona horaria, reloj atrasado): solo muy en el futuro es un comprobante editado.
+    if(info.fecha && info.fecha > ahora + 6 * 3600e3) return { nivel: 'falso', motivos: ['🚨 La fecha del comprobante es del futuro: está editado.'], info };
+    if(info.fecha && info.fecha > ahora + 10 * 60e3){ nivel = 'revisar'; motivos.push('⚠️ La hora del comprobante va adelantada ' + Math.round((info.fecha - ahora) / 60e3) + ' min frente a este equipo: revisa la hora del equipo y la del comprobante.'); }
+    if(!info.porEtiqueta) motivos.push('Mira que ' + plata(info.monto) + ' sea el valor del pantallazo: no encontré la palabra «¿Cuánto?» / «Valor» junto a él.');
     const ref = info.fecha || info.dia;
     if(ref && ahora - ref > 36 * 3600e3){ nivel = 'revisar'; motivos.push('⚠️ El comprobante es de hace ' + Math.round((ahora - ref) / 864e5 * 10) / 10 + ' días: no es de hoy.'); }
     if(!info.exito) motivos.push('El comprobante no dice «exitoso»/«realizado»: revisa que no sea un pago pendiente o rechazado.');
@@ -32772,31 +32816,51 @@ window.mesoraCelebrar = function(emojis){
   }
   const COLOR = { ok: '#22c55e', espera: '#f5a524', revisar: '#f5a524', falso: '#e5484d' };
   const TITULO = { ok: '✅ Pago verificado', espera: '⏳ Aún no llega', revisar: '⚠️ Revísalo', falso: '🚨 NO LO ACEPTES' };
-  function mostrar(r, mesa, alRegistrar){
+  function mostrar(r, mesa, alRegistrar, alQuitar){
     const ov = ventana(), i = r.info || {};
     ov.innerHTML = '<div class="modal" style="max-width:420px;width:100%"><h2 style="color:' + COLOR[r.nivel] + '">' + TITULO[r.nivel] + '</h2>' +
       '<div style="font:800 30px/1.2 var(--font-main);text-align:center;margin:4px 0">' + (i.monto ? plata(i.monto) : '¿?') + '</div>' +
       '<div class="modal-sub" style="text-align:center">' + esc(i.app || '') + (i.ref ? ' · Ref. ' + esc(i.ref) : '') + (i.fecha ? ' · ' + new Date(i.fecha).toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '') + (i.destino ? ' · a •••' + esc(i.destino) : '') + '</div>' +
       '<ul style="margin:12px 0 0;padding-left:18px;line-height:1.5">' + r.motivos.map(m => '<li>' + esc(m) + '</li>').join('') + '</ul>' +
-      '<div class="modal-actions" style="flex-wrap:wrap">' + (r.nivel === 'ok' && alRegistrar ? '<button type="button" class="btn-primary" id="compReg">Registrar ' + (i.monto ? plata(i.monto) : '') + ' en la cuenta</button>' : '') + '<button type="button" class="btn-close" id="compX">Cerrar</button></div></div>';
+      '<div class="modal-actions" style="flex-wrap:wrap">' + (r.nivel === 'ok' && alRegistrar ? '<button type="button" class="btn-primary" id="compReg">Registrar ' + (i.monto ? plata(i.monto) : '') + ' en la cuenta</button>' : '') + (r.nivel === 'falso' && alQuitar ? '<button type="button" class="btn-ghost" id="compQuitar">🗑 Quitar el pantallazo de la cuenta</button>' : '') + '<button type="button" class="btn-close" id="compX">Cerrar</button></div></div>';
     ov.classList.add('show');
     ov.querySelector('#compX').onclick = () => ov.classList.remove('show');
     const b = ov.querySelector('#compReg'); if(b) b.onclick = () => { ov.classList.remove('show'); alRegistrar(r); };
+    const q = ov.querySelector('#compQuitar'); if(q) q.onclick = () => { ov.classList.remove('show'); alQuitar(r); };
     if(r.nivel === 'falso'){ try{ (window.ventoHablar || window.speakVoice || function(){})('Ojo. ' + r.motivos[0].replace(/🚨/g, '')); }catch(e){} try{ navigator.vibrate && navigator.vibrate([400, 120, 400]); }catch(e){} }
   }
 
+  // Primero el pantallazo tal cual (en el hilo del lector, sin trabar la pantalla). Si así no aparece el valor junto a
+  // «¿Cuánto?»/«Valor» (una FOTO de la pantalla, con reflejos), se lee otra vez con el arreglo de las fotos de facturas.
   async function leerArchivo(f){
-    if(!window.VitoOfflineOCR || !window.VitoOfflineOCR.textoDeImagen) throw new Error('El lector de comprobantes no está disponible.');
-    return window.VitoOfflineOCR.textoDeImagen(f);
+    const O = window.VitoOfflineOCR;
+    if(!O || !(O.textoDeComprobante || O.textoDeImagen)) throw new Error('El lector de comprobantes no está disponible.');
+    let info = null, err = null;
+    if(O.textoDeComprobante){ try{ info = leer(await O.textoDeComprobante(f)); }catch(e){ err = e; } }
+    if((!info || !info.porEtiqueta) && O.textoDeImagen){
+      let otra = null; try{ otra = leer(await O.textoDeImagen(f)); }catch(e){ if(!info) throw err || e; }
+      if(otra && (!info || otra.porEtiqueta || (!info.monto && otra.monto))){
+        if(info){ ['ref', 'fecha', 'dia', 'destino', 'nombre'].forEach(k => { if(otra[k] == null || otra[k] === '') otra[k] = info[k]; }); otra.exito = otra.exito || info.exito; }
+        info = otra;
+      }
+    }
+    if(!info) throw err || new Error('No se pudo leer el comprobante.');
+    return info;
   }
+  window.comprobantePrecalentar = () => { try{ window.VitoOfflineOCR && window.VitoOfflineOCR.precalentar && window.VitoOfflineOCR.precalentar(); }catch(e){} };
   // Uso general: verificar un archivo (o un texto ya leído) para una cuenta.
   window.comprobanteVerificar = async function(fuente, mesa, opciones){
     opciones = opciones || {};
-    let texto = typeof fuente === 'string' ? fuente : null;
-    if(!texto){ try{ showToast('🔎 Revisando el comprobante…', 4000); }catch(e){} texto = await leerArchivo(fuente); }
-    const info = leer(texto), r = verificar(info, mesa);
+    let info;
+    if(typeof fuente === 'string') info = leer(fuente);
+    else {
+      try{ showToast('🔎 Revisando el comprobante…', 4000); }catch(e){}
+      await new Promise(z => setTimeout(z, 0));   // que el aviso se pinte antes de leer
+      info = await leerArchivo(fuente);
+    }
+    const r = verificar(info, mesa);
     guardar(r, mesa);
-    if(opciones.mostrar !== false) mostrar(r, mesa, opciones.alRegistrar);
+    if(opciones.mostrar !== false) mostrar(r, mesa, opciones.alRegistrar, opciones.alQuitar);
     return r;
   };
   window.comprobanteLeer = leer;
@@ -32814,16 +32878,18 @@ window.mesoraCelebrar = function(emojis){
       const a = document.getElementById('paymentAmount'), m = document.getElementById('paymentMethod'), n = document.getElementById('paymentNote');
       if(a) a.value = r.info.monto; if(m) m.value = 'transferencia'; if(n && !n.value) n.value = '💜 ' + r.info.app + ' (comprobante verificado)';
       document.getElementById('addPaymentBtn').click();
-    } }).then(r => {
-      // Un comprobante falso no queda adjunto al pago.
-      if(r && r.nivel === 'falso'){ try{ pendingReceipt[scope] = null; updatePayPickInfo(scope); }catch(e){} }
-    }).catch(err => { try{ showToast('No se pudo leer el comprobante: ' + (err.message || err), 7000); }catch(e){} });
+    }, alQuitar: () => {
+      // Antes un comprobante «falso» se quitaba solo: si la lectura se equivocaba, el pantallazo no quedaba en el pago.
+      // Ahora queda adjunto y la persona decide.
+      try{ pendingReceipt[scope] = null; updatePayPickInfo(scope); showToast('🗑 Pantallazo quitado de la cuenta.'); }catch(e){}
+    } }).catch(err => { try{ showToast('No se pudo leer el comprobante: ' + (err.message || err), 7000); }catch(e){} });
   }, true);
 
   // ---------- Botón suelto: Más → 💜 Pagos y Ajustes → 💜 Pagos ----------
   let entrada = null;
   window.comprobanteElegir = function(mesa){
     if(!entrada){ entrada = document.createElement('input'); entrada.type = 'file'; entrada.accept = 'image/*'; entrada.hidden = true; document.body.appendChild(entrada); }
+    window.comprobantePrecalentar();   // el lector carga mientras se elige el pantallazo
     entrada.onchange = () => { const f = entrada.files[0]; entrada.value = ''; if(f) window.comprobanteVerificar(f, mesa != null ? mesa : null).catch(err => showToast('No se pudo leer el comprobante: ' + (err.message || err), 7000)); };
     entrada.click();
   };

@@ -151,6 +151,13 @@ function crearBandeja(){
 let actualizador = null;
 function actualizar(aMano){
   if(!app.isPackaged || process.env.VENTO_PC_URL) return Promise.resolve(false);
+  // En Mac el programa no va firmado por Apple, y así la actualización sola no se puede instalar: se baja a mano.
+  // (La página de ORDEVA, que es casi todo, se actualiza sola igual que en Windows.)
+  if(process.platform === 'darwin'){
+    if(aMano) dialog.showMessageBox(ventana, { type: 'info', title: 'ORDEVA', message: 'Tienes ORDEVA para Mac ' + app.getVersion() + '.', detail: 'Las versiones nuevas del programa para Mac se descargan de la página de ORDEVA para PC (ORDEVA-Mac.dmg). Lo de adentro de ORDEVA ya se actualiza solo.', buttons: ['Abrir la descarga', 'Cerrar'], cancelId: 1 })
+      .then(r => { if(r.response === 0) shell.openExternal('https://github.com/cristhianlujan45-blip/ORDEVA/releases/tag/pc'); }).catch(() => {});
+    return Promise.resolve(false);
+  }
   try{ if(!actualizador){ actualizador = require('electron-updater').autoUpdater; actualizador.autoDownload = true; actualizador.autoInstallOnAppQuit = true;
     actualizador.on('update-downloaded', i => {
       dialog.showMessageBox(ventana, { type: 'info', title: 'ORDEVA', message: 'Hay una versión nueva del programa ORDEVA (' + i.version + ').', detail: 'Se instala al cerrar ORDEVA, o ahora mismo.', buttons: ['Instalar ahora', 'Después'], cancelId: 1 })

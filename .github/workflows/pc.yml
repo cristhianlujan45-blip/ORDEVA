@@ -1,5 +1,7 @@
-# Compila Vento para PC (Windows) y lo publica en las Descargas del repositorio (release «pc»):
-#   https://github.com/cristhianlujan45-blip/ORDEVA/releases/download/pc/Vento-Setup.exe
+# Compila ORDEVA para PC (Windows y Mac) y lo publica en las Descargas del repositorio (release «pc»):
+#   https://github.com/cristhianlujan45-blip/ORDEVA/releases/download/pc/Vento-Setup.exe   (Windows)
+#   https://github.com/cristhianlujan45-blip/ORDEVA/releases/download/pc/ORDEVA-Mac.dmg    (Mac: Intel y Apple M1-M4)
+# Solo se publica desde la rama principal; desde otra rama (a mano) se compila y queda como artefacto para revisar.
 # El programa (carpeta pc/) abre la página de Vento en su propia ventana y se actualiza solo desde ese mismo release
 # (latest.yml). Corre solo cada vez que cambia pc/ en la rama principal, y también a mano (Actions → App PC → Run workflow).
 # OJO: el release «pc» NUNCA se marca como «latest»: el enlace del APK de Android (releases/latest/download/vento.apk)
@@ -58,10 +60,11 @@ jobs:
             pc/dist/Vento-Setup.exe.blockmap
             pc/dist/latest.yml
       - name: Publicar en Descargas (release «pc», sin marcarlo como el último)
+        if: github.ref == 'refs/heads/claude/precio-margen-productos-tabla-mioclt'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          NOTAS="ORDEVA para PC ${VENTO_PC_VERSION} (Windows 10 y 11). Descarga Vento-Setup.exe, ábrelo y sigue los pasos. Si Windows dice «Windows protegió su PC», toca «Más información» → «Ejecutar de todas formas». Las versiones nuevas se instalan solas."
+          NOTAS="ORDEVA para PC ${VENTO_PC_VERSION} (Windows 10 y 11). Descarga Vento-Setup.exe, ábrelo y sigue los pasos. Si Windows dice «Windows protegió su PC», toca «Más información» → «Ejecutar de todas formas». Las versiones nuevas se instalan solas. Mac (Intel y Apple M1-M4, macOS 11 o más nuevo): descarga ORDEVA-Mac.dmg, ábrelo y arrastra ORDEVA a Aplicaciones; la primera vez, clic derecho en ORDEVA → Abrir → Abrir (o Ajustes del Sistema → Privacidad y seguridad → «Abrir igualmente»), porque no está firmado por Apple."
           if gh release view pc >/dev/null 2>&1; then
             gh release edit pc --title "ORDEVA para PC ${VENTO_PC_VERSION}" --notes "$NOTAS" --latest=false
           else
@@ -71,3 +74,65 @@ jobs:
           # El APK de Android sigue siendo el «último» (su enlace releases/latest/download/vento.apk depende de eso).
           gh release edit android --latest >/dev/null 2>&1 || true
           echo "### 💻 Vento para PC: https://github.com/${GITHUB_REPOSITORY}/releases/download/pc/Vento-Setup.exe" >> "$GITHUB_STEP_SUMMARY"
+
+  mac:
+    # Después de Windows: así el release «pc» ya existe y no se pisan al crearlo.
+    needs: windows
+    runs-on: macos-14
+    env:
+      VENTO_PC_VERSION: 1.0.${{ github.run_number }}
+    defaults:
+      run:
+        working-directory: pc
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Instalar (versiones fijas de package-lock.json)
+        run: |
+          npm ci --include=dev --no-audit --no-fund
+          test -f node_modules/electron/package.json
+      - name: Armar ORDEVA.app (Intel + Apple, en uno)
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npx --no-install electron-builder --mac dir --universal --publish never "-c.extraMetadata.version=${VENTO_PC_VERSION}"
+      - name: Firma local (ad-hoc) para que abra en los Mac con chip Apple
+        # Sin firma de Apple (cuenta de desarrollador paga), un programa sin ninguna firma no abre en M1-M4 («está dañado»).
+        # La firma local lo deja abrir; macOS pide la primera vez «Abrir» con clic derecho.
+        run: |
+          APP="$(ls -d dist/mac-universal/*.app | head -1)"
+          test -d "$APP"
+          codesign --force --deep --sign - "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          lipo -archs "$APP/Contents/MacOS/Vento" | grep -q x86_64
+          lipo -archs "$APP/Contents/MacOS/Vento" | grep -q arm64
+      - name: Probar que abre (5 s, sin ventana de error)
+        run: |
+          APP="$(ls -d dist/mac-universal/*.app | head -1)"
+          VENTO_PC_URL="about:blank" "$APP/Contents/MacOS/Vento" > /tmp/ordeva.log 2>&1 &
+          PID=$!; sleep 8
+          kill -0 $PID
+          kill $PID || true
+          cat /tmp/ordeva.log | tail -20
+      - name: Hacer el instalador ORDEVA-Mac.dmg
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: |
+          APP="$(ls -d dist/mac-universal/*.app | head -1)"
+          npx --no-install electron-builder --mac dmg --universal --publish never --prepackaged "$APP" "-c.extraMetadata.version=${VENTO_PC_VERSION}"
+          ls -la dist
+          test -s dist/ORDEVA-Mac.dmg
+          hdiutil verify dist/ORDEVA-Mac.dmg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ordeva-mac
+          path: pc/dist/ORDEVA-Mac.dmg
+      - name: Publicar en Descargas (release «pc»)
+        if: github.ref == 'refs/heads/claude/precio-margen-productos-tabla-mioclt'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload pc dist/ORDEVA-Mac.dmg --clobber
+          gh release edit android --latest >/dev/null 2>&1 || true
+          echo "### 🍎 ORDEVA para Mac: https://github.com/${GITHUB_REPOSITORY}/releases/download/pc/ORDEVA-Mac.dmg" >> "$GITHUB_STEP_SUMMARY"
