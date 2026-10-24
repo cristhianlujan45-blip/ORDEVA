@@ -17,6 +17,8 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
   chk('1. index.html carga ' + tags.length + ' archivos de app/', tags.length >= 20);
   chk('1. Todos existen', tags.every(t => fs.existsSync(path.join(raiz, t.f))), tags.filter(t => !fs.existsSync(path.join(raiz, t.f))));
   chk('1. Todos con ?v=' + vers + ' (la versión de la app) y version.txt igual', !!vers && tags.every(t => t.v === vers) && txt.endsWith('v' + vers), { vers, txt, distintos: tags.filter(t => t.v !== vers) });
+  const adm = (fs.readFileSync(path.join(raiz, 'admin.html'), 'utf8').match(/var ADMIN_VERSION = '([^']+)'/) || [])[1];
+  chk('1. El panel ORDEVA Admin tiene la misma versión que version.txt (si no, se queda pidiendo «Actualizar»)', adm === txt, { adm, txt });
   const enDisco = fs.readdirSync(path.join(raiz, 'app')).filter(f => /\.js$/.test(f)).map(f => 'app/' + f).sort();
   chk('2. No sobra ningún archivo en app/', enDisco.every(f => tags.some(t => t.f === f)), enDisco.filter(f => !tags.some(t => t.f === f)));
   chk('2. En orden (01, 02, …)', tags.map(t => t.f).join() === tags.map(t => t.f).sort().join());
