@@ -1,4 +1,4 @@
-# ORDEVA 1.62.0 · Pantallazo automático al reportar · PIN para los empleados
+# ORDEVA 1.62.0 · Pantallazo automático al reportar · PIN para los empleados · Elegir dónde suenan los pagos
 
 ## 5. 📷 «🐞 Reportar un problema» con pantallazo automático
 - **Al abrir «🐞 Reportar un problema»,** la app toma sola un pantallazo de lo que se veía: sin la ventana del reporte,
@@ -40,7 +40,49 @@
   - `servidor/usuariosequipo` 25/25: permisos, administrador sin PIN, la versión anterior no lo borra, al quitar el
     usuario se borra.
 
+## 7. 🔊 Tú eliges en qué equipos suenan los avisos de pago
+**Dónde:** Ajustes → 💜 Pagos → «🔊 Equipos y dónde suenan los pagos». Solo lo ven el dueño y el administrador.
+
+**Qué hay en la lista:**
+- Todos los celulares, tablets y computadores que entraron a ORDEVA con tu negocio.
+- **«🔊 Suena» / «🔕 No suena»:** un toque cambia cada uno.
+- **✏️ Ponerles nombre** (Caja, Barra, Celular de Ana…) para reconocerlos.
+- **Retirar** uno perdido, como antes.
+- Si los apagas todos, avisa «⚠️ Ningún equipo va a sonar».
+
+**En un equipo con «🔕 No suena»:**
+- El pago llega igual y queda en su lista, con un aviso en pantalla sin sonido (🔕).
+- No hay voz, ni sonido, ni vibración, ni notificación, ni ventana con el valor.
+
+**Funciona en todos los equipos:**
+- en la app abierta;
+- en la app Android aunque ORDEVA esté cerrada o el celular bloqueado, también en el celular que lee los avisos de
+  Nequi/DaviPlata;
+- en las notificaciones del navegador o el computador con ORDEVA cerrada: el servidor ya no se las manda.
+
+**Cuándo se entera cada equipo:** al instante con el aviso en vivo, cada 5 minutos y al volver a la app. Le sale «🔕 El
+administrador eligió que en este equipo no suenen los avisos de pago».
+
+**Lo que queda igual:**
+- Al principio suenan todos, como hasta ahora.
+- Sigue la regla de 1.48: a un mesero solo le llega el pago de la mesa que atiende.
+- Cada cambio queda en la actividad del negocio.
+
+**Pruebas:**
+- `pagossuenan` 12/12 (nueva, con un celular Android, una tablet Android y un computador): la lista con los 3, nombre a
+  la tablet, la tablet sin sonar; llega un pago, el computador suena y la tablet no, pero lo tiene en su lista; se
+  vuelve a prender y el siguiente pago sí suena.
+- `servidor/admin` 168/168: la notificación con la app cerrada solo a los que suenan; un empleado no puede cambiarlo; el
+  administrador sí; nombre; auditoría.
+
+**App Android:** necesita la versión nueva del APK, que se publica sola con esta versión. Con el APK anterior, en ese
+celular la página respeta la elección, pero el aviso que da Android con ORDEVA cerrada sigue sonando hasta actualizar.
+
 ## Base de datos (sin borrar nada)
+- `20261115000000_dispositivos_suenan.sql`:
+  - columna nueva `dispositivos.suena` (por defecto sí);
+  - `dispositivos_lista`, `dispositivo_sonar`, `dispositivo_nombre`, `dispositivo_suena`;
+  - `srv_push_destinos` solo a los que suenan.
 - `20261114000000_usuarios_pin.sql`:
   - columna nueva `usuarios_equipo.pin`;
   - `usuarios_equipo_lista` la devuelve;

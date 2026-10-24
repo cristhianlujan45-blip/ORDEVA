@@ -901,7 +901,7 @@ try{const A=window.VentoAndroid;if(A&&A.pagosNotif)A.pagosNotif(notifCfg().pagos
 const notifPedidos=()=>notifCfg().pedidos;
 const notifMusica=()=>notifCfg().musica;
 window.notifPedidos=notifPedidos;window.notifMusica=notifMusica;   // para el módulo de la campana, que corre en otro cierre
-window.ventoAvisoOn=tipo=>notifCfg()[tipo]!==false;               // cada aviso se puede apagar (Ajustes → Notificaciones)
+window.ventoAvisoOn=tipo=>notifCfg()[tipo]!==false&&(tipo!=='pagos'||!window.ventoPagoSuenaAqui||window.ventoPagoSuenaAqui());   // cada aviso se puede apagar (Ajustes → Notificaciones); los de pago, también si el administrador eligió que aquí no suenen
 function iniQR(){
   const c=qCfg();
   // Interruptores de cada aviso (Ajustes → Notificaciones del celular → Qué avisos quieres recibir)

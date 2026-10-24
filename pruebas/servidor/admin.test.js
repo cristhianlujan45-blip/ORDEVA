@@ -446,6 +446,28 @@ async function pruebas(sb) {
   r = await rpc('srv_push_destinos', { p_negocio: neg, p_pago: pagoMesa }, dueno.token);
   chk('Nadie de afuera puede pedir los destinos', r.st >= 400, r);
 
+  // ===== 1.62.0: el administrador elige en qué equipos SUENAN los avisos de pago =====
+  r = await rpc('dispositivos_lista', { p_negocio: neg }, dueno.token);
+  chk('🔊 La lista de equipos dice si suenan (todos sí, como antes)', r.st === 200 && r.j.length >= 4 && r.j.every(d => d.suena === true), r);
+  r = await rpc('dispositivo_sonar', { p_dispositivo: dAdm, p_suena: false }, dueno.token);
+  chk('🔊 El dueño elige que el equipo del administrador NO suene', r.st === 200 && r.j === false, r);
+  chk('🔊 … y la notificación con la app cerrada ya no le llega (los demás sí)', !(await dest(pagoMesa)).includes(dAdm) && (await dest(pagoMesa)).includes(dDueno) && !(await dest(pagoSin)).includes(dAdm), await dest(pagoMesa));
+  r = await rpc('dispositivo_suena', { p_dispositivo: dAdm }, adm2.token);
+  chk('🔊 Ese equipo pregunta por el suyo y sabe que no suena', r.st === 200 && r.j === false, r);
+  r = await rpc('dispositivo_suena', { p_dispositivo: dAdm }, emp.token);
+  chk('🔊 Otro usuario no ve el de otro equipo', r.st === 200 && r.j === null, r);
+  r = await rpc('dispositivo_sonar', { p_dispositivo: dDueno, p_suena: false }, emp.token);
+  chk('🔊 Un empleado no puede callar ni prender equipos', r.st >= 400 && (await dest(pagoMesa)).includes(dDueno), r);
+  r = await rpc('dispositivo_sonar', { p_dispositivo: dCaja, p_suena: false }, adm2.token);
+  chk('🔊 El administrador también puede elegir', r.st === 200 && !(await dest(pagoMesa)).includes(dCaja), r);
+  r = await rpc('dispositivo_nombre', { p_dispositivo: dDueno, p_nombre: '  Caja principal  ' }, dueno.token);
+  chk('✏️ Ponerle nombre a un equipo', r.st === 200 && r.j === 'Caja principal' && (await uno('select nombre from dispositivos where id = $1', [dDueno])).nombre === 'Caja principal', r);
+  r = await rpc('dispositivo_nombre', { p_dispositivo: dDueno, p_nombre: 'Mío' }, emp.token);
+  chk('✏️ … un empleado no le cambia el nombre al equipo de otro', r.st >= 400, r);
+  await rpc('dispositivo_sonar', { p_dispositivo: dAdm, p_suena: true }, dueno.token); await rpc('dispositivo_sonar', { p_dispositivo: dCaja, p_suena: true }, dueno.token);
+  chk('🔊 Volver a prenderlos', (await dest(pagoMesa)).includes(dAdm) && (await dest(pagoMesa)).includes(dCaja));
+  chk('🔊 Queda en la auditoría del negocio', (await uno("select count(*)::int n from auditoria where negocio_id = $1 and accion in ('dispositivo_callado', 'dispositivo_suena')", [neg])).n >= 4);
+
   // ===== La migración se puede volver a correr =====
   let errMig = null;
   try { await sb.sql(fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', '20261015000000_admin_soporte_licencias.sql'), 'utf8')); } catch (x) { errMig = x.message; }

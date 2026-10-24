@@ -87,6 +87,7 @@ function pagoHuella(t){
   window.ventoPagosVozOn = pgVozOn;
   window.ventoDecirPago = function(frase){
     if(!pgVozOn()) return;
+    if(window.ventoPagoSuenaAqui && !window.ventoPagoSuenaAqui()) return;   // el administrador eligió que aquí no suenen
     const A = window.VentoAndroid;
     if(A && A.pagosDecir){ try{ A.pagosDecir(String(frase)); return; }catch(e){} }
     try{ speakVoice(frase, { volumen: Math.min(1, pgVol() / 100) }); }catch(e){}
@@ -428,11 +429,12 @@ function pagoHuella(t){
     if(!op.voz) try{ if(!window.ventoAvisoOn || window.ventoAvisoOn('pagos')){ const orig = origTxt;
       const tit = '💜 Recibiste ' + plata(p.monto) + ' por ' + (p.breb ? 'Bre-B en ' : '') + p.app, fr = 'Recibiste ' + p.monto + ' pesos por ' + p.app + (p.de ? ', de ' + p.de : '') + '.' + (mesa ? ' ' + tableLabel(mesa) + '.' : '');
       if(!pgNotificarAndroid(tit, fr, orig, plata(p.monto), (p.breb ? 'Bre-B en ' : '') + p.app, 'ok')) window.ventoAvisoCel && window.ventoAvisoCel(tit, fr + (orig ? '\n«' + orig + '»' : ''), 'pagos'); } }catch(e){}
-    try{ window.ventoSonidos && window.ventoSonidos.success(); }catch(e){}
+    const suenaAqui = !window.ventoPagoSuenaAqui || window.ventoPagoSuenaAqui();
+    if(suenaAqui) try{ window.ventoSonidos && window.ventoSonidos.success(); }catch(e){}
     // «Pago confirmado. 200 pesos desde DaviPlata» (o «desde Nequi»…), con quién pagó y la mesa si se sabe.
     // «Llegaron 3200 pesos por Nequi»: la cantidad siempre, sin el nombre de quién pagó (1.49.0).
     if(!op.voz) window.ventoDecirPago('Llegaron ' + p.monto + ' pesos ' + (p.breb ? 'por Bre-B, en ' : 'por ') + p.app + (mesa ? ', de la ' + tableLabel(mesa) : ''));
-    if(navigator.vibrate) try{ navigator.vibrate([150, 80, 150]); }catch(e){}
+    if(navigator.vibrate && suenaAqui) try{ navigator.vibrate([150, 80, 150]); }catch(e){}
     try{ window.mesoraCelebrar && window.mesoraCelebrar(['💜', '💰', '✨']); }catch(e){}
     pgPintar();
     try{ window.pagoLlego && window.pagoLlego(reg); }catch(e){}    // ventana «Registrar en la mesa»

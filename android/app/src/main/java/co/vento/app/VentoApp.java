@@ -209,7 +209,7 @@ public class VentoApp extends Application {
     /** Además, la 💜 ventana emergente con el valor (VentanaPago): encima de la pantalla de bloqueo si está bloqueado, o
      *  encima de la app que se esté usando. tipo: ok · sinvalor · revisar · falso. */
     static void notificarPago(String titulo, String frase, String original, String valor, String banco, String tipo) {
-        if (app == null) return;
+        if (app == null || !suenaAqui()) return;
         String o = original == null ? "" : original.replaceAll("\\s+", " ").trim();
         if (o.length() > 220) o = o.substring(0, 220) + "…";
         String txt = (frase == null ? "" : frase) + (o.isEmpty() ? "" : "\n«" + o + "»");
@@ -333,8 +333,11 @@ public class VentoApp extends Application {
 
     /** «🔊 Decir los pagos en voz alta» (Ajustes → Pagos). Apagado: los pagos llegan con su notificación y su ventana, sin voz. */
     static boolean vozPagosOn() { return app == null || app.getSharedPreferences("vento", MODE_PRIVATE).getBoolean("pagosVoz", true); }
+    /** 1.62.0: ¿suenan AQUÍ los avisos de pago? Lo elige el dueño o el administrador (Ajustes → Pagos → equipos). En los
+     *  que no suenan, el pago llega igual a la lista de ORDEVA, sin voz, sin notificación y sin la ventana. */
+    static boolean suenaAqui() { return app == null || app.getSharedPreferences("vento", MODE_PRIVATE).getBoolean("pagosSuena", true); }
     static void decirPago(final String frase) {
-        if (!vozPagosOn()) return;
+        if (!vozPagosOn() || !suenaAqui()) return;
         decirPagoSiempre(frase);
     }
     static void decirPagoSiempre(final String frase) {
@@ -1211,6 +1214,8 @@ public class VentoApp extends Application {
         /** Ajustes → Notificaciones → «💜 Pagos que te llegan»: si sale (o no) el aviso del celular de cada pago. */
         @JavascriptInterface
         public void pagosNotif(boolean si) { getSharedPreferences("vento", MODE_PRIVATE).edit().putBoolean(VentoEscucha.PREF_NOTIF, si).apply(); }
+        @JavascriptInterface
+        public void pagosSuena(boolean si) { getSharedPreferences("vento", MODE_PRIVATE).edit().putBoolean("pagosSuena", si).apply(); }
 
         // ---------------------------------------------------------------- Parlante de avisos (Bluetooth o cable)
         /** Salidas de sonido conectadas: [{id, nombre, clase}] */
