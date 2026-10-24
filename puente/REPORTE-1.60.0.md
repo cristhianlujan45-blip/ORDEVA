@@ -87,3 +87,10 @@ nombre, la misma contraseña y el mismo rol.
 - **El aviso en vivo de Supabase (Realtime).** El servidor de pruebas no lo tiene, así que en las pruebas el aviso se
   simula. Si en producción no llegara, el equipo igual lo revisa cada 3 minutos (contraseña) o 5 minutos (usuarios),
   y al volver a la app.
+
+## Pruebas completas
+- **Servidor:** las 21 suites pasan, entre ellas la nueva `usuariosequipo` (18).
+- **App:** 94 de 96 pasaron en la corrida completa.
+  - Las otras dos, `cuentacliente` (en la parte de soporte) y `dian`, fallaron por esperas mientras corrían al mismo
+    tiempo las pruebas del servidor.
+  - Corridas solas pasan completas: `cuentacliente` 49/49 y `dian` 29/29.
