@@ -48,7 +48,7 @@ jobs:
       - name: Instalar Playwright (Chromium) y el cliente de PostgreSQL
         run: |
           npm install --prefix pruebas --no-save --no-audit --no-fund playwright@1.47.2 pg@8 @supabase/supabase-js@2.117.2 acorn@8.14.0 acorn-walk@8.3.4 >/dev/null
-          npx --prefix pruebas playwright install --with-deps chromium >/dev/null
+          npx --prefix pruebas playwright install --with-deps chromium webkit >/dev/null
       - name: Pruebas
         env:
           VENTO_PG_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres
@@ -58,5 +58,5 @@ jobs:
           if [ "$TODAS" = "true" ]; then
             bash pruebas/correr.sh
           else
-            bash pruebas/correr.sh canalseguro canalvivo qrprivado seguridadqr flujocompleto pagosaviso confirmapago alertaspagos cerrarcaja mejoras recetas practica facil cajapos entrar recuperacion clavelocal tactorapido comprobantepantallazo iphone erroresreal
+            bash pruebas/correr.sh canalseguro canalvivo qrprivado seguridadqr flujocompleto pagosaviso confirmapago alertaspagos cerrarcaja mejoras recetas practica facil cajapos entrar recuperacion clavelocal tactorapido comprobantepantallazo iphone erroresreal safari modulos
           fi
