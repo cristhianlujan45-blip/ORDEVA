@@ -29,7 +29,10 @@ if(exe && process.platform === 'linux' && !process.env.DISPLAY && !process.env.V
     const w = await app.firstWindow();
     w.on('pageerror', e => errs.push(e.message));
     await w.waitForLoadState('domcontentloaded'); await w.waitForTimeout(1500);
-    chk('1. Abre Vento en su propia ventana (la entrada de Vento)', await w.isVisible('#authBtn') && /Vento/.test(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getTitle())));
+    chk('1. Abre ORDEVA en su propia ventana (la entrada de ORDEVA)', await w.isVisible('#authBtn') && /ORDEVA/.test(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getTitle())));
+    // 1.58.2: el programa se llama ORDEVA, pero sus datos siguen en la carpeta de siempre («Vento»): no se pierde nada.
+    const ud = await app.evaluate(({ app }) => app.getPath('userData'));
+    chk('1. Los datos del programa siguen en la MISMA carpeta de antes («Vento»), aunque se llame ORDEVA', /[\\/]Vento$/.test(ud), ud);
     const ua = await w.evaluate(() => navigator.userAgent);
     chk('1. El navegador dice «VentoPC/<versión>» (la página sabe que es el programa de PC)', /VentoPC\/\d+\.\d+\.\d+/.test(ua) && /Chrome\//.test(ua), ua);
     const pc = await w.evaluate(() => window.ventoPC ? { v: window.ventoPC.version(), p: window.ventoPC.plataforma, i: typeof window.ventoPC.inicioConWindows } : null);

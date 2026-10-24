@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Vento</title>
+<title>ORDEVA</title>
 <meta name="robots" content="noindex">
 <script>
-/* Una dirección de Vento que no existe (un enlace viejo del correo, una página mal escrita) no se queda en «404»:
-   vuelve a la app con lo que traía (?recuperar=…, #access_token=… del enlace del correo), y Vento lo termina. */
+/* Una dirección de ORDEVA que no existe (un enlace viejo del correo, una página mal escrita) no se queda en «404»:
+   vuelve a la app con lo que traía (?recuperar=…, #access_token=… del enlace del correo), y ORDEVA lo termina. */
 (function(){
   var p = location.pathname, m = /^(\/[^/]+\/)/.exec(p), base = m ? m[1] : '/';
   var dest = /admin/i.test(p) ? base + 'admin.html' : /mesero/i.test(p) ? base + 'mesero.html' : /pedido/i.test(p) ? base + 'pedido.html' : base;
@@ -17,5 +17,5 @@
 </script>
 <style>body{margin:0;background:#0b0b0b;color:#fff;font:16px system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;text-align:center;padding:16px}a{color:#f5a524}</style>
 </head>
-<body><p>Abriendo Vento… Si no abre, toca <a href="./">aquí</a>.</p></body>
+<body><p>Abriendo ORDEVA… Si no abre, toca <a href="./">aquí</a>.</p></body>
 </html>

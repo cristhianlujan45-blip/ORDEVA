@@ -40,3 +40,21 @@ Incluye la 1.58.1 (toques al instante: ver `REPORTE-1.58.1.md`).
 - **Además**, para que el dedo no espere:
   - **la 1.58.1** quitó lo que trababa cada toque: el guardado, la actividad del equipo y la lluvia del fondo;
   - **la app Android 1.0.62** quitó las revisiones que corrían en el hilo de la pantalla cada 5 s.
+
+## 3. Todo se llama ORDEVA, también el programa de PC
+- **Programa de PC:** en Windows ahora se llama **ORDEVA**: acceso directo, menú Inicio, ventana, avisos, menú junto al
+  reloj y la publicación «ORDEVA para PC».
+  - **Sin perder nada:** sus datos siguen en la MISMA carpeta de antes. Con otro nombre, Electron habría buscado una
+    carpeta nueva y vacía.
+  - **El archivo del programa** (`Vento.exe`) y el instalador (`Vento-Setup.exe`) no cambian de nombre, para que los
+    accesos directos que ya existen y la actualización automática no se rompan. El navegador ya lo descarga como
+    «ORDEVA-Setup.exe».
+  - Probado con Electron de verdad (`pc` 14/14), con la comprobación nueva de la carpeta de datos.
+- **Página de dirección equivocada (404):** «Abriendo ORDEVA…».
+- **Apps comprobadas de punta a punta** con el servidor real (`canalvivo` 17/17):
+  - el QR del cliente (la carta, el pedido llega y el estado vuelve);
+  - la app de meseros (recibe las mesas y su pedido entra a la mesa);
+  - la pantalla de preparación;
+  - el TV;
+  - los avisos por MacroDroid.
+- **Flujo completo:** `flujocompleto` 87/87 y `cajaqr` 13/13.

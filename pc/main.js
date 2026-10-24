@@ -23,10 +23,14 @@ const ORIGEN_PRUEBA = process.env.VENTO_PC_URL ? new URL(process.env.VENTO_PC_UR
 
 let ventana = null, bandeja = null, saliendo = false, avisoFondo = false;
 
+// 1.58.2: el programa se llama ORDEVA, pero sus datos siguen en la MISMA carpeta de siempre («Vento»): con otro nombre
+// Electron buscaría una carpeta nueva y vacía y este computador parecería haber perdido lo guardado (sesión, datos).
+// Va antes del «una sola copia», que también depende de esa carpeta.
+try{ app.setPath('userData', path.join(app.getPath('appData'), 'Vento')); }catch(e){}
 // Una sola copia del programa: abrirlo otra vez trae la ventana que ya está.
 if(!app.requestSingleInstanceLock()){ app.quit(); }
 app.on('second-instance', () => mostrar());
-app.setAppUserModelId('co.vento.pc');   // avisos de Windows con el nombre «Vento»
+app.setAppUserModelId('co.vento.pc');   // avisos de Windows con el nombre «ORDEVA»
 
 function esVento(u){
   try{
@@ -83,7 +87,7 @@ function crearVentana(){
     e.preventDefault(); ventana.hide();
     if(!avisoFondo){
       avisoFondo = true;
-      try{ new Notification({ title: 'Vento sigue trabajando', body: 'Los avisos de pagos y pedidos siguen sonando. Para cerrarlo del todo: icono de Vento junto al reloj → Salir.', icon: path.join(__dirname, 'icono.png') }).show(); }catch(x){}
+      try{ new Notification({ title: 'ORDEVA sigue trabajando', body: 'Los avisos de pagos y pedidos siguen sonando. Para cerrarlo del todo: icono de ORDEVA junto al reloj → Salir.', icon: path.join(__dirname, 'icono.png') }).show(); }catch(x){}
     }
   });
   ventana.on('closed', () => { ventana = null; });
@@ -115,11 +119,11 @@ function permisos(){
 }
 function elegir(titulo, lista, listo){
   if(!lista.length){
-    dialog.showMessageBox(ventana, { type: 'info', title: 'Vento', message: 'No se encontró ningún aparato conectado.', detail: 'Conecta la balanza, la impresora o el cajón por USB (o el adaptador USB-serial), espera unos segundos y vuelve a intentar. Si es nuevo, instala primero el controlador que trae.' }).catch(() => {});
+    dialog.showMessageBox(ventana, { type: 'info', title: 'ORDEVA', message: 'No se encontró ningún aparato conectado.', detail: 'Conecta la balanza, la impresora o el cajón por USB (o el adaptador USB-serial), espera unos segundos y vuelve a intentar. Si es nuevo, instala primero el controlador que trae.' }).catch(() => {});
     return listo('');
   }
   const botones = lista.slice(0, 8).map(x => x.nombre).concat(['Cancelar']);
-  dialog.showMessageBox(ventana, { type: 'question', title: 'Vento', message: titulo, buttons: botones, cancelId: botones.length - 1, noLink: true })
+  dialog.showMessageBox(ventana, { type: 'question', title: 'ORDEVA', message: titulo, buttons: botones, cancelId: botones.length - 1, noLink: true })
     .then(r => listo(r.response < lista.length ? lista[r.response].id : '')).catch(() => listo(''));
 }
 
@@ -128,11 +132,11 @@ function crearBandeja(){
   try{
     bandeja = new Tray(nativeImage.createFromPath(path.join(__dirname, 'icono.png')).resize({ width: 16, height: 16 }));
   }catch(e){ bandeja = null; return; }
-  bandeja.setToolTip('Vento');
+  bandeja.setToolTip('ORDEVA');
   const menu = () => Menu.buildFromTemplate([
-    { label: 'Abrir Vento', click: mostrar },
+    { label: 'Abrir ORDEVA', click: mostrar },
     { type: 'separator' },
-    { label: 'Abrir Vento al prender el computador', type: 'checkbox', checked: app.getLoginItemSettings().openAtLogin,
+    { label: 'Abrir ORDEVA al prender el computador', type: 'checkbox', checked: app.getLoginItemSettings().openAtLogin,
       click: it => { app.setLoginItemSettings({ openAtLogin: it.checked, args: ['--escondido'] }); } },
     { label: 'Buscar actualización del programa', click: () => actualizar(true) },
     { type: 'separator' },
@@ -149,14 +153,14 @@ function actualizar(aMano){
   if(!app.isPackaged || process.env.VENTO_PC_URL) return Promise.resolve(false);
   try{ if(!actualizador){ actualizador = require('electron-updater').autoUpdater; actualizador.autoDownload = true; actualizador.autoInstallOnAppQuit = true;
     actualizador.on('update-downloaded', i => {
-      dialog.showMessageBox(ventana, { type: 'info', title: 'Vento', message: 'Hay una versión nueva del programa Vento (' + i.version + ').', detail: 'Se instala al cerrar Vento, o ahora mismo.', buttons: ['Instalar ahora', 'Después'], cancelId: 1 })
+      dialog.showMessageBox(ventana, { type: 'info', title: 'ORDEVA', message: 'Hay una versión nueva del programa ORDEVA (' + i.version + ').', detail: 'Se instala al cerrar ORDEVA, o ahora mismo.', buttons: ['Instalar ahora', 'Después'], cancelId: 1 })
         .then(r => { if(r.response === 0){ saliendo = true; actualizador.quitAndInstall(); } }).catch(() => {});
     }); } }
   catch(e){ return Promise.resolve(false); }
   return actualizador.checkForUpdates().then(r => {
-    if(aMano && (!r || !r.updateInfo || r.updateInfo.version === app.getVersion())) dialog.showMessageBox(ventana, { type: 'info', title: 'Vento', message: 'Tienes la última versión del programa (' + app.getVersion() + ').' }).catch(() => {});
+    if(aMano && (!r || !r.updateInfo || r.updateInfo.version === app.getVersion())) dialog.showMessageBox(ventana, { type: 'info', title: 'ORDEVA', message: 'Tienes la última versión del programa (' + app.getVersion() + ').' }).catch(() => {});
     return true;
-  }).catch(() => { if(aMano) dialog.showMessageBox(ventana, { type: 'warning', title: 'Vento', message: 'No se pudo buscar la actualización. Revisa el internet.' }).catch(() => {}); return false; });
+  }).catch(() => { if(aMano) dialog.showMessageBox(ventana, { type: 'warning', title: 'ORDEVA', message: 'No se pudo buscar la actualización. Revisa el internet.' }).catch(() => {}); return false; });
 }
 
 ipcMain.on('vento-version', e => { e.returnValue = app.getVersion(); });

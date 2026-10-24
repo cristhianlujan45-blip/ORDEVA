@@ -61,11 +61,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          NOTAS="Vento para PC ${VENTO_PC_VERSION} (Windows 10 y 11). Descarga Vento-Setup.exe, ábrelo y sigue los pasos. Si Windows dice «Windows protegió su PC», toca «Más información» → «Ejecutar de todas formas». Las versiones nuevas se instalan solas."
+          NOTAS="ORDEVA para PC ${VENTO_PC_VERSION} (Windows 10 y 11). Descarga Vento-Setup.exe, ábrelo y sigue los pasos. Si Windows dice «Windows protegió su PC», toca «Más información» → «Ejecutar de todas formas». Las versiones nuevas se instalan solas."
           if gh release view pc >/dev/null 2>&1; then
-            gh release edit pc --title "Vento para PC ${VENTO_PC_VERSION}" --notes "$NOTAS" --latest=false
+            gh release edit pc --title "ORDEVA para PC ${VENTO_PC_VERSION}" --notes "$NOTAS" --latest=false
           else
-            gh release create pc --title "Vento para PC ${VENTO_PC_VERSION}" --notes "$NOTAS" --target "${GITHUB_SHA}" --latest=false
+            gh release create pc --title "ORDEVA para PC ${VENTO_PC_VERSION}" --notes "$NOTAS" --target "${GITHUB_SHA}" --latest=false
           fi
           gh release upload pc dist/Vento-Setup.exe dist/Vento-Setup.exe.blockmap dist/latest.yml --clobber
           # El APK de Android sigue siendo el «último» (su enlace releases/latest/download/vento.apk depende de eso).
