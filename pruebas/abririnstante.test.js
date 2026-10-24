@@ -22,13 +22,13 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     await p.waitForSelector('#authOverlay:not([hidden])', { timeout: 15000 });
     const llaves = () => p.evaluate(async () => (await (await caches.open('ordeva-app-1')).keys()).map(r => r.url));
     let ks = [];
-    for(let i = 0; i < 60; i++){ ks = await llaves().catch(() => []); if(ks.some(u => /app\/04-principal\.js\?v=/.test(u)) && ks.some(u => /\/index\.html$/.test(u)) && ks.length > 40) break; await p.waitForTimeout(500); }
-    chk('1. La primera vez se guarda la página y sus archivos (' + ks.length + ')', ks.some(u => /\/index\.html$/.test(u)) && ks.some(u => /app\/04-principal\.js\?v=/.test(u)) && ks.some(u => /nube\/vento-nube\.js\?v=/.test(u)), ks.slice(0, 8));
+    for(let i = 0; i < 60; i++){ ks = await llaves().catch(() => []); if(ks.some(u => /app\/04a-inicio-cuentas-clientes\.js\?v=/.test(u)) && ks.some(u => /\/index\.html$/.test(u)) && ks.length > 40) break; await p.waitForTimeout(500); }
+    chk('1. La primera vez se guarda la página y sus archivos (' + ks.length + ')', ks.some(u => /\/index\.html$/.test(u)) && ks.some(u => /app\/04a-inicio-cuentas-clientes\.js\?v=/.test(u)) && ks.some(u => /nube\/vento-nube\.js\?v=/.test(u)), ks.slice(0, 8));
     chk('1. version.txt y el servidor (Supabase/Google) no se guardan', !ks.some(u => /version\.txt|supabase|google/.test(u)));
 
     const desdeEquipo = new Map(); p.on('response', r => { const u = new URL(r.url()); if(/^\/(app|lib|nube)\//.test(u.pathname)) desdeEquipo.set(u.pathname, r.fromServiceWorker()); });
     await p.reload(); await p.waitForSelector('#authOverlay:not([hidden])', { timeout: 15000 });
-    chk('2. Los archivos de la app los entrega el equipo (sw.js)', desdeEquipo.get('/app/04-principal.js') === true && desdeEquipo.get('/nube/vento-nube.js') === true, Object.fromEntries(desdeEquipo));
+    chk('2. Los archivos de la app los entrega el equipo (sw.js)', desdeEquipo.get('/app/04a-inicio-cuentas-clientes.js') === true && desdeEquipo.get('/nube/vento-nube.js') === true, Object.fromEntries(desdeEquipo));
     // Una página de prueba que cambia en el «servidor» (el disco): con internet siempre se ve la de internet.
     const pag = path.join(__dirname, 'tmp-sw-pagina.html'), escribir = t => fs.writeFileSync(pag, '<!doctype html><meta charset="utf-8"><title>p</title><p id="v">' + t + '</p>');
     const leer = async () => { await q.goto(BASE + '/pruebas/tmp-sw-pagina.html').catch(() => {}); return q.evaluate(() => (document.getElementById('v') || {}).textContent || '').catch(() => ''); };

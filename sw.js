@@ -2,7 +2,7 @@
    Cómo guarda la app en el equipo (sin que nadie quede con una versión vieja):
    • Las páginas (index.html, mesero.html…): SIEMPRE se piden primero a internet. Solo si no hay internet (o no responde
      en unos segundos) se abre la última copia guardada. Así, con internet, siempre abre la versión de hoy.
-   • Los archivos de la app con versión en la dirección («app/04-principal.js?v=1.61.0»): se guardan una vez y salen
+   • Los archivos de la app con versión en la dirección («app/04a-inicio-cuentas-clientes.js?v=1.61.0»): se guardan una vez y salen
      del equipo al instante (no cambian nunca: una versión nueva trae otra dirección). Al guardar una versión, la
      anterior de ese archivo se borra.
    • Lo demás de este sitio (iconos, archivos sin versión): primero internet; sin internet, la copia guardada.
