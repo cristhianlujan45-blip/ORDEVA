@@ -32766,7 +32766,8 @@ window.mesoraCelebrar = function(emojis){
     // La hora del equipo puede ir corrida (otra zona horaria, reloj atrasado): solo muy en el futuro es un comprobante editado.
     if(info.fecha && info.fecha > ahora + 6 * 3600e3) return { nivel: 'falso', motivos: ['🚨 La fecha del comprobante es del futuro: está editado.'], info };
     if(info.fecha && info.fecha > ahora + 10 * 60e3){ nivel = 'revisar'; motivos.push('⚠️ La hora del comprobante va adelantada ' + Math.round((info.fecha - ahora) / 60e3) + ' min frente a este equipo: revisa la hora del equipo y la del comprobante.'); }
-    if(!info.porEtiqueta) motivos.push('Mira que ' + plata(info.monto) + ' sea el valor del pantallazo: no encontré la palabra «¿Cuánto?» / «Valor» junto a él.');
+    if(info.porIA) motivos.push('🤖 El valor lo leyó la IA' + (info.iaVisto ? ' (y también aparece en el texto del pantallazo)' : '') + ': mira que ' + plata(info.monto) + ' sea el del pantallazo.');
+    else if(!info.porEtiqueta) motivos.push('Mira que ' + plata(info.monto) + ' sea el valor del pantallazo: no encontré la palabra «¿Cuánto?» / «Valor» junto a él.');
     const ref = info.fecha || info.dia;
     if(ref && ahora - ref > 36 * 3600e3){ nivel = 'revisar'; motivos.push('⚠️ El comprobante es de hace ' + Math.round((ahora - ref) / 864e5 * 10) / 10 + ' días: no es de hoy.'); }
     if(!info.exito) motivos.push('El comprobante no dice «exitoso»/«realizado»: revisa que no sea un pago pendiente o rechazado.');
@@ -32847,8 +32848,49 @@ window.mesoraCelebrar = function(emojis){
       }
     }
     if(!info) throw err || new Error('No se pudo leer el comprobante.');
+    // Con internet y sin «¿Cuánto?»/«Valor» junto al valor: también lo lee la IA del negocio. El valor de la IA se marca
+    // (🤖) y solo se registra si coincide con un pago que DE VERDAD llegó, como siempre: la IA no da un pago por recibido.
+    if((!info.monto || !info.porEtiqueta) && navigator.onLine !== false){ try{ const ia = await leerConIA(f); if(ia) info = mezclarIA(info, ia); }catch(e){} }
     return info;
   }
+  async function leerConIA(f){
+    if(typeof hasAIKey !== 'function' || !hasAIKey() || typeof aiText !== 'function') return null;
+    const foto = typeof scalePhotoForAI === 'function' ? await scalePhotoForAI(f, 1280, 0.75) : null; if(!foto) return null;
+    const prompt = 'Es el pantallazo de un comprobante de transferencia en Colombia (Nequi, DaviPlata, Bancolombia, Bre-B u otro banco). ' +
+      'Devuelve SOLO este JSON: {"monto": valor ENVIADO en pesos como número entero (no el saldo, no el costo, sin centavos), "referencia": texto o null, ' +
+      '"fecha": "AAAA-MM-DD HH:MM" o null, "app": "Nequi"|"DaviPlata"|"Bancolombia"|"Bre-B"|"Otro", "destino": últimos 4 dígitos del celular o cuenta destino o null, "exitoso": true/false}. ' +
+      'Si un dato no se ve claro, pon null. No inventes nada.';
+    const t = await Promise.race([aiText({ prompt, imageDataUrl: foto, json: true, timeoutMs: 9000, retries: 0, fast: true, maxOutputTokens: 300 }), new Promise((_, n) => setTimeout(() => n(new Error('tarde')), 10000))]);
+    const j = typeof cleanAiJsonText === 'function' ? cleanAiJsonText(t) : JSON.parse(t);
+    return j && typeof j === 'object' ? j : null;
+  }
+  function mezclarIA(info, j){
+    const r = Object.assign({}, info), m = Math.round(Number(String(j.monto == null ? '' : j.monto).replace(/[^\d.]/g, '')));
+    if(m > 0 && m < 1e9 && (!r.monto || !r.porEtiqueta)){
+      // ¿El lector sin internet vio ese mismo número en el pantallazo? Entonces es el de la imagen.
+      const dig = String(r.texto || '').replace(/[.,\s]/g, '');
+      r.monto = m; r.porIA = true; r.iaVisto = dig.indexOf(String(m)) >= 0;
+    }
+    if(!r.ref && j.referencia && /^[A-Z0-9-]{5,30}$/i.test(String(j.referencia).trim())) r.ref = String(j.referencia).trim().toUpperCase();
+    if(!r.fecha && j.fecha){ const x = String(j.fecha).match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{1,2}):(\d{2}))?/); if(x){ const t = new Date(+x[1], +x[2] - 1, +x[3], x[4] ? +x[4] : 12, x[5] ? +x[5] : 0).getTime(); if(x[4]) r.fecha = t; else r.dia = r.dia || t; } }
+    if(!r.destino && /^\d{4}$/.test(String(j.destino || ''))) r.destino = String(j.destino);
+    if((r.app === 'Transferencia' || !r.app) && /^(Nequi|DaviPlata|Bancolombia|Bre-B)$/.test(j.app || '')) r.app = j.app;
+    if(!r.exito && j.exitoso === true) r.exito = true;
+    return r;
+  }
+  // Con la cuenta de una mesa abierta y la pantalla quieta (1,5 s sin tocar), el lector se deja cargado: así el primer
+  // pantallazo del día ya no espera a que cargue. Una sola vez, nunca mientras se está tocando la pantalla, y no en
+  // equipos con poca memoria.
+  let precargado = false, ultimoToque = Date.now();
+  document.addEventListener('pointerdown', () => { ultimoToque = Date.now(); }, true);
+  setInterval(() => {
+    if(precargado || document.hidden || Date.now() - ultimoToque < 1500) return;
+    if(navigator.deviceMemory && navigator.deviceMemory < 3) return;
+    const enCuenta = document.querySelector('.overlay.show #addPaymentBtn'); if(!enCuenta) return;
+    precargado = true;
+    const ir = () => window.comprobantePrecalentar();
+    if(window.requestIdleCallback) requestIdleCallback(ir, { timeout: 3000 }); else setTimeout(ir, 0);
+  }, 1000);
   window.comprobantePrecalentar = () => { try{ window.VitoOfflineOCR && window.VitoOfflineOCR.precalentar && window.VitoOfflineOCR.precalentar(); }catch(e){} };
   // Uso general: verificar un archivo (o un texto ya leído) para una cuenta.
   window.comprobanteVerificar = async function(fuente, mesa, opciones){

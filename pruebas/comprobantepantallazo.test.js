@@ -49,6 +49,13 @@ const RECIBOS = {
       saveData();
     }, RECIBOS);
 
+    // ===== 0. Con la cuenta de una mesa abierta y la pantalla quieta, el lector queda cargado solo =====
+    chk('0. Al abrir ORDEVA el lector de comprobantes (12 MB) todavía no se carga', await p.evaluate(() => !window.__VITO_OCR2__));
+    await p.evaluate(() => openTableModal(1)); await p.waitForTimeout(400);
+    const pre = await p.waitForFunction(() => !!window.__VITO_OCR2__, null, { timeout: 15000 }).then(() => true, () => false);
+    chk('0. Con la cuenta abierta y sin tocar la pantalla, se deja cargado (el primer pantallazo ya no espera)', pre);
+    await p.evaluate(() => document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')));
+
     // ===== 1 y 2. El valor de la imagen, sin trabar la pantalla =====
     await p.evaluate(() => window.comprobantePrecalentar()); await p.waitForTimeout(300);
     for(const n of Object.keys(RECIBOS)){
@@ -121,6 +128,25 @@ const RECIBOS = {
     chk('5. Fecha 3 días en el futuro: «falso» (editado)', v[4] === 'falso', v);
     chk('5. Un número del destino mal leído (4587 vs 4567): se revisa, no es «falso»', v[5] === 'revisar', v);
     chk('5. Otro número de verdad (9999 vs 4567): «falso»', v[6] === 'falso', v);
+
+    // ===== 6. Sin «¿Cuánto?» / «Valor» junto al valor: con internet también lo lee la IA (🤖), sin inventar =====
+    const sinEtq = { monto: 65000, bg: '#ffffff', fg: '#222222', acc: '#e1251b', lineas: [['DaviPlata', 60, 1], ['Transacción exitosa', 56, 1], ['$ 65.000', 84, 1], ['Saldo disponible', 40], ['$ 1.250.300', 48, 1]] };
+    v = await p.evaluate(async R => {
+      window.__R.sinEtq = R; data.pagos.comprobantes = [];
+      const hk = window.hasAIKey, at = window.aiText; let pedidos = 0;
+      const prueba = async resp => { window.hasAIKey = () => true; window.aiText = async o => { pedidos++; window.__img = !!o.imageDataUrl; return JSON.stringify(resp); };
+        const f = await window.__archivo('sinEtq'); const r = await window.comprobanteVerificar(f, 1, { mostrar: false }); data.pagos.comprobantes = []; return { monto: r.info.monto, porIA: !!r.info.porIA, visto: !!r.info.iaVisto, nivel: r.nivel, motivos: r.motivos.join(' | ') }; };
+      const a = await prueba({ monto: 65000, referencia: null, fecha: null, app: 'DaviPlata', destino: null, exitoso: true });
+      const b = await prueba({ monto: 70000, referencia: null, fecha: null, app: 'DaviPlata', destino: null, exitoso: true });
+      window.hasAIKey = hk; window.aiText = at;
+      return { a, b, pedidos, img: window.__img };
+    }, sinEtq);
+    chk('6. Sin la palabra «Valor», la IA lee el pantallazo (con la imagen) y da $65.000 marcado 🤖, que también está en el texto', v.pedidos === 2 && v.img && v.a.monto === 65000 && v.a.porIA && v.a.visto && /leyó la IA/.test(v.a.motivos), v);
+    chk('6. Coincide con el pago que de verdad llegó → ✅ verificado', v.a.nivel === 'ok', v.a);
+    chk('6. Si la IA da otro valor ($70.000) que no llegó: no se verifica ni se registra (no inventa un pago)', v.b.monto === 70000 && !v.b.visto && v.b.nivel !== 'ok', v.b);
+    v = await p.evaluate(async () => { const hk = window.hasAIKey; let n = 0; window.hasAIKey = () => true; const at = window.aiText; window.aiText = async () => { n++; return '{}'; };
+      const f = await window.__archivo('nequiClaro'); const r = await window.comprobanteVerificar(f, null, { mostrar: false }); data.pagos.comprobantes = []; window.hasAIKey = hk; window.aiText = at; return { n, monto: r.info.monto }; });
+    chk('6. Con «¿Cuánto?» bien leído no se gasta la IA', v.n === 0 && v.monto === 71800, v);
     chk('Sin errores de página', !errs.length, errs);
   }catch(e){ mal++; console.log('❌ Error: ' + (e && e.stack || e)); }
   await b.close();
