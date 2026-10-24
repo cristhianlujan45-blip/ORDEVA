@@ -17,6 +17,8 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
   chk('1. index.html carga ' + tags.length + ' archivos de app/', tags.length >= 20);
   chk('1. Todos existen', tags.every(t => fs.existsSync(path.join(raiz, t.f))), tags.filter(t => !fs.existsSync(path.join(raiz, t.f))));
   chk('1. Todos con ?v=' + vers + ' (la versión de la app) y version.txt igual', !!vers && tags.every(t => t.v === vers) && txt.endsWith('v' + vers), { vers, txt, distintos: tags.filter(t => t.v !== vers) });
+  const otros = [...html.matchAll(/<script src="((?:lib|nube)\/[^"?]+\.js)(?:\?v=([^"]+))?"/g)].map(m => ({ f: m[1], v: m[2] || '' })).filter(t => t.f !== 'nube/config.js');
+  chk('1. Los de lib/ y nube/ también llevan ?v=' + vers + ' (el equipo los guarda y abre al instante, sin mezclar versiones)', otros.length >= 15 && otros.every(t => t.v === vers && fs.existsSync(path.join(raiz, t.f))), otros.filter(t => t.v !== vers));
   const adm = (fs.readFileSync(path.join(raiz, 'admin.html'), 'utf8').match(/var ADMIN_VERSION = '([^']+)'/) || [])[1];
   chk('1. El panel ORDEVA Admin tiene la misma versión que version.txt (si no, se queda pidiendo «Actualizar»)', adm === txt, { adm, txt });
   const enDisco = fs.readdirSync(path.join(raiz, 'app')).filter(f => /\.js$/.test(f)).map(f => 'app/' + f).sort();

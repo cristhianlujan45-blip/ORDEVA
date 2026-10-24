@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Sube la versión de ORDEVA en TODOS los lugares a la vez (si falta uno, la app pide «Actualizar» o mezcla archivos):
-#   MESORA_VERSION (app/*.js), ?v= de los archivos de app/ en index.html, version.txt y ADMIN_VERSION (admin.html).
+#   MESORA_VERSION (app/*.js), ?v= de los archivos de app/, lib/ y nube/ en index.html, version.txt y ADMIN_VERSION (admin.html).
 # Uso: bash puente/subir-version.sh 1.59.1        (la fecha es la de hoy)
 # Después: pruebas/modulos.test.js revisa que todo quedó igual.
 set -euo pipefail
@@ -13,6 +13,9 @@ grep -l "const MESORA_VERSION = '" app/*.js index.html 2>/dev/null | while read 
   sed -i "s/const MESORA_VERSION = '[^']*'/const MESORA_VERSION = '$TXT'/" "$f"
 done
 sed -i -E "s#(src=\"app/[^\"?]+\.js)\?v=[0-9.]+\"#\1?v=$NUEVA\"#g" index.html
+# 1.61.0: también lib/ y nube/ (menos nube/config.js): con versión, el equipo los guarda y abre al instante (sw.js)
+sed -i -E "s#(src=\"(lib|nube)/[^\"?]+\.js)(\?v=[0-9.]+)?\"#\1?v=$NUEVA\"#g" index.html
+sed -i -E "s#src=\"nube/config\.js\?v=[0-9.]+\"#src=\"nube/config.js\"#" index.html
 sed -i "s/var ADMIN_VERSION = '[^']*'/var ADMIN_VERSION = '$TXT'/" admin.html
 printf '%s\n' "$TXT" > version.txt
 echo "Listo: $TXT"
