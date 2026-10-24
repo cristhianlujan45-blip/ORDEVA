@@ -68,8 +68,29 @@ async function pruebas(sb) {
   r = await guardar(dueno.token, 'juan', { p_hash: 'p2:' + 'c'.repeat(64) });
   chk('Se puede volver a crear (versión 4)', r.st === 200 && r.j === 4 && (await lista(dueno.token)).j.find((x) => x.usuario === 'juan').borrado === false, r);
 
+  // ===== 1.62.0: el PIN de los empleados (su huella, nunca el PIN) =====
+  const pin = { s: 'salpin', h: 'p2:' + 'd'.repeat(64) };
+  const g2 = (tok, u, extra) => rpc('usuarios_equipo_guardar_v2', Object.assign({ p_negocio: NEG, p_usuario: u, p_salt: 'sal123', p_hash: 'p2:' + 'a'.repeat(64), p_rol: 'staff', p_borrado: false, p_pin: null }, extra || {}), tok);
+  r = await g2(dueno.token, 'pedro', { p_pin: pin });
+  let fp = (await lista(dueno.token)).j.find((x) => x.usuario === 'pedro');
+  chk('PIN: el dueño le pone PIN a «pedro» y queda su huella', r.st === 200 && fp && fp.pin && fp.pin.h === pin.h && fp.pin.s === 'salpin', { r, fp });
+  r = await guardar(admin.token, 'pedro', { p_hash: 'p2:' + 'e'.repeat(64) });
+  fp = (await lista(dueno.token)).j.find((x) => x.usuario === 'pedro');
+  chk('PIN: un equipo con la versión anterior (sin PIN) le cambia la contraseña y el PIN sigue', r.st === 200 && fp.pin && fp.pin.h === pin.h && fp.hash === 'p2:' + 'e'.repeat(64), fp);
+  r = await g2(dueno.token, 'pedro', { p_pin: null });
+  chk('PIN: se puede quitar', r.st === 200 && (await lista(dueno.token)).j.find((x) => x.usuario === 'pedro').pin === null, r);
+  r = await g2(dueno.token, 'jefe2', { p_rol: 'admin', p_pin: pin });
+  chk('PIN: un administrador no puede tener PIN (solo el equipo)', r.st >= 400, r);
+  r = await g2(mesero.token, 'pedro', { p_pin: pin });
+  chk('PIN: un mesero no le pone PIN a nadie', r.st >= 400, r);
+  r = await g2(dueno.token, 'pedro', { p_pin: { s: 'x' } });
+  chk('PIN: sin huella no se guarda', r.st >= 400, r);
+  await g2(dueno.token, 'pedro', { p_pin: pin });
+  r = await g2(dueno.token, 'pedro', { p_borrado: true, p_salt: null, p_hash: null, p_rol: null, p_pin: pin });
+  chk('PIN: al quitar el usuario también se borra su PIN', r.st === 200 && (await lista(dueno.token)).j.find((x) => x.usuario === 'pedro').pin === null, r);
+
   let err = null;
-  try { await sb.sql(fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', '20261111000000_usuarios_equipo.sql'), 'utf8')); } catch (e) { err = e.message; }
+  try { for (const m of ['20261111000000_usuarios_equipo.sql', '20261114000000_usuarios_pin.sql']) await sb.sql(fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', m), 'utf8')); } catch (e) { err = e.message; }
   chk('La migración se vuelve a correr sin errores', !err, err);
   chk('…sin perder los usuarios', (await lista(dueno.token)).j.some((x) => x.usuario === 'juan' && x.version === 4));
 }

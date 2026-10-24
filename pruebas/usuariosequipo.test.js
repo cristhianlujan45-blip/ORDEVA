@@ -74,13 +74,26 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     chk('2. Juan entra en el otro celular con SU contraseña', await dentro(B.p));
     chk('2. …como equipo (no como dueño)', await esperar(B.p, () => document.body.classList.contains('modo-mesero')));
 
+    // ===== 2b. 1.62.0: el PIN que el dueño le pone en un celular sirve en el otro =====
+    A.p.once('dialog', d => d.accept('1357'));
+    await A.p.evaluate(() => { const b = document.querySelector('nav button[data-view="ajustes"]'); if(b) b.click(); try{ accUsuariosPintar(); }catch(e){} });
+    chk('2b. El dueño le pone PIN a juan (🔢) en el primer celular', await filaJuan(A.p, '🔢') && await A.p.waitForFunction(() => { const u = JSON.parse(localStorage.getItem('cm-users')).find(x => x.user === 'juan'); return !!(u && u.pin); }, null, { timeout: 8000 }).then(() => true, () => false));
+    await sinc(A.p);
+    chk('2b. Llega al servidor (su huella, no el PIN)', await (async () => { const f = await uno('select pin from usuarios_equipo where negocio_id = $1 and usuario = $2', [NEG, 'juan']); return !!(f && f.pin && f.pin.h) && !JSON.stringify(f).includes('1357'); })());
+    await B.p.evaluate(() => window.dispatchEvent(new CustomEvent('vento-aviso-vivo')));
+    chk('2b. El otro celular lo recibe, y juan (que estaba adentro) sigue adentro', await B.p.waitForFunction(() => { const u = JSON.parse(localStorage.getItem('cm-users')).find(x => x.user === 'juan'); return !!(u && u.pin && u.pin.h); }, null, { timeout: 10000 }).then(() => true, () => false) &&
+      await B.p.evaluate(() => document.getElementById('authOverlay').hidden));
+    await salir(B.p);
+    await entrar(B.p, 'juan', '1357');
+    chk('2b. Juan entra en el otro celular con su PIN', await dentro(B.p));
+
     // ===== 3. El dueño le cambia la contraseña en el primero =====
     A.p.once('dialog', d => d.accept('juan-clave-2'));
     await A.p.evaluate(() => { const b = document.querySelector('nav button[data-view="ajustes"]'); if(b) b.click(); try{ accUsuariosPintar(); }catch(e){} });
     chk('3. El dueño toca 🔑 en la fila de juan', await filaJuan(A.p, '🔑'));
     await esperar(A.p, () => /Contraseña de juan cambiada/.test(document.body.innerText), null, 8000);
     await sinc(A.p);
-    chk('3. El cambio llega al servidor (versión 2)', (await uno('select version from usuarios_equipo where negocio_id = $1 and usuario = $2', [NEG, 'juan'])).version === 2);
+    chk('3. El cambio llega al servidor (versión 3: 1 crear, 2 el PIN, 3 la contraseña)', (await uno('select version from usuarios_equipo where negocio_id = $1 and usuario = $2', [NEG, 'juan'])).version === 3);
     await B.p.evaluate(() => window.dispatchEvent(new CustomEvent('vento-aviso-vivo')));   // aquí no hay tiempo real: el aviso se simula
     chk('3. En el otro celular, juan (que estaba adentro) sale con el aviso', await afuera(B.p) && await esperar(B.p, () => /cambió la contraseña a juan/.test(document.getElementById('authErr').textContent)), await B.p.textContent('#authErr').catch(() => ''));
     await entrar(B.p, 'juan', 'juan-clave-1');

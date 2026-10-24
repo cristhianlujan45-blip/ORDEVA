@@ -310,6 +310,22 @@ function accUsuariosPintar(){
         if(nb && nb.conectado(u.user)) nb.nuevaClave(np).catch(e => showToast('⚠️ En este celular quedó cambiada, pero en tu cuenta no (' + nb.msgError(e) + '). En otros celulares sigue la anterior.', 8000));
       };
       row.append(bRol, bPw);
+      // 1.62.0: PIN de 4 a 6 números para que el empleado entre rápido (no para administradores)
+      if(!esAdmin && !authEsCorreo(u.user)){
+        const bPin = document.createElement('button'); bPin.type = 'button'; bPin.className = 'btn-ghost'; bPin.textContent = u.pin && u.pin.h ? '🔢✓' : '🔢';
+        bPin.title = u.pin && u.pin.h ? 'Cambiar o quitar su PIN' : 'Ponerle un PIN para entrar rápido';
+        bPin.onclick = async () => {
+          const np = prompt('PIN de 4 a 6 números para ' + u.user + (u.pin && u.pin.h ? ' (déjalo vacío para quitarlo)' : '') + ':'); if(np == null) return;
+          const pin = np.replace(/\s+/g, '');
+          if(pin && !/^\d{4,6}$/.test(pin)){ showToast('⚠️ El PIN son de 4 a 6 números.'); return; }
+          if(!pin && !(u.pin && u.pin.h)) return;
+          const m = await authPonerPin(u.user, pin);
+          if(m){ showToast('⚠️ ' + m); return; }
+          showToast(pin ? '✅ ' + u.user + ' ya entra con su PIN (en la entrada: toca su nombre y escribe el PIN).' : 'PIN de ' + u.user + ' quitado.', 6000);
+          accUsuariosPintar();
+        };
+        row.appendChild(bPin);
+      }
       if(u.user !== authUser){
         const bDel = document.createElement('button'); bDel.type = 'button'; bDel.className = 'btn-ghost'; bDel.textContent = 'Quitar';
         bDel.onclick = async () => {
@@ -335,6 +351,14 @@ function aplicarModoMesero(){
     if(!chip){
       chip = document.createElement('div'); chip.id = 'meseroChip'; chip.className = 'mesero-chip';
       chip.innerHTML = '<span></span>';
+      // 1.62.0: tocar el nombre = cambiar de usuario (el siguiente entra con su PIN o su contraseña)
+      chip.style.cursor = 'pointer'; chip.title = 'Cambiar de usuario';
+      chip.onclick = async () => {
+        const ok = await showConfirm({ title: '¿Cambiar de usuario?', message: 'Se guarda todo y vuelve a la entrada para que entre otra persona (con su PIN o su contraseña).', confirmText: 'Sí, cambiar', icon: '🔁' });
+        if(!ok) return;
+        try{ saveData(); await guardadoAhora(); }catch(e){}
+        localStorage.removeItem(AUTH_SESSION_KEY); location.reload();
+      };
       const row = document.getElementById('topActionsRow') || document.getElementById('topActions');
       if(row) row.appendChild(chip);
     }
@@ -384,6 +408,28 @@ async function authClaveOk(u, pass){
     }
   }catch(e){}
   return true;
+}
+// 1.62.0 · PIN de los empleados (4 a 6 números) para cambiar rápido de usuario en el mismo equipo.
+// Solo para cajero, empleado o mesero (nunca el administrador ni las cuentas con correo). Se guarda su huella (PBKDF2,
+// como la contraseña), nunca el PIN. 5 intentos malos seguidos: el PIN queda bloqueado hasta que entre con su
+// contraseña o el administrador le ponga uno nuevo.
+const PIN_FALLOS_KEY = 'cm-pin-fallos', PIN_MAX_FALLOS = 5;
+const authPinPuede = u => !!(u && u.pin && u.pin.h && u.role !== 'admin' && !authEsCorreo(u.user));
+function authPinFallos(user){ try{ return (JSON.parse(localStorage.getItem(PIN_FALLOS_KEY)) || {})[user] || 0; }catch(e){ return 0; } }
+function authPinFallo(user, n){
+  let all; try{ all = JSON.parse(localStorage.getItem(PIN_FALLOS_KEY)) || {}; }catch(e){ all = {}; }
+  if(n) all[user] = n; else delete all[user];
+  try{ localStorage.setItem(PIN_FALLOS_KEY, JSON.stringify(all)); }catch(e){}
+}
+async function authPinOk(u, pin){ return authPinPuede(u) && /^\d{4,6}$/.test(pin) && (await authHashClave(pin, u.pin.s + ':pin')) === u.pin.h; }
+async function authPonerPin(user, pin){
+  const us = authUsers(), u = us.find(x => x.user === user); if(!u) return 'Usuario no encontrado.';
+  if(pin && !/^\d{4,6}$/.test(pin)) return 'El PIN son de 4 a 6 números.';
+  if(pin){ const s = Math.random().toString(36).slice(2) + Date.now().toString(36); u.pin = { s, h: await authHashClave(pin, s + ':pin') }; }
+  else delete u.pin;
+  localStorage.setItem(AUTH_USERS_KEY, JSON.stringify(us));
+  authPinFallo(user, 0);
+  return null;
 }
 async function authAddUser(user, pass, role, cuenta){
   user = (user || '').trim().toLowerCase();
@@ -1158,7 +1204,13 @@ function showAuth(firstRun){
     const b = document.createElement('button'); b.type = 'button';
     b.innerHTML = (u.role === 'admin' ? '👑 ' : '🧑‍🍳 ') + '<span></span> <small>' + (u.role === 'admin' ? 'Admin' : 'Mesero') + '</small>';
     b.querySelector('span').textContent = u.user;
-    b.onclick = () => { g('authUser').value = u.user; chips.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); g('authPass').focus(); };
+    b.onclick = () => {
+      g('authUser').value = u.user; chips.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+      // Con PIN: teclado de números y «PIN o contraseña»
+      const conPin = authPinPuede(u); g('authPass').inputMode = conPin ? 'numeric' : ''; g('authPass').placeholder = conPin ? '🔢 PIN o contraseña' : '';
+      g('authPass').focus();
+    };
+    if(authPinPuede(u)) b.title = 'Entra con su PIN';
     chips.appendChild(b);
   });
   g('authForgot').onclick = () => { af.hidden = true; rf.hidden = false; g('recUser').value = g('authUser').value; };
@@ -1326,7 +1378,20 @@ function showAuth(firstRun){
         const waitMin = authLoginLocked(user);
         if(waitMin){ err.textContent = '🔒 Demasiados intentos con "' + user + '". Espera ' + waitMin + ' min. e intenta de nuevo.'; return; }
         const u = authUsers().find(x => x.user === user);
-        if(u && await authClaveOk(u, pass)){
+        let entro = !!u && await authClaveOk(u, pass);
+        if(entro) authPinFallo(user, 0);                       // con la contraseña, el PIN se desbloquea
+        else if(u && authPinPuede(u) && /^\d{4,6}$/.test(pass)){
+          // Entrar con el PIN (empleados): 5 intentos malos seguidos y queda bloqueado.
+          if(authPinFallos(user) >= PIN_MAX_FALLOS){ err.textContent = '🔒 El PIN de "' + user + '" quedó bloqueado por intentos. Entra con la contraseña o pídele al administrador un PIN nuevo.'; return; }
+          if(await authPinOk(u, pass)){ entro = true; authPinFallo(user, 0); }
+          else{
+            const n = authPinFallos(user) + 1; authPinFallo(user, n);
+            err.textContent = n >= PIN_MAX_FALLOS ? '🔒 El PIN de "' + user + '" quedó bloqueado por intentos. Entra con la contraseña o pídele al administrador un PIN nuevo.'
+              : '❌ PIN incorrecto. Te queda' + (PIN_MAX_FALLOS - n === 1 ? '' : 'n') + ' ' + (PIN_MAX_FALLOS - n) + ' intento' + (PIN_MAX_FALLOS - n === 1 ? '' : 's') + '.';
+            document.getElementById('authPass').value = ''; return;
+          }
+        }
+        if(entro){
           authLoginClear(user);
           document.getElementById('authPass').value = '';
           await enterApp(user, null);

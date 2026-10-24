@@ -15,8 +15,9 @@
   var lsG = function(k, d){ try{ var v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; }catch(e){ return d; } };
   var lsS = function(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} };
   var esCorreo = function(u){ return String(u || '').indexOf('@') >= 0; };
-  var huella = function(u){ return u ? String(u.salt || '') + '|' + String(u.hash || '') + '|' + (u.role || 'staff') : null; };
-  var huellaSrv = function(r){ return String(r.salt || '') + '|' + String(r.hash || '') + '|' + (r.rol || 'staff'); };
+  // 1.62.0: también el PIN de los empleados (su huella, nunca el PIN)
+  var pinDe = function(p){ return p && p.h ? String(p.s || '') + ':' + String(p.h) : ''; };
+  var huella = function(u){ return u ? String(u.salt || '') + '|' + String(u.hash || '') + '|' + (u.role || 'staff') + '|' + pinDe(u.pin) : null; };
   function nb(){ return window.ventoNube || null; }
   function g(nombre){ try{ return (0, eval)('typeof ' + nombre + ' !== "undefined" ? ' + nombre + ' : undefined'); }catch(e){ return undefined; } }
   function rpc(fn, args){ return nb().cliente().then(function(c){ return c.rpc(fn, args); }).then(function(r){ if(r.error) throw r.error; return r.data; }); }
@@ -52,6 +53,7 @@
           return;
         }
         var nuevo = Object.assign({}, L || {}, { user: nom, salt: r.salt, hash: r.hash, role: r.rol || 'staff' });
+        if(r.pin && r.pin.h && nuevo.role !== 'admin') nuevo.pin = { s: r.pin.s, h: r.pin.h }; else delete nuevo.pin;
         if(d.grupo !== 'principal') nuevo.cuenta = d.grupo; else delete nuevo.cuenta;
         if(L){ l[l.indexOf(L)] = nuevo; if(nom === yo && !sacar) sacar = L.hash !== nuevo.hash ? 'clave' : (L.role !== nuevo.role ? 'rol' : null); }
         else l.push(nuevo);
@@ -67,7 +69,13 @@
       subir.forEach(function(x){
         p = p.then(function(){
           var u = x.u, nom = u ? u.user : x.quitar;
-          return rpc('usuarios_equipo_guardar', { p_negocio: d.neg.id, p_usuario: nom, p_salt: u ? u.salt : null, p_hash: u ? u.hash : null, p_rol: u ? (u.role || 'staff') : null, p_borrado: !u })
+          var args = { p_negocio: d.neg.id, p_usuario: nom, p_salt: u ? u.salt : null, p_hash: u ? u.hash : null, p_rol: u ? (u.role || 'staff') : null, p_borrado: !u };
+          var pin = u && u.pin && u.pin.h && u.role !== 'admin' ? { s: u.pin.s, h: u.pin.h } : null;
+          // Con PIN: la v2 (1.62.0). Si el servidor todavía no la tiene, la de antes (sin el PIN).
+          return rpc('usuarios_equipo_guardar_v2', Object.assign({ p_pin: pin }, args)).catch(function(e){
+            if(/usuarios_equipo_guardar_v2|PGRST202|does not exist|not find/i.test(String((e && (e.message || e.code)) || ''))) return rpc('usuarios_equipo_guardar', args);
+            throw e;
+          })
             .then(function(v){ var t = lsG(K_SINC, {}); (t[d.neg.id] = t[d.neg.id] || {})[nom] = { v: v, f: huella(u) }; lsS(K_SINC, t); res.subidos++; }, function(){});
         });
       });
