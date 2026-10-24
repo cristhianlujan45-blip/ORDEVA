@@ -14550,11 +14550,17 @@ async function authRevisarClave(email, pass){
 // La contraseña de la cuenta cambió (en otro equipo o desde ORDEVA Admin): se guarda todo, la vieja deja de servir
 // en este celular (también sin internet) y vuelve a la entrada con el aviso «La contraseña de X cambió».
 // 1.60.0: también lo llama lib/vento-cuenta.js cuando el servidor avisa que se la cambiaron estando adentro.
-async function authSalirPorClave(email){
+// 1.61.0: motivo 'sesiones' = cerraron la sesión en todos los equipos (la contraseña es la misma, pero hay que entrar
+// otra vez con internet).
+async function authSalirPorClave(email, motivo){
   if(authUser !== email) return;
   try{ await authPonerClaveLocal(email, authClaveAzar()); }catch(e){}
   try{ saveData(); await guardadoAhora(); }catch(e){}
-  try{ localStorage.removeItem(AUTH_SESSION_KEY); sessionStorage.setItem('vento-clave-cambio', email); }catch(e){}
+  try{
+    localStorage.removeItem(AUTH_SESSION_KEY);
+    if(motivo === 'sesiones') sessionStorage.setItem('vento-aviso-entrada', JSON.stringify({ u: email, m: '🚪 Se cerró la sesión de ' + email + ' en todos los equipos. Tu contraseña es la misma: entra otra vez (con internet).' }));
+    else sessionStorage.setItem('vento-clave-cambio', email);
+  }catch(e){}
   location.reload();
 }
 window.ventoSalirPorClave = authSalirPorClave;

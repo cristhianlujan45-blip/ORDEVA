@@ -193,6 +193,19 @@ async function pruebas(sb) {
   r = await api('/admin/usuario_clave_poner', { usuario: sinNeg.id, clave: 'No-soy-admin-1' }, dueno.token);
   chk('Un cliente no le puede cambiar la contraseña a nadie', r.st === 403, r);
   await api('/admin/usuario_clave_poner', { usuario: dueno.id, clave: 'nueva-clave-9', pedir_cambio: false }, admin.token);   // como estaba, para lo que sigue
+  // ===== 1.61.0: cerrar sesión en todos los equipos (sin cambiar la contraseña) =====
+  const tokS = (await entrar('dueno@bar.co', 'nueva-clave-9')).j.access_token;
+  const pAntes = (await rpc('perfil_yo', {}, tokS)).j;
+  r = await api('/admin/usuario_cerrar_sesiones', { usuario: dueno.id }, admin.token);
+  const pDesp = (await rpc('perfil_yo', {}, tokS)).j;
+  chk('Cerrar sesión en todos sus equipos: queda la hora, y la contraseña no cambia', r.st === 200 && pDesp.sesiones_cerradas_en && pDesp.clave_puesta_en === pAntes.clave_puesta_en &&
+    (await entrar('dueno@bar.co', 'nueva-clave-9')).st === 200, { r, pAntes, pDesp });
+  r = await api('/admin/usuario_cerrar_sesiones', { usuario: dueno.id }, dueno.token);
+  chk('Un cliente no puede cerrar la sesión de nadie desde el panel', r.st === 403, r);
+  r = await rpc('srv_cerrar_sesiones', { p_usuario: dueno.id }, tokS);
+  chk('…ni llamando directo a la base de datos', r.st >= 400, r);
+  r = await rpc('perfil_guardar', { p: { cerrar_sesiones: true } }, tokS);
+  chk('La persona misma cierra sus otros equipos: la hora cambia otra vez', r.st === 200 && Date.parse(r.j.sesiones_cerradas_en) > Date.parse(pDesp.sesiones_cerradas_en) && r.j.telefono === pDesp.telefono, r);
   r = await api('/admin/soporte', {}, admin.token);
   const cr = r.j.casos.find(c => c.id === casoRosa.id);
   chk('En el caso de soporte se ve si el correo tiene cuenta', cr && cr.cuenta_por_correo === null, cr);

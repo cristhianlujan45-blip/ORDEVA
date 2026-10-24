@@ -2081,7 +2081,7 @@
     const u = ad.us = j.usuario; const p = planDeUsuario(u);
     $('usTit').textContent = (u.admin ? '👑 ' : '') + u.email;
     const negs = (u.negocios || []).map(n => '<div class="item" data-neg="' + esc(n.id) + '"><div class="av">🏪</div><div class="t"><b>' + esc(n.nombre) + '</b><small>' + esc((SX_ROL[n.rol] || n.rol) + ' · plan ' + nomPlan(n.plan_efectivo)) + '</small></div><span class="pill ' + esc(sxEstadoSub(n.suscripcion)[1]) + '">' + esc(sxEstadoSub(n.suscripcion)[0]) + '</span></div>').join('');
-    const eqs = (u.equipos_lista || []).map(e => '<div>' + esc([e.plataforma === 'apk' ? '📱 App Android' : e.plataforma === 'web' ? '💻 Navegador' : (e.plataforma || 'Equipo'), e.modelo, e.version ? 'v' + e.version : ''].filter(Boolean).join(' · ')) + '<br><span class="soft">Primera vez ' + fCo(e.primera) + ' · última ' + hace(e.ultima) + ' · ' + e.veces + ' veces</span></div>').join('');
+    const eqs = (u.equipos_lista || []).map(e => '<div>' + esc([e.plataforma === 'apk' ? '📱 App Android' : e.plataforma === 'web' ? '💻 Navegador' : (e.plataforma || 'Equipo'), e.modelo, e.version ? 'v' + e.version : ''].filter(Boolean).join(' · ')) + '<br><span class="soft">' + (e.usuario ? '👤 ' + esc(e.usuario) + (e.negocio ? ' en ' + esc(e.negocio) : '') + ' · ' : '') + 'Primera vez ' + fCo(e.primera) + ' · última ' + hace(e.ultima) + ' · ' + e.veces + ' veces</span></div>').join('');
     $('usCuerpo').innerHTML =
       '<dl class="kv">' + kv('Correo', u.email) + kv('Celular', u.telefono || 'no lo ha puesto') + kv('Registrado', fCoHora(u.creado_en)) + kv('Último ingreso', u.ultimo_ingreso ? fCoHora(u.ultimo_ingreso) : 'nunca') +
         kv('Correo confirmado', u.confirmado ? 'Sí' : 'No') + kv('Estado', u.bloqueado ? '⛔ Bloqueada' : 'Activa') + kv('Plan', p[0]) + '</dl>' +
@@ -2094,6 +2094,7 @@
         '<button class="b p" type="button" data-ua="temp">🔑 Contraseña temporal (para mandar por SMS / WhatsApp)</button>' +
         (u.admin && u.id !== (sx.yo && sx.yo.id) ? '' : '<button class="b" type="button" data-ua="poner">✏️ Ponerle una contraseña</button>') +
         '<button class="b" type="button" data-ua="enlace">📧 Mandar enlace para cambiar la contraseña</button>' +
+        (u.admin && u.id !== (sx.yo && sx.yo.id) ? '' : '<button class="b" type="button" data-ua="sesiones">🚪 Cerrar sesión en todos sus equipos</button>') +
         '<button class="b" type="button" data-ua="lic">🎁 Darle una licencia</button>' +
         (u.confirmado ? '' : '<button class="b" type="button" data-ua="confirmar">✅ Confirmar su correo</button>') +
         (u.admin ? '' : '<button class="b" type="button" data-ua="bloq">' + (u.bloqueado ? '🔓 Desbloquear la cuenta' : '⛔ Bloquear la cuenta') + '</button>') +
@@ -2108,6 +2109,7 @@
     if(a === 'lic'){ $('dlgUs').close(); irTab('licencias'); $('lsCorreos').value = u.email; $('lsCorreos').focus(); toast('Elige la duración y toca «Crear licencia».'); return; }
     if(a === 'bloq' && !confirm(u.bloqueado ? '¿Desbloquear ' + u.email + '?' : '¿Bloquear ' + u.email + '? No va a poder entrar a ORDEVA hasta que la desbloquees.')) return;
     if(a === 'temp' && !confirm('¿Poner una contraseña temporal a ' + u.email + '? La que tiene deja de servir.')) return;
+    if(a === 'sesiones' && !confirm('¿Cerrar la sesión de ' + u.email + ' en todos sus equipos? La contraseña no cambia: en cada equipo le pide entrar otra vez (con internet). Úsalo si perdió o le robaron un celular.')) return;
     if(a === 'poner'){
       // Escribir la contraseña que el administrador quiera (dos veces, con 👁), y si la app le pide cambiarla al entrar.
       res.innerHTML = '<div class="card" style="margin-top:12px"><b>✏️ Contraseña nueva para ' + esc(u.email) + '</b>' +
@@ -2145,6 +2147,7 @@
             : '<a class="b p" href="sms:?body=' + encodeURIComponent(txt) + '">📱 Mandar por mensaje de texto</a>') + '<button class="b" type="button" data-copiar="' + esc(txt) + '">📋 Copiar</button></div>' +
           '<p class="soft">Al entrar con ella, ORDEVA le pide poner su propia contraseña.</p></div>';
       }else if(a === 'enlace'){ await sxApi('usuario_enlace_clave', { email: u.email }); res.innerHTML = '<p class="ok-t">📧 Listo: le llegó un correo a ' + esc(u.email) + ' para cambiar la contraseña.</p>'; }
+      else if(a === 'sesiones'){ await sxApi('usuario_cerrar_sesiones', { usuario: u.id }); res.innerHTML = '<p class="ok-t">🚪 Listo: en cada equipo donde estaba adentro con ' + esc(u.email) + ' se cierra la sesión (al instante con internet, o apenas se conecte). Su contraseña sigue igual.</p>'; }
       else if(a === 'confirmar'){ await sxApi('usuario_confirmar', { usuario: u.id }); toast('✅ Correo confirmado.'); usAbrir(u.id); usCargar(); }
       else if(a === 'bloq'){ await sxApi('usuario_bloquear', { usuario: u.id, bloquear: !u.bloqueado }); toast(u.bloqueado ? '🔓 Cuenta desbloqueada.' : '⛔ Cuenta bloqueada.'); usAbrir(u.id); usCargar(); }
     }catch(x){ if(!sxFallo(x)) res.innerHTML = '<p class="bad-t">⚠️ ' + esc(sxMsgError(x)) + '</p>'; }

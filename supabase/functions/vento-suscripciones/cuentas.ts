@@ -110,6 +110,18 @@ export async function accionAdmin(env: Env, db: Db, adminId: string, accion: str
       await clavePuesta(db, id);
       return { ok: true, pedir_cambio: pedir };
     }
+    case "usuario_cerrar_sesiones": {
+      // Cierra la sesión de la cuenta en todos los equipos donde estaba adentro (la contraseña no cambia). Los equipos
+      // piden entrar otra vez, con internet. La de otro administrador no se cierra desde aquí.
+      const id = uuid(b.usuario);
+      if (id !== adminId) {
+        const u = await db.rpc<Record<string, unknown> | null>("srv_admin_usuario", { p_usuario: id });
+        if (!u) throw new ErrorVento("no_existe", "No se encontró esa cuenta.", 404);
+        if (u.admin) throw new ErrorVento("sin_permiso", "La sesión de otro administrador solo la cierra él mismo.", 403);
+      }
+      const t = await db.rpc<string>("srv_cerrar_sesiones", { p_usuario: id });
+      return { ok: true, cerradas_en: t };
+    }
     case "usuario_enlace_clave": {
       const email = String(b.email || "").trim().toLowerCase();
       if (!CORREO.test(email)) throw new ErrorVento("correo_invalido", "Correo inválido.", 400);

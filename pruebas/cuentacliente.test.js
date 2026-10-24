@@ -147,6 +147,26 @@ const ADMIN = 'cristhianwkh@gmail.com';
     chk('4b. Entra con la nueva, con sus datos, y ya no lo vuelve a sacar', await dentro(A.p) && await esperar(A.p, () => !!window.ventoNube.negocio(), null, 15000) &&
       (await A.p.evaluate(() => window.ventoCuenta.revisarClave(true))) === false && await A.p.evaluate(() => document.getElementById('authOverlay').hidden && data.businessName === 'Bar Soporte'), await A.p.evaluate(() => data && data.businessName));
 
+    // ===== 4d. 1.61.0: «Cerrar sesión en todos sus equipos» (Admin) y «en mis otros equipos» (la persona) =====
+    const rc = await api('/admin/usuario_cerrar_sesiones', { usuario: uid }, adm.token);
+    chk('4d. El administrador cierra la sesión de la cuenta en todos sus equipos', rc.st === 200, rc);
+    await A.p.evaluate(() => window.dispatchEvent(new CustomEvent('vento-aviso-vivo')));
+    chk('4d. El celular que estaba adentro sale: «Se cerró la sesión… Tu contraseña es la misma»', await esperar(A.p, () => !document.getElementById('authOverlay').hidden && /Se cerró la sesión/.test(document.getElementById('authErr').textContent), null, 20000), await A.p.textContent('#authErr').catch(() => ''));
+    await A.p.fill('#authPass', 'mi-clave-nueva'); await A.p.click('#authBtn');
+    chk('4d. Entra otra vez con la MISMA contraseña y ya no lo saca', await dentro(A.p) && await esperar(A.p, () => !!window.ventoNube.negocio(), null, 15000) && (await A.p.evaluate(() => window.ventoCuenta.revisarClave(true))) === false);
+    const W = await equipo('celular nuevo');
+    await W.p.click('#authTabs [data-tab="entrar"]');
+    await W.p.fill('#authUser', 'dueno@soporte.co'); await W.p.fill('#authPass', 'mi-clave-nueva'); await W.p.click('#authBtn');
+    chk('4d. Otro celular entra con la cuenta', await dentro(W.p) && await esperar(W.p, () => !!window.ventoNube.negocio(), null, 15000));
+    chk('4d. Ajustes → Cuenta tiene «🚪 Cerrar sesión en mis otros equipos»', await esperar(W.p, () => !!document.getElementById('vcOtrosBtn') && !document.getElementById('vcOtros').hidden, null, 15000));
+    await W.p.evaluate(() => document.getElementById('vcOtrosBtn').click());
+    await W.p.click('#confirmOkBtn');
+    chk('4d. Lo confirma y queda listo', await esperar(W.p, () => /en tus otros equipos se cierra la sesión/.test(document.body.innerText), null, 10000));
+    await A.p.evaluate(() => window.dispatchEvent(new CustomEvent('vento-aviso-vivo')));
+    chk('4d. El primer celular sale', await esperar(A.p, () => !document.getElementById('authOverlay').hidden && /Se cerró la sesión/.test(document.getElementById('authErr').textContent), null, 20000));
+    chk('4d. El celular desde donde lo pidió sigue adentro', (await W.p.evaluate(() => window.ventoCuenta.revisarClave(true))) === false && await W.p.evaluate(() => document.getElementById('authOverlay').hidden));
+    await W.ctx.close();
+
     // ===== 4c. El administrador le PONE una contraseña: la vieja deja de servir también donde ya había entrado =====
     const V = await equipo('celular con la vieja');
     await V.p.click('#authTabs [data-tab="entrar"]');

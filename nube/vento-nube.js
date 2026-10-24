@@ -494,8 +494,17 @@
     cambiandoClave++;
     return cliente().then(function(c){ return c.auth.updateUser({ password: pass }); }).then(function(r){
       if(r.error) throw r.error;
-      return rpc('perfil_guardar', { p: { clave_nueva: true } }).then(function(p){ if(p && st.email) claveVista(st.email, p.clave_puesta_en || ''); }, function(){});
+      return rpc('perfil_guardar', { p: { clave_nueva: true } }).then(function(p){ if(p && st.email) claveVista(st.email, claveMarca(p)); }, function(){});
     }).then(function(){ cambiandoClave--; return true; }, function(e){ cambiandoClave--; throw e; });
+  }
+  // Lo que cada equipo compara: la hora de la contraseña y (1.61.0) la de «cerrar sesión en todos los equipos».
+  // Sin lo segundo queda igual que en 1.60.0 (así los equipos que ya lo tenían anotado no salen solos).
+  function claveMarca(p){ return String((p && p.clave_puesta_en) || '') + (p && p.sesiones_cerradas_en ? '|' + p.sesiones_cerradas_en : ''); }
+  // 1.61.0: «🚪 Cerrar sesión en todos mis otros equipos» (este sigue adentro). La contraseña no cambia.
+  function cerrarOtrasSesiones(){
+    cambiandoClave++;
+    return rpc('perfil_guardar', { p: { cerrar_sesiones: true } }).then(function(p){ if(p && st.email) claveVista(st.email, claveMarca(p)); return true; })
+      .then(function(r){ cambiandoClave--; return r; }, function(e){ cambiandoClave--; throw e; });
   }
   // Tras comprobar un correo para recuperar una cuenta del celular: si no se usa ORDEVA Nube, se cierra esa sesión.
   function soltarSesion(){ if(st.email) return Promise.resolve(); return cliente().then(function(c){ return c.auth.signOut(); }).catch(function(){}); }
@@ -714,7 +723,7 @@
     crearCuenta: crearCuenta, entrarCuenta: entrarCuenta, verificarClave: verificarClave, vincular: vincular, crearNegocio: crearNegocio, conectado: conectado, salir: salir,
     codigoEntrar: codigoEntrar, entrarConCodigo: entrarConCodigo, entrarConEnlace: entrarConEnlace, celularDisponible: celularDisponible, celularUnir: celularUnir, celularConfirmar: celularConfirmar, celularDeCuenta: celularDeCuenta, celularE164: celularE164,
     msgError: msgError, codigoCorreo: codigoCorreo, enlaceClave: enlaceClave, correoDeEnlace: correoDeEnlace, claveConEnlace: claveConEnlace, soltarEnlace: soltarEnlace, verificarCorreo: verificarCorreo, nuevaClave: nuevaClave, soltarSesion: soltarSesion,
-    claveVista: claveVista, cambiandoClave: function(){ return cambiandoClave > 0; },
+    claveVista: claveVista, cambiandoClave: function(){ return cambiandoClave > 0; }, claveMarca: claveMarca, cerrarOtrasSesiones: cerrarOtrasSesiones,
     _fusionar: fusionar,
     // Fotos y archivos compartidos entre los equipos de la cuenta
     enNube: enNube,

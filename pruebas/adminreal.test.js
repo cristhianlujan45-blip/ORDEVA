@@ -103,6 +103,10 @@ const ADMIN = 'cristhianwkh@gmail.com', CLAVE_ADMIN = 'Clave-de-prueba-77';
     chk('3. Guarda la contraseña que escribió el administrador y la muestra para mandarla', await esperar(() => /Contraseña cambiada/.test(document.getElementById('usRes').textContent) && /Elegida-Por-Mi-1/.test(document.querySelector('#usRes .clave-temp').textContent)));
     chk('3. … con ella entra el cliente y con la temporal ya no', (await entrar('dueno@bar.co', 'Elegida-Por-Mi-1')).st === 200 && (await entrar('dueno@bar.co', temp)).st === 400);
     claveDueno = 'Elegida-Por-Mi-1';
+    await p.click('#usCuerpo [data-ua="sesiones"]');
+    chk('3. «🚪 Cerrar sesión en todos sus equipos»: confirma y avisa que la contraseña sigue igual', await esperar(() => /Su contraseña sigue igual/.test(document.getElementById('usRes').textContent)));
+    const ses = (await sb.sql("select p.sesiones_cerradas_en from perfiles p join auth.users u on u.id = p.usuario_id where u.email = 'dueno@bar.co'"))[0];
+    chk('3. … queda anotado en el servidor y la contraseña sigue sirviendo', ses && ses.sesiones_cerradas_en && (await entrar('dueno@bar.co', claveDueno)).st === 200, ses);
     await p.click('#dlgUs [data-cerrar]');
     await p.fill('#usBuscar', '');
     // Crear cuenta con licencia
