@@ -58,5 +58,5 @@ jobs:
           if [ "$TODAS" = "true" ]; then
             bash pruebas/correr.sh
           else
-            bash pruebas/correr.sh canalseguro canalvivo qrprivado seguridadqr flujocompleto pagosaviso confirmapago alertaspagos cerrarcaja mejoras recetas practica facil cajapos entrar recuperacion clavelocal tactorapido comprobantepantallazo iphone erroresreal safari modulos cuentacliente usuariosequipo
+            bash pruebas/correr.sh canalseguro canalvivo qrprivado seguridadqr flujocompleto pagosaviso confirmapago alertaspagos cerrarcaja mejoras recetas practica facil cajapos entrar recuperacion clavelocal tactorapido comprobantepantallazo iphone erroresreal safari modulos cuentacliente usuariosequipo abririnstante
           fi
