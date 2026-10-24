@@ -125,6 +125,13 @@ prueba.
    - un Mac;
    - un computador con Windows.
 
+## 8b. Pendiente encontrado en las pruebas
+- ⚠️ **La prueba `cuentas` falla al azar, igual en la versión anterior:**
+  - a veces un segundo celular de la misma cuenta lee los datos antes de que terminen de llegar;
+  - sale el error «Cannot read properties of null (reading 'products')» y ese celular no muestra lo del otro hasta
+    recargar.
+  - Pasa en la 1.58.2 y en la 1.59.0 (no viene de estos cambios). Siguiente arreglo sugerido.
+
 ## 9. Qué más mejoraría después de esto (en orden)
 1. **Que ORDEVA abra al instante y sin internet.**
    - Guardar la app en el celular la primera vez, y que las siguientes abra desde ahí mientras revisa si hay versión nueva. El aviso «Hay una versión nueva» ya existe.
