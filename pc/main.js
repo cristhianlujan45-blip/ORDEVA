@@ -75,11 +75,21 @@ function crearVentana(){
       spellcheck: false
     }
   });
-  Menu.setApplicationMenu(null);
+  // En Mac sin menú no funcionan Cmd+C / Cmd+V / Cmd+Z (copiar, pegar, deshacer) ni Cmd+Q: se deja el menú mínimo de Mac.
+  // En Windows sigue sin menú, como siempre.
+  Menu.setApplicationMenu(process.platform === 'darwin' ? Menu.buildFromTemplate([
+    { label: 'ORDEVA', submenu: [{ role: 'about', label: 'Acerca de ORDEVA' }, { type: 'separator' }, { role: 'hide', label: 'Ocultar ORDEVA' }, { role: 'hideOthers', label: 'Ocultar otros' }, { type: 'separator' },
+      { label: 'Salir de ORDEVA', accelerator: 'Command+Q', click: () => { saliendo = true; app.quit(); } }] },
+    { label: 'Editar', submenu: [{ role: 'undo', label: 'Deshacer' }, { role: 'redo', label: 'Rehacer' }, { type: 'separator' }, { role: 'cut', label: 'Cortar' }, { role: 'copy', label: 'Copiar' }, { role: 'paste', label: 'Pegar' }, { role: 'selectAll', label: 'Seleccionar todo' }] },
+    { label: 'Ver', submenu: [{ role: 'reload', label: 'Volver a cargar' }, { role: 'togglefullscreen', label: 'Pantalla completa' }, { role: 'resetZoom', label: 'Tamaño normal' }, { role: 'zoomIn', label: 'Más grande' }, { role: 'zoomOut', label: 'Más pequeño' }] },
+    { label: 'Ventana', submenu: [{ role: 'minimize', label: 'Minimizar' }, { role: 'close', label: 'Cerrar ventana' }] }
+  ]) : null);
   // La página sabe que corre en el programa de PC («🔎 Este equipo: Vento para PC»). Sigue diciendo que es Chrome:
   // no se esconde nada.
   ventana.webContents.setUserAgent(ventana.webContents.getUserAgent() + ' VentoPC/' + app.getVersion());
-  ventana.once('ready-to-show', () => { if(!process.argv.includes('--escondido')) ventana.show(); });
+  // Al prender el computador abre escondido (sigue sonando junto al reloj). En Mac los «args» no llegan: se usa openAsHidden.
+  const escondido = process.argv.includes('--escondido') || (process.platform === 'darwin' && (() => { try{ return app.getLoginItemSettings().wasOpenedAsHidden; }catch(e){ return false; } })());
+  ventana.once('ready-to-show', () => { if(!escondido) ventana.show(); });
   ventana.loadURL(INICIO);
 
   // Enlaces: los de Vento se quedan en la ventana; los demás (WhatsApp, Google, bancos…) en el navegador.
@@ -158,7 +168,7 @@ function crearBandeja(){
     { label: 'Abrir ORDEVA', click: mostrar },
     { type: 'separator' },
     { label: 'Abrir ORDEVA al prender el computador', type: 'checkbox', checked: app.getLoginItemSettings().openAtLogin,
-      click: it => { app.setLoginItemSettings({ openAtLogin: it.checked, args: ['--escondido'] }); } },
+      click: it => { app.setLoginItemSettings({ openAtLogin: it.checked, openAsHidden: true, args: ['--escondido'] }); } },
     { label: 'Buscar actualización del programa', click: () => actualizar(true) },
     { type: 'separator' },
     { label: 'Salir', click: () => { saliendo = true; app.quit(); } }
@@ -192,7 +202,7 @@ function actualizar(aMano){
 }
 
 ipcMain.on('vento-version', e => { e.returnValue = app.getVersion(); });
-ipcMain.handle('vento-inicio', (e, si) => { app.setLoginItemSettings({ openAtLogin: !!si, args: ['--escondido'] }); return app.getLoginItemSettings().openAtLogin; });
+ipcMain.handle('vento-inicio', (e, si) => { app.setLoginItemSettings({ openAtLogin: !!si, openAsHidden: true, args: ['--escondido'] }); return app.getLoginItemSettings().openAtLogin; });
 ipcMain.handle('vento-actualizar', () => actualizar(true));
 
 app.whenReady().then(() => {

@@ -4,6 +4,7 @@
 <link rel="preconnect" href="https://generativelanguage.googleapis.com">
 <meta charset="UTF-8">
 <script src="lib/vento-errores.js"></script><!-- errores de este equipo → ORDEVA Admin (🐞 Errores) -->
+<script src="lib/vento-colormix.js" defer></script><!-- iPhone con iOS 15/16.0: colores mezclados (no hace nada en los demás) -->
 <script>
 /* ==================== Menús que no saltan arriba solos ====================
    Muchas partes de ORDEVA se refrescan solas (estado de los pagos, cola de canciones, pedidos de cocina…) rehaciendo su
@@ -4592,13 +4593,17 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
       <div class="settings-desc" style="margin-top:6px"><small>Abre <b>ORDEVA-Setup.exe</b> y sigue los pasos. Si Windows dice «Windows protegió su PC», toca <b>Más información → Ejecutar de todas formas</b>. Queda en el escritorio, sigue sonando con la ventana cerrada (icono junto al reloj), usa la balanza, la impresora y el cajón por USB, y se actualiza solo.</small></div>
       <a class="btn-ghost" id="instMac" href="https://github.com/cristhianlujan45-blip/ORDEVA/releases/download/pc/ORDEVA-Mac.dmg" download="ORDEVA-Mac.dmg" rel="noopener" style="display:block;text-align:center;box-sizing:border-box;margin-top:10px;text-decoration:none">🍎 Descargar ORDEVA para Mac</a>
       <div class="settings-desc" style="margin-top:6px"><small>Para Mac con chip Apple (M1–M4) o Intel, macOS 11 o más nuevo. Abre <b>ORDEVA-Mac.dmg</b> y arrastra ORDEVA a <b>Aplicaciones</b>. La primera vez: <b>clic derecho en ORDEVA → Abrir → Abrir</b> (o Ajustes del Sistema → Privacidad y seguridad → <b>Abrir igualmente</b>), porque no está firmado por Apple. Lo de adentro se actualiza solo; el programa nuevo se baja de aquí mismo.</small></div>
+      <details class="settings-desc" id="instIphone" style="margin-top:10px"><summary style="cursor:pointer;font-weight:700">📱 iPhone o iPad (sin descargar nada)</summary>
+        <ol style="margin:6px 0 0;padding-left:20px;line-height:1.55"><li>Abre esta página en <b>Safari</b>.</li><li>Toca <b>Compartir</b> (el cuadrito con la flecha ↑) → <b>Agregar a pantalla de inicio</b> → <b>Agregar</b>.</li><li>Abre ORDEVA desde el ícono nuevo y, en Ajustes → 💜 Pagos, activa las notificaciones: así los pagos te suenan con la app cerrada (iOS 16.4 o más nuevo).</li></ol>
+        <small>El iPhone no deja que ninguna app lea los avisos de Nequi o DaviPlata: esa lectura la hace un celular Android del negocio, y el iPhone recibe los pagos al instante.</small></details>
       <a class="btn-ghost" id="instApk" href="https://github.com/cristhianlujan45-blip/ORDEVA/releases/latest/download/vento.apk" download="vento.apk" rel="noopener" style="display:block;text-align:center;box-sizing:border-box;margin-top:10px;text-decoration:none">📲 Descargar la app para Android (vento.apk)</a>
       <script>
       (function(){
         // Si ya está en el programa de PC o en la app Android, lo dice y esconde ese botón.
         try{
           var ua = navigator.userAgent || '', pc = /VentoPC\/([\d.]+)/.exec(ua), t = '';
-          if(pc){ t = '✅ Este computador ya tiene ORDEVA para PC (versión ' + pc[1] + ').'; document.getElementById('instPc').style.display = 'none'; }
+          if(pc){ t = '✅ Este computador ya tiene ORDEVA para PC (versión ' + pc[1] + ').'; document.getElementById('instPc').style.display = 'none'; document.getElementById('instMac').style.display = 'none'; }
+          if(/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && (navigator.maxTouchPoints || 0) > 1)) document.getElementById('instIphone').open = true;
           else if(window.VentoAndroid){ t = '✅ Este celular ya tiene la app ORDEVA para Android.'; document.getElementById('instApk').style.display = 'none'; }
           document.getElementById('instAqui').textContent = t; document.getElementById('instAqui').hidden = !t;
         }catch(e){}
@@ -5505,7 +5510,7 @@ export default {
 <script src="lib/vento-confirma.js" defer></script><!-- Confirmación de pagos: ⏳ esperando el pago, mesa correcta, sin valor, mesero, cuadre -->
 <script src="lib/vento-guia.js" defer></script><!-- Modo fácil para mayores: guía paso a paso con voz, «Ayúdame» y recorrido -->
 <script src="lib/vento-cuenta.js" defer></script><!-- Soporte en la app, licencias del proveedor, recuperar por SMS, cuenta de cliente aparte del administrador -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script><!-- defer: antes frenaba todo lo de abajo (y si el CDN no respondía, ORDEVA se quedaba en blanco); solo se usa al tocar «imagen del recibo» -->
 <script src="lib/vento-sonidos.js"></script>
 <script>
 /* ---------- Lluvia de código (fondo Matrix) ---------- */
@@ -32889,7 +32894,7 @@ window.mesoraCelebrar = function(emojis){
     const enCuenta = document.querySelector('.overlay.show #addPaymentBtn'); if(!enCuenta) return;
     precargado = true;
     const ir = () => window.comprobantePrecalentar();
-    if(window.requestIdleCallback) requestIdleCallback(ir, { timeout: 3000 }); else setTimeout(ir, 0);
+    if(window.requestIdleCallback) window.requestIdleCallback(ir, { timeout: 3000 }); else setTimeout(ir, 0);
   }, 1000);
   window.comprobantePrecalentar = () => { try{ window.VitoOfflineOCR && window.VitoOfflineOCR.precalentar && window.VitoOfflineOCR.precalentar(); }catch(e){} };
   // Uso general: verificar un archivo (o un texto ya leído) para una cuenta.
