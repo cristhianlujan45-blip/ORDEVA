@@ -5,5 +5,7 @@ contextBridge.exposeInMainWorld('ventoPC', {
   version: () => ipcRenderer.sendSync('vento-version'),
   plataforma: process.platform,
   inicioConWindows: (si) => ipcRenderer.invoke('vento-inicio', si),
-  buscarActualizacion: () => ipcRenderer.invoke('vento-actualizar')
+  buscarActualizacion: () => ipcRenderer.invoke('vento-actualizar'),
+  // Errores del programa mismo desde la última vez (se borran al leerlos): la página los manda a ORDEVA Admin.
+  errores: () => ipcRenderer.sendSync('vento-errores')
 });

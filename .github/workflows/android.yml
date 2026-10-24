@@ -92,7 +92,8 @@ jobs:
             vento.apk
             vento-admin.apk
       - name: Publicar en Descargas (release «android»)
-        if: steps.firma.outputs.publicar == 'true'
+        # Solo desde la rama principal: desde otra rama (a mano) compila y deja el APK como artefacto para revisar.
+        if: steps.firma.outputs.publicar == 'true' && github.ref == 'refs/heads/claude/precio-margen-productos-tabla-mioclt'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

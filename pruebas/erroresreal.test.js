@@ -138,5 +138,47 @@ const ADMIN = 'cristhianwkh@gmail.com', CLAVE_ADMIN = 'Clave-de-prueba-77';
     await avisar('and-frase-2');
     chk('5. El siguiente aviso igual ya es un pago en la app del negocio, sin reinstalar: $4.000 por Bancolombia', await N.p.waitForFunction(() => (data.pagos.lista || []).some(x => x.monto === 4000 && x.app === 'Bancolombia'), null, { timeout: 8000 }).then(() => true, () => false));
     chk('5. … y lo dice en voz alta («Recibiste 4000 pesos por Bancolombia»)', await N.p.evaluate(() => window.__voz5.some(x => /^Llegaron 4000 pesos por Bancolombia/.test(x))), await N.p.evaluate(() => window.__voz5));
+
+    // ===== 6. 🐞 Reportar un problema (Más → 🐞): lo que escribe el cliente llega a 🐞 Errores con sus códigos =====
+    await N.p.addScriptTag({ content: 'setTimeout(function vamosMal(){ var o = null; o.nada(); }, 0);' });   // un error justo antes
+    await N.p.waitForTimeout(300);
+    await N.p.evaluate(() => document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')));
+    await N.p.click('#navMoreBtn');
+    await N.p.click('#navMoreSheet .more-tile[data-go="reportar"]');
+    await N.p.waitForSelector('#vcRepOv.show');
+    await N.p.fill('#vcRepMsg', 'Al cobrar la mesa 3 se quedó pegado');
+    await N.p.click('#vcRepSi');
+    await N.p.evaluate(() => window.ventoErrores.enviar());
+    chk('6. «🐞 Reportar un problema» llega al servidor con lo que escribió y los códigos de sus errores', await hasta(async () => (await filas("select 1 from app_errores where negocio = 'Bar Frases' and (detalle->>'reporte') = 'true' and detalle->>'texto' like '%se quedó pegado%' and jsonb_array_length(detalle->'codigos') >= 1")).length > 0),
+      await filas("select mensaje, detalle from app_errores where negocio = 'Bar Frases'"));
+    const cerro6 = await N.p.waitForFunction(() => !document.getElementById('vcRepOv').classList.contains('show'), null, { timeout: 10000 }).then(() => true, () => false);
+    chk('6. Se cierra y le dice que ya llegó', cerro6, await N.p.textContent('#vcRepEstado'));
+    chk('6. … y queda como caso de soporte (con los códigos para el administrador)', await hasta(async () => (await filas("select 1 from soporte_casos where asunto like '🐞 Al cobrar%'").catch(() => [])).length > 0), await filas("select table_name from information_schema.tables where table_name like 'soporte%'"));
+
+    // ===== 7. La app Android / el programa de PC se cerró por un error suyo: llega al abrir, con su pila =====
+    const P = await pagina('programa', 'about:blank');
+    await P.p.addInitScript(() => { window.ventoPC = { plataforma: 'darwin', version: () => '1.0.9', errores: () => [{ tipo: 'programa', mensaje: "TypeError: Cannot read properties of undefined (reading 'show')", pila: 'TypeError: x\n    at mostrar (main.js:44:12)', app: '1.0.9', so: 'darwin 14.6', t: Date.now() }] }; });
+    await P.p.goto(BASE + '/index.html'); await P.p.waitForTimeout(6800);
+    await P.p.evaluate(() => window.ventoErrores.enviar());
+    chk('7. El error del programa de Mac llega a 🐞 Errores marcado «[Mac]», con la pila y la plataforma', await hasta(async () => (await filas("select 1 from app_errores where mensaje like '[Mac]%' and (detalle->>'nativo') = 'Mac' and detalle->>'pila' like '%main.js:44%' and plataforma = 'mac-programa'")).length > 0),
+      await filas("select mensaje, plataforma, detalle from app_errores where mensaje like '[%'"));
+
+    // ===== 8. En el panel: qué significa, dónde, y «📋 Copiar para arreglar» =====
+    await D.p.selectOption('#erTipo', 'reporte'); await D.p.click('#erRef');
+    await D.p.waitForFunction(() => /se quedó pegado/.test(document.getElementById('erLista').textContent), null, { timeout: 8000 }).catch(() => {});
+    chk('8. Filtro «📝 Reportados por el cliente»', /se quedó pegado/.test(await D.p.textContent('#erLista')) && !/reproductor/.test(await D.p.textContent('#erLista')), await D.p.textContent('#erLista'));
+    await D.p.selectOption('#erTipo', ''); await D.p.click('#erRef');
+    await D.p.waitForSelector('#erLista [data-error] .t');
+    await D.p.evaluate(() => { const it = [...document.querySelectorAll('#erLista [data-error]')].find(x => /reading 'nada'|nada/.test(x.textContent) && !/Mac/.test(x.textContent)); it.querySelector('.t').click(); });
+    await D.p.waitForSelector('#dlgEr[open]');
+    const info8 = await D.p.textContent('#erInfo');
+    chk('8. El detalle dice en palabras qué significa y dónde (archivo:línea y la función)', /Qué significa:.*algo que no existía/.test(info8) && /Dónde:.*index\.html:\d+/.test(info8), info8.slice(0, 500));
+    await D.p.evaluate(() => { window.__copiado = ''; try{ Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: t => { window.__copiado = t; return Promise.resolve(); } } }); }catch(e){} });
+    await D.p.click('#erCopiar'); await D.p.waitForTimeout(200);
+    const txt8 = await D.p.evaluate(() => window.__copiado);
+    chk('8. «📋 Copiar para arreglar»: código E-XXXX, mensaje, qué significa, dónde, pila y los equipos', /E-[0-9A-Z]{4}/.test(txt8) && /Mensaje:/.test(txt8) && /Qué significa:/.test(txt8) && /Dónde: index\.html:\d+/.test(txt8) && /Pila:/.test(txt8) && /Bar Errores|Bar Frases/.test(txt8), txt8.slice(0, 800));
+    await D.p.evaluate(() => document.getElementById('dlgEr').close());
+    await D.p.selectOption('#erTipo', 'nativo');
+    chk('8. Filtro «📲 Del programa / app Android» con el de Mac', /\[Mac\]/.test(await D.p.textContent('#erLista')), await D.p.textContent('#erLista'));
   }
 })();

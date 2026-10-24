@@ -4708,6 +4708,7 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
       <button type="button" class="more-tile" data-go="calculadora"><span class="more-ic">🧮</span><strong>Calculadora</strong><small>Con teclado o por voz</small></button>
       <button type="button" class="more-tile" data-go="plan" id="morePlanTile"><span class="more-ic">💳</span><strong>Mi plan</strong><small id="morePlanTxt">Suscripción, planes y pagos</small></button>
       <button type="button" class="more-tile" data-go="ajustes"><span class="more-ic">⚙️</span><strong>Ajustes</strong><small>Configura tu negocio</small></button>
+      <button type="button" class="more-tile" data-go="reportar"><span class="more-ic">🐞</span><strong>Reportar un problema</strong><small>Algo no funciona: cuéntanos</small></button>
       <button type="button" class="more-tile more-tile-salir" data-go="salir"><span class="more-ic">🚪</span><strong>Cerrar sesión</strong><small>Salir o entrar con otro usuario</small></button>
       <button type="button" class="more-tile more-tile-ia" data-go="ia"><span class="more-ic more-ic-mesi"><i class="mesi-wrap" data-mesi="static" style="width:30px;height:30px"></i></span><strong>ORDEVA (IA)</strong><small>Pregúntale lo que sea</small></button>
     </div>
@@ -8961,6 +8962,7 @@ navMoreSheet.addEventListener('click', e => {
   if(tile.dataset.go === 'calculadora'){ if(window.calculadoraAbrir) window.calculadoraAbrir(); return; }
   if(tile.dataset.go === 'plan'){ try{ subPaywall(''); }catch(e){} return; }   // menú de suscripción siempre a mano (no solo desde la barra)
   if(tile.dataset.go === 'salir'){ cerrarSesion(); return; }
+  if(tile.dataset.go === 'reportar'){ if(window.ventoReportarProblema) window.ventoReportarProblema(); else showToast('Escríbenos en Ajustes → Guía y soporte.'); return; }
   const b = document.querySelector('nav button[data-view="' + tile.dataset.go + '"]');
   if(b) b.click();
 });

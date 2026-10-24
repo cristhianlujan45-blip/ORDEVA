@@ -68,8 +68,43 @@ public class VentoApp extends Application {
     public void onCreate() {
         super.onCreate();
         app = this;
+        vigilarCierres();
         crearCanales();
         Guardia.programar(this);                 // 🛡️ si la marca del celular cierra Vento, se vuelve a prender sola
+    }
+
+    // ---------- 🐞 Errores de la app (no de la página) → ORDEVA Admin ----------
+    // Si la app se cierra por un error de Java, o Android mata la página por memoria, queda anotado aquí. La página lo
+    // lee al abrir (Puente.erroresNativos) y lo manda a ORDEVA Admin → 🐞 Errores, con su pila. Máximo 10.
+    private void vigilarCierres() {
+        final Thread.UncaughtExceptionHandler antes = Thread.getDefaultUncaughtExceptionHandler();
+        Thread.setDefaultUncaughtExceptionHandler((hilo, e) -> {
+            try {
+                java.io.StringWriter sw = new java.io.StringWriter();
+                e.printStackTrace(new java.io.PrintWriter(sw));
+                anotarError("cierre", String.valueOf(e), "hilo " + hilo.getName() + "\n" + sw);
+            } catch (Throwable ignorado) { }
+            if (antes != null) antes.uncaughtException(hilo, e);
+        });
+    }
+
+    static void anotarError(String tipo, String mensaje, String pila) {
+        try {
+            if (app == null) return;
+            android.content.SharedPreferences p = app.getSharedPreferences("vento", MODE_PRIVATE);
+            JSONArray l = new JSONArray(p.getString("errores_nativos", "[]")), n = new JSONArray();
+            for (int i = Math.max(0, l.length() - 9); i < l.length(); i++) n.put(l.get(i));
+            JSONObject o = new JSONObject();
+            o.put("tipo", tipo);
+            o.put("mensaje", mensaje.length() > 400 ? mensaje.substring(0, 400) : mensaje);
+            o.put("pila", pila == null ? "" : (pila.length() > 1500 ? pila.substring(0, 1500) : pila));
+            o.put("app", BuildConfig.VERSION_NAME);
+            o.put("android", Build.VERSION.SDK_INT);
+            o.put("modelo", Build.MANUFACTURER + " " + Build.MODEL);
+            o.put("t", System.currentTimeMillis());
+            n.put(o);
+            p.edit().putString("errores_nativos", n.toString()).commit();   // commit: la app se está cerrando
+        } catch (Throwable ignorado) { }
     }
 
     /**
@@ -828,6 +863,17 @@ public class VentoApp extends Application {
     class Puente {
         private Thread escucha;
         private java.net.HttpURLConnection escuchaCon;
+
+        /** Los errores de la app (cierres, página muerta por memoria) desde la última vez; se borran al leerlos. */
+        @JavascriptInterface
+        public String erroresNativos() {
+            try {
+                android.content.SharedPreferences p = getSharedPreferences("vento", MODE_PRIVATE);
+                String l = p.getString("errores_nativos", "[]");
+                p.edit().remove("errores_nativos").apply();
+                return l;
+            } catch (Exception e) { return "[]"; }
+        }
 
         @JavascriptInterface
         public String info() {

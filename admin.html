@@ -202,6 +202,7 @@
   @media (max-width:520px){ .stats b{ font-size:15px; } .sxc{ padding:12px; } .sx-head .b{ padding:8px 10px; } }
 </style>
 <script src="nube/config.js"></script>
+<script src="lib/vento-errores.js"></script><!-- los errores del propio panel también llegan a 🐞 Errores -->
 </head>
 <body>
 
@@ -346,6 +347,8 @@
         <option value="pedido">🍺 Pedidos por QR</option>
         <option value="pago">💜 Pagos</option>
         <option value="js">🐞 Errores de la app</option>
+        <option value="reporte">📝 Reportados por el cliente</option>
+        <option value="nativo">📲 Del programa / app Android</option>
       </select>
       <input id="erBuscar" type="search" placeholder="🔎 Código (E-XXXX), negocio, mensaje o versión">
       <button class="b" id="erRef" type="button" title="Actualizar">🔄</button>
@@ -865,6 +868,7 @@
       <button class="b p" id="erResolver" type="button">✅ Ya lo arreglé</button>
       <button class="b" id="erReabrir" type="button" hidden>↩️ Volver a abrir</button>
       <button class="b" id="erEnsenar" type="button" hidden>💜 Enseñar esta frase</button>
+      <button class="b" id="erCopiar" type="button" title="Todo el detalle técnico en un texto, listo para pegar y arreglarlo">📋 Copiar para arreglar</button>
     </div>
   </div>
 </dialog>
@@ -2147,6 +2151,42 @@
   }
   // ---------- 🐞 Errores ----------
   const ER_TIPO = { js: '🐞 Error de la app', promesa: '🐞 Error de la app', musica: '🎵 Música', pedido: '🍺 Pedido por QR', pago: '💜 Pago', red: '📶 Conexión', otro: '❔ Otro' };
+  // Qué tipo de caso es, mirando también el detalle: lo que escribió el cliente (📝) o un cierre de la app/programa (📲).
+  const erDet = e => (e.casos || []).map(c => c.detalle).find(Boolean) || {};
+  const erClase = e => { const d = erDet(e); return d.reporte ? 'reporte' : d.nativo ? 'nativo' : e.tipo; };
+  const erEtiqueta = e => { const k = erClase(e), d = erDet(e); return k === 'reporte' ? '📝 Reportado por el cliente' : k === 'nativo' ? '📲 ' + (d.nativo === 'Android' ? 'App Android' : 'Programa ' + d.nativo) : (ER_TIPO[e.tipo] || e.tipo); };
+  const PLAT = { apk: '📲 App Android', 'pc-programa': '💻 Programa de PC', 'mac-programa': '🍎 Programa de Mac', iphone: '📱 iPhone (navegador)', ipad: '📱 iPad', android: '📱 Android (navegador)', 'mac-web': '💻 Mac (navegador)', 'windows-web': '💻 Windows (navegador)', web: '💻 Navegador' };
+  // 🧠 Qué significa el error, en palabras, y por dónde empezar a mirar (no adivina el arreglo: orienta).
+  function erExplicar(e){
+    const m = String(e.mensaje || '').replace(/^\[E-[0-9A-Z]{4,}\]\s*/, ''), d = erDet(e), k = erClase(e); let r;
+    if(k === 'reporte') r = 'Lo escribió la persona desde «🐞 Reportar un problema». Abajo van los errores que tenía su equipo justo antes (si había), su versión y su equipo.';
+    else if(k === 'nativo') r = /memoria/i.test(m) ? 'El celular o el computador se quedó sin memoria y cerró la página; ORDEVA la volvió a abrir sola (no se perdió nada). Si se repite mucho en el mismo equipo, ese equipo tiene poca memoria o muchas apps abiertas.' : 'Falló la app Android o el programa mismo (no la página). La pila de abajo dice en qué parte del código nativo.';
+    else if(/Cannot read propert(y|ies) of (undefined|null)(?: \(reading '([^']+)'\))?|undefined is not an object|null is not an object/i.test(m)){ const x = m.match(/reading '([^']+)'/); r = 'Se quiso usar ' + (x ? '«' + x[1] + '» de ' : '') + 'algo que no existía: un dato que faltaba o que todavía no había cargado (por ejemplo una mesa borrada en otro equipo). Arreglo típico: revisar que el dato exista antes de usarlo.'; }
+    else if(/is not a function/i.test(m)) r = 'Se llamó una función que no existe en esa versión o que todavía no cargaba (un componente que no terminó de bajar, o una app/programa viejo).';
+    else if(/is not defined|Can't find variable/i.test(m)) r = 'Se usó un nombre que no existe en ese equipo: casi siempre una parte de la app que no cargó (internet lento) o un navegador viejo.';
+    else if(/Unexpected token|JSON|SyntaxError/i.test(m)) r = 'Llegó un texto que no se pudo leer (datos dañados, una respuesta del servidor que no era la esperada, o un navegador que no entiende esa parte del código).';
+    else if(/Quota|storage|almacenamiento/i.test(m)) r = 'La memoria del navegador está llena: no se pudo guardar. ORDEVA pasa los datos al almacén grande, pero conviene revisar ese equipo.';
+    else if(e.tipo === 'musica') r = 'La música no arrancó o se quedó quieta en ese negocio (reproductor cerrado, YouTube bloqueado o sin internet).';
+    else if(e.tipo === 'pedido') r = 'Un pedido por QR no fue confirmado por el local a tiempo: el local puede estar sin internet o con la app cerrada.';
+    else if(e.tipo === 'pago') r = 'Un aviso de banco que ORDEVA no entendió: si es un pago, usa «💜 Enseñar esta frase».';
+    else r = 'Error de la app. Mira el archivo y la línea, y la pila de abajo.';
+    const donde = d.archivo ? d.archivo + (d.linea ? ':' + d.linea + (d.columna ? ':' + d.columna : '') : '') : (e.pagina ? e.pagina + '.html' : '');
+    const fn = String(d.pila || '').split('\n').map(l => (l.match(/at ([\w$.<>]+) /) || l.match(/^([\w$.<>]+)@/) || [])[1]).filter(x => x && !/^(Array|Promise|new|Object|async|HTMLElement)/.test(x))[0];
+    return { que: r, donde: donde ? donde + (fn ? ' (en ' + fn + ')' : '') : (fn ? 'en ' + fn : '') };
+  }
+  // Todo lo de un error en un solo texto: código, qué significa, dónde, pila y en qué equipos pasó. Para pegarlo y arreglarlo.
+  function erTexto(e){
+    const x = erExplicar(e), casos = e.casos || [], d = erDet(e);
+    return ['ORDEVA · ' + erEtiqueta(e) + (erCodigo(e) ? ' · ' + erCodigo(e) : ''),
+      'Mensaje: ' + String(e.mensaje || ''),
+      'Qué significa: ' + x.que,
+      x.donde ? 'Dónde: ' + x.donde : '',
+      'Página: ' + (e.pagina || '—') + ' · versión: ' + (e.version ? 'v' + e.version : '—'),
+      'Veces: ' + e.veces + ' · equipos: ' + e.equipos + ' · negocios: ' + e.negocios + ' · primera: ' + fCoHora(e.primero) + ' · última: ' + fCoHora(e.ultimo),
+      d.pila ? 'Pila:\n' + d.pila : '',
+      'Equipos:\n' + casos.slice(0, 8).map(c => '- ' + [c.negocio || 'sin negocio', c.usuario || '', PLAT[c.plataforma] || c.plataforma || '', c.version ? 'v' + c.version : '', c.veces + ' veces', c.modelo || ''].filter(Boolean).join(' · ') +
+        (c.detalle ? '\n  detalle: ' + JSON.stringify(Object.assign({}, c.detalle, { pila: undefined })) : '')).join('\n')].filter(Boolean).join('\n');
+  }
   function erBadge(n){ $('erBadge').textContent = n ? String(n) : ''; $('erBadge').hidden = !n; }
   async function erCargar(){
     const j = await intentar(() => sxApi('errores', { estado: $('erEstado').value }), $('erLista')); if(!j) return;
@@ -2156,7 +2196,7 @@
   // El código corto del error (E-XXXX): el que la app guarda en el equipo y manda en el diagnóstico de soporte.
   const erCodigo = e => { const c = (e.casos || []).map(x => x.detalle && x.detalle.codigo).find(Boolean); return c || ((String(e.mensaje || '').match(/^\[(E-[0-9A-Z]{4,})\]/) || [])[1]) || ''; };
   function erItem(e){
-    const t = ER_TIPO[e.tipo] || e.tipo, cod = erCodigo(e);
+    const t = erEtiqueta(e), cod = erCodigo(e);
     return '<div class="item" data-error="' + esc(e.huella) + '"><div class="av">' + esc(t.split(' ')[0]) + '</div><div class="t"><b>' + (cod ? '<span style="font-family:monospace">' + esc(cod) + '</span> · ' : '') + esc(String(e.mensaje || '').replace(/^\[E-[0-9A-Z]{4,}\]\s*/, '')) + '</b><small>' +
       esc([t.replace(/^\S+\s/, ''), e.veces + ' ' + (e.veces === 1 ? 'vez' : 'veces'), e.equipos + ' equipo' + (e.equipos === 1 ? '' : 's'), e.negocios + ' negocio' + (e.negocios === 1 ? '' : 's'),
         (e.casos && e.casos[0] && e.casos[0].negocio) || '', e.version ? 'v' + e.version : '', hace(e.ultimo)].filter(Boolean).join(' · ')) + '</small></div>' +
@@ -2164,7 +2204,7 @@
   }
   function erPintar(){
     const q = $('erBuscar').value.trim().toLowerCase(), tp = $('erTipo').value;
-    const l = (ad.errores || []).filter(e => (!tp || e.tipo === tp || (tp === 'js' && e.tipo === 'promesa')) && (!q || JSON.stringify([erCodigo(e), e.mensaje, e.version, e.pagina, (e.casos || []).map(c => [c.negocio, c.usuario, c.version])]).toLowerCase().includes(q)));
+    const l = (ad.errores || []).filter(e => (!tp || (tp === 'reporte' || tp === 'nativo' ? erClase(e) === tp : erClase(e) === tp || (tp === 'js' && erClase(e) === 'promesa'))) && (!q || JSON.stringify([erCodigo(e), e.mensaje, e.version, e.pagina, (e.casos || []).map(c => [c.negocio, c.usuario, c.version])]).toLowerCase().includes(q)));
     $('erLista').innerHTML = l.length ? l.map(erItem).join('') : '<div class="empty">' + ((ad.errores || []).length ? 'Nada coincide.' : '🎉 No hay errores sin resolver. Todo está funcionando.') + '</div>';
   }
   $('erEstado').onchange = erCargar; $('erTipo').onchange = erPintar; $('erBuscar').oninput = erPintar; $('erRef').onclick = erCargar;
@@ -2172,12 +2212,13 @@
   function erAbrir(h){
     const e = (ad.errores || []).find(x => x.huella === h); if(!e) return;
     ad.error = e;
-    $('erTit').textContent = (ER_TIPO[e.tipo] || e.tipo) + ' · ' + e.veces + ' ' + (e.veces === 1 ? 'vez' : 'veces');
+    $('erTit').textContent = erEtiqueta(e) + ' · ' + e.veces + ' ' + (e.veces === 1 ? 'vez' : 'veces');
+    const xp = erExplicar(e);
     const casos = e.casos || [];
-    $('erInfo').innerHTML = '<p><b>' + esc(e.mensaje) + '</b></p><dl class="kv">' + (erCodigo(e) ? kv('Código', erCodigo(e)) : '') + kv('Primera vez', fCoHora(e.primero)) + kv('Última vez', fCoHora(e.ultimo)) + kv('Equipos', e.equipos) + kv('Negocios', e.negocios) +
+    $('erInfo').innerHTML = '<p><b>' + esc(e.mensaje) + '</b></p><div class="card" style="margin:8px 0;padding:10px 12px"><b>🧠 Qué significa:</b> ' + esc(xp.que) + (xp.donde ? '<br><b>📍 Dónde:</b> <code>' + esc(xp.donde) + '</code>' : '') + '</div><dl class="kv">' + (erCodigo(e) ? kv('Código', erCodigo(e)) : '') + kv('Primera vez', fCoHora(e.primero)) + kv('Última vez', fCoHora(e.ultimo)) + kv('Equipos', e.equipos) + kv('Negocios', e.negocios) +
       kv('Página', e.pagina || '—') + kv('Versión', e.version ? 'v' + e.version : '—') + '</dl>' +
-      '<h3 style="margin:14px 0 6px">Dónde pasó</h3><div class="list">' + (casos.length ? casos.map(c => '<div class="item"><div class="av">' + (c.plataforma === 'apk' ? '📲' : /android|iphone/.test(c.plataforma || '') ? '📱' : '💻') + '</div><div class="t"><b>' +
-        esc(c.negocio || 'Sin nombre de negocio') + '</b><small>' + esc([c.usuario || '', c.plataforma || '', c.version ? 'v' + c.version : '', c.veces + (c.veces === 1 ? ' vez' : ' veces'), hace(c.ultimo)].filter(Boolean).join(' · ')) +
+      '<h3 style="margin:14px 0 6px">Dónde pasó</h3><div class="list">' + (casos.length ? casos.map(c => '<div class="item"><div class="av">' + (c.plataforma === 'apk' ? '📲' : /android|iphone|ipad/.test(c.plataforma || '') ? '📱' : /mac/.test(c.plataforma || '') ? '🍎' : '💻') + '</div><div class="t"><b>' +
+        esc(c.negocio || 'Sin nombre de negocio') + '</b><small>' + esc([c.usuario || '', PLAT[c.plataforma] || c.plataforma || '', c.version ? 'v' + c.version : '', c.veces + (c.veces === 1 ? ' vez' : ' veces'), hace(c.ultimo)].filter(Boolean).join(' · ')) +
         (c.detalle ? '<br><code style="white-space:pre-wrap;word-break:break-word;font-size:12px">' + esc(JSON.stringify(c.detalle, null, 1).slice(0, 1200)) + '</code>' : '') + '</small></div>' + (c.resuelto ? '<span class="pill ok">✅</span>' : '') + '</div>').join('') : '<div class="empty">Sin detalle.</div>') + '</div>';
     $('erResolver').hidden = !!e.resuelto; $('erReabrir').hidden = !e.resuelto;
     $('erEnsenar').hidden = !(e.tipo === 'pago' && frSugerir(e));
@@ -2230,6 +2271,7 @@
     toast(resuelto ? '✅ Marcado como arreglado. Si vuelve a pasar, aparece otra vez aquí.' : '↩️ Abierto otra vez.');
     $('dlgEr').close(); erCargar();
   }
+  $('erCopiar').onclick = () => { if(ad.error) copiar(erTexto(ad.error)); };
   $('erResolver').onclick = () => erMarcar(true); $('erReabrir').onclick = () => erMarcar(false);
   async function erContar(){ const j = await intentar(() => sxApi('errores_abiertos')); if(j) erBadge(j.abiertos || 0); }
 

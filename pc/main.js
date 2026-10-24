@@ -23,6 +23,24 @@ const ORIGEN_PRUEBA = process.env.VENTO_PC_URL ? new URL(process.env.VENTO_PC_UR
 
 let ventana = null, bandeja = null, saliendo = false, avisoFondo = false;
 
+// ---------- 🐞 Errores del programa (no de la página) → ORDEVA Admin ----------
+// Lo que falla en el programa mismo (un error suyo, la página que se cae) queda en un archivo; la página lo lee al abrir
+// (ventoPC.errores) y lo manda a ORDEVA Admin → 🐞 Errores con su pila. Máximo 10. Nunca datos del negocio.
+const fs = require('fs');
+const archivoErrores = () => path.join(app.getPath('userData'), 'errores-programa.json');
+function leerErrores(){ try{ const l = JSON.parse(fs.readFileSync(archivoErrores(), 'utf8')); return Array.isArray(l) ? l : []; }catch(e){ return []; } }
+function anotarError(tipo, mensaje, pila){
+  try{
+    const l = leerErrores().slice(-9);
+    l.push({ tipo, mensaje: String(mensaje || '').slice(0, 400), pila: String(pila || '').slice(0, 1500), app: app.getVersion(), so: process.platform + ' ' + (process.getSystemVersion ? process.getSystemVersion() : ''), t: Date.now() });
+    fs.writeFileSync(archivoErrores(), JSON.stringify(l));
+  }catch(e){}
+}
+process.on('uncaughtException', e => { anotarError('programa', e && e.message || String(e), e && e.stack); });
+process.on('unhandledRejection', e => { anotarError('programa', e && e.message || String(e), e && e.stack); });
+app.on('child-process-gone', (ev, d) => { if(d && d.reason !== 'clean-exit' && d.reason !== 'killed') anotarError('proceso', 'Se cayó una parte del programa (' + d.type + ': ' + d.reason + ')', 'código ' + d.exitCode); });
+ipcMain.on('vento-errores', e => { const l = leerErrores(); try{ fs.unlinkSync(archivoErrores()); }catch(x){} e.returnValue = l; });
+
 // 1.58.2: el programa se llama ORDEVA, pero sus datos siguen en la MISMA carpeta de siempre («Vento»): con otro nombre
 // Electron buscaría una carpeta nueva y vacía y este computador parecería haber perdido lo guardado (sesión, datos).
 // Va antes del «una sola copia», que también depende de esa carpeta.
@@ -79,7 +97,10 @@ function crearVentana(){
   ventana.webContents.on('did-fail-load', (e, codigo, desc, url, principal) => {
     if(principal && codigo !== -3) ventana.loadFile(path.join(__dirname, 'sin-internet.html'));
   });
-  ventana.webContents.on('render-process-gone', () => { setTimeout(() => { if(ventana) ventana.loadURL(INICIO); }, 1000); });
+  ventana.webContents.on('render-process-gone', (e, d) => {
+    if(d && d.reason !== 'clean-exit') anotarError('pagina', 'La página de ORDEVA se cayó en el programa (' + (d.reason || '') + ')', 'código ' + (d.exitCode != null ? d.exitCode : ''));
+    setTimeout(() => { if(ventana) ventana.loadURL(INICIO); }, 1000);
+  });
 
   // Cerrar la ventana = sigue trabajando junto al reloj (como la app Android). «Salir» lo cierra del todo.
   ventana.on('close', e => {

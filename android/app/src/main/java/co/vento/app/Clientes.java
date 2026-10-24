@@ -67,6 +67,7 @@ final class Clientes {
          *  Se descarta la página muerta y se crea otra; los datos están guardados, no se pierde nada. */
         @Override
         public boolean onRenderProcessGone(WebView v, android.webkit.RenderProcessGoneDetail d) {
+            VentoApp.anotarError("pagina", d != null && d.didCrash() ? "La página de ORDEVA se cayó (error del navegador del celular)" : "Android cerró la página de ORDEVA por falta de memoria", d != null ? "prioridad " + d.rendererPriorityAtExit() : "");
             VentoApp.ui.post(() -> {
                 try { if (v.getParent() instanceof android.view.ViewGroup) ((android.view.ViewGroup) v.getParent()).removeView(v); } catch (Exception ignorado) { }
                 try { v.destroy(); } catch (Exception ignorado) { }
