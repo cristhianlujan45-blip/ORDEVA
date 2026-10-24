@@ -135,6 +135,23 @@ const ADMIN = 'cristhianwkh@gmail.com';
       (await entrar('dueno@soporte.co', 'mi-clave-nueva')).st === 200 && (await entrar('dueno@soporte.co', temp)).st === 400);
     await B.ctx.close();
 
+    // ===== 4c. El administrador le PONE una contraseña: la vieja deja de servir también donde ya había entrado =====
+    const V = await equipo('celular con la vieja');
+    await V.p.click('#authTabs [data-tab="entrar"]');
+    await V.p.fill('#authUser', 'dueno@soporte.co'); await V.p.fill('#authPass', 'mi-clave-nueva'); await V.p.click('#authBtn');
+    chk('4c. Un celular entra con su contraseña (queda guardada en el celular)', await dentro(V.p));
+    await V.p.evaluate(() => { localStorage.removeItem('cm-session'); }); await V.p.reload(); await V.p.waitForSelector('#authOverlay:not([hidden])');
+    await V.p.waitForFunction(() => window.ventoNube && window.ventoNube.verificarClave, null, { timeout: 15000 });
+    const rp = await api('/admin/usuario_clave_poner', { usuario: uid, clave: 'Puesta-Por-El-Admin', pedir_cambio: false }, adm.token);
+    chk('4c. El administrador le pone «Puesta-Por-El-Admin»', rp.st === 200, rp);
+    await V.p.fill('#authUser', 'dueno@soporte.co'); await V.p.fill('#authPass', 'mi-clave-nueva'); await V.p.click('#authBtn');
+    chk('4c. En ese celular, la vieja ya no sirve (con internet): «La contraseña … cambió. Entra con la nueva.»', await esperar(V.p, () => !document.getElementById('authOverlay').hidden && /cambió/.test(document.getElementById('authErr').textContent), null, 20000), await V.p.textContent('#authErr').catch(() => ''));
+    await V.p.fill('#authPass', 'mi-clave-nueva'); await V.p.click('#authBtn');
+    chk('4c. … ni intentándolo otra vez', await esperar(V.p, () => /incorrectos/.test(document.getElementById('authErr').textContent) && !document.getElementById('authBtn').disabled, null, 15000), await V.p.textContent('#authErr'));
+    await V.p.fill('#authPass', 'Puesta-Por-El-Admin'); await V.p.click('#authBtn');
+    chk('4c. Entra con la que puso el administrador y ve su negocio', await dentro(V.p) && await esperar(V.p, () => !!window.ventoNube.negocio(), null, 15000));
+    await V.ctx.close();
+
     // ===== 5. Recuperar por mensaje de texto (sin entrar) =====
     const C = await equipo('olvidó');
     await C.p.click('#authTabs [data-tab="entrar"]');

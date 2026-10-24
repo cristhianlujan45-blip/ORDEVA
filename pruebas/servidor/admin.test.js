@@ -168,6 +168,18 @@ async function pruebas(sb) {
   chk('Un celular inválido se rechaza', r.st >= 400, r);
   r = await api('/admin/usuario_enlace_clave', { email: 'dueno@bar.co' }, admin.token);
   chk('Enviar el enlace para cambiar la contraseña al correo', r.st === 200 && sb.recuperaciones.some(x => x.ruta === '/recover' && x.email === 'dueno@bar.co'), r);
+  // ===== Ponerle una contraseña (la escribe el administrador) =====
+  r = await api('/admin/usuario_clave_poner', { usuario: dueno.id, clave: 'corta' }, admin.token);
+  chk('Ponerle contraseña: mínimo 8 caracteres', r.st === 400, r);
+  r = await api('/admin/usuario_clave_poner', { usuario: dueno.id, clave: 'Puesta-por-admin-1', pedir_cambio: false }, admin.token);
+  const rViejaP = await entrar('dueno@bar.co', 'nueva-clave-9'), rNuevaP = await entrar('dueno@bar.co', 'Puesta-por-admin-1');
+  chk('Ponerle una contraseña: la vieja deja de servir y entra con la que puso el administrador', r.st === 200 && rViejaP.st === 400 && rNuevaP.st === 200, { r, v: rViejaP.st, n: rNuevaP.st });
+  chk('… sin «pedir que la cambie»: la app no le pide otra', (await rpc('perfil_yo', {}, rNuevaP.j.access_token)).j.cambiar_clave === false);
+  r = await api('/admin/usuario_clave_poner', { usuario: dueno.id, clave: 'Puesta-por-admin-2' }, admin.token);
+  chk('… y por defecto la app le pide poner una propia al entrar', r.st === 200 && r.j.pedir_cambio === true && (await rpc('perfil_yo', {}, (await entrar('dueno@bar.co', 'Puesta-por-admin-2')).j.access_token)).j.cambiar_clave === true, r);
+  r = await api('/admin/usuario_clave_poner', { usuario: sinNeg.id, clave: 'No-soy-admin-1' }, dueno.token);
+  chk('Un cliente no le puede cambiar la contraseña a nadie', r.st === 403, r);
+  await api('/admin/usuario_clave_poner', { usuario: dueno.id, clave: 'nueva-clave-9', pedir_cambio: false }, admin.token);   // como estaba, para lo que sigue
   r = await api('/admin/soporte', {}, admin.token);
   const cr = r.j.casos.find(c => c.id === casoRosa.id);
   chk('En el caso de soporte se ve si el correo tiene cuenta', cr && cr.cuenta_por_correo === null, cr);
@@ -298,6 +310,8 @@ async function pruebas(sb) {
   const socio1 = x.j.user.id;
   r = await api('/admin/yo', {}, x.j.access_token);
   chk('Un correo de administrador entra la primera vez y queda amarrado a esa cuenta', r.st === 200 && (await uno('select count(*)::int n from platform_admins where user_id = $1', [socio1])).n === 1, r);
+  r = await api('/admin/usuario_clave_poner', { usuario: socio1, clave: 'Cambiada-por-otro-1' }, admin.token);
+  chk('Un administrador NO le cambia la contraseña a otro administrador (solo él mismo)', r.st === 403 && (await entrar('socio.admin@vento.co', 'clave-socio-1')).st === 200, r);
   await sb.sql('delete from auth.users where id = $1', [socio1]);
   x = await signup('socio.admin@vento.co', 'clave-del-atacante');
   r = await api('/admin/yo', {}, x.j.access_token);

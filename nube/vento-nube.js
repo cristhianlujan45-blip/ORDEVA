@@ -203,8 +203,8 @@
       var nube = x[0], b = x[1], local = datosApp();
       var mezcla = fusionar(b, local, nube.datos);
       st.version = nube.version; guardarSt();
-      return aplicar(mezcla).then(function(){
-        return rpc('guardar_datos', { p_negocio: st.negocio.id, p_datos: mezcla, p_version: nube.version });
+      return aplicarProtegido(mezcla).then(function(){
+        return rpc('guardar_datos', { p_negocio: st.negocio.id, p_datos: datosApp() || mezcla, p_version: nube.version });
       }).then(function(v){
         st.version = v; st.sucio = false; st.ultimo = Date.now(); guardarSt(); avisarOtros(v);
         // (sin aviso: los datos de los celulares se juntan solos, en silencio — el dueño pidió quitar esos avisos)
@@ -212,10 +212,32 @@
       });
     }).catch(function(e){ ultimoError = msgError(e); clearTimeout(tSubir); tSubir = setTimeout(subir, 10000); });
   }
-  function bajar(respaldarLocal){
+  // 1.59.2: bajar los datos de la nube NUNCA pisa lo que este equipo tocó y todavía no subió. Antes, si se agregaba
+  // algo (una venta, un producto) justo mientras llegaban los datos de otro equipo, se perdía: la bajada lo pisaba.
+  //  • Primero se guarda lo pendiente de la app (1.58.1 guarda un instante después de cada toque).
+  //  • Si este equipo tiene cambios sin subir, se JUNTAN con los de la nube (mezclarConNube), no se pisan.
+  //  • Si se toca algo mientras se aplican los datos, también se junta (aplicarProtegido).
+  // reemplazar=true (celular nuevo, cambiar de negocio, restaurar un respaldo): la nube manda, como siempre.
+  function guardarPendiente(){ try{ return Promise.resolve(window.ventoGuardarYa && window.ventoGuardarYa()).catch(function(){}); }catch(e){ return Promise.resolve(); } }
+  function bajar(respaldarLocal, reemplazar){
     return leerNube().then(function(n){
-      st.version = n.version; st.sucio = false; st.ultimo = Date.now(); ultimoError = ''; guardarSt();
-      return aplicar(n.datos, respaldarLocal === true).then(function(){ return base('put', clonar(n.datos)); });
+      return guardarPendiente().then(function(){
+        if(!reemplazar && st.sucio) return mezclarConNube();
+        st.version = n.version; st.sucio = false; st.ultimo = Date.now(); ultimoError = ''; guardarSt();
+        return (reemplazar ? aplicar(n.datos, respaldarLocal === true) : aplicarProtegido(n.datos, respaldarLocal === true)).then(function(){ return base('put', clonar(n.datos)); });
+      });
+    });
+  }
+  function aplicarProtegido(remoto, respaldar){
+    var d0 = datosApp(), foto = null;
+    try{ foto = d0 ? JSON.stringify(d0) : null; }catch(e){}
+    return aplicar(remoto, respaldar).then(function(){
+      var tocado = false;
+      try{ tocado = !!(d0 && foto !== null && d0 !== datosApp() && JSON.stringify(d0) !== foto); }catch(e){}
+      if(!tocado) return;
+      var mezcla = fusionar(JSON.parse(foto), d0, remoto);
+      st.sucio = true; guardarSt();
+      return aplicar(mezcla).then(function(){ clearTimeout(tSubir); tSubir = setTimeout(subir, SUBIR_MS); });
     });
   }
   function revisarNube(){
@@ -473,7 +495,7 @@
   }
   function elegir(n){
     st.negocio = { id: n.id, nombre: n.nombre, rol: n.rol }; st.sede = sedeActual(); st.version = 0; guardarSt();
-    return bajar(true).then(function(){ arrancar(); });
+    return bajar(true, true).then(function(){ arrancar(); });
   }
 
   // ---------- Cuenta con correo desde la pantalla de entrada ----------
@@ -494,6 +516,13 @@
         return { sesion: !!(r.data && r.data.session) };
       });
   }
+  // ¿Esta contraseña todavía es la de la cuenta? true / false (cambió en otro equipo o la cambió el soporte).
+  // Sin internet u otro problema: error (y la app no hace nada).
+  function verificarClave(email, pass){
+    email = String(email || '').trim().toLowerCase();
+    return cliente().then(function(c){ return c.auth.signInWithPassword({ email: email, password: pass }); })
+      .then(function(r){ if(r.error){ if(/invalid login credentials/i.test(String(r.error.message || ''))) return false; throw r.error; } return true; });
+  }
   // Entra a la cuenta y devuelve sus negocios (el primero es el que más le conviene: el suyo propio).
   function entrarCuenta(email, pass){
     email = String(email || '').trim().toLowerCase();
@@ -510,11 +539,11 @@
   // se bajan los datos de la nube. Si no: se juntan los dos (lo de cada lado se conserva) y se sube la mezcla.
   function vincular(n, reemplazar){
     st.negocio = { id: n.id, nombre: n.nombre, rol: n.rol }; st.sede = sedeActual(); st.version = 0; guardarSt();
-    if(reemplazar) return bajar(true).then(function(){ arrancar(); });
+    if(reemplazar) return bajar(true, true).then(function(){ arrancar(); });
     var local = datosApp();
     return leerNube().then(function(nube){
       var mezcla = local ? fusionar(null, local, nube.datos) : nube.datos;
-      return aplicar(mezcla, true).then(function(){ return rpc('guardar_datos', { p_negocio: n.id, p_datos: mezcla, p_version: nube.version }); })
+      return aplicarProtegido(mezcla, true).then(function(){ return rpc('guardar_datos', { p_negocio: n.id, p_datos: datosApp() || mezcla, p_version: nube.version }); })
         .then(function(v){ st.version = v; st.sucio = false; st.ultimo = Date.now(); guardarSt(); return base('put', clonar(mezcla)); });
     }).then(function(){ arrancar(); });
   }
@@ -528,7 +557,7 @@
   function quitar(uid){ return rpc('quitar_miembro', { p_negocio: st.negocio.id, p_usuario: uid }); }
   function cambiarRol(uid, rol){ return rpc('cambiar_rol', { p_negocio: st.negocio.id, p_usuario: uid, p_rol: rol }); }
   function respaldos(){ return cliente().then(function(c){ return c.from('respaldos').select('id,version,creado_en').eq('negocio_id', st.negocio.id).order('creado_en', { ascending: false }).limit(48); }).then(function(r){ if(r.error) throw r.error; return r.data; }); }
-  function restaurar(id){ return rpc('restaurar_respaldo', { p_respaldo: id }).then(function(){ return bajar(); }); }
+  function restaurar(id){ return rpc('restaurar_respaldo', { p_respaldo: id }).then(function(){ return bajar(false, true); }); }
   function linkConfig(){ var c = cfg(); return location.origin + location.pathname + '#nube=' + encodeURIComponent(btoa(c.url + '|' + c.key)); }
 
   // ---------- Ventana «ORDEVA Nube» ----------
@@ -660,7 +689,7 @@
     negocio: function(){ return st.negocio && configurada() ? { id: st.negocio.id, nombre: st.negocio.nombre, rol: st.negocio.rol } : null; },
     cliente: cliente, config: cfg,
     googleDisponible: googleDisponible, conGoogle: conGoogle, volvioDeGoogle: volvioDeGoogle,
-    crearCuenta: crearCuenta, entrarCuenta: entrarCuenta, vincular: vincular, crearNegocio: crearNegocio, conectado: conectado, salir: salir,
+    crearCuenta: crearCuenta, entrarCuenta: entrarCuenta, verificarClave: verificarClave, vincular: vincular, crearNegocio: crearNegocio, conectado: conectado, salir: salir,
     codigoEntrar: codigoEntrar, entrarConCodigo: entrarConCodigo, entrarConEnlace: entrarConEnlace, celularDisponible: celularDisponible, celularUnir: celularUnir, celularConfirmar: celularConfirmar, celularDeCuenta: celularDeCuenta, celularE164: celularE164,
     msgError: msgError, codigoCorreo: codigoCorreo, enlaceClave: enlaceClave, correoDeEnlace: correoDeEnlace, claveConEnlace: claveConEnlace, soltarEnlace: soltarEnlace, verificarCorreo: verificarCorreo, nuevaClave: nuevaClave, soltarSesion: soltarSesion,
     _fusionar: fusionar,

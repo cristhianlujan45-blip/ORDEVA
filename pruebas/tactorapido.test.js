@@ -34,6 +34,14 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     await p.tap('#favChips .fav-chip[data-id="ag"]');
     await p.reload(); await p.waitForTimeout(500); await entrar();
     chk('2. Agregar y cerrar la app de una: al volver sigue ahí (6)', await p.evaluate(() => data.tables[1].items.reduce((s, i) => s + i.qty, 0)) === 6, await p.evaluate(() => data.tables[1]));
+    // 2b. Lo más extremo: tocar y recargar en el MISMO instante (el celular cierra la app justo al tocar).
+    //      Antes de 1.59.2 lo último se perdía a veces: se escribía primero en IndexedDB y la página se iba antes.
+    for(let k = 0; k < 3; k++){
+      await p.evaluate(() => { data.tables[2].items.push({ productId: 'ag', name: 'Águila', price: 4000, qty: 1, personId: null }); saveData(); location.reload(); }).catch(() => {});
+      await p.waitForLoadState('load'); await p.waitForTimeout(500); await entrar();
+    }
+    chk('2b. Tocar y que la app se cierre en el mismo instante, 3 veces: las 3 quedan guardadas', await p.evaluate(() => (data.tables[2].items || []).reduce((s, i) => s + i.qty, 0)) === 3, await p.evaluate(() => data.tables[2]));
+    await p.evaluate(() => { data.tables[2] = { items: [], people: [], payments: [] }; saveData(); });
     // 3
     await p.evaluate(() => { openTableModal(1); });
     await p.waitForTimeout(400);

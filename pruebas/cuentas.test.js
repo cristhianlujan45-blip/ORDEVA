@@ -160,7 +160,8 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){
     chk('5. Sus datos («Arroz Viejo», «Tienda Vieja») están en la nube', await esperarNube(NEGD, d => nombres(d).includes('Arroz Viejo') && d.businessName === 'Tienda Vieja'));
     const E = await celular('celular E');
     await E.p.click('#authTabs [data-tab="entrar"]'); await entrar(E.p, 'viejo@tienda.co', 'clave456');
-    chk('5. Y en otro celular se ven los mismos datos', await dentro(E.p) && await esperar(E.p, () => data.products.some(p => p.name === 'Arroz Viejo'), null, 10000));
+    const r5 = await dentro(E.p) && await esperar(E.p, () => typeof data !== 'undefined' && !!data && data.products.some(p => p.name === 'Arroz Viejo'), null, 10000);
+    chk('5. Y en otro celular se ven los mismos datos', r5, r5 ? undefined : await E.p.evaluate(() => ({ prods: typeof data !== 'undefined' && data ? data.products.map(x => x.name) : String(typeof data === 'undefined' ? 'sin data' : data), nube: window.ventoNube.estado(), st: localStorage.getItem('vento_nube_estado'), key: typeof STORAGE_KEY !== 'undefined' ? STORAGE_KEY : '', sedes: localStorage.getItem('bar-sedes-list'), ls: (localStorage.getItem('bar-data') || '').slice(0, 60), err: document.getElementById('authErr').textContent })));
     await cerrarTodo(E.p);
 
     // ===== 6. Dos cuentas con correo en el mismo celular =====

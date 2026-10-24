@@ -87,6 +87,21 @@ export async function accionAdmin(env: Env, db: Db, adminId: string, accion: str
       await db.rpc("srv_marcar_cambiar_clave", { p_usuario: id, p_si: true });
       return { ok: true, clave };
     }
+    case "usuario_clave_poner": {
+      // El administrador le pone a la cuenta la contraseña que él escriba (la cliente la olvidó, o un empleado se fue).
+      // Por defecto la app le pide poner una propia al entrar. La de OTRO administrador no se cambia desde aquí.
+      const id = uuid(b.usuario), clave = String(b.clave || "");
+      if (clave.length < 8 || clave.length > 72) throw new ErrorVento("clave_debil", "La contraseña debe tener entre 8 y 72 caracteres.", 400);
+      if (id !== adminId) {
+        const u = await db.rpc<Record<string, unknown> | null>("srv_admin_usuario", { p_usuario: id });
+        if (!u) throw new ErrorVento("no_existe", "No se encontró esa cuenta.", 404);
+        if (u.admin) throw new ErrorVento("sin_permiso", "La contraseña de otro administrador solo la cambia él mismo.", 403);
+      }
+      await auth(env, "PUT", "/admin/users/" + id, { password: clave });
+      const pedir = b.pedir_cambio !== false;
+      await db.rpc("srv_marcar_cambiar_clave", { p_usuario: id, p_si: pedir });
+      return { ok: true, pedir_cambio: pedir };
+    }
     case "usuario_enlace_clave": {
       const email = String(b.email || "").trim().toLowerCase();
       if (!CORREO.test(email)) throw new ErrorVento("correo_invalido", "Correo inválido.", 400);

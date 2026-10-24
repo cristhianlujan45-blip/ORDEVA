@@ -118,11 +118,17 @@ async function storageSet(key, value){
     return await window.storage.set(key, value, false);
   }
   const t = Date.now();
+  // 1.59.2: primero localStorage (es instantáneo) y después IndexedDB. Al revés, lo guardado justo al cerrar o recargar
+  // la app (lo último que se tocó, que se guarda en ese momento) se perdía: la página se iba mientras IndexedDB
+  // terminaba y nunca llegaba a localStorage. Al leer gana el más nuevo (storageGet compara la marca de tiempo).
+  let enLs = false, errLs = null;
+  const ponerLs = () => { try{ localStorage.setItem(key, value); enLs = true; try{ localStorage.setItem(key + '@t', JSON.stringify({ t, n: value.length })); }catch(e){} }catch(e){ errLs = e; } };
+  if(value.length <= LS_DATOS_MAX) ponerLs();
   let enIdb = false;
   try{ await ventoAlmacen.set(key, { v: value, t }); enIdb = true; }catch(e){}
-  if(value.length <= LS_DATOS_MAX || !enIdb){
-    try{ localStorage.setItem(key, value); try{ localStorage.setItem(key + '@t', JSON.stringify({ t, n: value.length })); }catch(e){} }
-    catch(e){ if(!enIdb) throw e; }        // no cupo en localStorage pero quedó en IndexedDB: guardado
+  if(!enIdb && !enLs){
+    if(value.length > LS_DATOS_MAX) ponerLs();   // sin IndexedDB, aunque sea grande se intenta en localStorage
+    if(!enLs) throw errLs || new Error('No se pudo guardar');   // no cupo en ningún lado
   }
   return { key, value, shared: false };
 }
@@ -234,6 +240,9 @@ async function loadData(){
 window.ventoDatosActuales = () => (typeof data !== 'undefined' ? data : null);
 window.ventoAplicarDatosNube = async (obj, respaldarLocal) => {
   if(!obj || typeof obj !== 'object') return;
+  // 1.59.2: lo último que se tocó (se guarda un instante después) se guarda YA, antes de poner los datos de la nube.
+  // Si no, ese guardado pendiente caía después y pisaba lo que acababa de llegar (celular nuevo con los datos de muestra).
+  try{ await guardadoAhora(); }catch(e){}
   window.__nubeAplicando = true;
   try{
     if(respaldarLocal && typeof data !== 'undefined' && data){
@@ -14529,6 +14538,18 @@ async function authConectarNube(email, pass, crearSiFalta){
 // Entrar con una cuenta de la nube que no está en este celular (celular nuevo) o cuya contraseña se cambió
 // en otro celular. Lanza el error de la nube (ej. contraseña incorrecta) para mostrarlo.
 // pass = null y lista: ya se entró con un código (correo o celular), sin contraseña.
+// 1.59.2: la contraseña guardada en este celular sirve sin internet. Con internet se confirma con la cuenta: si se
+// cambió en otro equipo o se la cambió el soporte de ORDEVA, la vieja deja de servir aquí también (antes seguía
+// entrando con ella para siempre en el celular donde ya había entrado). Se cierra la sesión y pide la nueva.
+async function authRevisarClave(email, pass){
+  const nb = authNubeCuentas(); if(!nb || !nb.verificarClave || navigator.onLine === false) return;
+  let ok; try{ ok = await nb.verificarClave(email, pass); }catch(e){ return; }
+  if(ok !== false) return;
+  try{ await authPonerClaveLocal(email, authClaveAzar()); }catch(e){}     // la vieja ya no entra ni sin internet
+  try{ saveData(); await guardadoAhora(); }catch(e){}
+  try{ localStorage.removeItem(AUTH_SESSION_KEY); sessionStorage.setItem('vento-clave-cambio', email); }catch(e){}
+  location.reload();
+}
 async function authEntrarDesdeNube(email, pass, listaCodigo){
   const nb = authNubeCuentas();
   const lista = listaCodigo || await nb.entrarCuenta(email, pass);
@@ -14594,6 +14615,7 @@ function showAuth(firstRun){
   const af = document.getElementById('authForm'), rf = document.getElementById('recForm'), g = i => document.getElementById(i);
   const otpF = g('otpForm');
   af.hidden = false; rf.hidden = true; if(otpF) otpF.hidden = true;     // siempre se vuelve a «Iniciar sesión / Crear cuenta»
+  let claveCambio = ''; try{ claveCambio = sessionStorage.getItem('vento-clave-cambio') || ''; sessionStorage.removeItem('vento-clave-cambio'); }catch(e){}
   g('authForgot').hidden = firstRun;
   // «Crear cuenta nueva» en la entrada: otro negocio en este equipo, con sus propios datos y usuarios.
   // Sin ningún usuario en el celular arranca en «crear cuenta», pero se puede pasar a «iniciar sesión»
@@ -14625,6 +14647,7 @@ function showAuth(firstRun){
   g('authNueva').onclick = () => ponerModo(!modoNueva);
   g('authTabs').onclick = e => { const b = e.target.closest('[data-tab]'); if(b && (b.dataset.tab === 'crear') !== modoNueva) ponerModo(b.dataset.tab === 'crear'); };
   ponerModo(!!firstRun);
+  if(claveCambio){ ponerModo(false); g('authUser').value = claveCambio; g('authErr').textContent = '🔑 La contraseña de ' + claveCambio + ' cambió (en otro equipo o la cambió el soporte de ORDEVA). Entra con la nueva.'; setTimeout(() => { try{ g('authPass').focus(); }catch(e){} }, 50); }
   // Usuarios de este equipo: se tocan para no tener que escribir el nombre.
   let chips = document.getElementById('authUsers');
   if(!chips){ chips = document.createElement('div'); chips.id = 'authUsers'; chips.className = 'auth-users'; g('authUser').closest('label').before(chips); }
@@ -14807,7 +14830,7 @@ function showAuth(firstRun){
           authLoginClear(user);
           document.getElementById('authPass').value = '';
           await enterApp(user, null);
-          if(nb) authConectarNube(user, pass, true);
+          if(nb){ if(nb.conectado(user)) authRevisarClave(user, pass); else authConectarNube(user, pass, true); }
           return;
         }
         // Correo que no está en este celular (celular nuevo) o con la contraseña cambiada en otro celular:

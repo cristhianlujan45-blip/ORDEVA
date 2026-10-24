@@ -918,7 +918,7 @@
    Si después de recargar el servidor todavía entrega la versión vieja, no se queda recargando: deja el aviso. */
 (function(){
   'use strict';
-  var ADMIN_VERSION = '2026-10-24 · v1.59.1';
+  var ADMIN_VERSION = '2026-10-24 · v1.59.2';
   var ultima = 0, oculto = 0, inicio = Date.now();
   function corta(v){ return String(v).split('·').pop().trim(); }
   function libre(){
@@ -2092,6 +2092,7 @@
       ((u.soporte || []).length ? '<h3>🎧 Soporte</h3>' + u.soporte.map(c => '<div class="item" data-caso="' + esc(c.id) + '"><div class="av">🎧</div><div class="t"><b>' + esc(c.asunto) + '</b><small>' + esc(hace(c.actualizado_en)) + '</small></div><span class="pill ' + (SP_EST[c.estado] || ['', 'soft'])[1] + '">' + esc((SP_EST[c.estado] || [c.estado])[0]) + '</span></div>').join('') : '') +
       '<h3>🛟 Soporte de la cuenta</h3><div class="us-acc">' +
         '<button class="b p" type="button" data-ua="temp">🔑 Contraseña temporal (para mandar por SMS / WhatsApp)</button>' +
+        (u.admin && u.id !== (sx.yo && sx.yo.id) ? '' : '<button class="b" type="button" data-ua="poner">✏️ Ponerle una contraseña</button>') +
         '<button class="b" type="button" data-ua="enlace">📧 Mandar enlace para cambiar la contraseña</button>' +
         '<button class="b" type="button" data-ua="lic">🎁 Darle una licencia</button>' +
         (u.confirmado ? '' : '<button class="b" type="button" data-ua="confirmar">✅ Confirmar su correo</button>') +
@@ -2107,6 +2108,33 @@
     if(a === 'lic'){ $('dlgUs').close(); irTab('licencias'); $('lsCorreos').value = u.email; $('lsCorreos').focus(); toast('Elige la duración y toca «Crear licencia».'); return; }
     if(a === 'bloq' && !confirm(u.bloqueado ? '¿Desbloquear ' + u.email + '?' : '¿Bloquear ' + u.email + '? No va a poder entrar a ORDEVA hasta que la desbloquees.')) return;
     if(a === 'temp' && !confirm('¿Poner una contraseña temporal a ' + u.email + '? La que tiene deja de servir.')) return;
+    if(a === 'poner'){
+      // Escribir la contraseña que el administrador quiera (dos veces, con 👁), y si la app le pide cambiarla al entrar.
+      res.innerHTML = '<div class="card" style="margin-top:12px"><b>✏️ Contraseña nueva para ' + esc(u.email) + '</b>' +
+        '<label class="soft" style="display:block;margin-top:8px">Contraseña (mínimo 8)<div class="row" style="margin:4px 0 0"><input id="upC1" type="password" autocomplete="new-password" maxlength="72" style="flex:1"><button class="b" type="button" data-ojo="upC1">👁</button></div></label>' +
+        '<label class="soft" style="display:block;margin-top:8px">Otra vez<div class="row" style="margin:4px 0 0"><input id="upC2" type="password" autocomplete="new-password" maxlength="72" style="flex:1"><button class="b" type="button" data-ojo="upC2">👁</button></div></label>' +
+        '<label style="display:flex;gap:8px;align-items:center;margin-top:10px"><input id="upPedir" type="checkbox" checked> Pedirle que ponga una propia al entrar (recomendado)</label>' +
+        '<p class="soft" style="margin:8px 0 0">La que tiene deja de servir en todos sus equipos apenas entre con internet.</p>' +
+        '<div class="row"><button class="b p" type="button" id="upGo">Guardar contraseña</button></div><div id="upErr" class="bad-t"></div></div>';
+      res.querySelectorAll('[data-ojo]').forEach(o => o.onclick = () => { const i = $(o.dataset.ojo); i.type = i.type === 'password' ? 'text' : 'password'; o.textContent = i.type === 'password' ? '👁' : '🙈'; });
+      $('upC1').focus();
+      $('upGo').onclick = async () => {
+        const c1 = $('upC1').value, c2 = $('upC2').value, pedir = $('upPedir').checked;
+        if(c1.length < 8){ $('upErr').textContent = 'Mínimo 8 caracteres.'; $('upC1').focus(); return; }
+        if(c1 !== c2){ $('upErr').textContent = 'Las dos no son iguales.'; $('upC2').focus(); return; }
+        if(!confirm('¿Cambiar la contraseña de ' + u.email + '? La que tiene deja de servir.')) return;
+        $('upGo').disabled = true; $('upErr').textContent = '';
+        try{
+          await sxApi('usuario_clave_poner', { usuario: u.id, clave: c1, pedir_cambio: pedir });
+          const txt = 'Hola, soy del soporte de ORDEVA. Tu contraseña nueva es: ' + c1 + ' — entra con tu correo ' + u.email + (pedir ? ' y la app te pide poner una propia.' : '.');
+          res.innerHTML = '<div class="card" style="margin-top:12px"><b>✅ Contraseña cambiada</b><div class="clave-temp">' + esc(c1) + '</div><div class="row">' +
+            (u.telefono ? '<a class="b p" href="sms:' + esc(u.telefono) + '?body=' + encodeURIComponent(txt) + '">📱 Mandar por mensaje de texto</a><a class="b" target="_blank" rel="noopener" href="https://wa.me/' + esc(telWa(u.telefono)) + '?text=' + encodeURIComponent(txt) + '">💬 WhatsApp</a>' : '') +
+            '<button class="b" type="button" data-copiar="' + esc(txt) + '">📋 Copiar</button></div><p class="soft">' + (pedir ? 'Al entrar con ella, ORDEVA le pide poner su propia contraseña.' : 'Queda con esta contraseña.') + '</p></div>';
+          toast('✅ Contraseña cambiada.');
+        }catch(x){ if(!sxFallo(x)) $('upErr').textContent = '⚠️ ' + sxMsgError(x); $('upGo').disabled = false; }
+      };
+      return;
+    }
     b.disabled = true;
     try{
       if(a === 'temp'){

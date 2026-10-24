@@ -135,5 +135,30 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){
     await CEL.p.evaluate(() => window.dispatchEvent(new Event('online')));
     chk('6. Vuelve el internet → la foto se sube sola y llega al computador', await esperar(PC.p, u => fotosCache['p-poker'] === u, verde, 20000));
     chk('6. … y la cola quedó vacía', await esperar(CEL.p, () => window.ventoNube.archivos.pendientes() === 0, null, 8000));
+
+    // ===== 7. Tocar algo justo cuando llegan los datos del otro equipo: no se pierde nada (1.59.2) =====
+    //   a) en el MISMO instante en que el computador pone los datos que llegaron del celular, alguien agrega algo en él;
+    //   b) agregar algo y que en ese instante (aún sin guardar del todo) lleguen datos del otro.
+    // Antes, la bajada de datos pisaba lo que este equipo acababa de tocar: se perdía la venta o el producto.
+    const nubeTiene = async n => { const r = await uno('select datos from datos_negocio where negocio_id = $1', [NEG]); return !!r && (r.datos.products || []).some(p => p.name === n); };
+    const esperarNube = async (n, ms) => { const t = Date.now(); while(Date.now() - t < (ms || 15000)){ if(await nubeTiene(n)) return true; await new Promise(r => setTimeout(r, 300)); } return false; };
+    await PC.p.evaluate(() => {
+      const orig = window.ventoAplicarDatosNube; let una = true;
+      window.ventoAplicarDatosNube = async (obj, r) => {
+        if(una){ una = false; data.products.push({ id: 'p-en-el-instante', name: 'Del PC en el instante', price: 1000 }); saveData(); }
+        return orig(obj, r);
+      };
+    });
+    await CEL.p.evaluate(() => { data.products.push({ id: 'p-del-cel-7', name: 'Del celular 7', price: 2000 }); saveData(); });
+    chk('7a. Al computador le llega lo del celular', await esperar(PC.p, () => data.products.some(p => p.name === 'Del celular 7'), null, 15000));
+    chk('7a. … y NO se pierde lo que se agregó en el computador en ese mismo instante', await esperar(PC.p, () => data.products.some(p => p.name === 'Del PC en el instante'), null, 8000), await PC.p.evaluate(() => data.products.map(p => p.name)));
+    chk('7a. … y los dos quedan en la nube y en el celular', await esperarNube('Del PC en el instante') && await esperarNube('Del celular 7') && await esperar(CEL.p, () => data.products.some(p => p.name === 'Del PC en el instante'), null, 15000));
+    await CEL.p.evaluate(() => { data.products.push({ id: 'p-del-cel-7b', name: 'Del celular 7b', price: 2000 }); saveData(); });
+    await PC.p.evaluate(() => { window.__antesDeBajar = true; const orig = window.ventoAplicarDatosNube; window.ventoAplicarDatosNube = async (obj, r) => orig(obj, r); });
+    // b) el computador agrega algo y, sin dar tiempo a guardarlo, llegan los datos del celular (que ya subió 7b)
+    await new Promise(r => setTimeout(r, 1200));
+    await PC.p.evaluate(() => { data.products.push({ id: 'p-pc-7b', name: 'Del PC 7b', price: 1000 }); saveData(); });
+    chk('7b. Lo del computador sin guardar del todo tampoco se pierde cuando llega lo del celular', await esperar(PC.p, () => data.products.some(p => p.name === 'Del celular 7b') && data.products.some(p => p.name === 'Del PC 7b'), null, 15000), await PC.p.evaluate(() => data.products.map(p => p.name)));
+    chk('7b. … y queda en la nube', await esperarNube('Del PC 7b') && await esperarNube('Del celular 7b'));
   }
 })();

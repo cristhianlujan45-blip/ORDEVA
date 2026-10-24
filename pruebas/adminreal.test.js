@@ -85,6 +85,7 @@ const ADMIN = 'cristhianwkh@gmail.com', CLAVE_ADMIN = 'Clave-de-prueba-77';
     await p.click('#usCuerpo [data-ua="temp"]');
     chk('3. Contraseña temporal con botón para mandarla por mensaje de texto al celular', await esperar(() => !!document.querySelector('#usRes .clave-temp') && /^sms:3001234567\?body=/.test(document.querySelector('#usRes a[href^="sms:"]').getAttribute('href'))));
     const temp = (await texto('#usRes .clave-temp')).trim();
+    let claveDueno = temp;
     chk('3. Con esa contraseña el cliente entra', (await entrar('dueno@bar.co', temp)).st === 200, temp);
     await p.click('#usCuerpo [data-ua="bloq"]');
     chk('3. Bloquear la cuenta', await esperar(() => /Desbloquear la cuenta/.test(document.getElementById('usCuerpo').textContent)));
@@ -92,6 +93,16 @@ const ADMIN = 'cristhianwkh@gmail.com', CLAVE_ADMIN = 'Clave-de-prueba-77';
     await p.click('#usCuerpo [data-ua="bloq"]');
     await esperar(() => /Bloquear la cuenta/.test(document.getElementById('usCuerpo').textContent));
     chk('3. Desbloquearla', (await entrar('dueno@bar.co', temp)).st === 200);
+    await p.click('#usCuerpo [data-ua="poner"]');
+    await p.fill('#upC1', 'corta1'); await p.fill('#upC2', 'corta1'); await p.click('#upGo');
+    chk('3. «✏️ Ponerle una contraseña»: pide mínimo 8', await esperar(() => /Mínimo 8/.test(document.getElementById('upErr').textContent)));
+    await p.fill('#upC1', 'Elegida-Por-Mi-1'); await p.fill('#upC2', 'Otra-Distinta-1'); await p.click('#upGo');
+    chk('3. … y que las dos sean iguales', await esperar(() => /no son iguales/.test(document.getElementById('upErr').textContent)));
+    await p.fill('#upC2', 'Elegida-Por-Mi-1');
+    await p.click('#upGo');
+    chk('3. Guarda la contraseña que escribió el administrador y la muestra para mandarla', await esperar(() => /Contraseña cambiada/.test(document.getElementById('usRes').textContent) && /Elegida-Por-Mi-1/.test(document.querySelector('#usRes .clave-temp').textContent)));
+    chk('3. … con ella entra el cliente y con la temporal ya no', (await entrar('dueno@bar.co', 'Elegida-Por-Mi-1')).st === 200 && (await entrar('dueno@bar.co', temp)).st === 400);
+    claveDueno = 'Elegida-Por-Mi-1';
     await p.click('#dlgUs [data-cerrar]');
     await p.fill('#usBuscar', '');
     // Crear cuenta con licencia
@@ -114,12 +125,12 @@ const ADMIN = 'cristhianwkh@gmail.com', CLAVE_ADMIN = 'Clave-de-prueba-77';
     chk('4. Abre el caso con el mensaje y los datos del cliente', await esperar(() => document.getElementById('dlgSp').open && /no me sale la factura escaneada/.test(document.getElementById('spHilo').textContent) && /Bar Las Palmas/.test(document.getElementById('spInfo').textContent)));
     await p.fill('#spTexto', 'Hola, ya lo revisé: toca «Facturas anteriores» y ahí está.'); await p.click('#spResponder');
     chk('4. Responder: queda en el hilo', await esperar(() => document.querySelectorAll('#spHilo .sp-m.adm').length === 1));
-    const visto = (await rpc('soporte_mis_casos', { p_claves: [] }, (await entrar('dueno@bar.co', temp)).j.access_token)).j;
+    const visto = (await rpc('soporte_mis_casos', { p_claves: [] }, (await entrar('dueno@bar.co', claveDueno)).j.access_token)).j;
     chk('4. Al cliente le llega la respuesta en su app', visto[0].mensajes.some(m => m.autor === 'admin' && /Facturas anteriores/.test(m.texto)) && visto[0].sin_leer === 1, visto);
     // El cliente manda un pantallazo: el panel se entera al instante (aviso «soporte» del tiempo real), avisa con una
     // notificación del celular (app Android: VentoAdmin.notificar) y la imagen se abre en el caso.
     await p.evaluate(() => { window.__avisos = []; window.VentoAdmin = Object.assign(window.VentoAdmin || {}, { notificar: (t, c, g) => window.__avisos.push([t, c, g]) }); });
-    const tokDueno = (await entrar('dueno@bar.co', temp)).j.access_token;
+    const tokDueno = (await entrar('dueno@bar.co', claveDueno)).j.access_token;
     const zlib = require('zlib');
     const png = (w, h) => { const T = []; for(let n = 0; n < 256; n++){ let c = n; for(let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; T[n] = c >>> 0; }
       const crc = b => { let c = 0xffffffff; for(const x of b) c = T[(c ^ x) & 255] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
@@ -149,14 +160,14 @@ const ADMIN = 'cristhianwkh@gmail.com', CLAVE_ADMIN = 'Clave-de-prueba-77';
     chk('5. Crear licencia de 3 meses para el correo del cliente: muestra el código para enviar', await esperar(() => !document.getElementById('lsRes').hidden && /VENTO-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}/.test(document.getElementById('lsRes').textContent)) && /3 meses/.test(await texto('#lsRes')), await texto('#lsRes'));
     chk('5. Botón para mandarla por WhatsApp', /^https:\/\/wa\.me\/\?text=/.test(await p.getAttribute('#lsWa', 'href')));
     const cod = /VENTO-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}/.exec(await texto('#lsRes'))[0];
-    const e2 = await api('/estado', { negocio: NEG }, (await entrar('dueno@bar.co', temp)).j.access_token);
+    const e2 = await api('/estado', { negocio: NEG }, (await entrar('dueno@bar.co', claveDueno)).j.access_token);
     chk('5. Al dueño (correo de la lista) se le activa sola por 3 meses', e2.j.plan_efectivo === 'pro' && Math.abs(Date.parse(e2.j.subscription.expiry_date) - (Date.now() + 91 * 864e5)) < 3 * 864e5, e2.j.subscription);
     await p.click('#lsRef');
     chk('5. En la lista se ve que el dueño ya la usó', await esperar(c => { const card = [...document.querySelectorAll('#lsLista [data-lic]')].find(x => x.textContent.includes(c)); return card && /Activada/.test(card.textContent) && /Bar Las Palmas/.test(card.textContent); }, cod));
     chk('5. Licencia de un solo cliente: con su correo ya no ofrece «➕ Correo»', await p.evaluate(c => { const card = [...document.querySelectorAll('#lsLista [data-lic]')].find(x => x.textContent.includes(c)); return !!card && !card.querySelector('[data-la="correo"]'); }, cod));
     await p.evaluate(c => { const card = [...document.querySelectorAll('#lsLista [data-lic]')].find(x => x.textContent.includes(c)); card.querySelector('[data-la="anular"]').click(); }, cod);
     chk('5. Anular la licencia (y quitar el plan)', await esperar(c => { const card = [...document.querySelectorAll('#lsLista [data-lic]')].find(x => x.textContent.includes(c)); return card && /Anulada/.test(card.textContent); }, cod));
-    const e3 = await api('/estado', { negocio: NEG }, (await entrar('dueno@bar.co', temp)).j.access_token);
+    const e3 = await api('/estado', { negocio: NEG }, (await entrar('dueno@bar.co', claveDueno)).j.access_token);
     chk('5. El negocio vuelve al plan gratis', e3.j.plan_efectivo !== 'pro' || e3.j.subscription.source === 'trial', e3.j.subscription);
 
     // Suscripciones sigue funcionando sin pedir otra vez la contraseña
