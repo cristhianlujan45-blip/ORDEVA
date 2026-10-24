@@ -2913,8 +2913,7 @@ body.neg-tienda #quickSaleBtn, body:not(.neg-tienda) #fiadosBtn, body:not(.neg-t
     box-sizing: border-box;
     padding: 11px 16px 13px 11px;
     background: var(--surface-2);
-    background: color-mix(in srgb, var(--surface-2) 90%, transparent);
-    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+    background: color-mix(in srgb, var(--surface-2) 90%, transparent);   /* 1.58.1: sin desenfoque detrás (se veía casi igual y cada aviso costaba en el toque) */
     border: 1px solid var(--line);
     border-radius: 16px;
     box-shadow: 0 14px 34px rgba(0,0,0,.38), 0 2px 6px rgba(0,0,0,.2);
@@ -5539,7 +5538,11 @@ export default {
       drops[i]++;
     }
   }
-  setInterval(draw, 45);
+  // 1.58.1 (tacto): no dibuja cuando no se ve (escondida, modo fácil o temática sin lluvia) y se queda quieta 0,4 s cada
+  // vez que se toca la pantalla, así el dedo nunca espera a la animación.
+  let quietoHasta = 0;
+  ['pointerdown', 'touchstart', 'keydown'].forEach(n => window.addEventListener(n, () => { quietoHasta = performance.now() + 400; }, { passive: true, capture: true }));
+  setInterval(() => { if(document.hidden || performance.now() < quietoHasta || !canvas.getClientRects().length || document.querySelector('.overlay.show')) return; draw(); }, 45);   // con una ventana abierta (la mesa, cobrar…) tampoco: queda tapada y desenfocada, y redibujarla obligaba a recalcular el desenfoque de toda la pantalla
 })();
 
 let data = null;
@@ -5597,6 +5600,7 @@ const LS_DATOS_MAX = 1500000;
 const metaLs = key => { try{ return JSON.parse(localStorage.getItem(key + '@t') || 'null'); }catch(e){ return null; } };
 
 async function storageGet(key){
+  if(typeof guardadoPend !== 'undefined' && guardadoPend && guardadoPend.key === key) await guardadoAhora();   // lo último que se tocó
   if(hasNativeStorage){
     try{
       return await window.storage.get(key, false);
@@ -5751,10 +5755,35 @@ window.ventoAplicarDatosNube = async (obj, respaldarLocal) => {
 };
 // Otro equipo cambió una foto: se baja enseguida (sin esperar a que lleguen los datos).
 setTimeout(() => { try{ window.ventoNube && window.ventoNube.archivos && window.ventoNube.archivos.alCambiar(k => { if(/^foto\//.test(k)) setTimeout(() => window.fotosDeLaNube && window.fotosDeLaNube(), 1200); }); }catch(e){} }, 0);
-async function saveData(){
+// 1.58.1 (tacto al instante): guardar ya no frena el toque. Antes cada toque (agregar una cerveza, cobrar, quitar…)
+// convertía TODO el negocio a texto antes de pintar la pantalla; con meses de ventas eso se sentía en el dedo. Ahora la
+// pantalla se pinta primero y se guarda enseguida (en el mismo segundo); varios toques seguidos se guardan juntos una
+// vez. Se guarda de inmediato al esconder o cerrar la app, al cambiar de sede/negocio y antes de leer lo guardado.
+let guardadoPend = null;
+function saveData(){
+  const key = STORAGE_KEY, obj = data;
+  if(guardadoPend && guardadoPend.key === key && guardadoPend.obj === obj) return guardadoPend.p;
+  if(guardadoPend) guardadoAhora();                       // otra sede u otros datos: lo pendiente se guarda ya, con su llave
+  let listo; const p = new Promise(r => { listo = r; });
+  const g = guardadoPend = { key, obj, p, listo };
+  const ir = () => { if(guardadoPend === g) guardadoAhora(); };
+  try{ requestAnimationFrame(() => setTimeout(ir, 0)); }catch(e){}
+  g.t = setTimeout(ir, 120);                              // sin cuadros (app en el fondo): igual se guarda enseguida
+  return p;
+}
+function guardadoAhora(){
+  const g = guardadoPend; if(!g) return Promise.resolve();
+  guardadoPend = null; clearTimeout(g.t);
+  const r = guardarYa(g.key, g.obj); g.listo(r); return r;
+}
+window.ventoGuardarYa = guardadoAhora;
+document.addEventListener('visibilitychange', () => { if(document.hidden) guardadoAhora(); });
+window.addEventListener('pagehide', () => { guardadoAhora(); });
+window.addEventListener('beforeunload', () => { guardadoAhora(); });
+async function guardarYa(key, obj){
   try{
-    const json = JSON.stringify(data);
-    const result = await storageSet(STORAGE_KEY, json);
+    const json = JSON.stringify(obj);
+    const result = await storageSet(key, json);
     if(!result) showToast('No se pudo guardar. Intenta de nuevo.');
     else { autoBackupTick(json); if(!window.__nubeAplicando) try{ window.ventoNube && window.ventoNube.cambio(); }catch(e){} }
   }catch(e){
@@ -26091,7 +26120,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-23 · v1.58.0';
+const MESORA_VERSION = '2026-10-23 · v1.58.1';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'ORDEVA · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 /* 🔄 La app Android se actualiza SOLA (Actualizador): revisa cada 3 h, baja la versión nueva y la instala cuando no se
@@ -33244,30 +33273,41 @@ window.mesoraCelebrar = function(emojis){
   const $ = n => { try{ return typeof fmt === 'function' ? fmt(n) : '$' + Math.round(+n || 0).toLocaleString('es-CO'); }catch(e){ return String(n); } };
   const lee = () => { try{ const c = JSON.parse(localStorage.getItem(COLA) || '[]'); return Array.isArray(c) ? c : []; }catch(e){ return []; } };
   const guarda = c => { try{ localStorage.setItem(COLA, JSON.stringify(c.slice(-MAX_COLA))); }catch(e){} };
+  // 1.58.1: durante una comparación lo anotado se junta (lote) y la cola se lee y se escribe UNA vez, no una por anotación.
+  let lote = null;
   function anotar(a, d, m){
     if(!a) return;
-    const c = lee(); c.push({ a: String(a).slice(0, 60), d: String(d || '').slice(0, 300), m: typeof m === 'number' && isFinite(m) ? Math.round(m) : undefined, u: quien(), t: Date.now(), n: (neg() || {}).id || '' });
-    guarda(c); programar();
+    const e = { a: String(a).slice(0, 60), d: String(d || '').slice(0, 300), m: typeof m === 'number' && isFinite(m) ? Math.round(m) : undefined, u: quien(), t: Date.now(), n: (neg() || {}).id || '' };
+    if(lote){ lote.push(e); return; }
+    const c = lee(); c.push(e); guarda(c); programar();
   }
   // ---------- Diferencias entre lo que había y lo que hay ----------
   const mesaNom = (id, t) => { try{ return typeof tableLabel === 'function' ? tableLabel(id) : ((t && t.name) || ('Mesa ' + id)); }catch(e){ return 'Mesa ' + id; } };
   function foto(){
     if(typeof data === 'undefined' || !data) return null;
     const h = {}, p = {}, m = {};
-    (data.history || []).forEach(x => { if(x && x.id != null) h[x.id] = { total: +x.total || 0, items: (x.items || []).map(i => (i.qty || 1) + ' ' + i.name).join(', ').slice(0, 160), mesa: x.tableName || x.table || '' }; });
+    // 1.58.1: de cada venta solo el total y la venta misma; el texto de sus productos se arma solo para la que se anota
+    // (antes se armaba el de TODAS las ventas en cada toque y con meses de ventas se sentía en el dedo).
+    (data.history || []).forEach(x => { if(x && x.id != null) h[x.id] = { total: +x.total || 0, x, mesa: x.tableName || x.table || '' }; });
     (data.products || []).forEach(x => { if(x && x.id != null) p[x.id] = { name: x.name, price: +x.price || 0, cost: x.cost, stock: x.stock }; });
     Object.keys(data.tables || {}).forEach(id => { const t = data.tables[id], q = {}; ((t && t.items) || []).forEach(i => { q[i.name] = (q[i.name] || 0) + (+i.qty || 1); }); m[id] = { q, nom: mesaNom(id, t) }; });
     const au = data.auditoria || [];
     return { ref: data, h, p, m, aud: au.length ? (+au[au.length - 1].t || 0) : 0 };
   }
   let antes = null;
+  const prods = v => ((v && v.x && v.x.items) || []).map(i => (i.qty || 1) + ' ' + i.name).join(', ').slice(0, 160);
   function comparar(){
     const ahora = foto(); if(!ahora) return;
     if(!antes || antes.ref !== ahora.ref || window.__nubeAplicando){ antes = ahora; return; }   // datos nuevos (otro negocio, otro celular): no se anotan aquí
-    const A = antes; antes = ahora;
-    Object.keys(ahora.h).forEach(id => { if(!A.h[id]){ const v = ahora.h[id]; anotar('venta', (v.mesa ? 'Mesa ' + v.mesa + ' · ' : '') + v.items + ' · ' + $(v.total), v.total); }
-      else if(A.h[id].total !== ahora.h[id].total) anotar('venta cambiada', 'De ' + $(A.h[id].total) + ' a ' + $(ahora.h[id].total) + ' · ' + ahora.h[id].items, ahora.h[id].total - A.h[id].total); });
-    Object.keys(A.h).forEach(id => { if(!ahora.h[id]){ const v = A.h[id]; anotar('venta borrada', (v.mesa ? 'Mesa ' + v.mesa + ' · ' : '') + v.items + ' · ' + $(v.total), -v.total); } });
+    lote = [];
+    try{ compararCon(antes, ahora); }
+    finally{ const l = lote; lote = null; if(l.length){ const c = lee(); c.push.apply(c, l); guarda(c); programar(); } }
+  }
+  function compararCon(A, ahora){
+    antes = ahora;
+    Object.keys(ahora.h).forEach(id => { if(!A.h[id]){ const v = ahora.h[id]; anotar('venta', (v.mesa ? 'Mesa ' + v.mesa + ' · ' : '') + prods(v) + ' · ' + $(v.total), v.total); }
+      else if(A.h[id].total !== ahora.h[id].total) anotar('venta cambiada', 'De ' + $(A.h[id].total) + ' a ' + $(ahora.h[id].total) + ' · ' + prods(ahora.h[id]), ahora.h[id].total - A.h[id].total); });
+    Object.keys(A.h).forEach(id => { if(!ahora.h[id]){ const v = A.h[id]; anotar('venta borrada', (v.mesa ? 'Mesa ' + v.mesa + ' · ' : '') + prods(v) + ' · ' + $(v.total), -v.total); } });
     Object.keys(ahora.p).forEach(id => { const n = ahora.p[id], o = A.p[id];
       if(!o) return anotar('producto creado', n.name + ' · ' + $(n.price), n.price);
       if(o.name !== n.name) anotar('producto renombrado', o.name + ' → ' + n.name);
