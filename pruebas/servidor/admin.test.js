@@ -419,6 +419,11 @@ async function pruebas(sb) {
   chk('El administrador ve el diagnóstico del equipo: código, qué pasó, dónde, veces, versión y equipo', casoAdm.diagnostico && casoAdm.diagnostico.errores[0].cod === 'E-1K9Z' && casoAdm.diagnostico.errores[0].n === 3 && casoAdm.diagnostico.version === '1.40.2' && casoAdm.diagnostico.vista === 'mesas' && !('extra' in casoAdm.diagnostico), casoAdm.diagnostico);
   r = await rpc('soporte_diagnostico', { p_caso: casoDiag.id, p_clave: casoDiag.clave, p: Object.assign({}, diag, { errores: [{ cod: 'E-ZZ01', tipo: 'js', msg: 'otro', n: 1 }] }) });
   chk('Al volver a escribir, el diagnóstico se pone al día (con la clave del caso)', r.st === 200 && r.j === true && (await uno('select diagnostico from soporte_casos where id = $1', [casoDiag.id])).diagnostico.errores[0].cod === 'E-ZZ01', r);
+  // 1.62.1: el estado de los avisos de pago de ese equipo (sin nombres ni números), recortado.
+  r = await rpc('soporte_diagnostico', { p_caso: casoDiag.id, p_clave: casoDiag.clave, p: Object.assign({}, diag, { pagos: { suena: true, lector: false, ultimo: 1792860000000, raro: 'x',
+    traza: Array.from({ length: 12 }, (_, i) => ({ t: 1792860000000 + i, app: 'Nequi', txt: 'Recarga exitosa por $# ' + 'y'.repeat(300), r: '🚫 no dice que llegó plata', otro: 1 })) } }) });
+  const dPag = (await uno('select diagnostico from soporte_casos where id = $1', [casoDiag.id])).diagnostico.pagos || {};
+  chk('El reporte trae los avisos de pago del equipo: lector, si suena, último aviso y los últimos 8 (recortados, sin campos raros)', r.j === true && dPag.lector === false && dPag.suena === true && dPag.ultimo === 1792860000000 && dPag.traza.length === 8 && dPag.traza[0].txt.length === 160 && !('raro' in dPag) && !('otro' in dPag.traza[0]), dPag);
   r = await rpc('soporte_diagnostico', { p_caso: casoDiag.id, p_clave: 'mala', p: diag });
   chk('Sin la clave (ni la cuenta) no se puede cambiar el diagnóstico de otro', r.st === 200 && r.j === false, r);
   r = await rpc('soporte_crear', { p: { tipo: 'error', asunto: 'Grande', mensaje: 'Diagnóstico enorme', equipo: 'EQ-grande-01', diagnostico: { errores: [{ msg: 'x'.repeat(20000) }] } } });

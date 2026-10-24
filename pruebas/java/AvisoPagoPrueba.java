@@ -203,6 +203,13 @@ public class AvisoPagoPrueba {
             {"Recarga exitosa desde Davivienda por $15.000", "15000"},
             {"Recarga desde Bancolombia por $9.000. Mira el comprobante en tu app", "9000"},
             {"Recarga por PSE desde Banco de Bogotá $50.000", "50000"},
+            // 1.62.1: sin el nombre del banco
+            {"Nequi Recarga exitosa por $1.950,00", "1950"},
+            {"Recarga realizada $1.950", "1950"},
+            {"Recargamos $1.950 a tu Nequi", "1950"},
+            {"Tu Nequi fue recargado con $1.950", "1950"},
+            {"Se recargó tu Nequi con $1.950", "1950"},
+            {"Recargaste $1.950", "1950"},
         };
         for (String[] r : recargas) {
             chk("Recarga desde un banco = plata que llegó: «" + r[0] + "»", AvisoPago.esRecibido(r[0]), AvisoPago.porQueNo(r[0]));
@@ -210,7 +217,8 @@ public class AvisoPagoPrueba {
         }
         String[] recargasNo = { "Recargaste $5.000 a tu celular 3001234567", "Recarga Claro por $10.000 desde Bancolombia", "Recarga tu Nequi desde Bancolombia y gana $5.000",
                 "Haz una recarga desde Bancolombia y participa por $1.000.000", "Tu recarga desde Bancolombia por $9.000 está pendiente", "Recarga fallida desde Bancolombia por $9.000",
-                "Compraste una recarga de minutos por $3.000", "Recarga de datos desde Bancolombia $10.000", "Recargaste $10.000 al 300 123 4567 desde Bancolombia" };
+                "Compraste una recarga de minutos por $3.000", "Recarga de datos desde Bancolombia $10.000", "Recargaste $10.000 al 300 123 4567 desde Bancolombia",
+                "Recarga exitosa de tu TuLlave por $10.000", "Recargaste $5.000 a tu celular", "Recarga exitosa de minutos Claro $3.000" };
         for (String rn : recargasNo) chk("Recarga que NO es plata que llegó: «" + rn + "»", !AvisoPago.esRecibido(rn), rn);
         chk("Por qué no: «recarga de celular o que no se hizo»", AvisoPago.porQueNo("Recarga Claro por $10.000 desde Bancolombia").startsWith("recarga de celular"), AvisoPago.porQueNo("Recarga Claro por $10.000 desde Bancolombia"));
         chk("Una recarga que no se entendió igual se le pasa a la página (sirveCrudo)", AvisoPago.sirveCrudo("Recarga exitosa por $9.000"), "");

@@ -54,10 +54,12 @@ public final class AvisoPago {
     // operador, a un número), una recarga fallida o pendiente, ni la publicidad «Recarga tu Nequi…».
     static final Pattern RECARGA = Pattern.compile("recarga(?:ste)?\\b[^|\\n]{0,60}?\\b(?:(?:desde|de|por|con)\\s+(?:tu\\s+|su\\s+)?(?:cuenta\\s+(?:de\\s+)?)?)?"
             + "(?:bancolombia|davivienda|daviplata|bbva|scotiabank|colpatria|av villas|ita[uú]|banco\\s+(?:de\\s+)?\\w+|pse|otr[oa]s?\\s+(?:entidad|banco))\\b"
-            + "|recibiste\\s+una\\s+recarga|(?:te|le)\\s+recargaron", Pattern.CASE_INSENSITIVE);
+            + "|recibiste\\s+una\\s+recarga|(?:te|le)\\s+recargaron"
+            // 1.62.1: sin el nombre del banco («Recarga exitosa por $9.000», «Recargamos $9.000 a tu Nequi», «Tu Nequi fue recargado»)
+            + "|\\brecarga\\s+(?:exitosa|realizada|recibida|aprobada|confirmada)\\b|\\brecargaste\\s+(?:\\$|cop)\\s?\\d|\\brecarg(?:amos|ado|ada|[oó]|aron)(?![a-zñ])[^|\\n]{0,40}?(?:\\$|cop)\\s?\\d|(?:nequi|cuenta|daviplata)\\s+(?:fue|ha sido|se)\\s+recarg|\\brecarg[oó]\\s+(?:tu|su)\\s+(?:nequi|cuenta|daviplata)", Pattern.CASE_INSENSITIVE);
     static final Pattern RECARGA_NO = Pattern.compile("\\brecarga\\s+(?:tu|su)\\b|celular|minutos|paquete|recarga(?:ste)?\\s+(?:de\\s+)?(?:datos|plan|m[oó]vil)\\b"
             + "|\\b(?:claro|tigo|movistar|wom|virgin|etb|avantel|kalley)\\b|(?:a|al|para)\\s+(?:el\\s+)?(?:n[uú]mero\\s+)?(?:\\+?57\\s?)?3\\d{2}\\s?\\d{3}\\s?\\d{4}"
-            + "|fallid|no exitosa|pendiente|compraste|compra de", Pattern.CASE_INSENSITIVE);
+            + "|fallid|no exitosa|pendiente|compraste|compra de|\\b(?:tullave|transmilenio|sitp|c[ií]vica|peaje|flypass)\\b", Pattern.CASE_INSENSITIVE);
     static boolean esRecarga(String todo) { return todo != null && RECARGA.matcher(todo).find() && !RECARGA_NO.matcher(todo).find(); }
 
     static boolean esRecibido(String todo) {

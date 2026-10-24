@@ -68,7 +68,7 @@ async function pruebas(sb) {
   ];
   for (const [t, m, met] of casos7) { const a = A.leerAviso(t); chk('7. «' + t.split('|').slice(1).join('|').trim() + '» → ' + m, a && a.monto === m && a.metodo === met && a.confianza === 'app', a); }
   // 7b. 1.55.1: una transferencia de Bancolombia a Nequi llega como «Recarga desde Bancolombia»
-  for (const [t, m] of [['Nequi | Nequi | Recarga desde Bancolombia por $9.000,00', 9000], ['Nequi | Recarga realizada | Recargaste $9.000 desde Bancolombia', 9000], ['Nequi | Nequi | ¡Listo! Recibiste una recarga de $20.000', 20000]]) {
+  for (const [t, m] of [['Nequi | Nequi | Recarga desde Bancolombia por $9.000,00', 9000], ['Nequi | Recarga realizada | Recargaste $9.000 desde Bancolombia', 9000], ['Nequi | Nequi | ¡Listo! Recibiste una recarga de $20.000', 20000], ['Nequi | Recarga realizada | Recarga exitosa por $1.950,00', 1950], ['Nequi | Nequi | Recargamos $1.950 a tu Nequi', 1950], ['Nequi | Nequi | Tu Nequi fue recargado con $1.950', 1950]]) {
     const a = A.leerAviso(t); chk('7b. «' + t.split('|').slice(1).join('|').trim() + '» → ' + m + ' por Nequi', a && a.monto === m && a.metodo === 'NEQUI' && a.de === '' && a.confianza === 'app', a);
   }
   chk('7b. La recarga de un celular, una fallida o «Recarga tu Nequi…» no son pagos',

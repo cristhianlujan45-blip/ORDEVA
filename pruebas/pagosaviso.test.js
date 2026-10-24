@@ -200,8 +200,8 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     chk('16. Pagos que antes no sonaban (con «nunca comparta su clave», transferencia entrante, abono Bre-B, «Recibio» sin tilde…)', !r16.si.length, r16.si);
     // 16b. 1.55.1: una transferencia de Bancolombia a Nequi llega como «Recarga desde Bancolombia» (antes no sonaba)
     const rRecarga = await p.evaluate(() => {
-      const si = ['Nequi | Nequi | Recarga desde Bancolombia por $9.000,00', 'Nequi | Recarga realizada | Recargaste $9.000 desde Bancolombia', 'Nequi | Nequi | Recarga desde Bancolombia por $9.000. Mira el comprobante'];
-      const no = ['Nequi | Nequi | Recargaste $5.000 a tu celular 3001234567 desde Bancolombia', 'Nequi | Nequi | Recarga fallida desde Bancolombia por $9.000', 'Nequi | Nequi | Recarga tu Nequi desde Bancolombia y gana $5.000'];
+      const si = ['Nequi | Nequi | Recarga desde Bancolombia por $9.000,00', 'Nequi | Recarga realizada | Recargaste $9.000 desde Bancolombia', 'Nequi | Nequi | Recarga desde Bancolombia por $9.000. Mira el comprobante', 'Nequi | Recarga realizada | Recarga exitosa por $9.000,00', 'Nequi | Nequi | Recargamos $9.000 a tu Nequi', 'Nequi | Nequi | Se recargó tu Nequi con $9.000'];
+      const no = ['Nequi | Nequi | Recargaste $5.000 a tu celular 3001234567 desde Bancolombia', 'Nequi | Nequi | Recarga fallida desde Bancolombia por $9.000', 'Nequi | Nequi | Recarga tu Nequi desde Bancolombia y gana $5.000', 'Nequi | Nequi | Recarga exitosa de tu TuLlave por $9.000', 'Nequi | Nequi | Recarga exitosa de minutos Claro $3.000'];
       const x = window.pagosLeer(si[0]);
       return { si: si.filter(t => !window.pagosLeer(t)), no: no.filter(t => window.pagosLeer(t)), x };
     });

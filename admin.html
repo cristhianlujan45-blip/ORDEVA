@@ -920,7 +920,7 @@
    Si después de recargar el servidor todavía entrega la versión vieja, no se queda recargando: deja el aviso. */
 (function(){
   'use strict';
-  var ADMIN_VERSION = '2026-10-24 · v1.62.0';
+  var ADMIN_VERSION = '2026-10-24 · v1.63.0';
   var ultima = 0, oculto = 0, inicio = Date.now();
   function corta(v){ return String(v).split('·').pop().trim(); }
   function libre(){
@@ -2375,7 +2375,8 @@
   function spDiagTexto(c){
     const d = c.diagnostico || {}, l = Array.isArray(d.errores) ? d.errores : [];
     return 'Caso ' + c.id + ' · ' + (c.negocio_nombre || '') + ' · v' + (d.version || '?') + ' · ' + (d.plataforma || '') + ' · ' + (d.pagina || '') + (d.vista ? ' (' + d.vista + ')' : '') + '\n' + (d.modelo || '') + '\n' +
-      (l.length ? l.map(e => (e.cod || '—') + ' [' + (e.tipo || '') + '] ×' + (e.n || 1) + ' ' + (e.t ? new Date(+e.t).toISOString() : '') + ' · ' + (e.msg || '') + (e.donde ? ' @ ' + e.donde : '')).join('\n') : 'Sin errores registrados en el equipo.');
+      (l.length ? l.map(e => (e.cod || '—') + ' [' + (e.tipo || '') + '] ×' + (e.n || 1) + ' ' + (e.t ? new Date(+e.t).toISOString() : '') + ' · ' + (e.msg || '') + (e.donde ? ' @ ' + e.donde : '')).join('\n') : 'Sin errores registrados en el equipo.') +
+      (d.pagos ? '\nPagos: lector ' + d.pagos.lector + ' · suena ' + d.pagos.suena + ' · último ' + (d.pagos.ultimo ? new Date(+d.pagos.ultimo).toISOString() : '—') + '\n' + (d.pagos.traza || []).map(x => (x.app || '') + ': «' + (x.txt || '') + '» → ' + (x.r || '')).join('\n') : '');
   }
   function spDiagHtml(d){
     if(!d) return '<p class="soft" style="margin:6px 0 0">🐞 Sin diagnóstico (reporte de una versión vieja de la app).</p>';
@@ -2383,7 +2384,16 @@
     return '<details class="sp-diag" style="margin-top:8px"' + (l.length ? ' open' : '') + '><summary style="cursor:pointer;font-weight:700">🐞 Diagnóstico del equipo (' + l.length + ' error' + (l.length === 1 ? '' : 'es') + ') · solo tú lo ves</summary>' +
       '<div class="soft" style="font-size:12.5px;margin:4px 0">v' + esc(d.version || '?') + ' · ' + esc(d.plataforma || '') + ' · ' + esc(d.pagina || '') + (d.vista ? ' · pantalla ' + esc(d.vista) : '') + '<br>' + esc(d.modelo || '') + '</div>' +
       (l.length ? l.map(e => '<div style="padding:5px 0;border-top:1px solid var(--line,#333)"><b style="font-family:monospace">' + esc(e.cod || '—') + '</b> <small class="soft">' + esc(e.tipo || '') + ' · ' + (e.n || 1) + ' vez' + ((e.n || 1) === 1 ? '' : 'es') + (e.t ? ' · ' + esc(fCoHora(new Date(+e.t).toISOString())) : '') + '</small><br>' + esc(e.msg || '') + (e.donde ? '<br><small class="soft">' + esc(e.donde) + '</small>' : '') + '</div>').join('') : '<p class="soft">Sin errores registrados en el equipo.</p>') +
-      '<div class="row"><button class="b" type="button" data-spdiag-copiar>📋 Copiar diagnóstico</button></div></details>';
+      spDiagPagos(d.pagos) + '<div class="row"><button class="b" type="button" data-spdiag-copiar>📋 Copiar diagnóstico</button></div></details>';
+  }
+  // 1.62.1: cómo están los avisos de pago en ese equipo (los textos llegan sin nombres ni números).
+  function spDiagPagos(p){
+    if(!p) return '';
+    const tr = Array.isArray(p.traza) ? p.traza : [];
+    return '<div style="padding:6px 0;border-top:1px solid var(--line,#333)"><b>💜 Avisos de pago en este equipo</b><br><small class="soft">' +
+      (p.lector === true ? '👂 Lector de avisos vivo' : p.lector === false ? '⚠️ Lector de avisos APAGADO (sin permiso de notificaciones o Android lo cerró)' : 'No es la app Android') +
+      ' · ' + (p.suena === false ? '🔕 aquí NO suenan los pagos' : '🔊 aquí suenan') + (p.ultimo ? ' · último aviso de un banco: ' + esc(fCoHora(new Date(+p.ultimo).toISOString())) : ' · ningún aviso de banco todavía') + '</small>' +
+      tr.slice().reverse().map(x => '<div style="font-size:12.5px;margin-top:4px">' + (x.t ? '<small class="soft">' + esc(fCoHora(new Date(+x.t).toISOString())) + '</small> ' : '') + '<b>' + esc(x.app || '') + '</b>: «' + esc(x.txt || '') + '» → ' + esc(x.r || '') + '</div>').join('') + '</div>';
   }
   function spPintarCaso(){
     const c = ad.caso; if(!c) return;

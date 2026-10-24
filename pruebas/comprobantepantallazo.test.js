@@ -147,6 +147,50 @@ const RECIBOS = {
     v = await p.evaluate(async () => { const hk = window.hasAIKey; let n = 0; window.hasAIKey = () => true; const at = window.aiText; window.aiText = async () => { n++; return '{}'; };
       const f = await window.__archivo('nequiClaro'); const r = await window.comprobanteVerificar(f, null, { mostrar: false }); data.pagos.comprobantes = []; window.hasAIKey = hk; window.aiText = at; return { n, monto: r.info.monto }; });
     chk('6. Con «¿Cuánto?» bien leído no se gasta la IA', v.n === 0 && v.monto === 71800, v);
+
+    // ===== 7. 1.62.1: recargas desde Bancolombia, la lista de movimientos, el «$» leído «5» y la foto girada =====
+    v = await p.evaluate(() => {
+      const L = window.comprobanteLeer;
+      // Texto tal cual lo sacó el lector de los pantallazos que mandó el dueño (24 oct 2026).
+      const lista = L('Recarga desde Bancolombia            62.800,00\n\nO,   Recarga en\n\nJONATAN ANDRES RODRIGUEZ 6     6 4.300,00\n\nDE\n\nCAMILO ANDRES CONTRERAS AVI...    $ 2.500,00\nDe\n\nRecarga desde Bancolombia             $ 11.000,00\nRecarga en\n\nRecarga desde Bancolombia\n\n0                        S 14.400,00\nRecarga en\n\nCarda más\n\nINICIO      Movimientos    vervicios\n');
+      const det = L('»\n\n€ Detalle del movimiento\n\nRecarga Bancolombia\nRecarga Desde Bancolombia\n\n¿Cuánto?\nS 11.000,00\n\nFecha\n24 de octubre de 2026 alas 10:37 a. Mm.\n\nReferencia\nMO5698629\n');
+      const cinco = L('Recarga realizada\nRecarga Desde Bancolombia\n¿Cuánto?\n5 11.000,00\nReferencia\nM05698629');
+      const pegado = L('Recarga realizada\nRecarga Desde Bancolombia\n¿Cuánto?\n51.950,00\nReferencia\nM07383225');
+      const davi = L('DaviPlata\nTransacción exitosa\nCompra tienda $ 65.000,00\nSaldo disponible $ 1.250.300,00\nOtra cosa $ 2.000,00');
+      return { lista: lista.lista, listaApp: lista.app, det: { app: det.app, monto: det.monto, ref: det.ref, exito: det.exito, fecha: new Date(det.fecha).getHours() + ':' + new Date(det.fecha).getMinutes() },
+        cinco: cinco.monto, pegado: [pegado.monto, pegado.montoAlt], davi: davi.lista };
+    });
+    chk('7. Lista de movimientos de Nequi: salen las 5 llegadas con su valor (también la de abajo, con el nombre en otro renglón)', v.lista && v.lista.map(e => e.monto).join() === '2800,4300,2500,11000,14400' && v.listaApp === 'Nequi', v);
+    chk('7. «62.800,00» pegado: $2.800 (el $ leído «6»), guardando también $62.800', v.lista && v.lista[0].alt === 62800, v.lista && v.lista[0]);
+    chk('7. Detalle «Recarga Desde Bancolombia»: Nequi, $11.000, exitosa, referencia M05698629 (la O leída como cero) y la hora', v.det.app === 'Nequi' && v.det.monto === 11000 && v.det.exito && v.det.ref === 'M05698629' && v.det.fecha === '10:37', v.det);
+    chk('7. «5 11.000,00» debajo de «¿Cuánto?» es $11.000 (el $ leído «5»)', v.cinco === 11000, v);
+    chk('7. «51.950,00» sin $: se guardan $51.950 y $1.950', v.pegado[0] === 51950 && v.pegado[1] === 1950, v);
+    chk('7. Un comprobante con varios valores no se toma como lista', !v.davi, v);
+    v = await p.evaluate(async () => {
+      data.pagos.comprobantes = []; const antes = data.pagos.lista;
+      data.pagos.lista = antes.concat([{ id: 'and-n11', app: 'Nequi', monto: 11000, t: Date.now() - 90e3, estado: 'ok' }, { id: 'and-n19', app: 'Nequi', monto: 1950, t: Date.now() - 60e3, estado: 'ok' }]);
+      const r1 = await window.comprobanteVerificar('Recarga realizada\nRecarga Desde Bancolombia\n¿Cuánto?\n51.950,00', null, { mostrar: false });
+      data.pagos.comprobantes = [];
+      let reg = null;
+      const r = await window.comprobanteVerificar('Recarga desde Bancolombia $ 2.800,00\nRecarga en\nCAMILO ANDRES $ 2.500,00\nDe\nRecarga desde Bancolombia $ 11.000,00\nRecarga en', 1, { alRegistrar: x => { reg = x.info.monto; } });
+      const ov = document.getElementById('compOv'), filas = [...ov.querySelectorAll('.comp-fila')].map(b => b.innerText.replace(/\s+/g, ' '));
+      ov.querySelectorAll('.comp-fila')[2].click(); await new Promise(z => setTimeout(z, 100));
+      const tras = ov.innerText.replace(/\s+/g, ' '), boton = document.getElementById('compReg');
+      if(boton) boton.click();
+      data.pagos.lista = antes; data.pagos.comprobantes = [];
+      return { alt: [r1.nivel, r1.info.monto], nivel: r.nivel, filas, tras, reg };
+    });
+    chk('7. «51.950,00» coincide con el pago de $1.950 que de verdad llegó → ✅ verificado por $1.950', v.alt[0] === 'ok' && v.alt[1] === 1950, v.alt);
+    chk('7. La lista se muestra fila por fila y marca la que ya llegó (✅ $11.000)', v.nivel === 'lista' && v.filas.length === 3 && /Llegó/.test(v.filas[2]) && !/Llegó/.test(v.filas[0]), v.filas);
+    chk('7. Al tocar la fila de $11.000: ✅ verificado y «Registrar» pone $11.000 en la cuenta', /Pago verificado/.test(v.tras) && v.reg === 11000, v);
+    v = await p.evaluate(async () => {
+      const f = await window.__archivo('nequiClaro'), bmp = await createImageBitmap(f), c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height;
+      const x = c.getContext('2d'); x.translate(c.width / 2, c.height / 2); x.rotate(Math.PI); x.drawImage(bmp, -bmp.width / 2, -bmp.height / 2);
+      const g = new File([await new Promise(z => c.toBlob(z, 'image/png'))], 'foto.png', { type: 'image/png' });
+      const r = await window.comprobanteVerificar(g, null, { mostrar: false }); data.pagos.comprobantes = [];
+      return { monto: r.info.monto, girada: r.info.girada, ref: r.info.ref };
+    });
+    chk('7. Una foto al revés se gira sola y se lee ($71.800, referencia M17933329)', v.monto === 71800 && v.girada === 180 && v.ref === 'M17933329', v);
     chk('Sin errores de página', !errs.length, errs);
   }catch(e){ mal++; console.log('❌ Error: ' + (e && e.stack || e)); }
   await b.close();

@@ -18,11 +18,13 @@
   function leer(texto){
     const t = String(texto || '').replace(/\r/g, '').replace(/[ \t]+/g, ' ');
     const plano = t.replace(/\n+/g, ' ');
-    const app = /daviplata/i.test(plano) ? 'DaviPlata' : /bre-?b|llave/i.test(plano) && !/nequi/i.test(plano) ? 'Bre-B' : /nequi/i.test(plano) ? 'Nequi' : /bancolombia/i.test(plano) ? 'Bancolombia' : 'Transferencia';
+    // «Recarga desde Bancolombia» (detalle o lista de movimientos de Nequi): plata que LLEGÓ a Nequi desde un banco.
+    const recargaBanco = /recarga\s+(?:desde|de)\s+(?:bancolombia|davivienda|bbva|banco\b|otr[oa]s?\s+(?:banco|entidad)|pse)/i.test(plano);
+    const app = /daviplata/i.test(plano) ? 'DaviPlata' : /bre-?b|llave/i.test(plano) && !/nequi/i.test(plano) ? 'Bre-B' : /nequi/i.test(plano) || recargaBanco ? 'Nequi' : /bancolombia/i.test(plano) ? 'Bancolombia' : 'Transferencia';
     // Valor: el que va junto a «¿Cuánto?», «Valor», «Monto», «Total»; si no, el mayor que no sea costo/saldo.
     // El valor que va DEBAJO de «Saldo disponible» / «Costo…» es el saldo o el costo, nunca el pago (antes, si el
     // renglón del valor no se leía, quedaba el saldo: «$ 1.250.300» en vez de «$ 65.000»).
-    let monto = null, porEtiqueta = false;
+    let monto = null, porEtiqueta = false, montoAlt = null;
     const lineas = t.split('\n').map(x => x.trim()).filter(Boolean);
     const RX_PLATA = /(?:\$|\bS(?=\s?\d{1,3}[.,]\d{3}))\s?(\d{1,3}(?:[.,]\d{3})+(?:,\d{1,2})?|\d+(?:,\d{1,2})?)/;   // «S 65.000»: el $ mal leído
     const ETQ = /(cu[aá]nto|valor|monto|total|enviaste|pasaste|pagaste|recibiste|transferiste)/i, NO = /(costo|comisi|saldo|gmf|4x1000|cuota de manejo|disponible)/i;
@@ -30,8 +32,13 @@
     for(let i = 0; i < lineas.length && monto == null; i++){
       if(ETQ.test(lineas[i]) && !NO.test(lineas[i])){
         const sig = lineas[i + 1] && !excluida(i + 1) ? lineas[i + 1] : '';
-        const m = lineas[i].match(RX_PLATA) || sig.match(RX_PLATA) || sig.match(/^(\d{1,3}(?:[.,]\d{3})+)(?:,\d{1,2})?$/);
+        const m = lineas[i].match(RX_PLATA) || sig.match(RX_PLATA) || sig.replace(/(\d)-(\d{3})/g, '$1.$2').match(/^(\d{1,3}(?:[.,]\d{3})+)(?:,\d{1,2})?$/);
         if(m && num(m[1]) > 0){ monto = num(m[1]); porEtiqueta = true; }
+        // En una FOTO de la pantalla el «$» se lee «5» o «6»: «5 11.000,00» es $11.000; «51.950,00» puede ser $1.950 o $51.950
+        // (se guardan los dos y vale el que coincida con un pago que de verdad llegó).
+        const s5 = !m && sig.match(/^[56]\s(\d{1,3}(?:[.,]\d{3})+)(?:,\d{1,2})?$/);
+        if(s5){ monto = num(s5[1]); porEtiqueta = true; }
+        else if(m && !/\$|\bS\s?\d/.test(lineas[i] + ' ' + sig)){ const x = String(m[1]).match(/^[56](\d{1,3}(?:[.,]\d{3})+)$/); if(x) montoAlt = num(x[1]); }
       }
     }
     if(monto == null){
@@ -42,8 +49,10 @@
     let ref = null;
     const rxs = [/referencia\s*[:#]?\s*([A-Z]{0,3}\d{5,})/i, /\b(M\d{6,})\b/, /(?:n[uú]mero|no\.?|c[oó]digo)\s*(?:de\s*)?(?:aprobaci[oó]n|autorizaci[oó]n|transacci[oó]n|comprobante)\s*[:#]?\s*([A-Z0-9]{5,})/i,
       /(?:aprobaci[oó]n|autorizaci[oó]n|comprobante|transacci[oó]n)\s*(?:no\.?|n[uú]mero|#)?\s*[:#]?\s*([A-Z0-9]{6,})/i];
-    for(const rx of rxs){ const m = plano.match(rx); if(m && !/^3\d{9}$/.test(m[1])){ ref = m[1].toUpperCase(); break; } }
-    if(!ref){ const i = lineas.findIndex(l => /^(referencia|n[uú]mero de (aprobaci[oó]n|autorizaci[oó]n|transacci[oó]n))$/i.test(l)); if(i >= 0 && /^[A-Z0-9]{5,}$/i.test(lineas[i + 1] || '')) ref = lineas[i + 1].toUpperCase(); }
+    // Nequi: «M05698629» a veces se lee «MO5698629» (la O en vez del cero).
+    const planoRef = plano.replace(/\bM[Oo](\d{6,})\b/g, 'M0$1');
+    for(const rx of rxs){ const m = planoRef.match(rx); if(m && !/^3\d{9}$/.test(m[1])){ ref = m[1].toUpperCase(); break; } }
+    if(!ref){ const i = lineas.findIndex(l => /^(referencia|n[uú]mero de (aprobaci[oó]n|autorizaci[oó]n|transacci[oó]n))$/i.test(l)); if(i >= 0 && /^[A-Z0-9]{5,}$/i.test(lineas[i + 1] || '')) ref = lineas[i + 1].toUpperCase().replace(/^MO(\d)/, 'M0$1'); }
     // Fecha y hora
     let fecha = null;
     let d = null, mes = null, an = null;
@@ -63,8 +72,36 @@
     const md = plano.match(/(?:para|a|destino|n[uú]mero nequi|celular|daviplata|cuenta)\D{0,12}(3\d{2})[\s*•·.xX-]*(\d{3}|\*{2,4}|[•·]{2,4})?[\s*•·.xX-]*(\d{4})\b/i) || plano.match(/\b(3\d{2})\s?(\d{3})\s?(\d{4})\b/);
     if(md) destino = md[3];
     const nombre = (plano.match(/(?:para|nombre|destinatario)\s*:?\s*([A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ.]+(?:\s+[A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ.]+){0,3})/) || [])[1] || '';
-    const exito = /(exitos|realizad|aprobad|env[ií]o\s+(exitoso|realizado)|listo|enviaste|pasaste|transferencia exitosa|transacci[oó]n exitosa|pago exitoso)/i.test(plano);
-    return { app, monto, porEtiqueta, ref, fecha: typeof fecha === 'number' ? fecha : null, dia: fecha && fecha.soloDia ? fecha.t : null, destino, nombre, exito, texto: plano.slice(0, 600) };
+    const exito = /(exitos|realizad|aprobad|env[ií]o\s+(exitoso|realizado)|listo|enviaste|pasaste|transferencia exitosa|transacci[oó]n exitosa|pago exitoso)/i.test(plano) || recargaBanco;
+    // 1.62.1: ¿es la LISTA de movimientos (varias entradas, cada una con su valor al final del renglón) y no un comprobante?
+    // «Recarga desde Bancolombia $ 2.800,00», «CAMILO ANDRES CONTRERAS AVI… $ 2.500,00». El «$» a veces se lee «6» o «S».
+    // Si el valor quedó solo en su renglón (el nombre en el de arriba), se toma el nombre de arriba. Los que salen («-$») no son llegadas.
+    const lista = [], usadas = new Set();
+    const RX_FILA = /^(.*?)\s*(-\s*)?(?:([$S6])(\s?))?(\d{1,3}(?:[.,]\d{3})+)(,\d{2})?\s*$/, LETRAS = /[A-Za-zÁÉÍÓÚÑáéíóúñ]{3}/;
+    const SUB = /^\W*(recarga en|de|para|hoy|ayer|movimientos)\W*$/i;
+    // Un comprobante («exitosa», «aprobación», «referencia»…) nunca es la lista, aunque tenga dos valores.
+    const esComprobante = /exitos|aprobaci|autorizaci|referencia|comprobante|cu[aá]nto\?/i.test(plano);
+    if(!porEtiqueta && !esComprobante) lineas.forEach((l, i) => {
+      const x = l.match(RX_FILA);
+      if(!x || NO.test(l) || x[2] || !(x[3] || x[6])) return;
+      let desc = x[1].replace(/\s+[$S6O0]$/, '').replace(/^[^A-Za-zÁÉÍÓÚÑáéíóúñ]+/, '').trim();
+      if(!LETRAS.test(desc)){
+        desc = '';
+        for(let k = i - 1; k >= Math.max(0, i - 2); k--){
+          const a = lineas[k];
+          if(usadas.has(k) || RX_FILA.test(a) || SUB.test(a) || !LETRAS.test(a)) continue;
+          desc = a.replace(/^[^A-Za-zÁÉÍÓÚÑáéíóúñ]+/, '').trim(); usadas.add(k); break;
+        }
+        if(!desc) return;
+      }
+      usadas.add(i);
+      const e = { desc: desc.slice(0, 60), monto: num(x[5]), signo: x[3] || '' };
+      // «62.800,00» pegado: puede ser «$ 2.800» (el $ leído como 6) o de verdad $62.800. Se guardan los dos.
+      if(x[3] === '6' && !x[4]) e.alt = num('6' + x[5]);
+      if(e.monto > 0) lista.push(e);
+    });
+    return { app, monto, montoAlt, porEtiqueta, ref, fecha: typeof fecha === 'number' ? fecha : null, dia: fecha && fecha.soloDia ? fecha.t : null, destino, nombre, exito,
+      lista: lista.length >= 2 ? lista : null, texto: plano.slice(0, 600) };
   }
 
   // ---------- Cruzar con lo que llegó ----------
@@ -73,9 +110,21 @@
   const avisosActivos = () => !!(data.pagos && data.pagos.on) || !!(window.ventoPagos && window.ventoPagos.estado().resumen && (window.ventoPagos.estado().resumen.nequi.estado === 'conectado' || window.ventoPagos.estado().resumen.daviplata.estado === 'conectado'));
   const quien = c => c.mesa ? (window.tableLabel ? tableLabel(c.mesa) : 'Mesa ' + c.mesa) : 'otra cuenta';
 
+  // El pago que llegó (Servidor ORDEVA o avisos del banco) por ese valor, cerca de esa hora, y que ningún comprobante usó todavía.
+  function llegado(monto, fecha, mesa){
+    const g = G(), ahora = Date.now();
+    const desde = fecha ? fecha - 20 * 60e3 : ahora - 6 * 3600e3, hasta = fecha ? fecha + 4 * 3600e3 : ahora + 60e3;
+    const ya = new Set(g.comprobantes.map(c => c.pago).filter(Boolean));
+    const cands = (g.lista || []).filter(x => confirmado(x) && Number(x.monto) === Number(monto) && x.t >= desde && x.t <= hasta && !ya.has(x.id));
+    cands.sort((a, b) => (a.mesa == mesa ? 0 : 1) - (b.mesa == mesa ? 0 : 1) || Math.abs(a.t - (fecha || ahora)) - Math.abs(b.t - (fecha || ahora)));
+    return cands[0] || null;
+  }
+
   function verificar(info, mesa){
     const g = G(), ahora = Date.now(), motivos = [];
     let nivel = 'ok', pago = null;
+    // La LISTA de movimientos de Nequi (varias llegadas en un pantallazo): se muestra cada una con si de verdad llegó, y se elige cuál es.
+    if(info && info.lista && !info.porEtiqueta) return { nivel: 'lista', motivos: [], info, filas: info.lista.map(e => Object.assign({}, e, { pago: llegado(e.monto, null, mesa) || (e.alt ? llegado(e.alt, null, mesa) : null) })) };
     if(!info || !info.monto) return { nivel: 'revisar', motivos: ['No pude leer el valor del comprobante. Revisa que la foto se vea completa y clara.'], info };
     if(info.ref){
       const usado = g.comprobantes.find(c => c.ref === info.ref && c.app === info.app);
@@ -97,11 +146,9 @@
     if(ref && ahora - ref > 36 * 3600e3){ nivel = 'revisar'; motivos.push('⚠️ El comprobante es de hace ' + Math.round((ahora - ref) / 864e5 * 10) / 10 + ' días: no es de hoy.'); }
     if(!info.exito) motivos.push('El comprobante no dice «exitoso»/«realizado»: revisa que no sea un pago pendiente o rechazado.');
     // ¿Llegó un pago así?
-    const desde = info.fecha ? info.fecha - 20 * 60e3 : ahora - 6 * 3600e3, hasta = info.fecha ? info.fecha + 4 * 3600e3 : ahora + 60e3;
-    const ya = new Set(g.comprobantes.map(c => c.pago).filter(Boolean));
-    const cands = (g.lista || []).filter(x => confirmado(x) && Number(x.monto) === Number(info.monto) && x.t >= desde && x.t <= hasta && !ya.has(x.id));
-    cands.sort((a, b) => (a.mesa == mesa ? 0 : 1) - (b.mesa == mesa ? 0 : 1) || Math.abs(a.t - (info.fecha || ahora)) - Math.abs(b.t - (info.fecha || ahora)));
-    pago = cands[0] || null;
+    pago = llegado(info.monto, info.fecha, mesa);
+    if(!pago && info.montoAlt){ const p2 = llegado(info.montoAlt, info.fecha, mesa); if(p2){ pago = p2; info = Object.assign({}, info, { monto: info.montoAlt, montoAlt: null }); } }
+    if(!pago && info.montoAlt) motivos.push('⚠️ El valor se leyó como ' + plata(info.monto) + ', pero puede ser ' + plata(info.montoAlt) + ' (el «$» mal leído en la foto): míralo en el pantallazo.');
     if(pago){ if(nivel === 'ok') motivos.unshift('✅ Coincide con el pago de ' + plata(pago.monto) + ' que llegó por ' + pago.app + (pagoDet(pago).de ? ' de ' + pagoDet(pago).de : '') + ' a las ' + new Date(pago.t).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }).replace(/\.$/, '') + '.'); }
     else if(avisosActivos()){ nivel = nivel === 'revisar' ? 'revisar' : 'espera'; motivos.unshift('⏳ Todavía NO ha llegado un pago de ' + plata(info.monto) + '. No entregues nada: te aviso apenas llegue.'); }
     else { nivel = 'revisar'; motivos.unshift('⚠️ ORDEVA no tiene avisos automáticos de pagos activos: confírmalo en tu app ' + (info.app === 'DaviPlata' ? 'DaviPlata' : 'Nequi') + ' antes de entregar. (Actívalos en Ajustes → 💜 Pagos.)'); }
@@ -109,6 +156,7 @@
   }
 
   function guardar(r, mesa){
+    if(r.nivel === 'lista') return null;
     const g = G();
     const c = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5), t: Date.now(), ref: r.info.ref || null, app: r.info.app, monto: r.info.monto, mesa: mesa != null ? mesa : null, nivel: r.nivel, pago: r.pago ? r.pago.id : null };
     if(r.nivel !== 'falso' && (c.ref || c.pago)) { g.comprobantes.unshift(c); g.comprobantes = g.comprobantes.slice(0, 300); }
@@ -144,7 +192,30 @@
   }
   const COLOR = { ok: '#22c55e', espera: '#f5a524', revisar: '#f5a524', falso: '#e5484d' };
   const TITULO = { ok: '✅ Pago verificado', espera: '⏳ Aún no llega', revisar: '⚠️ Revísalo', falso: '🚨 NO LO ACEPTES' };
+  COLOR.lista = 'var(--accent, #7c5cff)'; TITULO.lista = '📋 Movimientos de Nequi';
+  const hora = t => new Date(t).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }).replace(/\.$/, '');
+  function mostrarLista(r, mesa, alRegistrar, alQuitar){
+    const ov = ventana(), filas = r.filas || [];
+    ov.innerHTML = '<div class="modal" style="max-width:440px;width:100%"><h2>' + TITULO.lista + '</h2>' +
+      '<div class="modal-sub">Este pantallazo es la lista de movimientos, no un comprobante. Toca el que es de esta cuenta.</div>' +
+      '<div class="comp-filas" style="display:flex;flex-direction:column;gap:8px;margin-top:12px">' + filas.map((e, k) => {
+        const v = e.pago ? Number(e.pago.monto) : e.monto;
+        return '<button type="button" class="btn-ghost comp-fila" data-k="' + k + '" style="display:flex;align-items:center;gap:10px;text-align:left;width:100%;padding:10px 12px">' +
+          '<span style="flex:1;min-width:0"><b style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(e.desc) + '</b>' +
+          '<small style="color:' + (e.pago ? COLOR.ok : 'var(--text-secondary, #9a9ab0)') + '">' + (e.pago ? '✅ Llegó a las ' + esc(hora(e.pago.t)) : (avisosActivos() ? 'Todavía no veo que haya llegado' : 'Sin avisos automáticos: revísalo en Nequi')) + '</small></span>' +
+          '<b style="font-size:17px;white-space:nowrap">' + plata(v) + (e.alt && !e.pago ? ' <small style="font-weight:600">o ' + plata(e.alt) + '</small>' : '') + '</b></button>';
+      }).join('') + '</div>' +
+      '<div class="modal-actions"><button type="button" class="btn-close" id="compX">Cerrar</button></div></div>';
+    ov.classList.add('show');
+    ov.querySelector('#compX').onclick = () => ov.classList.remove('show');
+    ov.querySelectorAll('.comp-fila').forEach(b => b.onclick = () => {
+      const e = filas[+b.dataset.k];
+      const info = Object.assign({}, r.info, { lista: null, porEtiqueta: true, elegido: true, monto: e.pago ? Number(e.pago.monto) : e.monto });
+      const r2 = verificar(info, mesa); guardar(r2, mesa); mostrar(r2, mesa, alRegistrar, alQuitar);
+    });
+  }
   function mostrar(r, mesa, alRegistrar, alQuitar){
+    if(r.nivel === 'lista') return mostrarLista(r, mesa, alRegistrar, alQuitar);
     const ov = ventana(), i = r.info || {};
     ov.innerHTML = '<div class="modal" style="max-width:420px;width:100%"><h2 style="color:' + COLOR[r.nivel] + '">' + TITULO[r.nivel] + '</h2>' +
       '<div style="font:800 30px/1.2 var(--font-main);text-align:center;margin:4px 0">' + (i.monto ? plata(i.monto) : '¿?') + '</div>' +
@@ -172,11 +243,38 @@
         info = otra;
       }
     }
+    // 1.62.1: una FOTO del celular tomada de lado o al revés no se lee. Si no salió nada claro, se gira (de lado primero si la
+    // foto es horizontal) y se vuelve a leer; se queda la primera vuelta que sí se entiende.
+    if(!legible(info) && O.textoDeComprobante && window.createImageBitmap){
+      let bmp = null; try{ bmp = await createImageBitmap(f); }catch(e){}
+      if(bmp){
+        const vueltas = bmp.width > bmp.height * 1.1 ? [90, 270, 180] : [180, 90, 270];
+        for(const g of vueltas){
+          let otra = null, fg = null; try{ fg = await girar(bmp, g); otra = leer(await O.textoDeComprobante(fg)); }catch(e){}
+          if(legible(otra)){
+            otra.girada = g; info = otra;
+            // Sin el valor: la misma foto ya derecha, con el arreglo de las fotos de facturas.
+            if(!info.porEtiqueta && O.textoDeImagen){ try{ const o2 = leer(await O.textoDeImagen(fg)); if(o2.monto && o2.porEtiqueta){ info.monto = o2.monto; info.montoAlt = o2.montoAlt; info.porEtiqueta = o2.porEtiqueta; } }catch(e){} }
+            break;
+          }
+        }
+        try{ bmp.close && bmp.close(); }catch(e){}
+      }
+    }
     if(!info) throw err || new Error('No se pudo leer el comprobante.');
     // Con internet y sin «¿Cuánto?»/«Valor» junto al valor: también lo lee la IA del negocio. El valor de la IA se marca
     // (🤖) y solo se registra si coincide con un pago que DE VERDAD llegó, como siempre: la IA no da un pago por recibido.
-    if((!info.monto || !info.porEtiqueta) && navigator.onLine !== false){ try{ const ia = await leerConIA(f); if(ia) info = mezclarIA(info, ia); }catch(e){} }
+    if((!info.monto || !info.porEtiqueta) && !info.lista && navigator.onLine !== false){ try{ const ia = await leerConIA(f); if(ia) info = mezclarIA(info, ia); }catch(e){} }
     return info;
+  }
+  const legible = i => !!(i && (i.porEtiqueta || i.lista || ((i.monto || i.ref || i.fecha) && (i.exito || i.ref))));
+  async function girar(bmp, grados){
+    const k = Math.min(1, 2400 / Math.max(bmp.width, bmp.height)), w = Math.round(bmp.width * k), h = Math.round(bmp.height * k);
+    const c = document.createElement('canvas'), lado = grados % 180 !== 0;
+    c.width = lado ? h : w; c.height = lado ? w : h;
+    const x = c.getContext('2d'); x.translate(c.width / 2, c.height / 2); x.rotate(grados * Math.PI / 180); x.drawImage(bmp, -w / 2, -h / 2, w, h);
+    const b = await new Promise(z => c.toBlob(z, 'image/jpeg', 0.9));
+    return new File([b], 'girada.jpg', { type: 'image/jpeg' });
   }
   async function leerConIA(f){
     if(typeof hasAIKey !== 'function' || !hasAIKey() || typeof aiText !== 'function') return null;
