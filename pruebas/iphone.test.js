@@ -19,7 +19,7 @@ for(const d of [path.join(__dirname, 'node_modules'), '/opt/node-tools/node_modu
   // ===== 1. Revisión del código =====
   if(acorn){
     const archivos = fs.readdirSync(raiz).filter(f => /\.html$/.test(f))
-      .concat(fs.readdirSync(path.join(raiz, 'lib')).filter(f => /\.js$/.test(f) && !/vento-ocr|vento-pdf/.test(f)).map(f => 'lib/' + f), fs.readdirSync(path.join(raiz, 'nube')).filter(f => /\.js$/.test(f)).map(f => 'nube/' + f), ['sw.js']);
+      .concat(fs.readdirSync(path.join(raiz, 'lib')).filter(f => /\.js$/.test(f) && !/vento-ocr|vento-pdf/.test(f)).map(f => 'lib/' + f), fs.readdirSync(path.join(raiz, 'nube')).filter(f => /\.js$/.test(f)).map(f => 'nube/' + f), fs.readdirSync(path.join(raiz, 'app')).filter(f => /\.js$/.test(f)).map(f => 'app/' + f), ['sw.js']);
     const IOS16 = new Set(['toSorted', 'toReversed', 'toSpliced', 'fromAsync', 'groupBy', 'withResolvers']);
     const malos = [], ilegibles = [];
     const revisar = (cod, a, l0) => {

@@ -3,10 +3,12 @@ const crypto=require('crypto'); const fs=require('fs');
 (async()=>{
  const { privateKey, publicKey } = crypto.generateKeyPairSync('ec', { namedCurve: 'P-256' });
  const priv = privateKey.export({ format: 'jwk' }), pub = publicKey.export({ format: 'jwk' });
- const html = fs.readFileSync(require('path').join(__dirname, '..', 'index.html'),'utf8').replace(/const LIC_PUB = \{[^}]*\};/, 'const LIC_PUB = '+JSON.stringify({kty:'EC',crv:'P-256',x:pub.x,y:pub.y})+';');
+ // La llave pública de las licencias se cambia por la de prueba en el archivo donde esté (index.html o app/*.js).
+ const LLAVE = 'const LIC_PUB = '+JSON.stringify({kty:'EC',crv:'P-256',x:pub.x,y:pub.y})+';';
+ const conLlave = ruta => { const f = require('path').join(__dirname, '..', ruta); if(!/\.(html|js)$/.test(ruta) || !fs.existsSync(f)) return null; const t = fs.readFileSync(f, 'utf8'); return /const LIC_PUB = \{[^}]*\};/.test(t) ? t.replace(/const LIC_PUB = \{[^}]*\};/, LLAVE) : null; };
  const b=await chromium.launch(); let ok=0, mal=0; const chk=(n,c,x)=>{ if(c){ok++;console.log('✅ '+n);} else {mal++;console.log('❌ '+n+(x?' → '+x:''));} };
  const ctx=await b.newContext({viewport:{width:390,height:844}});
- await ctx.route('**/*', r=>{ const u=new URL(r.request().url()); if(u.hostname!=='localhost') return r.abort(); if(/\/index\.html$/.test(u.pathname)) return r.fulfill({body:html,contentType:'text/html'}); return r.continue(); });
+ await ctx.route('**/*', r=>{ const u=new URL(r.request().url()); if(u.hostname!=='localhost') return r.abort(); { const t = conLlave(u.pathname.replace(/^\//, '')); if(t != null) return r.fulfill({ body: t, contentType: /\.js$/.test(u.pathname) ? 'application/javascript' : 'text/html' }); } return r.continue(); });
  const p=await ctx.newPage(); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
  await p.goto((process.env.VENTO_BASE||'http://localhost:8765')+'/index.html'); await p.waitForTimeout(2500);
  await p.fill('#authBiz','Bar'); await p.fill('#authUser','ana'); await p.fill('#authPass','clave123'); await p.click('#authBtn'); await p.waitForTimeout(1500);
