@@ -1,0 +1,75 @@
+# Compila ORDEVA Admin para PC (Windows) y lo publica en las Descargas del repositorio (release «admin-pc»):
+#   https://github.com/cristhianlujan45-blip/ORDEVA/releases/download/admin-pc/ORDEVA-Admin-Setup.exe
+# Solo se publica desde la rama principal; desde otra rama (a mano) se compila y queda como artefacto para revisar.
+# El programa (carpeta pc-admin/) abre el panel de administración (admin.html) en su propia ventana y se actualiza solo
+# desde ese mismo release (latest.yml). Corre cada vez que cambia pc-admin/ en la rama principal, y también a mano
+# (Actions → ORDEVA Admin PC → Run workflow).
+# OJO: el release «admin-pc» NUNCA se marca como «latest»: el enlace del APK de Android depende de eso.
+name: ORDEVA Admin PC
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/precio-margen-productos-tabla-mioclt]
+    paths: ['pc-admin/**', '.github/workflows/admin-pc.yml']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: admin-pc
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    env:
+      VENTO_ADMIN_PC_VERSION: 1.0.${{ github.run_number }}
+    defaults:
+      run:
+        working-directory: pc-admin
+        # bash también en Windows: PowerShell parte «-c.extraMetadata.version=…» en el punto y electron-builder lo lee mal.
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Instalar (versiones fijas de package-lock.json, con electron y electron-builder)
+        run: |
+          npm ci --include=dev --no-audit --no-fund
+          test -f node_modules/electron/package.json
+          test -f node_modules/electron-builder/package.json
+      - name: Compilar el instalador (ORDEVA-Admin-Setup.exe)
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npx --no-install electron-builder --win nsis --x64 --publish never "-c.extraMetadata.version=${VENTO_ADMIN_PC_VERSION}"
+      - name: Revisar lo que salió
+        run: |
+          ls -la dist
+          test -s dist/ORDEVA-Admin-Setup.exe
+          test -s dist/latest.yml
+          grep -q "version: ${VENTO_ADMIN_PC_VERSION}" dist/latest.yml
+          grep -q "ORDEVA-Admin-Setup.exe" dist/latest.yml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ordeva-admin-pc
+          path: |
+            pc-admin/dist/ORDEVA-Admin-Setup.exe
+            pc-admin/dist/ORDEVA-Admin-Setup.exe.blockmap
+            pc-admin/dist/latest.yml
+      - name: Publicar en Descargas (release «admin-pc», sin marcarlo como el último)
+        if: github.ref == 'refs/heads/claude/precio-margen-productos-tabla-mioclt'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          NOTAS="ORDEVA Admin para PC ${VENTO_ADMIN_PC_VERSION} (Windows 10 y 11), solo para el proveedor de ORDEVA. Descarga ORDEVA-Admin-Setup.exe, ábrelo y sigue los pasos. Si Windows dice «Windows protegió su PC», toca «Más información» → «Ejecutar de todas formas». Las versiones nuevas se instalan solas. Sin instalar nada: https://cristhianlujan45-blip.github.io/ORDEVA/admin.html (en Chrome o Edge: ⋮ → Instalar ORDEVA Admin)."
+          if gh release view admin-pc >/dev/null 2>&1; then
+            gh release edit admin-pc --title "ORDEVA Admin para PC ${VENTO_ADMIN_PC_VERSION}" --notes "$NOTAS" --latest=false
+          else
+            gh release create admin-pc --title "ORDEVA Admin para PC ${VENTO_ADMIN_PC_VERSION}" --notes "$NOTAS" --target "${GITHUB_SHA}" --latest=false
+          fi
+          gh release upload admin-pc dist/ORDEVA-Admin-Setup.exe dist/ORDEVA-Admin-Setup.exe.blockmap dist/latest.yml --clobber
+          # El APK de Android sigue siendo el «último» (su enlace releases/latest/download/vento.apk depende de eso).
+          gh release edit android --latest >/dev/null 2>&1 || true
+          echo "### 👑 ORDEVA Admin para PC: https://github.com/${GITHUB_REPOSITORY}/releases/download/admin-pc/ORDEVA-Admin-Setup.exe" >> "$GITHUB_STEP_SUMMARY"

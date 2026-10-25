@@ -39,6 +39,7 @@ Límites del canal (servidor): 240 mensajes/min por canal, 300/min por conexión
 | `tv.html` | El TV reproduce la cola de canciones sola y muestra el tiempo real, la mesa y la siguiente canción. |
 | `mesero.html` | App de los meseros en su celular, por un canal privado. |
 | `licencias.html` | Códigos para sedes adicionales, firmados con una llave privada que no está en el repositorio. |
+| `admin.html` | ORDEVA Admin, el panel del proveedor (web instalable con `admin.webmanifest`). Programa para Windows: `pc-admin/` ([pc-admin/LEEME.md](pc-admin/LEEME.md)). |
 | `puente/laya-worker.js` | Puente seguro (Cloudflare Worker) hacia el motor de decisiones Laya. |
 | `puente/youtube-tv-worker.js` | Puente para la opción "YouTube del TV" (vincular con código de TV). |
 | `icons/`, `marca/` | Íconos y logo de ORDEVA (SVG y PNG; `marca/LEEME.md` explica cómo se generan). |

@@ -1,0 +1,67 @@
+{
+  "name": "vento-admin-pc",
+  "productName": "ORDEVA Admin",
+  "version": "1.0.0",
+  "description": "ORDEVA Admin para PC: el panel del proveedor de ORDEVA (clientes, suscripciones, pagos, soporte y errores).",
+  "author": "ORDEVA",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis --x64 --publish never"
+  },
+  "dependencies": {
+    "electron-updater": "6.3.9"
+  },
+  "devDependencies": {
+    "electron": "44.9.3",
+    "electron-builder": "25.1.8"
+  },
+  "build": {
+    "appId": "co.vento.admin.pc",
+    "productName": "ORDEVA Admin",
+    "copyright": "ORDEVA",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "sin-internet.html",
+      "icono.png",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "icono.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "ORDEVA Admin",
+      "artifactName": "ORDEVA-Admin-Setup.${ext}",
+      "installerLanguages": [
+        "es_ES"
+      ],
+      "language": "3082"
+    },
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://github.com/cristhianlujan45-blip/ORDEVA/releases/download/admin-pc"
+      }
+    ],
+    "executableName": "ORDEVA-Admin"
+  }
+}
