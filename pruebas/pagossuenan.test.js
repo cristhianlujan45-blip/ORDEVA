@@ -1,6 +1,6 @@
 // 🔊 El administrador elige en qué equipos SUENAN los avisos de pago (ORDEVA 1.62.0), de punta a punta (PostgreSQL REAL +
 // Servidor ORDEVA + la app de verdad), con un celular (app Android, lee los avisos), una tablet (app Android) y un computador:
-//  1. Ajustes → 💜 Pagos → «🔊 Equipos y dónde suenan los pagos»: los tres, con su botón «🔊 Suena» y ✏️ para el nombre.
+//  1. Ajustes → 💜 Pagos → «🔊 Celulares y dónde suenan los pagos»: los tres, con su botón «🔊 SUENA», su modelo y «ESTE CELULAR» y ✏️ para el nombre.
 //  2. El administrador le pone nombre a la tablet y elige que NO suene: la tablet se entera (también la app Android).
 //  3. Llega un pago: el computador suena (ventana con el valor); la tablet NO (ni voz, ni notificación, ni ventana),
 //     pero el pago igual queda en su lista.
@@ -81,14 +81,15 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     await cerrarTodo(PC.p);
     await PC.p.click('#navMoreBtn').catch(() => {}); await PC.p.click('.more-tile[data-go="ajustes"]').catch(() => {});
     await PC.p.evaluate(() => { try{ window.ventoPagos.abrirAjustes(); }catch(e){} const c = document.querySelector('.ajustes-cat[data-cat="pagos"]'); if(c) c.click(); });
-    chk('1. «🔊 Equipos y dónde suenan los pagos»: los 3 equipos, todos sonando', await esperar(PC.p, () => document.querySelectorAll('#vpDevs [data-suena]').length === 3 && [...document.querySelectorAll('#vpDevs [data-suena]')].every(b => /🔊 Suena/.test(b.textContent)), null, 20000),
+    chk('1. «🔊 Celulares y dónde suenan los pagos»: los 3 equipos, todos con «🔊 SUENA»', await esperar(PC.p, () => document.querySelectorAll('#vpDevs [data-suena]').length === 3 && [...document.querySelectorAll('#vpDevs [data-suena]')].every(b => /🔊 SUENA/.test(b.textContent)), null, 20000),
       await PC.p.evaluate(() => (document.getElementById('vpDevs') || {}).textContent));
 
+    chk('1. «ESTE CELULAR» marca solo al equipo donde se mira, y cada uno dice si está conectado', await PC.p.evaluate(() => (document.getElementById('vpDevs').textContent.match(/ESTE CELULAR/g) || []).length === 1 && /Conectado ahora/.test(document.getElementById('vpDevs').textContent)));
     // ===== 2. Nombre y «no suena» para la tablet =====
     await PC.p.evaluate(id => document.querySelector('#vpDevs [data-nom="' + id + '"]').click(), devTab);
     chk('2. ✏️ Le pone nombre a la tablet', await esperar(PC.p, () => /Tablet de la barra/.test(document.getElementById('vpDevs').textContent), null, 10000));
     await PC.p.evaluate(id => document.querySelector('#vpDevs [data-suena="' + id + '"]').click(), devTab);
-    chk('2. La elige para que NO suene', await esperar(PC.p, id => { const b = document.querySelector('#vpDevs [data-suena="' + id + '"]'); return !!b && /No suena/.test(b.textContent); }, devTab, 10000) &&
+    chk('2. La elige para que NO suene', await esperar(PC.p, id => { const b = document.querySelector('#vpDevs [data-suena="' + id + '"]'); return !!b && /NO SUENA/.test(b.textContent); }, devTab, 10000) &&
       (await sb.sql('select suena from dispositivos where id = $1', [devTab]))[0].suena === false);
     await TAB.p.evaluate(() => window.dispatchEvent(new CustomEvent('vento-aviso-vivo')));   // aquí no hay tiempo real: el aviso se simula
     chk('2. La tablet se entera (y se lo dice a la app Android)', await esperar(TAB.p, () => localStorage.getItem('vento_pagos_suena') === 'false' && window.__and.suena === false, null, 10000));
@@ -108,7 +109,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
 
     // ===== 4. Volver a prenderla =====
     await PC.p.evaluate(id => document.querySelector('#vpDevs [data-suena="' + id + '"]').click(), devTab);
-    await esperar(PC.p, id => { const b = document.querySelector('#vpDevs [data-suena="' + id + '"]'); return !!b && /🔊 Suena/.test(b.textContent); }, devTab, 10000);
+    await esperar(PC.p, id => { const b = document.querySelector('#vpDevs [data-suena="' + id + '"]'); return !!b && /🔊 SUENA/.test(b.textContent); }, devTab, 10000);
     await TAB.p.evaluate(() => window.dispatchEvent(new CustomEvent('vento-aviso-vivo')));
     chk('4. La tablet vuelve a sonar', await esperar(TAB.p, () => localStorage.getItem('vento_pagos_suena') === 'true' && window.__and.suena === true, null, 10000));
     await llega(500, 'kb:500:1');

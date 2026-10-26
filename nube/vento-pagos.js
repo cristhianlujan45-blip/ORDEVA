@@ -66,6 +66,34 @@
 
   // ---------- Este celular ----------
   function plataforma(){ var u = navigator.userAgent || ''; return /iPhone|iPad/.test(u) ? 'iPhone' : /Android/.test(u) ? 'Android' : /Windows/.test(u) ? 'Windows' : /Mac/.test(u) ? 'Mac' : 'Navegador'; }
+  /* 1.65.2: el nombre que se ve en «🔊 Celulares y dónde suenan los pagos». Antes todos salían «Dueño · Android» y no se
+     sabía cuál era cuál. Ahora sale la marca y el modelo del celular: «Samsung Galaxy A34», «Xiaomi 24090RA29G»,
+     «Computador Windows»… (sale del texto del navegador que guarda el servidor; si el dueño le puso nombre, ese manda). */
+  function equipoDe(ua){
+    ua = String(ua || '');
+    var m = /Android[^;)]*;\s*([^;)]+?)(?:\s+Build\/|[;)])/.exec(ua), mod = m ? m[1].trim() : '';
+    if(/Windows/.test(ua)) return '💻 Computador Windows';
+    if(/Macintosh|Mac OS X/.test(ua) && !/iPhone|iPad/.test(ua)) return '💻 Computador Mac';
+    if(/iPad/.test(ua)) return '📱 iPad';
+    if(/iPhone/.test(ua)) return '📱 iPhone';
+    if(/Android/.test(ua)){
+      if(!mod || /^K$/.test(mod)) return '📱 Celular Android';
+      var g = /^SM-([AMF])(\d{2})\d/i.exec(mod);
+      if(g) return '📱 Samsung Galaxy ' + g[1].toUpperCase() + g[2] + ' (' + mod + ')';
+      if(/^SM-/i.test(mod)) return '📱 Samsung ' + mod;
+      if(/^(Redmi|POCO|Mi )/i.test(mod)) return '📱 Xiaomi ' + mod;
+      if(/^\d{4,5}[A-Z0-9]{3,8}$/i.test(mod)) return '📱 Xiaomi ' + mod;
+      if(/^(CPH|RMX)\d/i.test(mod)) return '📱 OPPO/Realme ' + mod;
+      if(/^moto/i.test(mod)) return '📱 Motorola ' + mod;
+      if(/^(TECNO|Infinix|itel)/i.test(mod)) return '📱 ' + mod;
+      return '📱 ' + mod;
+    }
+    if(/Linux/.test(ua)) return '💻 Computador Linux';
+    return '🌐 Navegador';
+  }
+  // Nombre puesto solo (de antes): «Dueño · Android», «Caja · Windows»… Ese no lo eligió nadie: se muestra el del modelo.
+  function nombreAuto(n){ return !n || /^(Dueño|Administrador|Caja|Mesero|Empleado|Celular|[^·]{1,30}) · (Android|Windows|iPhone|Mac|Navegador)$/.test(String(n)); }
+  function nombreVer(d){ return nombreAuto(d.nombre) ? equipoDe(d.plataforma) : '📱 ' + d.nombre + (d.plataforma && /Android|iPhone|Windows|Mac/.test(d.plataforma) ? ' · ' + equipoDe(d.plataforma).replace(/^\S+\s/, '') : ''); }
   function nombreRol(r){ return ({ dueno: 'Dueño', admin: 'Administrador', cajero: 'Caja', mesero: 'Mesero', empleado: (window.ventoRolNombre ? window.ventoRolNombre('empleado') : 'Empleado') })[r] || 'Celular'; }
   function miDispositivo(){ var n = negocio(), d = lsGet(K_DEV, null); return n && d && d.negocio === n.id ? d : null; }
   function registrarDispositivo(forzar){
@@ -114,7 +142,11 @@
   function cruceAndroid(){
     var A = window.VentoAndroid; if(!A || !A.pagosCruce) return;
     var n = negocio(), d = miDispositivo(), c = nube() && nube().config && nube().config();
-    var j = n && d && d.token && c && c.url && c.key && !est.revocado ? JSON.stringify({ url: c.url, key: c.key, token: d.token, negocio: n.id }) : '';
+    // 1.65.2: ya no se le quita a Android mientras la página lo vuelve a autorizar («est.revocado»). Antes, si esa nueva
+    // autorización no salía (la página dormida con el celular bloqueado, sin internet un momento), Android se quedaba sin
+    // su conexión directa (pagos de los otros equipos y reenvío al instante) hasta abrir la app. Android usa el token del
+    // celular: si de verdad lo retiraron, el servidor se lo dice a Android y la página lo vuelve a autorizar (ventoPagosCruceMal).
+    var j = n && d && d.token && c && c.url && c.key ? JSON.stringify({ url: c.url, key: c.key, token: d.token, negocio: n.id }) : '';
     if(j === cruceDado) return;
     cruceDado = j;
     try{ A.pagosCruce(j); }catch(e){}
@@ -423,6 +455,14 @@
     '.vp-monto{font:800 34px/1.2 var(--font-main);text-align:center;margin:6px 0}.vp-estado{text-align:center;font-weight:800;font-size:17px;margin:10px 0}' +
     '.vp-btn-cuenta{width:100%;margin:8px 0 4px;padding:12px;border-radius:14px;border:1px solid #7c3aed;background:color-mix(in srgb,#7c3aed 14%,transparent);color:inherit;font:700 15px var(--font-main);cursor:pointer}' +
     '.vp-opc[hidden]{display:none}.vp-nw{white-space:nowrap}' +
+    '.vp-eq-ayuda{font-size:13px;color:var(--ink-soft);padding:2px 0 8px;line-height:1.4}' +
+    '#vpDevs .vp-eq{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:10px 12px;margin:0 0 8px;border:1px solid var(--line);border-top:1px solid var(--line);border-radius:12px;justify-content:flex-start}' +
+    '#vpDevs .vp-eq.este{border-color:var(--accent,#8b5cf6);box-shadow:0 0 0 1px var(--accent,#8b5cf6) inset}' +
+    '.vp-eq-txt{flex:1 1 180px;min-width:0}.vp-eq-txt b{font-size:15px;word-break:break-word}.vp-eq-txt small{margin-top:2px}' +
+    '.vp-eq-este{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:800;background:var(--accent,#8b5cf6);color:#fff;vertical-align:2px}' +
+    '.vp-eq-sw{flex:0 0 auto;min-width:118px;padding:10px 14px;border-radius:12px;font:inherit;font-weight:800;font-size:14px;cursor:pointer;border:2px solid #9a9aa8;background:transparent;color:inherit}' +
+    '.vp-eq.on .vp-eq-sw{border-color:#2fbf6b;background:#2fbf6b;color:#04220f}' +
+    '.vp-eq-mas{flex:1 1 100%;display:flex;gap:6px;flex-wrap:wrap}.vp-eq-mas .btn-ghost{padding:4px 10px;font-size:13px}' +
     '.vp-doc{display:grid;grid-template-columns:96px 1fr;gap:8px}.vp-doc select,.vp-doc input{font-size:18px;min-height:48px}' +
     '.vp-grande{width:100%;min-height:52px;margin-top:12px;font-size:16px}' +
     '.vp-otp{width:100%;box-sizing:border-box;font:800 34px/1.2 ui-monospace,monospace;letter-spacing:.35em;text-align:center;padding:12px 6px;min-height:64px}' +
@@ -626,7 +666,7 @@
           ((!miDispositivo() || est.revocado) ? '<button type="button" class="btn-ghost" id="vpAutorizar">📱 Autorizar este celular</button>' : '') + '</div>';
         if(admin && info.webhook_wompi) html += '<div class="settings-row" style="flex-direction:column;align-items:stretch;gap:6px"><div class="settings-row-text"><strong>Eventos de Wompi ' + (r.webhook === 'recibiendo' ? '<span class="vp-ok">✅ recibiendo</span>' : '<span class="vp-pend">⏳ esperando el primero</span>') + '</strong><span>Pégala una vez en Wompi → Desarrolladores → «URL de Eventos». Mientras tanto ORDEVA consulta el estado de cada cobro, así que igual funciona.</span></div><input class="mz-in vp-url" readonly id="vpHook" value="' + esc(info.webhook_wompi) + '"><div class="mz-actions"><button type="button" class="btn-ghost" id="vpCopHook">📋 Copiar URL de eventos</button><a class="btn-ghost" href="https://comercios.wompi.co" target="_blank" rel="noopener">Abrir Wompi</a></div></div>';
         html += '<div class="settings-row" style="flex-direction:column;align-items:stretch"><div class="settings-row-text"><strong>Últimos pagos en el servidor</strong></div><div class="vp-hist" id="vpHist"></div></div>';
-        if(admin) html += '<div class="settings-row" style="flex-direction:column;align-items:stretch"><div class="settings-row-text"><strong>🔊 Equipos y dónde suenan los pagos</strong><span>Cada celular, tablet o computador que entra a ORDEVA con tu negocio sale aquí. Elige en cuáles <b>suenan</b> los avisos de pago (voz, sonido y notificación): en los demás el pago igual llega a la lista, sin sonar. Ponles nombre (✏️) para reconocerlos. Puedes retirar uno perdido.</span></div><div class="vp-hist" id="vpDevs">Cargando…</div><div class="settings-desc" id="vpDevsAviso"></div></div>';
+        if(admin) html += '<div class="settings-row" style="flex-direction:column;align-items:stretch"><div class="settings-row-text"><strong>🔊 Celulares y dónde suenan los pagos</strong><span>Cada celular, tablet o computador de tu negocio, con su marca y modelo. El tuyo dice <b>ESTE CELULAR</b>.</span></div><div class="vp-hist" id="vpDevs">Cargando…</div><div class="settings-desc" id="vpDevsAviso"></div></div>';
         if(puedeCaja() && miDispositivo() && !(window.VentoAndroid && window.VentoAndroid.pagosAvisosTomar)) html += '<details class="settings-desc"><summary><b>Avisos del celular (método auxiliar, MacroDroid)</b></summary><p style="margin:8px 0 0">Si quieres que también cuenten las notificaciones de la app Nequi/DaviPlata de ESTE celular (por ejemplo, transferencias normales a tu número), en MacroDroid crea una macro: disparador <b>Notificación recibida</b> (apps Nequi y DaviPlata) → acción <b>Solicitud HTTP POST</b> a esta dirección, con el cuerpo <b>[app] | [título] | [texto]</b>. Quedan marcadas como «aviso del celular» (no verificadas por la entidad).</p><input class="mz-in vp-url" readonly id="vpAvisoUrl" value="' + esc((info.aviso_url || (base() + '/aviso')) + '/' + miDispositivo().token) + '"><div class="mz-actions"><button type="button" class="btn-ghost" id="vpCopAviso">📋 Copiar dirección</button></div></details>';
       }
       g.innerHTML = html;
@@ -673,12 +713,18 @@
     // dispositivos_lista (1.62.0) trae «suena»; si el servidor todavía no la tiene, la de antes.
     rpc('dispositivos_lista', { p_negocio: n.id }).catch(function(){ return rpc('mis_dispositivos', { p_negocio: n.id }); }).then(function(l){
       var mio = miDispositivo(), conSuena = (l || []).some(function(d){ return typeof d.suena === 'boolean'; });
-      el.innerHTML = (l || []).map(function(d){
-        var suena = d.suena !== false;
-        return '<div><span>' + (conSuena ? (suena ? '🔊 ' : '🔕 ') : '') + esc(d.nombre) + (mio && mio.id === d.id ? ' <b>(este)</b>' : '') + '<small>' + esc(d.usuario || '') + ' · ' + nombreRol(d.rol) + ' · visto ' + new Date(d.ultimo_visto).toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + (d.push ? ' · 🔔' : '') + '</small></span>' +
-          '<span class="vp-nw">' + (conSuena ? '<button type="button" class="btn-ghost" data-suena="' + esc(d.id) + '" data-v="' + (suena ? '0' : '1') + '" style="padding:4px 10px" title="' + (suena ? 'Que NO suene aquí' : 'Que suene aquí') + '">' + (suena ? '🔊 Suena' : '🔕 No suena') + '</button> ' : '') +
-          '<button type="button" class="btn-ghost" data-nom="' + esc(d.id) + '" data-actual="' + esc(d.nombre) + '" style="padding:4px 8px" title="Ponerle nombre">✏️</button> ' +
-          '<button type="button" class="btn-ghost" data-rev="' + esc(d.id) + '" style="padding:4px 10px">Retirar</button></span></div>';
+      // Primero ESTE celular, luego los que están conectados ahora.
+      l = (l || []).slice().sort(function(x, y){ return (mio && y.id === mio.id) - (mio && x.id === mio.id) || (Date.parse(y.ultimo_visto) || 0) - (Date.parse(x.ultimo_visto) || 0); });
+      el.innerHTML = '<div class="vp-eq-ayuda">Toca el botón de cada uno para elegir si <b>SUENA</b> (voz, sonido y aviso) cuando llega un pago. En los que no suenan, el pago igual queda en la lista.</div>' +
+        l.map(function(d){
+        var suena = d.suena !== false, este = mio && mio.id === d.id, ms = Date.now() - (Date.parse(d.ultimo_visto) || 0);
+        var vivo = ms < 2 * 60e3, estado = vivo ? '🟢 Conectado ahora' : ms < 30 * 60e3 ? '🟡 Visto ' + haceTxt(ms) : '⚪ Visto ' + haceTxt(ms) + ' (cerrado o dormido: no va a sonar)';
+        return '<div class="vp-eq' + (este ? ' este' : '') + (suena ? ' on' : '') + '">' +
+          '<div class="vp-eq-txt"><b>' + esc(nombreVer(d)) + '</b>' + (este ? '<span class="vp-eq-este">ESTE CELULAR</span>' : '') +
+          '<small>' + estado + ' · ' + esc(d.usuario || '') + ' (' + nombreRol(d.rol) + ')</small></div>' +
+          (conSuena ? '<button type="button" class="vp-eq-sw" data-suena="' + esc(d.id) + '" data-v="' + (suena ? '0' : '1') + '" aria-pressed="' + suena + '">' + (suena ? '🔊 SUENA' : '🔕 NO SUENA') + '</button>' : '') +
+          '<span class="vp-eq-mas"><button type="button" class="btn-ghost" data-nom="' + esc(d.id) + '" data-actual="' + esc(nombreAuto(d.nombre) ? '' : d.nombre) + '" title="Ponerle nombre (ej. Caja, Celular de Ana)">✏️ Nombre</button>' +
+          '<button type="button" class="btn-ghost" data-rev="' + esc(d.id) + '">Retirar</button></span></div>';
       }).join('') || '<div class="empty-note">Ninguno.</div>';
       var av = document.getElementById('vpDevsAviso');
       if(av) av.textContent = conSuena && (l || []).length && !(l || []).some(function(d){ return d.suena !== false; }) ? '⚠️ Ningún equipo va a sonar con los pagos: elige al menos uno.' : '';
@@ -694,7 +740,7 @@
           return;
         }
         if(bn){
-          var nom = prompt('Nombre para este equipo (ej. Caja, Barra, Celular de Ana):', bn.dataset.actual || ''); if(nom == null || !nom.trim()) return;
+          var nom = prompt('Nombre para reconocer este equipo (ej. Caja, Barra, Celular de Ana):', bn.dataset.actual || ''); if(nom == null || !nom.trim()) return;
           rpc('dispositivo_nombre', { p_dispositivo: bn.dataset.nom, p_nombre: nom.trim().slice(0, 60) }).then(function(){ pintarDispositivos(); }, function(x){ toast('⚠️ No se pudo: ' + (x && x.message || x), 6000); });
           return;
         }

@@ -77,6 +77,11 @@ async function pruebas(sb) {
   const am = (pdM.pagos || []).find((x) => x.id === av.id) || {}, ad = (pdD.pagos || []).find((x) => x.id === av.id) || {};
   chk('Android del mesero: el pago (valor y mesa) sin quién pagó', pdM.ok && am.monto === 20000 && am.pagador === null && am.detalle === null, am);
   chk('Android del dueño: completo', pdD.ok && ad.pagador === 'JUAN PÉREZ', ad);
+  // 1.65.2: Android sabe del servidor si ESTE celular suena (no de la página, que con el celular bloqueado duerme).
+  chk('pagos_dispositivo dice «suena» (por defecto sí)', pdD.suena === true && pdM.suena === true, { d: pdD.suena, m: pdM.suena });
+  await sb.sql("update dispositivos set suena = false where token_hash = encode(extensions.digest($1, 'sha256'), 'hex')", [tD]);
+  chk('… y «no suena» en el celular que el dueño eligió callar', (await rpc('pagos_dispositivo', { p_token: tD, p_desde: null })).j.suena === false);
+  await sb.sql("update dispositivos set suena = true where token_hash = encode(extensions.digest($1, 'sha256'), 'hex')", [tD]);
 
   // ---------- Los avisos en los datos del negocio ----------
   const lista = [

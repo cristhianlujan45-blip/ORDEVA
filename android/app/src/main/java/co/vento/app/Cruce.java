@@ -109,6 +109,9 @@ final class Cruce {
                     VentoApp.js("try{window.ventoPagosCruceMal&&window.ventoPagosCruceMal(" + VentoApp.q(r.optString("error")) + ")}catch(e){}");
                     return;
                 }
+                // 1.65.2: si ESTE celular suena lo dice el servidor (lo elige el dueño), no la página: con el celular
+                // bloqueado la página duerme y su dato podía quedar viejo, y los pagos solo sonaban al desbloquear.
+                if (r.has("suena")) sp(c).edit().putBoolean("pagosSuena", r.optBoolean("suena", true)).apply();
                 JSONArray l = r.optJSONArray("pagos");
                 boolean primera = desde.isEmpty(), jefe = "dueno".equals(r.optString("rol")) || "admin".equals(r.optString("rol"));
                 String yo = r.optString("dispositivo"), max = desde, ahora = r.optString("ahora");

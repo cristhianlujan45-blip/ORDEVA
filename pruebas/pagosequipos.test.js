@@ -238,5 +238,17 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     await CEL.p.click('#vpChequeo [data-ck="bat"]'); await CEL.p.click('#vpChequeo [data-ck="auto"]');
     chk('8. … «Arreglar» abre el ahorro de batería y «Abrir inicio automático» el de la marca', await CEL.p.evaluate(() => window.__and.abrioBateria === 1 && window.__and.abrioAuto === 1));
     chk('8. 🩺 Chequeo: servidor, este equipo autorizado y los 3 equipos de la cuenta con «escuchando»', ck && /Servidor ORDEVA/.test(ckTxt) && /Este equipo autorizado/.test(ckTxt) && (ckTxt.match(/🟢/g) || []).length >= 3, ckTxt.slice(0, 900));
+    // ===== 9. 1.65.2: mientras la página vuelve a autorizar el celular, Android NO pierde su conexión directa =====
+    // Antes, si esa autorización no salía (página dormida con el celular bloqueado, sin internet un momento), Android se
+    // quedaba sin pagos de los otros equipos ni reenvío al instante hasta abrir la app.
+    const tokAntes = await CEL.p.evaluate(() => JSON.parse(window.__and.cruce || '{}').token);
+    const r9 = await CEL.p.evaluate(async () => {
+      window.ventoPagos.estado().revocado = true;              // como si el servidor lo hubiera rechazado y aún no se reautoriza
+      for(let i = 0; i < 2; i++){ window.ventoPagosLatido(); await new Promise(r => setTimeout(r, 5000)); }
+      const t = JSON.parse(window.__and.cruce || '{}').token || '';
+      window.ventoPagos.estado().revocado = false;
+      return t;
+    });
+    chk('9. Mientras se vuelve a autorizar, Android sigue con su conexión directa (el mismo token): no se calla con el celular bloqueado', !!tokAntes && r9 === tokAntes, { antes: tokAntes, ahora: r9 });
   }
 })();
