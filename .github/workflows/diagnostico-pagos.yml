@@ -1,6 +1,7 @@
 # ORDEVA · 🔎 Diagnóstico de los avisos de pago (SOLO LECTURA, se corre a mano).
 # Responde: ¿están llegando pagos al servidor? ¿de qué equipos? ¿hay equipos con los pagos callados? ¿qué avisos del banco
 # no se tomaron? Todo en cuentas y conteos: sin nombres de quien paga, teléfonos ni correos. No cambia nada.
+# También: los demás errores de los equipos (página caída, cierres de la app) y cada equipo del negocio (sin nombres).
 name: Diagnóstico de pagos
 
 on:
@@ -41,6 +42,19 @@ jobs:
             'avisos_no_tomados', (select coalesce(json_agg(x), '[]') from (
                 select left(negocio_id::text, 8) neg, left(mensaje, 140) mensaje, left(coalesce(detalle->>'texto', ''), 160) texto, version, plataforma, veces, (ultimo at time zone 'America/Bogota')::text ultimo
                 from app_errores where tipo = 'pago' and ultimo > now() - interval '72 hours' order by ultimo desc limit 40) x),
+            'otros_errores', (select coalesce(json_agg(x), '[]') from (
+                select tipo, left(mensaje, 160) mensaje, left(coalesce(pagina, ''), 30) pagina, version, plataforma, left(coalesce(modelo, ''), 40) modelo, veces,
+                       (primero at time zone 'America/Bogota')::text primero, (ultimo at time zone 'America/Bogota')::text ultimo
+                from app_errores where tipo <> 'pago' and ultimo > now() - interval '96 hours' order by ultimo desc limit 60) x),
+            'equipos_detalle', (select coalesce(json_agg(x), '[]') from (
+                select left(d.negocio_id::text, 8) neg, coalesce(m.rol, '?') rol, d.suena, d.push is not null con_push, left(coalesce(d.plataforma, ''), 60) plataforma,
+                       (d.creado_en at time zone 'America/Bogota')::text creado, (d.ultimo_visto at time zone 'America/Bogota')::text ultimo_visto
+                from dispositivos d left join miembros m on m.negocio_id = d.negocio_id and m.usuario_id = d.usuario_id
+                where d.revocado_en is null and d.ultimo_visto > now() - interval '7 days' order by d.ultimo_visto desc limit 20) x),
+            'pagos_ultimas_horas', (select coalesce(json_agg(x), '[]') from (
+                select left(negocio_id::text, 8) neg, metodo, confianza, (creado_en at time zone 'America/Bogota')::text creado,
+                       extract(epoch from (actualizado_en - creado_en))::int seg_hasta_actualizado
+                from pagos where creado_en > now() - interval '30 hours' order by creado_en desc limit 60) x),
             'versiones_en_uso', (select coalesce(json_agg(x), '[]') from (
                 select version, plataforma, count(distinct equipo) equipos, (max(ultimo) at time zone 'America/Bogota')::text ultimo
                 from app_errores where ultimo > now() - interval '72 hours' group by 1, 2 order by max(ultimo) desc limit 20) x)
