@@ -181,6 +181,7 @@ document.getElementById('productLabelsBtn').addEventListener('click', () => {
    códigos de barras. Queda abierta para escanear varios seguidos: fácil de
    usar, sin tener que volver a tocar el botón cada vez. */
 let scanStream = null, scanDetector = null, scanTimer = null, scanLastCode = null, scanLastAt = 0, scanOnResult = null, scanVivo = false;
+let scanVez = 0;   // cada apertura/cierre suma 1: lo que termina tarde (cámara, lector) de una apertura vieja no se mete en la nueva
 // Formatos que se piden: los que el celular sí sabe leer (pedir uno que no soporta rompe el lector en algunos equipos).
 const SCAN_FORMATOS = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'qr_code', 'code_39', 'itf', 'codabar'];
 
@@ -202,6 +203,13 @@ function scanBeep(){
 // Código leído: si con él se agregó un producto, su «tún» (Sonidos POS) ya confirma la lectura y no se pita encima.
 function scanLeido(raw){
   const t0 = Date.now();
+  // 📱 El QR de «Usar el celular como lector» de otro equipo, leído con este celular: este celular pasa a ser el lector.
+  if(/\/lector\.html#c=lc[A-Za-z0-9]{20,40}$/.test(String(raw || '').trim())){
+    try{
+      const u = new URL(String(raw).trim());
+      if(u.origin === location.origin){ closeScanOverlay(); location.href = u.href; return; }
+    }catch(e){}
+  }
   if(navigator.vibrate) try{ navigator.vibrate(60); }catch(e){}
   try{ if(scanOnResult) scanOnResult(raw); }
   finally{ if(!(window.ventoSonidos && window.ventoSonidos.ultimo() >= t0)) scanBeep(); }
@@ -211,10 +219,42 @@ function closeScanOverlay(){
   const ov = document.getElementById('scanOverlay');
   if(ov) ov.classList.remove('show');
   if(scanTimer){ clearInterval(scanTimer); scanTimer = null; }
-  scanVivo = false;
+  scanVivo = false; scanVez++;
   const tb = document.getElementById('scanTorchBtn'); if(tb){ tb.hidden = true; tb.classList.remove('on'); }
   if(scanStream){ scanStream.getTracks().forEach(t => t.stop()); scanStream = null; }
+  try{ if(window.ventoLectorCel) window.ventoLectorCel.cerrar(); }catch(e){}
   scanDetector = null; scanOnResult = null; scanLastCode = null;
+}
+
+/* 1.65.0: 📱 el celular como lector (lib/vento-lector-cel.js): mientras esta ventana está abierta, lo que lea el celular
+   emparejado llega aquí igual que si lo hubiera leído esta cámara. Y por cable: el celular conectado por USB como
+   cámara web (o DroidCam / Iriun) sale en «Cámara» para elegirlo; queda recordada en este equipo. */
+const SCAN_CAM_LS = 'vento_scan_cam';
+async function scanAbrirCamara(){
+  let cam = ''; try{ cam = localStorage.getItem(SCAN_CAM_LS) || ''; }catch(e){}
+  const pedir = v => navigator.mediaDevices.getUserMedia({ video: v });
+  /* Cámara en buena resolución y con enfoque continuo: con la cámara por defecto (baja
+     resolución, sin autoenfoque) los códigos pequeños o de cerca no se leían. Si el celular
+     no acepta estas opciones, se abre la cámara normal. */
+  const buena = { width: { ideal: 1280 }, height: { ideal: 720 }, advanced: [{ focusMode: 'continuous' }] };
+  if(cam){
+    try{ return await pedir(Object.assign({ deviceId: { exact: cam } }, buena)); }catch(e){}
+    try{ return await pedir({ deviceId: { exact: cam } }); }catch(e){}   // ya no está conectada: la de siempre
+  }
+  try{ return await pedir(Object.assign({ facingMode: 'environment' }, buena)); }
+  catch(e){ return await pedir({ facingMode: 'environment' }); }
+}
+// «Cámara»: solo sale con más de una (la del computador y el celular por cable, por ejemplo).
+async function scanPintarCamaras(){
+  const sel = document.getElementById('scanCamSel'), fila = document.getElementById('scanCamRow');
+  if(!sel || !fila) return;
+  let cams = [];
+  try{ cams = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput'); }catch(e){}
+  if(cams.length < 2){ fila.hidden = true; return; }
+  const actual = scanStream && scanStream.getVideoTracks()[0] && scanStream.getVideoTracks()[0].getSettings ? scanStream.getVideoTracks()[0].getSettings().deviceId : '';
+  sel.innerHTML = cams.map((c, i) => '<option value="' + invEsc(c.deviceId) + '">' + invEsc(c.label || ('Cámara ' + (i + 1))) + (/android|phone|celular|droidcam|iriun|usb/i.test(c.label || '') ? ' 📱' : '') + '</option>').join('');
+  if(actual) sel.value = actual;
+  fila.hidden = false;
 }
 
 async function openScanOverlay(onResult, opts){
@@ -224,33 +264,40 @@ async function openScanOverlay(onResult, opts){
   const status = document.getElementById('scanStatus');
   if(!ov || !video) return;
   closeScanOverlay();
+  const vez = scanVez;
   ov.classList.add('show');
-  status.textContent = opts.hint || i18nPut('Apunta la cámara al código del producto.');
+  const hint = opts.hint || i18nPut('Apunta la cámara al código del producto.');
+  status.textContent = hint;
   scanOnResult = onResult;
-  if(!('BarcodeDetector' in window)){
-    status.textContent = 'Tu navegador no soporta lectura de códigos por cámara (usa Chrome en Android). Busca el producto a mano.';
+  try{ if(window.ventoLectorCel) window.ventoLectorCel.abrir(hint, raw => { if(scanVez === vez && scanOnResult) scanLeido(raw); }); }catch(e){}
+  const sinCamara = msg => {
+    status.textContent = msg + (window.ventoLectorCel ? ' Puedes usar tu celular como lector (abajo).' : '');
+    try{ if(window.ventoLectorCel) window.ventoLectorCel.mostrar(true); }catch(e){}
+  };
+  if(!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)){ sinCamara('Este equipo no deja usar la cámara aquí.'); return; }
+  // El lector: el del equipo (Chrome en Android y Mac) o ZXing (programa de PC en Windows, iPhone).
+  const lector = window.ventoCodigos ? window.ventoCodigos.detector(SCAN_FORMATOS) : Promise.reject(new Error('sin_lector'));
+  lector.catch(() => {});
+  let stream;
+  try{ stream = await scanAbrirCamara(); }
+  catch(e){
+    if(scanVez !== vez) return;
+    sinCamara(e && e.name === 'NotFoundError' ? 'Este equipo no tiene cámara.' : 'No se pudo abrir la cámara. Revisa los permisos del navegador para esta página.');
     return;
   }
-  /* Cámara en buena resolución y con enfoque continuo: con la cámara por defecto (baja
-     resolución, sin autoenfoque) los códigos pequeños o de cerca no se leían. Si el celular
-     no acepta estas opciones, se abre la cámara normal. */
-  try{
-    scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 }, advanced: [{ focusMode: 'continuous' }] } });
-  }catch(e){
-    try{ scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }); }
-    catch(e2){ status.textContent = 'No se pudo abrir la cámara. Revisa los permisos del navegador para esta página.'; return; }
-  }
+  if(scanVez !== vez){ stream.getTracks().forEach(t => t.stop()); return; }
+  scanStream = stream;
   video.srcObject = scanStream;
   try{ await video.play(); }catch(e){}
-  try{
-    let formatos = SCAN_FORMATOS;
-    try{ const sop = await BarcodeDetector.getSupportedFormats(); if(sop && sop.length) formatos = SCAN_FORMATOS.filter(f => sop.includes(f)); }catch(e){}
-    scanDetector = new BarcodeDetector({ formats: formatos.length ? formatos : ['ean_13', 'qr_code'] });
-  }catch(e){
-    status.textContent = 'Tu navegador no soporta lectura de códigos por cámara. Busca el producto a mano.';
-    closeScanOverlay();
+  scanPintarCamaras();
+  try{ scanDetector = await lector; }
+  catch(e){
+    if(scanVez !== vez) return;
+    scanDetector = null;
+    sinCamara('No se pudo preparar el lector de códigos de esta cámara (revisa el internet).');
     return;
   }
+  if(scanVez !== vez){ scanDetector = null; return; }
   // Linterna (en un bar suele estar oscuro): solo si la cámara la tiene.
   try{
     const track = scanStream.getVideoTracks()[0], cap = track && track.getCapabilities ? track.getCapabilities() : {};
@@ -264,17 +311,18 @@ async function openScanOverlay(onResult, opts){
     }
   }catch(e){}
   /* Se lee en cada cuadro del video (antes cada 350 ms): el código sale apenas entra en
-     cámara. Nunca se lanzan dos lecturas a la vez, para no trabar celulares lentos. */
+     cámara. Nunca se lanzan dos lecturas a la vez, para no trabar celulares lentos. Con ZXing
+     (sin lector propio del equipo) se lee cada 120 ms: así no se come el procesador del computador. */
   scanVivo = true;
   let ocupado = false;
   const leer = async () => {
-    if(!scanVivo) return;
+    if(!scanVivo || scanVez !== vez) return;
     if(!ocupado && scanDetector && video.videoWidth){
       ocupado = true;
       try{
         const codes = await scanDetector.detect(video);
         const c0 = codes && codes.find(c => c && c.rawValue);
-        if(c0){
+        if(c0 && scanVez === vez){
           const raw = c0.rawValue, now = Date.now();
           // Mientras el código siga en cámara no se repite (antes se volvía a sumar cada 1,5 s si
           // se dejaba quieto). Para sumar otra unidad del mismo, se retira un momento y se vuelve a mostrar.
@@ -286,10 +334,19 @@ async function openScanOverlay(onResult, opts){
       }catch(e){}
       ocupado = false;
     }
-    if(scanVivo) (video.requestVideoFrameCallback ? video.requestVideoFrameCallback(leer) : requestAnimationFrame(leer));
+    if(!scanVivo || scanVez !== vez) return;
+    if(scanDetector && scanDetector.zxing) setTimeout(leer, 120);
+    else (video.requestVideoFrameCallback ? video.requestVideoFrameCallback(leer) : requestAnimationFrame(leer));
   };
   leer();
 }
+
+document.getElementById('scanCamSel').addEventListener('change', e => {
+  try{ localStorage.setItem(SCAN_CAM_LS, e.target.value); }catch(x){}
+  // Se vuelve a abrir con la cámara elegida, con lo mismo que se estaba escaneando.
+  const fn = scanOnResult, hint = document.getElementById('scanStatus').textContent;
+  if(fn) openScanOverlay(fn, { hint });
+});
 
 document.getElementById('scanCloseBtn').addEventListener('click', closeScanOverlay);
 document.getElementById('scanCloseBtn2').addEventListener('click', closeScanOverlay);
