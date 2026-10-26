@@ -82,6 +82,26 @@ async function pruebas(sb) {
   await sb.sql("update dispositivos set suena = false where token_hash = encode(extensions.digest($1, 'sha256'), 'hex')", [tD]);
   chk('… y «no suena» en el celular que el dueño eligió callar', (await rpc('pagos_dispositivo', { p_token: tD, p_desde: null })).j.suena === false);
   await sb.sql("update dispositivos set suena = true where token_hash = encode(extensions.digest($1, 'sha256'), 'hex')", [tD]);
+  // 1.65.3: el pago les llega AL INSTANTE a todos: pagos_dispositivo le da a Android el canal en vivo del negocio y el
+  // servidor avisa por ahí apenas un pago queda aprobado (aquí realtime.send se simula y se anota).
+  chk('pagos_dispositivo le da a Android el canal en vivo secreto del negocio (el mismo para todos sus celulares)', /^vp-[0-9a-f]{32}$/.test(pdD.vivo || '') && pdD.vivo === pdM.vivo && !String(pdD.vivo).includes(NEG), { d: pdD.vivo, m: pdM.vivo });
+  await sb.sql(`create schema if not exists realtime;
+    create table if not exists realtime.enviados(t timestamptz default clock_timestamp(), payload jsonb, evento text, topic text);
+    create or replace function realtime.send(payload jsonb, event text, topic text, private boolean default true) returns void language sql as $$ insert into realtime.enviados(payload, evento, topic) values (payload, event, topic) $$;`);
+  const nuevoPago = await uno(`insert into pagos(negocio_id, referencia, proveedor, metodo, canal, monto, estado, confianza, verificado, aprobado_en)
+    values ($1, 'AV-instante', 'dispositivo', 'NEQUI', 'notificacion', 7000, 'aprobado', 'app', false, now()) returning id`, [NEG]);
+  let env = await sb.sql("select topic, evento, payload from realtime.enviados");
+  chk('Pago aprobado: el servidor avisa en vivo por el canal del negocio, sin datos del pago', env.length === 1 && env[0].topic === pdD.vivo && env[0].evento === 'p' && !JSON.stringify(env[0].payload).includes('7000'), env);
+  const pend = await uno(`insert into pagos(negocio_id, referencia, proveedor, metodo, canal, monto, estado) values ($1, 'VNT-espera', 'wompi', 'NEQUI', 'push', 9000, 'pendiente') returning id`, [NEG]);
+  env = await sb.sql("select topic from realtime.enviados");
+  chk('Un cobro que todavía espera el pago no avisa', env.length === 1, env.length);
+  await sb.sql("update pagos set estado = 'aprobado', aprobado_en = now() where id = $1", [pend.id]);
+  env = await sb.sql("select topic from realtime.enviados");
+  chk('… y avisa en el instante en que queda pagado', env.length === 2, env.length);
+  await sb.sql("update pagos set detalle = 'otra cosa' where id = $1", [pend.id]);
+  chk('Cambiar otra cosa del pago no vuelve a avisar', (await sb.sql("select count(*)::int n from realtime.enviados"))[0].n === 2);
+  await sb.sql('delete from pagos where id = any($1)', [[nuevoPago.id, pend.id]]);
+  await sb.sql('drop table realtime.enviados; drop function realtime.send(jsonb, text, text, boolean);');
 
   // ---------- Los avisos en los datos del negocio ----------
   const lista = [

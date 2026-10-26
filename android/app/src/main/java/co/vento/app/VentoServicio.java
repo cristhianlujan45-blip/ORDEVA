@@ -54,9 +54,27 @@ public class VentoServicio extends Service {
         @Override public void run() {
             if (!activo) return;
             try { Cruce.revisar(VentoServicio.this); } catch (Throwable ignorado) { }
+            try { vigilarEnVivo(); } catch (Throwable ignorado) { }
             VentoApp.ui.postDelayed(this, Cruce.CADA_MS);
         }
     };
+
+    /* ⚡ 1.65.3: conexión en vivo con el servidor (EnVivo): apenas un pago queda aprobado en cualquier equipo, el servidor
+       avisa y aquí se pregunta en ese instante, en vez de esperar la siguiente pregunta (hasta 2,5 s). La pregunta cada
+       2,5 s sigue de respaldo. Se abre con el canal que da el servidor y se cambia si cambia el negocio o el servidor. */
+    private EnVivo enVivo;
+    private String enVivoClave = "";
+    private void vigilarEnVivo() {
+        org.json.JSONObject k = Cruce.cfg(this);
+        String url = k.optString("url"), key = k.optString("key"), t = Cruce.vivo;
+        String clave = url.isEmpty() || key.isEmpty() || t == null ? "" : url + "|" + key + "|" + t;
+        if (clave.equals(enVivoClave) && (enVivo != null || clave.isEmpty())) return;
+        if (enVivo != null) { enVivo.parar(); enVivo = null; }
+        enVivoClave = clave;
+        if (clave.isEmpty()) return;
+        enVivo = new EnVivo(url, key, t, () -> Cruce.revisar(VentoServicio.this));
+        enVivo.iniciar();
+    }
 
     private int vueltas = 0, sinEscucha = 0;
 
@@ -142,6 +160,7 @@ public class VentoServicio extends Service {
         activo = false;
         VentoApp.ui.removeCallbacks(latido);
         VentoApp.ui.removeCallbacks(cruce);
+        if (enVivo != null) { enVivo.parar(); enVivo = null; enVivoClave = ""; }
         try { if (cpu != null && cpu.isHeld()) cpu.release(); } catch (Exception ignorado) { }
         try { if (wifi != null && wifi.isHeld()) wifi.release(); } catch (Exception ignorado) { }
         super.onDestroy();
