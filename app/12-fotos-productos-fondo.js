@@ -418,7 +418,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-26 · v1.65.0';
+const MESORA_VERSION = '2026-10-26 · v1.65.1';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'ORDEVA · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 /* 🔄 La app Android se actualiza SOLA (Actualizador): revisa cada 3 h, baja la versión nueva y la instala cuando no se
@@ -1126,6 +1126,38 @@ function tvSinLista(msg){
   showToast('📺 ' + msg, 9000);
   const d = document.getElementById('tvOptCodigo'); if(d){ d.open = true; setTimeout(() => d.scrollIntoView({ block: 'start', behavior: 'smooth' }), 300); }
 }
+/* 1.65.1 · Con el celular bloqueado no llegaban ni pedidos ni pagos (en todos los celulares): los avisos del banco quedaban
+   en la barra y se leían todos juntos al desbloquear. Eso pasa cuando el «trabajo de fondo» (el aviso fijo «ORDEVA está
+   trabajando») no está prendido o el celular tiene a ORDEVA con ahorro de batería: Android congela la app al bloquear.
+   Cada vez que se abre ORDEVA (o se vuelve a ella) se revisa: si el trabajo de fondo se apagó sin que el dueño lo apagara
+   a propósito en Ajustes (por ejemplo con «Detener» en el aviso fijo, o después de reinstalar la app), se prende solo;
+   y si tiene ahorro de batería, se avisa con el botón para quitarlo. Las dos cosas quedan en 🐞 Errores del panel. */
+const FONDO_APAGADO_KEY = 'vento-fondo-apagado';   // '1' = el dueño lo apagó a propósito en Ajustes
+let fondoAvisoBat = 0;
+function revisarFondoApp(){
+  const A = window.VentoAndroid;
+  if(!A || typeof A.fondo !== 'function' || typeof A.fondoActivar !== 'function' || document.hidden) return;
+  if(typeof authUser === 'undefined' || !authUser) return;
+  let aPropos = false; try{ aPropos = localStorage.getItem(FONDO_APAGADO_KEY) === '1'; }catch(e){}
+  let p = {}; try{ p = JSON.parse(A.permisos ? A.permisos() || '{}' : '{}'); }catch(e){}
+  const reportar = (k, msg) => { try{ window.ventoError && window.ventoError('otro', msg, { bateria: p.bateria, fondo: p.fondo }, 'fondo|' + k); }catch(e){} };
+  if(!A.fondo() && !aPropos){
+    A.fondoActivar(true);
+    reportar('apagado', 'El trabajo de fondo estaba apagado en la app (se prendió solo): con el celular bloqueado no llegaban pedidos ni pagos');
+    showToast('🔋 ORDEVA vuelve a trabajar de fondo: con el celular bloqueado te siguen llegando los pedidos y los pagos.', 7000);
+  }
+  if(p.bateria === false && Date.now() - fondoAvisoBat > 6 * 3600e3){
+    fondoAvisoBat = Date.now();
+    reportar('bateria', 'ORDEVA con ahorro de batería: con el celular bloqueado Android la congela (no llegan pedidos ni pagos)');
+    if(typeof showConfirm === 'function' && typeof A.ajustesBateria === 'function'){
+      showConfirm({ icon: '🔋', title: 'Para que te lleguen los avisos con el celular bloqueado',
+        message: 'Este celular tiene a ORDEVA con ahorro de batería: al bloquearlo, Android la congela y no te llegan los pedidos ni los pagos hasta desbloquearlo. Toca «Arreglar» y elige «Sin restricciones» (o «Permitir»).',
+        confirmText: 'Arreglar', cancelText: 'Luego' }).then(ok => { if(ok) try{ A.ajustesBateria(); }catch(e){} });
+    }
+  }
+}
+document.addEventListener('visibilitychange', () => { if(!document.hidden) setTimeout(() => { try{ revisarFondoApp(); }catch(e){} }, 1500); });
+setTimeout(() => { try{ revisarFondoApp(); }catch(e){} }, 6000);
 function iniCast(){
   if(!document.getElementById('castPres')) return;
   const tb = document.getElementById('tvTransmitir'); if(tb) tb.onclick = tvTransmitirToque;
@@ -1134,7 +1166,7 @@ function iniCast(){
     if(A && typeof A.fondo === 'function' && fila && sw){
       fila.hidden = false; bat.hidden = false;
       sw.checked = !!A.fondo();
-      sw.onchange = () => { A.fondoActivar(sw.checked); showToast(sw.checked ? '🔋 ORDEVA seguirá trabajando con la app cerrada (verás un aviso fijo en la barra).' : 'ORDEVA solo trabajará con la app abierta.', 6000); setTimeout(() => { try{ sw.checked = !!A.fondo(); }catch(e){} }, 1500); };
+      sw.onchange = () => { try{ if(sw.checked) localStorage.removeItem(FONDO_APAGADO_KEY); else localStorage.setItem(FONDO_APAGADO_KEY, '1'); }catch(e){} A.fondoActivar(sw.checked); showToast(sw.checked ? '🔋 ORDEVA seguirá trabajando con la app cerrada (verás un aviso fijo en la barra).' : 'ORDEVA solo trabajará con la app abierta.', 6000); setTimeout(() => { try{ sw.checked = !!A.fondo(); }catch(e){} }, 1500); };
       bat.onclick = () => { try{ A.ajustesBateria(); }catch(e){} };
       const pb = document.getElementById('apkPermisos'), pt = document.getElementById('apkPermisosTxt');
       if(pb && typeof A.permisos === 'function'){
