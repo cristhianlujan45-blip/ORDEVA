@@ -55,6 +55,18 @@ jobs:
                 select left(negocio_id::text, 8) neg, metodo, confianza, (creado_en at time zone 'America/Bogota')::text creado,
                        extract(epoch from (actualizado_en - creado_en))::int seg_hasta_actualizado
                 from pagos where creado_en > now() - interval '30 hours' order by creado_en desc limit 60) x),
+            'quien_lee_avisos', (select coalesce(json_agg(x), '[]') from (
+                select left(coalesce(d.plataforma, e.cuerpo->>'dispositivo', '?'), 60) equipo, count(*) avisos,
+                       (min(e.recibido_en) at time zone 'America/Bogota')::text primero, (max(e.recibido_en) at time zone 'America/Bogota')::text ultimo
+                from pago_eventos e left join dispositivos d on d.id::text = e.cuerpo->>'dispositivo'
+                where e.recibido_en > now() - interval '72 hours' and e.proveedor = 'dispositivo'
+                group by 1 order by 2 desc limit 10) x),
+            'avisos_por_minuto_hoy', (select coalesce(json_agg(x), '[]') from (
+                select to_char(date_trunc('minute', e.recibido_en at time zone 'America/Bogota'), 'MM-DD HH24:MI') minuto,
+                       left(coalesce(d.plataforma, '?'), 40) equipo, count(*) n
+                from pago_eventos e left join dispositivos d on d.id::text = e.cuerpo->>'dispositivo'
+                where e.recibido_en > now() - interval '30 hours' and e.proveedor = 'dispositivo'
+                group by 1, 2 order by 1 desc limit 60) x),
             'versiones_en_uso', (select coalesce(json_agg(x), '[]') from (
                 select version, plataforma, count(distinct equipo) equipos, (max(ultimo) at time zone 'America/Bogota')::text ultimo
                 from app_errores where ultimo > now() - interval '72 hours' group by 1, 2 order by max(ultimo) desc limit 20) x)
