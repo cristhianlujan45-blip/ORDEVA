@@ -170,6 +170,23 @@
       .then(function(){ lsSet('vento_pagos_push', true); return true; });
   }
   function pushActivo(){ return !!lsGet('vento_pagos_push', false) && pushSoportado() && Notification.permission === 'granted'; }
+  /* 1.65.4: con ORDEVA CERRADA en un computador o una tableta (navegador), el pago solo llega por notificación push. Ningún
+     equipo la tenía prendida: se ofrece una vez (y otra a los 3 días si dice «Luego») al dueño, administrador o caja.
+     No en la app Android (avisa ella misma) ni en el programa de PC (sigue trabajando junto al reloj). */
+  var K_PUSH_LUEGO = 'vento-push-luego';
+  function sugerirPush(){
+    var n = negocio(); if(!n || !puedeCaja() || window.VentoAndroid || /VentoPC\//.test(navigator.userAgent || '')) return;
+    if(!pushSoportado() || pushActivo() || Notification.permission === 'denied' || document.hidden) return;
+    var prueba = false; try{ prueba = localStorage.getItem('vento-push-prueba') === '1'; }catch(e){}
+    if(location.protocol !== 'https:' && !prueba) return;   // solo en ORDEVA de verdad (en las pruebas locales no estorba)
+    if(Date.now() < (Number(lsGet(K_PUSH_LUEGO, 0)) || 0)) return;
+    if(typeof window.showConfirm !== 'function') return;
+    lsSet(K_PUSH_LUEGO, Date.now() + 3 * 864e5);
+    window.showConfirm({ icon: '🔔', title: 'Que los pagos te lleguen aunque cierres ORDEVA', confirmText: 'Sí, avisarme', cancelText: 'Luego',
+      message: 'En este equipo, cuando te paguen te sale el aviso al instante aunque ORDEVA esté cerrada (como en el celular). El navegador te va a pedir permiso: toca «Permitir».' })
+      .then(function(ok){ if(ok) activarPush().then(function(){ toast('🔔 Listo: en este equipo te llegan los pagos aunque ORDEVA esté cerrada.', 6000); }, function(e){ toast(e.message, 9000); }); });
+  }
+  window.ventoPagosSugerirPush = sugerirPush;
 
   // ---------- Pagos que llegan del servidor ----------
   var cache = lsGet(K_CACHE, {});          // id → pago (últimos 150)
@@ -365,7 +382,10 @@
   };
 
   function sincronizar(){
-    var n = negocio(); if(!n || est.revisando) return Promise.resolve();
+    var n = negocio(); if(!n) return Promise.resolve();
+    // 1.65.4: si ya hay una pregunta en camino, se pregunta otra vez apenas termine (el aviso en vivo puede llegar justo
+    // después de que esa pregunta salió, y el pago nuevo no venía en ella).
+    if(est.revisando){ est.otraVez = true; return Promise.resolve(); }
     est.revisando = true;
     var desde = lsGet(K_VISTO, {})[n.id] || null;
     return rpc('pagos_desde', { p_negocio: n.id, p_desde: desde, p_limite: 200 }).then(function(l){
@@ -373,7 +393,34 @@
       (l || []).forEach(function(p){ recibir(p, !!desde && Date.parse(p.actualizado_en) > Date.now() - 15 * 60e3); if(!max || p.actualizado_en > max) max = p.actualizado_en; });
       var v = lsGet(K_VISTO, {}); v[n.id] = max || new Date(Date.now() - 2 * 864e5).toISOString(); lsSet(K_VISTO, v);
       est.ultimoSync = Date.now();
-    }).catch(function(){}).then(function(){ est.revisando = false; });
+    }).catch(function(){}).then(function(){ est.revisando = false; if(est.otraVez){ est.otraVez = false; sincronizar(); } });
+  }
+
+  /* ⚡ 1.65.4: el pago llega AL MISMO TIEMPO a todos los equipos (celulares, computador, tabletas, navegador). El servidor
+     avisa por el canal secreto del negocio («vp-…», Supabase Realtime) apenas un pago queda aprobado, y aquí se trae en
+     ese instante. Es el mismo aviso que usa la app Android (EnVivo.java). Sirve para todos los roles (antes la caja y los
+     empleados preguntaban cada 6 s) y no depende del permiso de la tabla de pagos. Si se cae, se vuelve a conectar a los
+     3 s (no a los 15). La pregunta cada 6 / 20 s sigue de respaldo. */
+  function conectarAvisoVivo(){
+    var n = negocio(); if(!n || est.avisoVivo) return;
+    est.avisoVivo = 'conectando';
+    rpc('pagos_canal_vivo', { p_negocio: n.id }).then(function(t){
+      if(!/^vp-[0-9a-f]{32}$/.test(String(t || ''))) throw new Error('sin_canal');
+      return nube().cliente().then(function(c){
+        if(!c.channel) throw new Error('sin_tiempo_real');
+        var cerrado = false, ch = c.channel(t, { config: { broadcast: { self: false, ack: false }, private: false } });
+        est.avisoVivo = ch;
+        ch.on('broadcast', { event: 'p' }, function(){ est.ultimoAvisoVivo = Date.now(); sincronizar(); })
+          .subscribe(function(st){
+            if(st === 'SUBSCRIBED'){ est.avisoVivoOk = true; sincronizar(); return; }   // recién conectado: lo que llegó sin conexión
+            if(cerrado || !(st === 'CHANNEL_ERROR' || st === 'TIMED_OUT' || st === 'CLOSED')) return;
+            cerrado = true; est.avisoVivoOk = false;
+            if(est.avisoVivo === ch) est.avisoVivo = null;
+            try{ Promise.resolve(c.removeChannel(ch)).catch(function(){}); }catch(e){}
+            setTimeout(conectarAvisoVivo, 3000);
+          });
+      });
+    }).catch(function(){ if(est.avisoVivo === 'conectando') est.avisoVivo = null; setTimeout(conectarAvisoVivo, 15000); });
   }
 
   function conectarTiempoReal(){
@@ -417,6 +464,7 @@
     // paga, el servidor solo se los da al preguntar): para él se pregunta cada 6 s siempre.
     if(Date.now() - est.ultimoSync > (est.vivo && esJefePagos() ? 20000 : 6000)) sincronizar();
     if(!est.canal && Date.now() - (est.intentoCanal || 0) > 30000){ est.intentoCanal = Date.now(); conectarTiempoReal(); }
+    if(!est.avisoVivo && Date.now() - (est.intentoAviso || 0) > 10000){ est.intentoAviso = Date.now(); conectarAvisoVivo(); }
   }
   // La app Android despierta la página cada 5 s (window.ventoLatido): con ORDEVA cerrada Android frena los relojes de la
   // página hasta 1 vez por minuto, y los pagos de los otros equipos llegarían tarde.
@@ -428,13 +476,15 @@
     salud().then(function(ok){
       registrarDispositivo(false).then(function(){ cruceAndroid(); revisarSuena(true); return latido(null); }).catch(function(){});
       sincronizar().then(conectarTiempoReal);
+      conectarAvisoVivo();
+      setTimeout(function(){ try{ sugerirPush(); }catch(e){} }, 20000);
       if(ok) crearBotonCuenta();
     });
   }
   setInterval(vigilar, 5000);
   setInterval(function(){ if(negocio()){ latido(null); revisarSuena(true); } }, 5 * 60e3);
   window.addEventListener('vento-aviso-vivo', function(){ if(negocio()) setTimeout(function(){ revisarSuena(true); }, 300); });   // el administrador lo cambió
-  window.addEventListener('online', function(){ if(negocio()){ mandarPendientes(); sincronizar(); conectarTiempoReal(); } });
+  window.addEventListener('online', function(){ if(negocio()){ mandarPendientes(); sincronizar(); conectarTiempoReal(); if(!est.avisoVivo) conectarAvisoVivo(); } });
   document.addEventListener('visibilitychange', function(){ if(!document.hidden && negocio()){ sincronizar(); revisarSuena(false); } });
   var espera = setInterval(function(){ if(typeof data !== 'undefined' && data && nube()){ clearInterval(espera); if(negocio()) arrancar(); else setInterval(function(){ if(negocio() && !est.dev && !miDispositivo()) arrancar(); }, 20000); } }, 1500);
 
