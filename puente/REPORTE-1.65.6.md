@@ -78,6 +78,18 @@ el plan o el rol esconden. La regla de estilo de la lista le ganaba a la que los
 que la vista sencilla es la de fábrica habría salido en todos los equipos. Quedó cubierto en `vistasencilla` y en
 `flujocompleto`.
 
+## 5. Se actualiza sola
+- **La página (web, app Android y programa de PC por dentro):** ya no hay que tocar «Actualizar ahora».
+  - Con ORDEVA en segundo plano se recarga de una vez.
+  - En pantalla avisa «Se actualiza sola en 15 s» y se recarga.
+  - Si la persona está escribiendo o tiene algo abierto (un cobro, una cuenta, el aviso de un pago), espera a que termine.
+  - Guarda todo antes de recargar y nunca se queda recargando en vueltas.
+- **La app Android** (el APK) ya se actualizaba sola desde la release «android». La primera vez Android pide confirmar
+  «Actualizar» una sola vez.
+- **El programa de PC** ya se actualizaba solo (release «pc»).
+- **Unión:** esta rama se unió a la principal (`claude/precio-margen-productos-tabla-mioclt`). Eso publica la web,
+  el APK, el programa de PC y el servidor (migraciones).
+
 ## Pruebas
 - **`equiposprobar` (nueva, 19 ✅):** PostgreSQL real, Servidor ORDEVA y la app en un celular Android, un computador y
   una tableta, con el Realtime simulado.
@@ -90,6 +102,8 @@ que la vista sencilla es la de fábrica habría salido en todos los equipos. Que
 - **`apariencias` (nueva, 16 ✅):** contraste, que ninguna se parezca a otra, grupos, vista previa, colores aplicados y
   pedido.html.
 - **`lectorcel` (24 ✅):** el celular manda códigos a la caja y a la toma de inventario.
+- **`autoactualiza` (nueva, 10 ✅):** se recarga sola sin hacer nada; espera si está ocupado; en segundo plano, de
+  una vez; no da vueltas si la versión nueva todavía no llega.
 - **`vistasencilla` (45 ✅):** prendida de fábrica; se apaga y todo vuelve a como estaba. Un empleado no ve Ajustes en
   «Más».
 - **Pruebas de la vista completa** (`cerrarcaja`, `mesa`, `mesarepetida`, `sonidomesa`): ahora la piden explícitamente,

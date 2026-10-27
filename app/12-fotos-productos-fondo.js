@@ -503,17 +503,52 @@ function mesoraRevisarVersionNueva(){
       if(v && v.length < 60 && v.indexOf('·') > 0 && v !== MESORA_VERSION) mesoraAvisoVersionNueva(v);
     }).catch(() => {});
 }
+/* 1.65.6: la versión nueva se pone SOLA (pedido del dueño), sin tocar nada:
+   • Con ORDEVA en segundo plano (otra app, pantalla apagada, minimizada): se recarga de una vez.
+   • En pantalla: aviso arriba «Se actualiza sola en 15 s» y se recarga al terminar. Si la persona está escribiendo, tiene
+     una ventana abierta (cobro, cuenta, ajustes…) o está el aviso de un pago, espera a que termine. «Actualizar ahora» sigue.
+   • Antes de recargar se guarda todo. Si después de recargar sigue la versión vieja (la página nueva todavía no llega a
+     todos los servidores), no vuelve a intentarlo en 10 minutos: nunca se queda recargando en vueltas. */
+const MESORA_AUTO_KEY = 'vento-actualizando';
+function mesoraOcupado(){
+  const a = document.activeElement;
+  if(a && (/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) || a.isContentEditable) && a.offsetParent !== null) return true;
+  return !!document.querySelector('.overlay.show, #pgVentana, #lcelOv, .vs-sheet.show');
+}
+async function mesoraRecargarYa(nueva){
+  try{ const r = JSON.parse(sessionStorage.getItem(MESORA_AUTO_KEY) || 'null');
+    if(r && r.v === nueva && Date.now() - r.t < 10 * 60000) return false;          // ya se intentó: no más vueltas
+    sessionStorage.setItem(MESORA_AUTO_KEY, JSON.stringify({ v: nueva, t: Date.now() })); }catch(e){}
+  try{ if(typeof saveData === 'function') saveData(); if(typeof guardadoAhora === 'function') await guardadoAhora(); }catch(e){}
+  location.reload();
+  return true;
+}
+function mesoraYaIntentada(nueva){
+  try{ const r = JSON.parse(sessionStorage.getItem(MESORA_AUTO_KEY) || 'null'); return !!(r && r.v === nueva && Date.now() - r.t < 10 * 60000); }catch(e){ return false; }
+}
 function mesoraAvisoVersionNueva(nueva){
+  if(document.hidden && !mesoraYaIntentada(nueva)){ mesoraRecargarYa(nueva); return; }
   if(document.getElementById('mesoraNuevaVersion')) return;
   const b = document.createElement('div');
   b.id = 'mesoraNuevaVersion';
   // Arriba, no abajo: abajo es donde vive el botón flotante del micrófono (que además se
   // puede arrastrar a cualquier lado), así este aviso nunca lo tapa ni se le monta encima.
   b.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:99999;background:#2d7d46;color:#fff;padding:12px 16px;display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;font:600 14px system-ui;box-shadow:0 4px 16px rgba(0,0,0,.3)';
-  b.innerHTML = '<span>🔄 Hay una versión nueva de ORDEVA (' + String(nueva).split('·').pop().trim() + '). Actualízala para que todo funcione bien.</span>' +
+  const auto = !mesoraYaIntentada(nueva);
+  b.innerHTML = '<span>🔄 Versión nueva de ORDEVA (' + String(nueva).split('·').pop().trim() + '). <span id="mesoraNuevaCuenta"></span></span>' +
     '<button type="button" style="background:#fff;color:#2d7d46;border:0;border-radius:8px;padding:8px 16px;font:700 14px system-ui;cursor:pointer">Actualizar ahora</button>';
-  b.querySelector('button').onclick = () => location.reload();
+  b.querySelector('button').onclick = () => { try{ sessionStorage.removeItem(MESORA_AUTO_KEY); }catch(e){} mesoraRecargarYa(nueva); };
   document.body.appendChild(b);
+  const txt = b.querySelector('#mesoraNuevaCuenta');
+  if(!auto){ txt.textContent = 'Toca «Actualizar ahora».'; return; }
+  let falta = 15;
+  const t = setInterval(() => {
+    if(document.hidden){ clearInterval(t); mesoraRecargarYa(nueva); return; }
+    if(mesoraOcupado()){ txt.textContent = 'Se actualiza sola cuando termines lo que estás haciendo.'; return; }
+    txt.textContent = 'Se actualiza sola en ' + falta + ' s (no se pierde nada).';
+    if(--falta < 0){ clearInterval(t); mesoraRecargarYa(nueva); }
+  }, 1000);
+  window.mesoraActualizacion = { nueva, parar: () => clearInterval(t) };
 }
 setInterval(() => { if(document.visibilityState === 'visible') mesoraRevisarVersionNueva(); }, 5 * 60000);
 document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') mesoraRevisarVersionNueva(); });
