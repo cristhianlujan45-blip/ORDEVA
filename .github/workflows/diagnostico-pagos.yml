@@ -67,6 +67,23 @@ jobs:
                 from pago_eventos e left join dispositivos d on d.id::text = e.cuerpo->>'dispositivo'
                 where e.recibido_en > now() - interval '30 hours' and e.proveedor = 'dispositivo'
                 group by 1, 2 order by 1 desc limit 60) x),
+            'demora_por_pago', (select coalesce(json_agg(x), '[]') from (
+                select left(p.negocio_id::text, 8) neg, p.metodo, p.confianza, (p.creado_en at time zone 'America/Bogota')::text creado,
+                       left(coalesce(d.plataforma, '?'), 70) lo_leyo,
+                       round(extract(epoch from (p.creado_en - e.recibido_en))::numeric, 2) seg_evento_a_pago,
+                       round(extract(epoch from (coalesce(p.aprobado_en, p.creado_en) - e.recibido_en))::numeric, 2) seg_evento_a_aprobado,
+                       e.cuerpo->>'t_cel' t_cel, e.cuerpo->>'t_banco' t_banco,
+                       (e.recibido_en at time zone 'America/Bogota')::text evento
+                from pagos p
+                left join lateral (select * from pago_eventos e where e.negocio_id = p.negocio_id and e.proveedor = 'dispositivo'
+                                   and e.recibido_en between p.creado_en - interval '2 minutes' and p.creado_en + interval '5 seconds' order by e.recibido_en desc limit 1) e on true
+                left join dispositivos d on d.id::text = e.cuerpo->>'dispositivo'
+                where p.creado_en > now() - interval '48 hours' and p.proveedor = 'dispositivo' order by p.creado_en desc limit 40) x),
+            'equipos_con_modelo', (select coalesce(json_agg(x), '[]') from (
+                select left(d.negocio_id::text, 8) neg, coalesce(m.rol, '?') rol, d.suena, d.nombre, left(coalesce(d.plataforma, ''), 120) plataforma,
+                       (d.ultimo_visto at time zone 'America/Bogota')::text ultimo_visto
+                from dispositivos d left join miembros m on m.negocio_id = d.negocio_id and m.usuario_id = d.usuario_id
+                where d.revocado_en is null and d.ultimo_visto > now() - interval '3 days' order by d.ultimo_visto desc limit 25) x),
             'versiones_en_uso', (select coalesce(json_agg(x), '[]') from (
                 select version, plataforma, count(distinct equipo) equipos, (max(ultimo) at time zone 'America/Bogota')::text ultimo
                 from app_errores where ultimo > now() - interval '72 hours' group by 1, 2 order by max(ultimo) desc limit 20) x)
