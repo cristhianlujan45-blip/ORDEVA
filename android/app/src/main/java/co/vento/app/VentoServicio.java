@@ -39,7 +39,13 @@ public class VentoServicio extends Service {
             // prendía la lectura de avisos: con el celular bloqueado Android no la reconecta hasta desbloquear, así que la cortaba
             // una y otra vez y los pagos llegaban al desbloquear.
             if (++vueltas % 12 == 0) revisarEscucha();               // cada minuto: ¿sigue leyendo los avisos de los bancos?
-            if (vueltas % 2 == 0) try { VentoEscucha.barrer(); } catch (Throwable ignorado) { }   // cada 10 s: ¿quedó un pago en la barra sin llegar?
+            // 1.65.7: desconectada (pasó 10 veces en un día en el Samsung que lee los avisos): mientras tanto no se lee ningún
+            // pago. Se le pide a Android reconectarla cada 5 s (antes solo cada minuto). Solo se PIDE (requestRebind, no
+            // hace daño); apagar y prender el componente sigue siendo cada minuto, como en la 1.55.3.
+            else if (VentoEscucha.activa == null) pedirReconexion();
+            // 1.65.7: cada 30 s, ¿el motor de voz de los pagos sigue vivo? (Android lo cierra sin avisar y el siguiente pago
+            // esperaba segundos a que arrancara otro: «el motor de voz no respondió».)
+            if (vueltas % 6 == 3) try { VentoApp.revisarVozPagos(); } catch (Throwable ignorado) { }
             // Cada 5 min: ¿hay una versión nueva de la app? (revisa cada 30 min; si ya hay una, la instala cuando no se use Vento)
             if (vueltas % 60 == 30) try { Actualizador.revisar(VentoServicio.this, false); } catch (Throwable ignorado) { }
             // Cada 5 min: el motor de voz de los pagos listo (si Android lo cerró, se vuelve a preparar): el pago suena de una.
@@ -55,6 +61,9 @@ public class VentoServicio extends Service {
             if (!activo) return;
             try { Cruce.revisar(VentoServicio.this); } catch (Throwable ignorado) { }
             try { vigilarEnVivo(); } catch (Throwable ignorado) { }
+            // 1.65.7: cada 2,5 s (antes cada 10 s): ¿quedó un pago en la barra que Android no le pasó a ORDEVA? Pasa sobre todo
+            // en Xiaomi con el celular EN USO (desbloqueado): ese pago sonaba hasta 10 s tarde.
+            try { VentoEscucha.barrer(); } catch (Throwable ignorado) { }
             VentoApp.ui.postDelayed(this, Cruce.CADA_MS);
         }
     };
@@ -111,6 +120,15 @@ public class VentoServicio extends Service {
                 pm.setComponentEnabledSetting(cn, android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED, android.content.pm.PackageManager.DONT_KILL_APP);
                 sinEscucha = 0;
             }
+        } catch (Throwable ignorado) { }
+    }
+
+    private void pedirReconexion() {
+        try {
+            if (!getSharedPreferences("vento", MODE_PRIVATE).getBoolean(VentoEscucha.PREF_ON, false) || Build.VERSION.SDK_INT < 24) return;
+            String s = android.provider.Settings.Secure.getString(getContentResolver(), "enabled_notification_listeners");
+            if (s == null || !s.contains(getPackageName())) return;
+            android.service.notification.NotificationListenerService.requestRebind(new android.content.ComponentName(this, VentoEscucha.class));
         } catch (Throwable ignorado) { }
     }
 

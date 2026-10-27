@@ -306,6 +306,14 @@
     }catch(e){}
     return true;
   }
+  // ¿Android hace sonar los pagos de este equipo? Su revisión (Cruce) respondió bien hace poco y aquí es dueño o
+  // administrador (Android solo anuncia a ellos; al cajero le suena la página, como antes).
+  function androidSuena(){
+    try{
+      var A = window.VentoAndroid, n = negocio(), e = JSON.parse(A.pagosCruceEstado() || '{}');
+      return !!n && (n.rol === 'dueno' || n.rol === 'admin') && e.ok === true && Date.now() - Number(e.t || 0) < 20000;
+    }catch(x){ return false; }
+  }
   function avisar(p, x, enPantalla){
     if(!paraMi(p, x)) return;
     // Mesero, empleado o cajero: solo «✅ Mesa 3 ya pagó», sin el valor ni quién pagó.
@@ -314,8 +322,20 @@
     var nivel = p.confianza === 'falso' ? 'falso' : p.confianza === 'revisar' ? 'revisar' : 'ok';
     // En este equipo no suenan (lo eligió el administrador): solo se ve, sin voz, sonido ni notificación.
     if(!suenaAqui()){ toast('🔕 ' + (nivel === 'falso' ? 'Pago FALSO: ' : nivel === 'revisar' ? 'Pago por revisar: ' : 'Pago confirmado · ') + plata(p.monto) + ' por ' + nombreMetodo(p.metodo) + m, 9000); return; }
-    // Cada pago suena UNA vez: si Android ya lo anunció (Cruce, con la página dormida), aquí solo se muestra.
     var A0 = window.VentoAndroid;
+    /* 1.65.7: en la app Android SUENA ANDROID, con ORDEVA abierta o no (igual que con el celular bloqueado, que es lo que
+       siempre funcionó): la página le avisa que hay un pago nuevo (pagosCruceYa) y Android pregunta en ese instante y lo
+       dice con su voz, su notificación y su 🪟 ventana. Antes, con ORDEVA abierta, la página lo reclamaba y lo sonaba ella,
+       y si algo de la página fallaba, ese pago quedaba en silencio (Xiaomi desbloqueado). Aquí solo se ve. */
+    if(A0 && A0.pagosCruceYa && androidSuena()){
+      var ya = false; try{ ya = A0.pagosCruceYa(); }catch(e){}
+      if(ya){
+        toast((nivel === 'falso' ? '🚨 Pago FALSO: ' : nivel === 'revisar' ? '⚠️ Pago por revisar: ' : '✅ Pago confirmado · ') + plata(p.monto) + ' por ' + nombreMetodo(p.metodo) + m, 9000);
+        if(nivel === 'ok') try{ window.mesoraCelebrar && window.mesoraCelebrar(['💜', '💰', '✨']); }catch(e){}
+        return;
+      }
+    }
+    // Cada pago suena UNA vez: si Android ya lo anunció (Cruce, con la página dormida), aquí solo se muestra.
     if(A0 && A0.pagoReclamar){ var mio = true; try{ mio = A0.pagoReclamar(String(p.id)); }catch(e){}
       if(!mio){ toast((nivel === 'falso' ? '🚨 Pago FALSO: ' : nivel === 'revisar' ? '⚠️ Pago por revisar: ' : '✅ Pago confirmado · ') + plata(p.monto) + ' por ' + nombreMetodo(p.metodo) + m, 9000); return; } }
     if(enPantalla && document.visibilityState === 'visible'){}         // ya lo muestra la pantalla «Esperando el pago»

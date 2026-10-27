@@ -38,7 +38,10 @@ public class MainActivity extends Activity {
     private ValueCallback<Uri[]> archivoCb;
     private WebChromeClient.FileChooserParams archivoParams;
     private Uri camaraUri;
-    private PermissionRequest permisoWeb;
+    // 1.65.7: las peticiones de cámara/micrófono de la página que esperan la respuesta de Android, EN FILA. Antes se guardaba
+    // una sola: al tocar «Escanear» dos veces, la primera quedaba colgada para siempre (la cámara nunca abría) y la segunda
+    // recibía una respuesta «cancelada» que se tomaba como «no»: «No se pudo abrir la cámara».
+    private final java.util.ArrayList<PermissionRequest> permisosWeb = new java.util.ArrayList<>();
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -192,7 +195,10 @@ public class MainActivity extends Activity {
     }
 
     void pedirPermisosWeb(PermissionRequest req, ArrayList<String> faltan) {
-        permisoWeb = req;
+        boolean yaPreguntando = !permisosWeb.isEmpty();
+        permisosWeb.add(req);
+        if (yaPreguntando) return;                      // se responde junto con la que ya está preguntando
+        if (faltan.contains(Manifest.permission.CAMERA)) getSharedPreferences("vento", MODE_PRIVATE).edit().putBoolean("camaraPreguntada", true).apply();
         if (Build.VERSION.SDK_INT >= 23) requestPermissions(faltan.toArray(new String[0]), RC_PERM_WEB);
     }
 
@@ -285,9 +291,17 @@ public class MainActivity extends Activity {
         boolean ok = resultados.length > 0;
         for (int r : resultados) if (r != PackageManager.PERMISSION_GRANTED) ok = false;
         if (rc == Equipos.RC_BT) { Equipos.permisoBluetooth(ok); return; }   // impresora o balanza Bluetooth
-        if (rc == RC_PERM_WEB && permisoWeb != null) {
-            if (ok) permisoWeb.grant(permisoWeb.getResources()); else permisoWeb.deny();
-            permisoWeb = null;
+        if (rc == RC_PERM_WEB) {
+            // Se mira el permiso de VERDAD (no la respuesta, que llega vacía si se canceló por otra pregunta encima).
+            for (PermissionRequest r : new java.util.ArrayList<>(permisosWeb)) {
+                boolean todos = true;
+                for (String x : r.getResources()) {
+                    if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(x) && !VentoApp.tiene(Manifest.permission.CAMERA)) todos = false;
+                    if (PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(x) && !VentoApp.tiene(Manifest.permission.RECORD_AUDIO)) todos = false;
+                }
+                try { if (todos) r.grant(r.getResources()); else r.deny(); } catch (Exception ignorado) { }
+            }
+            permisosWeb.clear();
         } else if (rc == RC_PERM_ARCHIVO) {
             abrirSelector();
         } else if (rc == RC_PERM_INICIO) {

@@ -72,7 +72,8 @@ jobs:
                        left(coalesce(d.plataforma, '?'), 70) lo_leyo,
                        round(extract(epoch from (p.creado_en - e.recibido_en))::numeric, 2) seg_evento_a_pago,
                        round(extract(epoch from (coalesce(p.aprobado_en, p.creado_en) - e.recibido_en))::numeric, 2) seg_evento_a_aprobado,
-                       e.cuerpo->>'t_cel' t_cel, e.cuerpo->>'t_banco' t_banco,
+                       round((extract(epoch from e.recibido_en) - (e.cuerpo->>'t_cel')::numeric / 1000)::numeric, 2) seg_celular_a_servidor,
+                       round(((e.cuerpo->>'t_cel')::numeric - (e.cuerpo->>'t_banco')::numeric) / 1000, 2) seg_banco_a_celular,
                        (e.recibido_en at time zone 'America/Bogota')::text evento
                 from pagos p
                 left join lateral (select * from pago_eventos e where e.negocio_id = p.negocio_id and e.proveedor = 'dispositivo'

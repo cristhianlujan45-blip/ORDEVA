@@ -88,9 +88,13 @@ final class Cruce {
         if (k.optString("url").isEmpty() || k.optString("token").length() < 20) return;
         final long monto = AvisoPago.monto(txt);
         if (monto <= 0) return;                                          // sin valor: la página decide (frases del administrador)
+        final long leido = System.currentTimeMillis(), banco = VentoEscucha.horaBanco();
         new Thread(() -> {
             try {
-                JSONObject pista = new JSONObject().put("monto", monto).put("app", txt.split("\\|")[0].trim());
+                // t / tb (1.65.7): cuándo lo leyó este celular y la hora que trae el aviso del banco: el servidor las guarda y el
+                // diagnóstico dice de dónde viene una demora (el banco, el celular o el internet).
+                JSONObject pista = new JSONObject().put("monto", monto).put("app", txt.split("\\|")[0].trim()).put("t", leido);
+                if (banco > 0) pista.put("tb", banco);
                 if (revisar != null) pista.put("nivel", "revisar"); else if (smsOk) pista.put("nivel", "app");
                 JSONObject j = new JSONObject().put("text", txt.length() > 1000 ? txt.substring(0, 1000) : txt).put("id", "and-" + id).put("pista", pista);
                 for (int i = 0; i < 3; i++) {

@@ -219,9 +219,10 @@ function closeScanOverlay(){
   const ov = document.getElementById('scanOverlay');
   if(ov) ov.classList.remove('show');
   if(scanTimer){ clearInterval(scanTimer); scanTimer = null; }
-  scanVivo = false; scanVez++;
+  scanVivo = false; scanVez++; scanAbriendo = false;
   const tb = document.getElementById('scanTorchBtn'); if(tb){ tb.hidden = true; tb.classList.remove('on'); }
   if(scanStream){ scanStream.getTracks().forEach(t => t.stop()); scanStream = null; }
+  try{ const v = document.getElementById('scanVideo'); if(v){ v.pause(); v.srcObject = null; } }catch(e){}   // suelta la cámara del todo
   try{ if(window.ventoLectorCel) window.ventoLectorCel.cerrar(); }catch(e){}
   scanDetector = null; scanOnResult = null; scanLastCode = null;
 }
@@ -241,8 +242,16 @@ async function scanAbrirCamara(){
     try{ return await pedir(Object.assign({ deviceId: { exact: cam } }, buena)); }catch(e){}
     try{ return await pedir({ deviceId: { exact: cam } }); }catch(e){}   // ya no está conectada: la de siempre
   }
-  try{ return await pedir(Object.assign({ facingMode: 'environment' }, buena)); }
-  catch(e){ return await pedir({ facingMode: 'environment' }); }
+  /* 1.65.7: si la cámara está «ocupada» (NotReadableError: todavía la tiene la apertura anterior, otra app o el celular
+     no la soltó), se espera un momento y se intenta otra vez; y al final, cualquier cámara. Antes fallaba de una y salía
+     «No se pudo abrir la cámara» (tocar el botón varias veces lo provocaba). Sin permiso no se reintenta: se pregunta. */
+  const ocupada = e => e && /NotReadable|TrackStart|Abort|Overconstrained|ConstraintNotSatisfied/.test(e.name || '');
+  let ultimo;
+  for(const v of [Object.assign({ facingMode: 'environment' }, buena), { facingMode: 'environment' }, { facingMode: 'environment' }, true]){
+    try{ return await pedir(v); }
+    catch(e){ ultimo = e; if(e && /NotAllowed|Security|NotFound/.test(e.name || '')) throw e; if(ocupada(e)) await new Promise(r => setTimeout(r, 450)); }
+  }
+  throw ultimo;
 }
 // «Cámara»: solo sale con más de una (la del computador y el celular por cable, por ejemplo).
 async function scanPintarCamaras(){
@@ -257,21 +266,34 @@ async function scanPintarCamaras(){
   fila.hidden = false;
 }
 
+let scanAbriendo = false;
 async function openScanOverlay(onResult, opts){
   opts = opts || {};
   const ov = document.getElementById('scanOverlay');
   const video = document.getElementById('scanVideo');
   const status = document.getElementById('scanStatus');
   if(!ov || !video) return;
+  /* 1.65.7: tocar «Escanear» otra vez mientras la cámara abre (o ya abierta) NO la vuelve a abrir: antes cada toque
+     cerraba la apertura en curso y pedía la cámara de nuevo, y en muchos celulares terminaba en «No se pudo abrir la
+     cámara» (la cámara seguía ocupada por la apertura anterior). Solo se cambia a qué va lo que se lea. */
+  if(ov.classList.contains('show') && !opts.reabrir && (scanAbriendo || (scanStream && scanStream.getVideoTracks().some(t => t.readyState === 'live')))){
+    scanOnResult = onResult;
+    if(opts.hint) status.textContent = opts.hint;
+    return;
+  }
   closeScanOverlay();
+  const reintentar = document.getElementById('scanRetryBtn'); if(reintentar) reintentar.hidden = true;
   const vez = scanVez;
   ov.classList.add('show');
   const hint = opts.hint || i18nPut('Apunta la cámara al código del producto.');
   status.textContent = hint;
   scanOnResult = onResult;
   try{ if(window.ventoLectorCel) window.ventoLectorCel.abrir(hint, raw => { if(scanVez === vez && scanOnResult) scanLeido(raw); }); }catch(e){}
-  const sinCamara = msg => {
-    status.textContent = msg + (window.ventoLectorCel ? ' Puedes usar tu celular como lector (abajo).' : '');
+  const sinCamara = (msg, conReintento) => {
+    scanAbriendo = false;
+    status.textContent = msg + (window.ventoLectorCel ? ' También puedes usar tu celular como lector (abajo).' : '');
+    const rb = document.getElementById('scanRetryBtn');
+    if(rb && conReintento){ rb.hidden = false; rb.onclick = () => openScanOverlay(onResult, Object.assign({}, opts, { reabrir: true })); }
     try{ if(window.ventoLectorCel) window.ventoLectorCel.mostrar(true); }catch(e){}
   };
   if(!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)){ sinCamara('Este equipo no deja usar la cámara aquí.'); return; }
@@ -279,12 +301,29 @@ async function openScanOverlay(onResult, opts){
   const lector = window.ventoCodigos ? window.ventoCodigos.detector(SCAN_FORMATOS) : Promise.reject(new Error('sin_lector'));
   lector.catch(() => {});
   let stream;
+  scanAbriendo = true;
+  // Si en 12 s la cámara no abrió (el permiso quedó sin responder), se dice y sale «Reintentar».
+  const lento = setTimeout(() => { if(scanVez === vez && scanAbriendo) { status.textContent = '⏳ La cámara no responde todavía. Si salió un aviso de permiso, toca «Permitir».'; const rb = document.getElementById('scanRetryBtn'); if(rb){ rb.hidden = false; rb.onclick = () => openScanOverlay(onResult, Object.assign({}, opts, { reabrir: true })); } } }, 12000);
   try{ stream = await scanAbrirCamara(); }
   catch(e){
+    clearTimeout(lento);
     if(scanVez !== vez) return;
-    sinCamara(e && e.name === 'NotFoundError' ? 'Este equipo no tiene cámara.' : 'No se pudo abrir la cámara. Revisa los permisos del navegador para esta página.');
+    const n = e && e.name || '';
+    if(/NotAllowed|Security/.test(n)){
+      sinCamara(window.VentoAndroid ? '📷 ORDEVA no tiene permiso de la cámara. Toca «Reintentar» y elige «Permitir» (si no sale, actívalo en Ajustes del celular → Apps → ORDEVA → Permisos → Cámara).'
+        : '📷 El navegador no dejó usar la cámara. Toca el candado 🔒 junto a la dirección → Cámara → Permitir, y luego «Reintentar».', true);
+      // «Reintentar»: si Android ya no vuelve a preguntar, abre los permisos de ORDEVA en Ajustes (app Android).
+      const rb = document.getElementById('scanRetryBtn');
+      if(rb) rb.onclick = () => {
+        let ajustes = false; try{ ajustes = !!(window.VentoAndroid && window.VentoAndroid.camaraPermiso && window.VentoAndroid.camaraPermiso()); }catch(x){}
+        if(ajustes) status.textContent = '⚙️ En la pantalla que se abrió: Permisos → Cámara → Permitir. Luego vuelve y toca «Reintentar».';
+        else openScanOverlay(onResult, Object.assign({}, opts, { reabrir: true }));
+      };
+    } else sinCamara(/NotFound|DevicesNotFound/.test(n) ? 'Este equipo no tiene cámara.' : 'No se pudo abrir la cámara (otra app la está usando). Toca «Reintentar».', !/NotFound|DevicesNotFound/.test(n));
     return;
   }
+  clearTimeout(lento);
+  scanAbriendo = false;
   if(scanVez !== vez){ stream.getTracks().forEach(t => t.stop()); return; }
   scanStream = stream;
   video.srcObject = scanStream;
@@ -345,12 +384,13 @@ document.getElementById('scanCamSel').addEventListener('change', e => {
   try{ localStorage.setItem(SCAN_CAM_LS, e.target.value); }catch(x){}
   // Se vuelve a abrir con la cámara elegida, con lo mismo que se estaba escaneando.
   const fn = scanOnResult, hint = document.getElementById('scanStatus').textContent;
-  if(fn) openScanOverlay(fn, { hint });
+  if(fn) openScanOverlay(fn, { hint, reabrir: true });
 });
 
 document.getElementById('scanCloseBtn').addEventListener('click', closeScanOverlay);
 document.getElementById('scanCloseBtn2').addEventListener('click', closeScanOverlay);
-document.getElementById('scanOverlay').addEventListener('click', (e) => { if(e.target.id === 'scanOverlay') closeScanOverlay(); });
+// 1.65.7: tocar el fondo ya NO cierra la cámara: al tocar «📷» varias veces, los toques caían en el fondo y la cerraban y
+// abrían una y otra vez. Se cierra con ✕ o «Cerrar».
 
 // Encuentra el producto dueño de un código leído: coincide con el código de
 // barras exacto, o con el código que va al final del texto del QR (ver

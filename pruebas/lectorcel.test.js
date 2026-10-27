@@ -134,10 +134,9 @@ const EAN = '7702535011119', QR_TXT = 'PROD-QR-4471';
       await cel.evaluate(() => document.getElementById('estado').textContent));
     await cel.fill('#manoTxt', '7701111111111'); await cel.click('#mano button[type=submit]');
     chk('7. … y lo que lee el celular se suma a la venta de la caja', await esperar(pc, () => window.ventoPOS.carrito().some(l => l.name === 'Gaseosa Lector')), await pc.evaluate(() => window.ventoPOS.carrito()));
-    await pc.click('#pzCajaOv [data-lcel-abrir]');
-    chk('7. La caja tiene su botón «📱 Celular lector»: abre la ventana con el QR y cómo conectar (wifi, Bluetooth, USB)',
-      await esperar(pc, () => { const o = document.getElementById('lcelOv'); return !!o && o.classList.contains('show') && !!o.querySelector('.lcel-qr canvas, .lcel-qr img') && /Bluetooth/.test(o.textContent) && /USB/.test(o.textContent); }));
-    await pc.evaluate(() => { document.getElementById('lcelOv').classList.remove('show'); window.ventoPOS.cerrarCaja(); });
+    // 1.65.7: un solo botón para escanear (pedido del dueño): ya no hay «📱 Celular lector» aparte; el celular está dentro de «📷».
+    chk('7. La caja tiene UN botón para escanear («📷»), sin botones de más', await pc.evaluate(() => !document.querySelector('#pzCajaOv [data-lcel-abrir]') && !!document.querySelector('#pzCajaOv [data-scan]')));
+    await pc.evaluate(() => window.ventoPOS.cerrarCaja());
     // 8. … y la toma de inventario
     await pc.evaluate(() => {
       const b = document.querySelector('nav [data-view="inventario"]'); if(b) b.click();

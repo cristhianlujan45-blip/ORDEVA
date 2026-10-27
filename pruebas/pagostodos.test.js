@@ -157,6 +157,23 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     chk('3. Con el computador y la tableta en segundo plano (bloqueados o escondidos): notificación del sistema «💜 Recibiste $15.000» en los dos al instante (' + notif.join(' / ') + ' ms)', notif.every(x => x >= 0 && x < 1500), notif);
     chk('3. … con la misma marca que la push del servidor («pago-<id>»): no suena dos veces', tagOk);
 
+    // ===== 3c. 1.65.7: app Android con ORDEVA ABIERTA (desbloqueado): suena Android, no la página =====
+    // (Con el celular bloqueado ya sonaba Android; abierto, la página lo reclamaba y si algo suyo fallaba, no sonaba.)
+    await CEL.p.evaluate(() => { const A = window.VentoAndroid, a = window.__and; a.cruceYa = 0; a.pagos = []; a.decir = []; a.reclamados = [];
+      A.pagosCruceYa = () => { a.cruceYa++; return true; }; A.pagosCruceEstado = () => JSON.stringify({ t: Date.now(), ok: true });
+      window.ventoPagos.estado().ultimoSync = Date.now(); });
+    await sb.sql(`insert into pagos(negocio_id, referencia, proveedor, metodo, canal, monto, estado, confianza, verificado, aprobado_en)
+      values ($1, 'AV-todos-16000', 'dispositivo', 'NEQUI', 'notificacion', 16000, 'aprobado', 'app', false, now())`, [NEG]);
+    const and3c = await esperar(CEL.p, () => window.__and.cruceYa > 0, null, 6000) && await CEL.p.evaluate(() => JSON.parse(JSON.stringify(window.__and)));
+    chk('3c. App Android abierta: la página le pide a Android que lo haga sonar ya (con su voz, notificación y ventana)', !!and3c && and3c.cruceYa === 1, and3c);
+    chk('3c. … y la página no lo suena ni lo reclama (no suena dos veces); se ve en pantalla', !!and3c && !and3c.pagos.length && !and3c.decir.some(t => /16000/.test(t)) && !(and3c.reclamados || []).length &&
+      /16\.000/.test(await CEL.p.textContent('#toast')), and3c);
+    // Si Android no responde (su revisión lleva rato sin contestar), la página suena como antes: nunca queda en silencio.
+    await CEL.p.evaluate(() => { window.VentoAndroid.pagosCruceEstado = () => JSON.stringify({ t: Date.now() - 120000, ok: true }); window.__and.pagos = []; window.ventoPagos.estado().ultimoSync = Date.now(); });
+    await sb.sql(`insert into pagos(negocio_id, referencia, proveedor, metodo, canal, monto, estado, confianza, verificado, aprobado_en)
+      values ($1, 'AV-todos-17000', 'dispositivo', 'NEQUI', 'notificacion', 17000, 'aprobado', 'app', false, now())`, [NEG]);
+    chk('3c. Si Android no responde, suena la página (notificación y voz con «$17.000»)', await esperar(CEL.p, () => window.__and.pagos.some(x => x.v === '$17.000'), null, 6000), await CEL.p.evaluate(() => JSON.parse(JSON.stringify(window.__and))));
+
     // ===== 4. Notificaciones push para cuando ORDEVA esté cerrada =====
     await PC.p.evaluate(() => {
       Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
