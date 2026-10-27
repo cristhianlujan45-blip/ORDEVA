@@ -93,14 +93,20 @@ self.addEventListener('message', function(e){
 self.addEventListener('push', function(e){
   var d = {};
   try{ d = e.data ? e.data.json() : {}; }catch(err){ d = { titulo: '💜 ORDEVA', cuerpo: e.data ? e.data.text() : '' }; }
-  e.waitUntil(self.registration.showNotification(d.titulo || '💜 ORDEVA', {
-    body: d.cuerpo || '',
-    icon: 'icons/ordeva-192.png',
-    badge: 'icons/ordeva-64.png',
-    tag: d.tag || 'vento-pago',
-    renotify: true,
-    vibrate: [150, 80, 150],
-    data: { url: d.url || './' }
+  var tag = d.tag || 'vento-pago';
+  // 1.65.5: si ORDEVA abierta en este equipo ya mostró este mismo pago (mismo «pago-<id>»), la push solo lo deja al día,
+  // sin sonar otra vez. Si no, suena (también con el equipo bloqueado: el servidor la manda con Urgency: high).
+  e.waitUntil(self.registration.getNotifications({ tag: tag }).catch(function(){ return []; }).then(function(ya){
+    return self.registration.showNotification(d.titulo || '💜 ORDEVA', {
+      body: d.cuerpo || '',
+      icon: 'icons/ordeva-192.png',
+      badge: 'icons/ordeva-64.png',
+      tag: tag,
+      renotify: !(ya && ya.length),
+      requireInteraction: /^pago-/.test(tag),
+      vibrate: [150, 80, 150],
+      data: { url: d.url || './' }
+    });
   }));
 });
 

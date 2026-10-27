@@ -176,11 +176,19 @@
   var K_PUSH_LUEGO = 'vento-push-luego';
   function sugerirPush(){
     var n = negocio(); if(!n || !puedeCaja() || window.VentoAndroid || /VentoPC\//.test(navigator.userAgent || '')) return;
-    if(!pushSoportado() || pushActivo() || Notification.permission === 'denied' || document.hidden) return;
     var prueba = false; try{ prueba = localStorage.getItem('vento-push-prueba') === '1'; }catch(e){}
     if(location.protocol !== 'https:' && !prueba) return;   // solo en ORDEVA de verdad (en las pruebas locales no estorba)
-    if(Date.now() < (Number(lsGet(K_PUSH_LUEGO, 0)) || 0)) return;
-    if(typeof window.showConfirm !== 'function') return;
+    if(Date.now() < (Number(lsGet(K_PUSH_LUEGO, 0)) || 0) || document.hidden || typeof window.showConfirm !== 'function') return;
+    // iPhone / iPad: Safari solo deja las notificaciones push si ORDEVA está en la pantalla de inicio (iOS 16.4 o más).
+    var ios = /iPhone|iPad|iPod/.test(navigator.userAgent || '') || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    var instalada = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+    if(ios && !instalada){
+      lsSet(K_PUSH_LUEGO, Date.now() + 3 * 864e5);
+      window.showConfirm({ icon: '📲', title: 'Para que los pagos te lleguen en este iPhone o iPad', confirmText: 'Entendido', cancelText: 'Luego',
+        message: 'Con la pantalla bloqueada, el iPhone solo avisa si ORDEVA está en la pantalla de inicio. En Safari toca Compartir (el cuadro con la flecha) → «Agregar a pantalla de inicio». Luego abre ORDEVA desde ese icono y acepta las notificaciones.' });
+      return;
+    }
+    if(!pushSoportado() || pushActivo() || Notification.permission === 'denied') return;
     lsSet(K_PUSH_LUEGO, Date.now() + 3 * 864e5);
     window.showConfirm({ icon: '🔔', title: 'Que los pagos te lleguen aunque cierres ORDEVA', confirmText: 'Sí, avisarme', cancelText: 'Luego',
       message: 'En este equipo, cuando te paguen te sale el aviso al instante aunque ORDEVA esté cerrada (como en el celular). El navegador te va a pedir permiso: toca «Permitir».' })

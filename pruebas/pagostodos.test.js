@@ -139,12 +139,44 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     t = await pago(14000);
     chk('3. … y el siguiente pago le llega al instante (' + t[2] + ' ms)', t.every(x => x >= 0 && x < 1500), t);
 
+    // ===== 3b. Equipos en segundo plano (pantalla bloqueada o ventana escondida): notificación del sistema al instante =====
+    for(const E of [PC, TAB]) await E.p.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+      window.__notifs = [];
+      const N = function(t, o){ window.__notifs.push({ t, o, ms: Date.now() }); }; N.permission = 'granted'; N.requestPermission = () => Promise.resolve('granted');
+      window.Notification = N;
+      window.ventoPagos.estado().ultimoSync = Date.now();
+    });
+    await CEL.p.evaluate(() => { window.ventoPagos.estado().ultimoSync = Date.now(); });
+    const t3b = Date.now();
+    const pb = (await sb.sql(`insert into pagos(negocio_id, referencia, proveedor, metodo, canal, monto, estado, confianza, verificado, aprobado_en)
+      values ($1, 'AV-todos-15000', 'dispositivo', 'NEQUI', 'notificacion', 15000, 'aprobado', 'app', false, now()) returning id`, [NEG]))[0];
+    const notif = await Promise.all([PC, TAB].map(async E => (await esperar(E.p, () => window.__notifs.some(n => /Recibiste \$15\.000/.test(n.t)), null, 6000)) ? Date.now() - t3b : -1));
+    const tagOk = await PC.p.evaluate(id => window.__notifs.some(n => n.o && n.o.tag === 'pago-' + id), pb.id);
+    chk('3. Con el computador y la tableta en segundo plano (bloqueados o escondidos): notificación del sistema «💜 Recibiste $15.000» en los dos al instante (' + notif.join(' / ') + ' ms)', notif.every(x => x >= 0 && x < 1500), notif);
+    chk('3. … con la misma marca que la push del servidor («pago-<id>»): no suena dos veces', tagOk);
+
     // ===== 4. Notificaciones push para cuando ORDEVA esté cerrada =====
-    await PC.p.evaluate(() => { localStorage.removeItem('vento-push-luego'); window.ventoPagosSugerirPush(); });
+    await PC.p.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
+      window.Notification.permission = 'default';                 // la primera vez en este equipo
+      localStorage.removeItem('vento-push-luego'); window.ventoPagosSugerirPush();
+    });
     const pcPush = await esperar(PC.p, () => /aunque cierres ORDEVA/.test((document.getElementById('confirmOverlay') || document.body).innerText), null, 4000);
     chk('4. Computador (navegador): ofrece «Que los pagos te lleguen aunque cierres ORDEVA»', pcPush);
     await cerrarTodo(PC.p);
     const celTxt = await CEL.p.evaluate(() => { localStorage.removeItem('vento-push-luego'); window.ventoPagosSugerirPush(); return document.body.innerText; });
     chk('4. En la app Android no la ofrece (avisa la app misma)', !/aunque cierres ORDEVA/.test(celTxt));
+    await cerrarTodo(TAB.p);
+    const ipad = await TAB.p.evaluate(() => {
+      Object.defineProperty(navigator, 'userAgent', { configurable: true, get: () => 'Mozilla/5.0 (iPad; CPU OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1' });
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
+      localStorage.removeItem('vento-push-luego'); window.ventoPagosSugerirPush();
+      return document.getElementById('confirmOverlay').classList.contains('show') ? document.getElementById('confirmOverlay').textContent : '';
+    });
+    chk('4. iPhone/iPad en Safari: explica «Agregar a pantalla de inicio» (sin eso el iPhone no avisa bloqueado)', /pantalla de inicio/.test(ipad) && /bloqueada/.test(ipad), ipad.slice(0, 200));
   }
 })();
