@@ -284,6 +284,15 @@ const fiEsPdf = f => (window.VitoOfflineOCR && window.VitoOfflineOCR.isPdfFile &
 // Archivos válidos: fotos o PDF, de hasta 15 MB cada uno, máximo 10 a la vez.
 function fiValidarArchivos(files){
   const ok = [], malos = [];
+  // 1.65.7: el archivo llegó VACÍO (0 bytes): pasaba al elegir el PDF desde WhatsApp, Drive o Descargas en la app Android
+  // vieja, y salía un error en inglés («The PDF file is empty»). Ahora se dice qué hacer (la app nueva ya lo arregla sola).
+  const vacios = (files || []).filter(f => f && f.size === 0);
+  if(vacios.length){
+    showToast('⚠️ ' + (vacios.length === 1 ? 'El archivo «' + vacios[0].name + '» llegó vacío' : vacios.length + ' archivos llegaron vacíos') + ' (0 bytes). ' +
+      (window.VentoAndroid ? 'Actualiza la app ORDEVA (se actualiza sola) o guarda el PDF en el celular y elígelo desde «Archivos».' : 'Descárgalo primero al equipo y vuelve a elegirlo.'), 12000);
+    try{ window.ventoError && window.ventoError('otro', 'Factura: el archivo llegó vacío (0 bytes)', { tipo: vacios[0].type, nombre: String(vacios[0].name).slice(-20) }, 'factura|vacio'); }catch(e){}
+    files = files.filter(f => f && f.size > 0);
+  }
   (files || []).slice(0, 10).forEach(f => { if(!(f.type && /^image\//.test(f.type)) && !fiEsPdf(f)) malos.push(f.name + ' (no es foto ni PDF)'); else if(f.size > FI_MAX_BYTES) malos.push(f.name + ' (pesa más de 15 MB)'); else ok.push(f); });
   if(malos.length) showToast('⚠️ No se usaron: ' + malos.join(', '));
   return ok;

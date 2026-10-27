@@ -280,9 +280,54 @@ public class MainActivity extends Activity {
         } else if (camaraUri != null) {
             try { getContentResolver().delete(camaraUri, null, null); } catch (Exception ignorado) { }
         }
-        archivoCb.onReceiveValue(res);
+        // 1.65.7: se le pasa a la página una COPIA del archivo dentro de ORDEVA (con su tamaño y su nombre de verdad), no la
+        // dirección de la app de donde vino. Con WhatsApp, Drive, Descargas y otros, el visor web de Android leía el PDF
+        // como «vacío (0 bytes)» y la factura no se podía leer. La foto recién tomada con la cámara ya es de ORDEVA.
+        final ValueCallback<Uri[]> cb = archivoCb;
+        final Uri[] originales = res;
+        final Uri propia = camaraUri;
         archivoCb = null;
         camaraUri = null;
+        if (originales == null) { cb.onReceiveValue(null); return; }
+        new Thread(() -> {
+            Uri[] copias = new Uri[originales.length];
+            for (int i = 0; i < originales.length; i++) copias[i] = originales[i] != null && !originales[i].equals(propia) ? copiaPropia(originales[i]) : originales[i];
+            VentoApp.ui.post(() -> cb.onReceiveValue(copias));
+        }, "vento-archivo").start();
+    }
+
+    /** Copia lo elegido a la caché de ORDEVA («elegidos/», se borra a la hora) y devuelve su dirección propia. Si no se pudo
+     *  copiar, la de antes. */
+    private Uri copiaPropia(Uri u) {
+        try {
+            java.io.File dir = new java.io.File(getCacheDir(), "elegidos");
+            if (!dir.exists()) dir.mkdirs();
+            java.io.File[] viejos = dir.listFiles();
+            if (viejos != null) for (java.io.File f : viejos) if (System.currentTimeMillis() - f.lastModified() > 3600_000L) f.delete();
+            String nombre = null;
+            try (android.database.Cursor c = getContentResolver().query(u, new String[]{android.provider.OpenableColumns.DISPLAY_NAME}, null, null, null)) {
+                if (c != null && c.moveToFirst()) nombre = c.getString(0);
+            } catch (Exception ignorado) { }
+            if (nombre == null || nombre.trim().isEmpty()) nombre = u.getLastPathSegment();
+            nombre = (nombre == null ? "archivo" : nombre).replaceAll("[^A-Za-z0-9._ ()-]", "_");
+            if (!nombre.contains(".")) {
+                String ext = android.webkit.MimeTypeMap.getSingleton().getExtensionFromMimeType(getContentResolver().getType(u));
+                if (ext != null) nombre += "." + ext;
+            }
+            java.io.File sub = new java.io.File(dir, Long.toString(System.nanoTime(), 36));
+            sub.mkdirs();
+            java.io.File f = new java.io.File(sub, nombre);
+            long n = 0;
+            try (java.io.InputStream in = getContentResolver().openInputStream(u); java.io.OutputStream out = new java.io.FileOutputStream(f)) {
+                if (in == null) return u;
+                byte[] b = new byte[64 * 1024]; int r;
+                while ((r = in.read(b)) > 0) { out.write(b, 0, r); n += r; }
+            }
+            if (n <= 0) return u;
+            return androidx.core.content.FileProvider.getUriForFile(this, getPackageName() + ".archivos", f);
+        } catch (Throwable e) {
+            return u;
+        }
     }
 
     @Override

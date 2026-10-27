@@ -137,6 +137,31 @@ const PERFILES = [
       chk('4. Un empleado no ve «Funciones de este negocio» y no puede apagar nada', !v.box && v.mod === true && !v.guardado, v);
       await ctx.close();
     }
+    // ===== 5. 1.65.7: «Mostrar todas las funciones» NO prende Insumos y recetas en una tienda; el restaurante lo oculta =====
+    {
+      const { ctx, p } = await abrir('tienda', 'Tienda Completa');
+      await p.evaluate(() => { data.modoCompleto = true; saveData(); try{ aplicarModulos(); }catch(e){} });
+      let v = await mirar(p);
+      chk('5. Tienda con «Mostrar todas las funciones»: NO aparece «Insumos y recetas» (es solo para los que preparan comida)', !v.mod && !v.panel, v);
+      const fac = await p.evaluate(() => { const f = document.getElementById('invFacturaPanel'); return { etiquetasEnFactura: !!f.querySelector('#productLabelsBtn'), titulos: (f.innerText.match(/Factura del proveedor/g) || []).length, etiquetas: !!document.querySelector('#invEtiquetasPanel #productLabelsBtn') }; });
+      chk('5. Menú «Factura del proveedor» limpio: sin las etiquetas adentro (tienen su tarjeta) y sin el título repetido', !fac.etiquetasEnFactura && fac.titulos === 1 && fac.etiquetas, fac);
+      await ctx.close();
+    }
+    {
+      const { ctx, p } = await abrir('restaurante', 'Restaurante Oculta');
+      await p.evaluate(() => { document.querySelector('nav button[data-view="inventario"]').click(); const d = document.getElementById('insumosPanel'); d.open = true; });
+      await p.waitForTimeout(300);
+      await p.evaluate(() => document.querySelector('#insumosPanel [data-ins="ocultar"]').click());
+      await p.waitForTimeout(500);
+      let v = await mirar(p);
+      chk('5. Restaurante: «🙈 No lo uso: ocultar» en la misma tarjeta lo esconde (y se puede volver a prender en Ajustes)', !v.mod && !v.panel && v.sw === false, v);
+      await p.evaluate(async () => { document.querySelector('nav button[data-view="ajustes"]').click(); document.querySelector('.ajustes-cat[data-cat="negocio"]').click(); await new Promise(z => setTimeout(z, 250));
+        const sw = document.querySelector('#modulosBox [data-modulo="r"]'); sw.checked = true; sw.dispatchEvent(new Event('change', { bubbles: true })); });
+      await p.waitForTimeout(400);
+      v = await mirar(p);
+      chk('5. … y al prenderlo en Ajustes → Funciones vuelve a aparecer', v.mod && v.panel, v);
+      await ctx.close();
+    }
     chk('Sin errores de página', !errs.length, errs);
   }catch(e){ mal++; console.log('❌ Error: ' + (e && e.stack || e)); }
   await b.close();

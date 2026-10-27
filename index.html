@@ -3285,10 +3285,16 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
       <summary><span>🧾</span><b>Factura del proveedor</b><small>Foto o PDF: se anotan cantidades y costos solos</small></summary>
       <div class="pr-panel-body">
       <div class="cam-card">
-      <div class="cam-card-head"><span class="cam-ic">🧾</span><div class="cam-tx"><strong>Factura del proveedor</strong><small>Toma la foto o sube la foto o el PDF: se anotan cantidades y costos. Con internet la lee la IA; sin internet igual se lee. Siempre revisas antes de guardar.</small></div></div>
+      <div class="modal-sub" style="margin:0 0 8px">Con internet la lee la IA; sin internet igual se lee. Siempre revisas antes de guardar.</div>
       <div class="cam-card-btns"><button type="button" class="btn-camera cam-sm" id="invInvoiceCamBtn" title="Tomar foto de la factura">📷 Tomar foto</button><button type="button" class="btn-camera cam-sm" id="invInvoiceGalBtn" title="Elegir foto o PDF ya guardado">🖼️ Galería o PDF</button></div>
       <div class="cam-card-btns"><button type="button" class="btn-ghost" id="fiHistBtn">📚 Facturas anteriores</button><button type="button" class="btn-ghost" id="fiMovBtn">🔁 Movimientos de inventario</button></div>
     </div>
+      </div>
+    </details>
+    <!-- 1.65.7: las etiquetas tienen su propia tarjeta (antes estaban dentro de «Factura del proveedor», que no tiene que ver). -->
+    <details class="pr-panel" id="invEtiquetasPanel">
+      <summary><span>🏷️</span><b>Etiquetas con código</b><small>Imprime el código de barras o QR y el precio de tus productos</small></summary>
+      <div class="pr-panel-body">
       <div class="config-row">
       <select id="labelTypeSelect" class="acc-inline" style="padding:10px;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px">
         <option value="barcode">📊 Código de barras</option>
