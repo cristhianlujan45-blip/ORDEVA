@@ -17,7 +17,8 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     await ctx.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); }catch(e){} });
     const p = await ctx.newPage(); p.on('pageerror', e => errs.push(e.message));
     let respuesta = '2468'; p.on('dialog', d => d.type() === 'prompt' ? d.accept(respuesta) : d.accept());
-    const esperar = (fn, arg, ms) => p.waitForFunction(fn, arg, { timeout: ms || 10000, polling: 200 }).then(() => true, () => false);
+    // Si la página se recarga justo mientras se espera (al sacar la sesión), lo de adentro todavía no existe: se sigue esperando.
+    const esperar = (fn, arg, ms) => p.waitForFunction(([f, a]) => { try{ return (0, eval)('(' + f + ')')(a); }catch(e){ return false; } }, [String(fn), arg], { timeout: ms || 10000, polling: 200 }).then(() => true, () => false);
     const dentro = () => esperar(() => document.getElementById('authOverlay').hidden, null, 15000);
     const afuera = () => esperar(() => !document.getElementById('authOverlay').hidden, null, 15000);
     const entrar = async (u, c) => { await p.fill('#authUser', u); await p.fill('#authPass', c); await p.click('#authBtn'); };

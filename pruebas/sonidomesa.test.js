@@ -5,6 +5,7 @@
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 (async()=>{ const b=await chromium.launch(); let ok=0,mal=0; const chk=(n,c,x)=>{ if(c){ok++;console.log('✅ '+n);} else {mal++;console.log('❌ '+n+(x!==undefined?' → '+JSON.stringify(x):''));} };
  const ctx=await b.newContext({viewport:{width:390,height:844}});
+ await ctx.addInitScript(()=>{ try{ localStorage.setItem('vento_vista_sencilla','0'); }catch(e){} });   // la vista completa: en la sencilla el 🔊 está en «⋯ Opciones»
  await ctx.route('**/*', r=>{const u=new URL(r.request().url()); return u.hostname==='localhost'?r.continue():r.abort();});
  const p=await ctx.newPage(); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
  const BASE=process.env.VENTO_BASE||'http://localhost:8765';

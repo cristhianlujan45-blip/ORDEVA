@@ -55,6 +55,10 @@
   .pie button{ background:none; border:none; color:var(--mut); text-decoration:underline; padding:0; }
   .sin{ padding:22px 16px; border-radius:16px; background:var(--sf); border:1px solid var(--line); text-align:center; line-height:1.5; margin-top:12px; }
   .sin .ico{ font-size:46px; }
+  .modos{ display:flex; gap:8px; margin:0 0 10px; }
+  .modos .btn{ flex:1; padding:9px 10px; font-size:14px; }
+  .modos .btn.on{ background:var(--am); border-color:var(--am); color:#1a1300; }
+  #btAcc{ margin-top:8px; }
 </style>
 </head>
 <body>
@@ -64,11 +68,14 @@
   <div id="sinPar" class="sin" hidden>
     <div class="ico">🔳</div>
     <b>Este celular todavía no está emparejado.</b>
-    <p>En el computador (o la tablet) con ORDEVA toca <b>📷 Escanear</b> → <b>📱 Usar el celular como lector</b> y escanea ese código QR con la cámara de este celular.</p>
+    <p>En el computador (o la tablet) con ORDEVA toca <b>📱 Celular lector</b> (en la caja o el inventario) o <b>📷 Escanear</b> → <b>📱 Usar el celular como lector</b>, y escanea ese código QR con la cámara de este celular.</p>
+    <button type="button" class="btn pri" id="btSolo" hidden>🔵 Usar Bluetooth (sin internet)</button>
   </div>
 
   <div id="app" hidden>
+    <div class="modos" id="modos" hidden><button type="button" class="btn" data-modo="internet">📶 Internet</button><button type="button" class="btn" data-modo="bt">🔵 Bluetooth</button></div>
     <div class="estado off" id="estado" role="status" aria-live="polite"><i class="dot"></i><div><b id="estTit">Conectando…</b><span id="estSub"></span></div></div>
+    <div class="fila" id="btAcc" hidden><button type="button" class="btn" id="btVisible">📡 Emparejar con el computador</button></div>
     <div class="cam" id="cam">
       <video id="video" playsinline muted autoplay></video>
       <div class="marco"></div>
@@ -90,7 +97,11 @@
   </div>
 </div>
 
-<script>window.VENTO_REQUIERE_BD = true;   // sin el servidor no llega nada al computador: «Sin conexión con ORDEVA» y la pantalla no se apaga</script>
+<script>
+// Sin el servidor no llega nada al computador: «Sin conexión con ORDEVA» y la pantalla no se apaga. Con 🔵 Bluetooth no se
+// necesita internet (va directo al computador), así que ahí no se tapa la pantalla.
+window.VENTO_REQUIERE_BD = (function(){ try{ return !(window.VentoAndroid && window.VentoAndroid.btTecladoEstado && localStorage.getItem('vento_lector_bt') === '1'); }catch(e){ return true; } })();
+</script>
 <script src="nube/config.js"></script>
 <script src="lib/vento-canal.js"></script><!-- canales en vivo por el servidor de ORDEVA -->
 <script src="lib/vento-codigos.js"></script><!-- lector de códigos: el del celular o ZXing (iPhone) -->
@@ -109,7 +120,15 @@
     if(m){ c = m[1]; try{ localStorage.setItem(LS, c); }catch(e){} }
     else{ try{ var g = localStorage.getItem(LS) || ''; if(/^lc[A-Za-z0-9]{20,40}$/.test(g)) c = g; }catch(e){} }
   })();
-  if(!c){ $('sinPar').hidden = false; return; }
+  // 🔵 1.65.6: dentro de la app ORDEVA el celular también puede ser lector Bluetooth del computador (TecladoBT.java): se
+  // presenta como un teclado y escribe cada código con Enter, como una pistola lectora. No necesita internet ni el QR.
+  var A = window.VentoAndroid, hayBT = !!(A && A.btTecladoEstado && (function(){ try{ return JSON.parse(A.btTecladoEstado()).soportado; }catch(e){ return false; } })());
+  var modoBT = false; try{ modoBT = hayBT && localStorage.getItem('vento_lector_bt') === '1'; }catch(e){}
+  if(!c && !modoBT){
+    $('sinPar').hidden = false;
+    if(hayBT){ $('btSolo').hidden = false; $('btSolo').onclick = function(){ try{ localStorage.setItem('vento_lector_bt', '1'); }catch(e){} location.reload(); }; }
+    return;
+  }
   $('app').hidden = false;
 
   function azar(n){ var a = 'abcdefghijkmnopqrstuvwxyz23456789', r = ''; for(var i = 0; i < n; i++) r += a[Math.floor(Math.random() * a.length)]; return r; }
@@ -118,13 +137,41 @@
   function equipo(){ var u = navigator.userAgent || ''; return /iphone|ipad/i.test(u) ? 'iPhone' : /android/i.test(u) ? 'Celular Android' : 'Celular'; }
 
   // ---------- Lo que dice el computador (canal <c>r): ¿está escaneando? y «✅ recibido» ----------
+  var bt = {};
   function pintarEstado(){
     var e = $('estado');
+    $('modos').hidden = !hayBT || !c;
+    [].forEach.call(document.querySelectorAll('[data-modo]'), function(b){ b.classList.toggle('on', (b.dataset.modo === 'bt') === modoBT); });
+    $('btAcc').hidden = !modoBT;
+    if(modoBT){
+      var listo = bt.conectado;
+      e.className = 'estado ' + (listo ? 'on' : 'off');
+      $('estTit').textContent = listo ? '🔵 Conectado por Bluetooth' + (bt.computador ? ' con ' + bt.computador : '') : !bt.bluetooth ? 'Prende el Bluetooth del celular' : !bt.permiso ? 'Falta el permiso «Dispositivos cercanos»' : 'Esperando al computador por Bluetooth';
+      $('estSub').textContent = listo ? 'Cada código se escribe en el computador con Enter, como una pistola lectora (sin internet). Ten abierta la caja o el inventario allá.'
+        : bt.error ? bt.error : 'La primera vez: toca «📡 Emparejar con el computador» y en el computador abre Bluetooth → «Agregar dispositivo» → el nombre de este celular. Después se conecta solo.';
+      return;
+    }
     e.className = 'estado ' + (pc.on ? 'on' : 'off');
     $('estTit').textContent = pc.on ? 'El computador está esperando códigos' : 'El computador no está escaneando';
-    $('estSub').textContent = pc.on ? (pc.h || 'Apunta la cámara al código.') : 'Allá toca «📷 Escanear» (en la mesa, Venta rápida, Productos o Inventario) y lo que leas aquí llega solo.';
+    $('estSub').textContent = pc.on ? (pc.h || 'Apunta la cámara al código.') : 'Allá abre la caja, el inventario por código, la cuenta de una mesa, la venta rápida o «📷 Escanear», y lo que leas aquí entra solo.';
     if(pc.n) $('neg').textContent = pc.n;
   }
+  function revisarBT(){
+    if(!hayBT) return;
+    try{ bt = JSON.parse(A.btTecladoEstado()) || {}; }catch(e){ bt = {}; }
+    if(modoBT && !bt.prendido && bt.bluetooth) try{ A.btTecladoPrender(); }catch(e){}
+    pintarEstado();
+  }
+  function ponerModo(siBT){
+    modoBT = !!siBT;
+    try{ localStorage.setItem('vento_lector_bt', modoBT ? '1' : '0'); }catch(e){}
+    window.VENTO_REQUIERE_BD = !modoBT;
+    if(modoBT){ var o = document.getElementById('vcSinConexion'); if(o) o.remove(); try{ A.btTecladoPrender(); }catch(e){} }
+    revisarBT();
+  }
+  [].forEach.call(document.querySelectorAll('[data-modo]'), function(b){ b.onclick = function(){ ponerModo(b.dataset.modo === 'bt'); }; });
+  $('btVisible').onclick = function(){ try{ A.btTecladoPrender(); A.btTecladoMostrarse(); }catch(e){} setTimeout(revisarBT, 800); };
+  if(hayBT){ setInterval(revisarBT, 1500); setTimeout(revisarBT, 200); }
   function oir(){
     var es;
     try{ es = new EventSource(CANAL + c + 'r/sse?since=12h'); }catch(e){ return; }
@@ -135,13 +182,13 @@
         var t = +m.id || 0; if(t < pc.t) return;
         pc = { on: !!o.on, s: o.s || '', h: o.h || '', n: o.n || pc.n, t: t };
         pintarEstado();
-      } else if(o.t === 'ok'){
-        items.forEach(function(it){ if(it.id === o.id && it.estado !== 'ok'){ it.estado = 'ok'; } });
+      } else if(o.t === 'ok' || o.t === 'sin'){
+        items.forEach(function(it){ if(it.id === o.id && it.estado !== 'ok'){ it.estado = o.t; } });
         pintarLista();
       }
     };
   }
-  function hola(){ if(!document.hidden) publicar({ t: 'hola', d: equipo() }).catch(function(){}); }
+  function hola(){ if(c && !document.hidden) publicar({ t: 'hola', d: equipo() }).catch(function(){}); }
 
   // ---------- Mandar un código ----------
   function pitar(bien){
@@ -159,6 +206,13 @@
     var it = { id: azar(10), v: v, estado: 'va', t: Date.now() };
     items.unshift(it); items = items.slice(0, 30);
     var cam = $('cam');
+    if(modoBT){
+      var ok = false; try{ ok = A.btTecladoEscribir(v); }catch(e){}
+      it.estado = ok ? 'bt' : 'nobt';
+      cam.classList.add(ok ? 'leyo' : 'nolee'); setTimeout(function(){ cam.classList.remove('leyo'); cam.classList.remove('nolee'); }, 400);
+      try{ navigator.vibrate && navigator.vibrate(ok ? 60 : [60, 60, 60]); }catch(e){}
+      pitar(ok); pintarLista(); return;
+    }
     if(!pc.on){
       it.estado = 'no';
       cam.classList.add('nolee'); setTimeout(function(){ cam.classList.remove('nolee'); }, 500);
@@ -175,8 +229,8 @@
     pintarLista();
   }
   function pintarLista(){
-    var E = { va: '⏳ enviando…', ok: '✅ recibido', mal: '⚠️ no llegó', no: '⚠️ no se envió' };   // arriba ya dice que el computador no está escaneando
-    $('lista').innerHTML = items.map(function(it){ return '<li class="' + (it.estado === 'ok' ? 'ok' : it.estado === 'va' ? '' : 'mal') + '"><code>' + esc(it.v) + '</code><span class="e">' + E[it.estado] + '</span></li>'; }).join('');
+    var E = { va: '⏳ enviando…', ok: '✅ recibido', mal: '⚠️ no llegó', no: '⚠️ no se envió', sin: '⚠️ allá no había nada abierto', bt: '✅ escrito por Bluetooth', nobt: '⚠️ sin conexión Bluetooth' };   // arriba dice el porqué
+    $('lista').innerHTML = items.map(function(it){ return '<li class="' + (it.estado === 'ok' || it.estado === 'bt' ? 'ok' : it.estado === 'va' ? '' : 'mal') + '"><code>' + esc(it.v) + '</code><span class="e">' + E[it.estado] + '</span></li>'; }).join('');
     $('vacio').hidden = items.length > 0;
   }
   $('mano').addEventListener('submit', function(e){ e.preventDefault(); var v = $('manoTxt').value; $('manoTxt').value = ''; mandar(v); });
@@ -257,7 +311,7 @@
   });
 
   pintarEstado(); pintarLista();
-  oir(); hola(); setInterval(hola, 30000);
+  if(c){ oir(); hola(); setInterval(hola, 30000); }   // solo Bluetooth (sin emparejar por QR): no hay canal
   abrir();
 })();
 </script>

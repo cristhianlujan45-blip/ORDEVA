@@ -33,7 +33,8 @@ const ADMIN = 'cristhianwkh@gmail.com';
     const rpc = async (fn, args, tok) => { const r = await fetch(sb.url + '/rest/v1/rpc/' + fn, { method: 'POST', headers: cab(tok), body: JSON.stringify(args || {}) }); return { st: r.status, j: await r.json().catch(() => null) }; };
     const entrar = async (email, clave) => { const r = await fetch(sb.url + '/auth/v1/token?grant_type=password', { method: 'POST', headers: cab(), body: JSON.stringify({ email, password: clave }) }); return { st: r.status, j: await r.json() }; };
     const uno = async (q, p) => (await sb.sql(q, p))[0];
-    const esperar = (p, fn, arg, ms) => p.waitForFunction(fn, arg, { timeout: ms || 12000, polling: 250 }).then(() => true, () => false);
+    // Si la página se recarga justo mientras se espera (al sacar la sesión), lo de adentro todavía no existe: se sigue esperando.
+    const esperar = (p, fn, arg, ms) => p.waitForFunction(([f, a]) => { try{ return (0, eval)('(' + f + ')')(a); }catch(e){ return false; } }, [String(fn), arg], { timeout: ms || 12000, polling: 250 }).then(() => true, () => false);
     async function equipo(nombre, hash){
       const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
       await ctx.route('**/*', rt => { const u = new URL(rt.request().url()); return (u.hostname === 'localhost' || u.hostname === '127.0.0.1') ? rt.continue() : rt.abort(); });

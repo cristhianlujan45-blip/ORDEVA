@@ -93,7 +93,47 @@
   }
   // Nombre puesto solo (de antes): «Dueño · Android», «Caja · Windows»… Ese no lo eligió nadie: se muestra el del modelo.
   function nombreAuto(n){ return !n || /^(Dueño|Administrador|Caja|Mesero|Empleado|Celular|[^·]{1,30}) · (Android|Windows|iPhone|Mac|Navegador)$/.test(String(n)); }
-  function nombreVer(d){ return nombreAuto(d.nombre) ? equipoDe(d.plataforma) : '📱 ' + d.nombre + (d.plataforma && /Android|iPhone|Windows|Mac/.test(d.plataforma) ? ' · ' + equipoDe(d.plataforma).replace(/^\S+\s/, '') : ''); }
+  // 1.65.6: el que el propio equipo se pone al entrar (marca, modelo y dónde corre ORDEVA): empieza con 📱 / 💻 / 🌐.
+  function nombreDetectado(n){ return /^(📱|💻|🌐)/.test(String(n || '')); }
+  function nombreVer(d){
+    if(nombreDetectado(d.nombre)) return d.nombre;
+    if(nombreAuto(d.nombre)) return equipoDe(d.plataforma) + (navegadorDe(d.plataforma) ? ' · ' + navegadorDe(d.plataforma) : '');
+    return '🏷️ ' + d.nombre + (d.plataforma && /Android|iPhone|iPad|Windows|Mac/.test(d.plataforma) ? ' · ' + equipoDe(d.plataforma).replace(/^\S+\s/, '') : '');
+  }
+  // Dónde corre ORDEVA en ese equipo (si se ve en el texto del navegador que guardó el servidor).
+  function navegadorDe(ua){
+    ua = String(ua || '');
+    return /VentoPC\//.test(ua) ? 'programa ORDEVA' : /VentoAndroid\//.test(ua) ? 'app ORDEVA' : /Edg\//.test(ua) ? 'Edge' : /OPR\//.test(ua) ? 'Opera' : /SamsungBrowser/.test(ua) ? 'Samsung Internet'
+      : /Firefox\//.test(ua) ? 'Firefox' : /CriOS|Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : '';
+  }
+  /* El nombre de ESTE equipo, para que en la lista se sepa cuál es cuál: «📱 Samsung Galaxy A34 (SM-A346M) · app ORDEVA»,
+     «💻 Computador Windows · programa ORDEVA», «📱 Xiaomi 24090RA29G · Chrome». Chrome en Android esconde el modelo en su
+     texto («K»): ahí se le pregunta al navegador (userAgentData). */
+  function equipoAqui(){
+    var ua = navigator.userAgent || '';
+    return Promise.resolve().then(function(){
+      var uad = navigator.userAgentData;
+      return uad && uad.getHighEntropyValues ? uad.getHighEntropyValues(['model']).then(function(h){ return h && h.model || ''; }, function(){ return ''; }) : '';
+    }).then(function(modelo){
+      var base = modelo && /Android/.test(ua) ? equipoDe('Android; ' + modelo + ')') : equipoDe(ua), nav = navegadorDe(ua);
+      return (base + (nav ? ' · ' + nav : '')).slice(0, 60);
+    });
+  }
+  // Una vez al día: si este equipo tiene el nombre de antes («Dueño · Android») o uno detectado que ya no es, se pone el
+  // nombre de verdad. Si el dueño le puso uno propio (✏️ «Caja», «Celular de Ana»), ese no se toca.
+  var K_NOMBRADO = 'vento_pagos_nombrado';
+  function nombrarEsteEquipo(){
+    var d = miDispositivo(), n = negocio(); if(!d || !n) return;
+    var v = lsGet(K_NOMBRADO, {}); if(v.id === d.id && Date.now() - (v.t || 0) < 864e5) return;
+    equipoAqui().then(function(nombre){
+      return rpc('dispositivos_lista', { p_negocio: n.id }).then(function(l){
+        var yo = (l || []).find(function(x){ return x.id === d.id; });
+        lsSet(K_NOMBRADO, { id: d.id, t: Date.now() });
+        if(!yo || yo.nombre === nombre || !(nombreAuto(yo.nombre) || nombreDetectado(yo.nombre))) return;
+        return rpc('dispositivo_nombre', { p_dispositivo: d.id, p_nombre: nombre });
+      });
+    }).catch(function(){});
+  }
   function nombreRol(r){ return ({ dueno: 'Dueño', admin: 'Administrador', cajero: 'Caja', mesero: 'Mesero', empleado: (window.ventoRolNombre ? window.ventoRolNombre('empleado') : 'Empleado') })[r] || 'Celular'; }
   function miDispositivo(){ var n = negocio(), d = lsGet(K_DEV, null); return n && d && d.negocio === n.id ? d : null; }
   function registrarDispositivo(forzar){
@@ -409,6 +449,22 @@
      ese instante. Es el mismo aviso que usa la app Android (EnVivo.java). Sirve para todos los roles (antes la caja y los
      empleados preguntaban cada 6 s) y no depende del permiso de la tabla de pagos. Si se cae, se vuelve a conectar a los
      3 s (no a los 15). La pregunta cada 6 / 20 s sigue de respaldo. */
+  /* 🔔 1.65.6: «Probar» en la lista de equipos: el servidor manda la prueba por el canal en vivo solo para ESE equipo
+     (dispositivo_probar). Suena igual que un pago de verdad (ventana o notificación, sonido y voz), sin crear ningún
+     pago. En «🔕 NO SUENA» no suena: así se comprueba que apagar y volver a prender el sonido funciona. En la app Android
+     la atiende Android mismo (también con el celular bloqueado). */
+  function probarAqui(){
+    // Se pregunta otra vez si este equipo suena (el dueño pudo cambiarlo hace un segundo).
+    return revisarSuena(true).catch(function(){}).then(probarYa);
+  }
+  function probarYa(){
+    if(!suenaAqui()){ toast('🔕 Llegó la prueba, pero en este equipo los pagos están en «NO SUENA». Préndelo en la lista de equipos para que suene.', 9000); return; }
+    toast('🧪 Prueba: Recibiste $1.000 por Nequi. Así suena un pago en este equipo.', 9000);
+    try{ window.ventoSonidos && window.ventoSonidos.success(); }catch(e){}
+    hablarPago('Prueba de ORDEVA. Llegaron mil pesos por Nequi.');
+    try{ avisoPagoCompleto({ id: 'prueba-' + Date.now(), monto: 1000, metodo: 'NEQUI', pagador: '', mesa: null, confianza: 'app', detalle: 'Prueba de ORDEVA' }, null, 'ok'); }catch(e){}
+  }
+  window.ventoPagosProbarAqui = probarAqui;
   function conectarAvisoVivo(){
     var n = negocio(); if(!n || est.avisoVivo) return;
     est.avisoVivo = 'conectando';
@@ -419,6 +475,7 @@
         var cerrado = false, ch = c.channel(t, { config: { broadcast: { self: false, ack: false }, private: false } });
         est.avisoVivo = ch;
         ch.on('broadcast', { event: 'p' }, function(){ est.ultimoAvisoVivo = Date.now(); sincronizar(); })
+          .on('broadcast', { event: 'prueba' }, function(m){ var d = miDispositivo(), x = m && (m.payload || m); if(!window.VentoAndroid && d && x && x.d === d.id){ if(typeof x.s === 'boolean') lsSet(K_SUENA, x.s); probarAqui(); } })
           .subscribe(function(st){
             if(st === 'SUBSCRIBED'){ est.avisoVivoOk = true; sincronizar(); return; }   // recién conectado: lo que llegó sin conexión
             if(cerrado || !(st === 'CHANNEL_ERROR' || st === 'TIMED_OUT' || st === 'CLOSED')) return;
@@ -482,7 +539,7 @@
   function arrancar(){
     if(!negocio()) return;
     salud().then(function(ok){
-      registrarDispositivo(false).then(function(){ cruceAndroid(); revisarSuena(true); return latido(null); }).catch(function(){});
+      registrarDispositivo(false).then(function(){ cruceAndroid(); revisarSuena(true); setTimeout(nombrarEsteEquipo, 3000); return latido(null); }).catch(function(){});
       sincronizar().then(conectarTiempoReal);
       conectarAvisoVivo();
       setTimeout(function(){ try{ sugerirPush(); }catch(e){} }, 20000);
@@ -514,6 +571,8 @@
     '.vp-btn-cuenta{width:100%;margin:8px 0 4px;padding:12px;border-radius:14px;border:1px solid #7c3aed;background:color-mix(in srgb,#7c3aed 14%,transparent);color:inherit;font:700 15px var(--font-main);cursor:pointer}' +
     '.vp-opc[hidden]{display:none}.vp-nw{white-space:nowrap}' +
     '.vp-eq-ayuda{font-size:13px;color:var(--ink-soft);padding:2px 0 8px;line-height:1.4}' +
+    '.vp-eq-grupo{font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-soft);margin:12px 2px 6px}' +
+    '.vp-eq-viejos{margin-top:12px}.vp-eq-viejos summary{cursor:pointer;font-weight:700;padding:6px 0}.vp-eq-viejos .vp-eq{opacity:.75}.vp-eq-viejos [data-rev-viejos]{margin:6px 0 10px}' +
     '#vpDevs .vp-eq{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:10px 12px;margin:0 0 8px;border:1px solid var(--line);border-top:1px solid var(--line);border-radius:12px;justify-content:flex-start}' +
     '#vpDevs .vp-eq.este{border-color:var(--accent,#8b5cf6);box-shadow:0 0 0 1px var(--accent,#8b5cf6) inset}' +
     '.vp-eq-txt{flex:1 1 180px;min-width:0}.vp-eq-txt b{font-size:15px;word-break:break-word}.vp-eq-txt small{margin-top:2px}' +
@@ -771,23 +830,57 @@
     // dispositivos_lista (1.62.0) trae «suena»; si el servidor todavía no la tiene, la de antes.
     rpc('dispositivos_lista', { p_negocio: n.id }).catch(function(){ return rpc('mis_dispositivos', { p_negocio: n.id }); }).then(function(l){
       var mio = miDispositivo(), conSuena = (l || []).some(function(d){ return typeof d.suena === 'boolean'; });
-      // Primero ESTE celular, luego los que están conectados ahora.
-      l = (l || []).slice().sort(function(x, y){ return (mio && y.id === mio.id) - (mio && x.id === mio.id) || (Date.parse(y.ultimo_visto) || 0) - (Date.parse(x.ultimo_visto) || 0); });
-      el.innerHTML = '<div class="vp-eq-ayuda">Toca el botón de cada uno para elegir si <b>SUENA</b> (voz, sonido y aviso) cuando llega un pago. En los que no suenan, el pago igual queda en la lista.</div>' +
-        l.map(function(d){
-        var suena = d.suena !== false, este = mio && mio.id === d.id, ms = Date.now() - (Date.parse(d.ultimo_visto) || 0);
-        var vivo = ms < 2 * 60e3, estado = vivo ? '🟢 Conectado ahora' : ms < 30 * 60e3 ? '🟡 Visto ' + haceTxt(ms) : '⚪ Visto ' + haceTxt(ms) + ' (cerrado o dormido: no va a sonar)';
-        return '<div class="vp-eq' + (este ? ' este' : '') + (suena ? ' on' : '') + '">' +
-          '<div class="vp-eq-txt"><b>' + esc(nombreVer(d)) + '</b>' + (este ? '<span class="vp-eq-este">ESTE CELULAR</span>' : '') +
-          '<small>' + estado + ' · ' + esc(d.usuario || '') + ' (' + nombreRol(d.rol) + ')</small></div>' +
+      /* 1.65.6: solo los equipos de verdad. Arriba los de TU cuenta que se están usando; luego los de tus empleados (si
+         hay); y aparte, cerrados, los viejos (más de 14 días sin abrir ORDEVA), los repetidos (el mismo equipo registrado
+         otra vez al reinstalar) y los de cuentas que ya no están en el negocio, con «🧹 Retirar los viejos». */
+      var ahora = Date.now(), DIA = 864e5, vistos = {};
+      l = (l || []).map(function(d){ var ms = ahora - (Date.parse(d.ultimo_visto) || 0); return Object.assign({}, d, { ms: ms, este: !!(mio && mio.id === d.id), nombreV: nombreVer(d) }); })
+        .sort(function(x, y){ return (y.este - x.este) || (x.ms - y.ms); });
+      l.forEach(function(d){
+        var clave = (d.propio ? 'yo' : d.usuario || '') + '|' + d.nombreV.replace(/^\S+\s/, '').split(' · ')[0];   // el modelo, sin «· Chrome»
+        // el mismo modelo otra vez (al reinstalar se registra de nuevo): el que lleva más de 2 días sin usarse. Dos celulares
+        // iguales que se usan los dos no se esconden; con nombre propio (🏷️) tampoco.
+        d.repetido = !d.este && !!vistos[clave] && d.ms > 2 * DIA && !/^🏷️/.test(d.nombreV); vistos[clave] = 1;
+        d.huerfano = !d.propio && 'rol' in d && !d.rol;   // de una cuenta que ya no está en el negocio
+        d.viejo = !d.este && (d.huerfano || d.ms > 14 * DIA || d.repetido);
+      });
+      var mios = l.filter(function(d){ return !d.viejo && (d.propio || d.este); }), otros = l.filter(function(d){ return !d.viejo && !d.propio && !d.este; }), viejos = l.filter(function(d){ return d.viejo; });
+      var fila = function(d){
+        var suena = d.suena !== false, ms = d.ms, compu = /^💻/.test(d.nombreV);
+        var estado = ms < 2 * 60e3 ? '🟢 Conectado ahora' : ms < 30 * 60e3 ? '🟡 Visto ' + haceTxt(ms) : '⚪ Visto ' + haceTxt(ms) + ' (cerrado o dormido: no va a sonar)';
+        return '<div class="vp-eq' + (d.este ? ' este' : '') + (suena ? ' on' : '') + '">' +
+          '<div class="vp-eq-txt"><b>' + esc(d.nombreV) + '</b>' + (d.este ? '<span class="vp-eq-este">' + (compu ? 'ESTE EQUIPO' : 'ESTE CELULAR') + '</span>' : '') +
+          '<small>' + estado + (d.propio || d.este ? '' : ' · ' + esc(d.usuario || '') + ' (' + nombreRol(d.rol) + ')') + '</small></div>' +
           (conSuena ? '<button type="button" class="vp-eq-sw" data-suena="' + esc(d.id) + '" data-v="' + (suena ? '0' : '1') + '" aria-pressed="' + suena + '">' + (suena ? '🔊 SUENA' : '🔕 NO SUENA') + '</button>' : '') +
-          '<span class="vp-eq-mas"><button type="button" class="btn-ghost" data-nom="' + esc(d.id) + '" data-actual="' + esc(nombreAuto(d.nombre) ? '' : d.nombre) + '" title="Ponerle nombre (ej. Caja, Celular de Ana)">✏️ Nombre</button>' +
+          '<span class="vp-eq-mas"><button type="button" class="btn-ghost" data-probar="' + esc(d.id) + '" data-nombre="' + esc(d.nombreV) + '" title="Hace sonar un pago de prueba en ese equipo (no crea ningún pago)">🔔 Probar</button>' +
+          '<button type="button" class="btn-ghost" data-nom="' + esc(d.id) + '" data-actual="' + esc(nombreAuto(d.nombre) || nombreDetectado(d.nombre) ? '' : d.nombre) + '" title="Ponerle nombre (ej. Caja, Celular de Ana)">✏️ Nombre</button>' +
           '<button type="button" class="btn-ghost" data-rev="' + esc(d.id) + '">Retirar</button></span></div>';
-      }).join('') || '<div class="empty-note">Ninguno.</div>';
+      };
+      var viejaFila = function(d){ return '<div class="vp-eq vp-eq-viejo"><div class="vp-eq-txt"><b>' + esc(d.nombreV) + '</b><small>' + (d.huerfano ? 'De una cuenta que ya no está en el negocio' : d.repetido ? 'Repetido (el mismo equipo, registrado otra vez)' : 'Sin abrir ORDEVA') + ' · visto ' + haceTxt(d.ms) + '</small></div><span class="vp-eq-mas"><button type="button" class="btn-ghost" data-rev="' + esc(d.id) + '">Retirar</button></span></div>'; };
+      el.innerHTML = '<div class="vp-eq-ayuda">Toca el botón de cada uno para elegir si <b>SUENA</b> (voz, sonido y aviso) cuando llega un pago. En los que no suenan, el pago igual queda en la lista. Con <b>🔔 Probar</b> suena un pago de prueba en ese equipo (no se crea ningún pago).</div>' +
+        '<div class="vp-eq-grupo">Tus equipos</div>' + (mios.map(fila).join('') || '<div class="empty-note">Ninguno conectado en estos días.</div>') +
+        (otros.length ? '<div class="vp-eq-grupo">De tu equipo de trabajo</div>' + otros.map(fila).join('') : '') +
+        (viejos.length ? '<details class="vp-eq-viejos"><summary>🗂️ Equipos viejos o repetidos (' + viejos.length + ')</summary><div class="settings-desc">No se usan: no suenan ni reciben pagos. Puedes retirarlos para que la lista quede limpia.</div>' +
+          '<button type="button" class="btn-ghost" data-rev-viejos="' + esc(viejos.map(function(d){ return d.id; }).join(',')) + '">🧹 Retirar los ' + viejos.length + ' viejos</button>' + viejos.map(viejaFila).join('') + '</details>' : '');
       var av = document.getElementById('vpDevsAviso');
       if(av) av.textContent = conSuena && (l || []).length && !(l || []).some(function(d){ return d.suena !== false; }) ? '⚠️ Ningún equipo va a sonar con los pagos: elige al menos uno.' : '';
       el.onclick = function(e){
-        var bs = e.target.closest('[data-suena]'), bn = e.target.closest('[data-nom]'), b = e.target.closest('[data-rev]');
+        var bs = e.target.closest('[data-suena]'), bn = e.target.closest('[data-nom]'), b = e.target.closest('[data-rev]'), bp = e.target.closest('[data-probar]'), bv = e.target.closest('[data-rev-viejos]');
+        if(bp){
+          bp.disabled = true;
+          rpc('dispositivo_probar', { p_dispositivo: bp.dataset.probar }).then(function(ok){
+            toast(ok === false ? '⚠️ No se pudo mandar la prueba (el aviso en vivo del servidor no respondió).' : '🔔 Prueba enviada a ' + bp.dataset.nombre + ': debe sonar en un instante (si está en «🔊 SUENA»).', 7000);
+          }, function(x){ toast('⚠️ No se pudo: ' + (x && x.message || x), 6000); }).then(function(){ setTimeout(function(){ bp.disabled = false; }, 2000); });
+          return;
+        }
+        if(bv){
+          var ids = bv.dataset.revViejos.split(',').filter(Boolean);
+          if(!ids.length || !confirm('¿Retirar los ' + ids.length + ' equipos viejos o repetidos? No se usan: no suenan ni reciben pagos.')) return;
+          bv.disabled = true;
+          Promise.all(ids.map(function(id){ return rpc('revocar_dispositivo', { p_dispositivo: id }).catch(function(){ return null; }); }))
+            .then(function(){ toast('🧹 Listo: ' + ids.length + ' equipos viejos retirados.'); pintarDispositivos(); });
+          return;
+        }
         if(bs){
           bs.disabled = true;
           rpc('dispositivo_sonar', { p_dispositivo: bs.dataset.suena, p_suena: bs.dataset.v === '1' }).then(function(v){

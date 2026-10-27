@@ -104,6 +104,7 @@ function applyCustomColors(){
   set('--ink', ac); set('--ink-soft', hexMix(ac, bg, 0.4));
   set('--cream', ac); set('--cream-soft', hexMix(ac, bg, 0.2));
   set('--amber', ac); set('--amber-deep', hexMix(ac, '#000000', 0.35));
+  try{ set('--on-amber', textoSobre(ac)); }catch(e){}   // 1.65.6: la letra de los botones se lee sobre cualquier acento
   if(pb) pb.value = bg;
   if(pa) pa.value = ac;
 }

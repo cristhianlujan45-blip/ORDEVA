@@ -72,7 +72,22 @@ public class VentoServicio extends Service {
         if (enVivo != null) { enVivo.parar(); enVivo = null; }
         enVivoClave = clave;
         if (clave.isEmpty()) return;
-        enVivo = new EnVivo(url, key, t, () -> Cruce.revisar(VentoServicio.this));
+        enVivo = new EnVivo(url, key, t, new EnVivo.Oyente() {
+            @Override public void aviso() { Cruce.revisar(VentoServicio.this); }
+            // 🔔 Probar (1.65.6): un pago de PRUEBA por el mismo camino de uno de verdad (voz, notificación y ventana), solo
+            // en el equipo nombrado y respetando «🔕 NO SUENA». No crea ningún pago.
+            @Override public void prueba(String m) {
+                final String yo = Cruce.yo;
+                if (yo == null || !m.contains(yo)) return;
+                // El servidor dice si este equipo suena (el dueño pudo cambiarlo hace un segundo).
+                if (m.contains("\"s\":false")) VentoApp.ponerSuena(false);
+                else if (m.contains("\"s\":true")) VentoApp.ponerSuena(true);
+                VentoApp.ui.post(() -> {
+                    VentoApp.decirPago("Prueba de ORDEVA. Llegaron mil pesos por Nequi.");
+                    VentoApp.notificarPago("🧪 Prueba: Recibiste $1.000 por Nequi", "Prueba de ORDEVA: así suena un pago en este equipo.", "Prueba de ORDEVA", "$1.000", "Nequi", "ok");
+                });
+            }
+        });
         enVivo.iniciar();
     }
 

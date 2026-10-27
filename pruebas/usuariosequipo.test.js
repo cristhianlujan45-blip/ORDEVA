@@ -26,7 +26,8 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
   console.log('RESULTADO', ok, 'bien', mal, 'mal'); process.exit(mal ? 1 : 0);
 
   async function pruebas(){
-    const esperar = (p, fn, arg, ms) => p.waitForFunction(fn, arg, { timeout: ms || 12000, polling: 250 }).then(() => true, () => false);
+    // Si la página se recarga justo mientras se espera (al sacar la sesión), lo de adentro todavía no existe: se sigue esperando.
+    const esperar = (p, fn, arg, ms) => p.waitForFunction(([f, a]) => { try{ return (0, eval)('(' + f + ')')(a); }catch(e){ return false; } }, [String(fn), arg], { timeout: ms || 12000, polling: 250 }).then(() => true, () => false);
     const uno = async (q, pr) => (await sb.sql(q, pr))[0];
     async function equipo(nombre){
       const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });

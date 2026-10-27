@@ -335,6 +335,7 @@ public class VentoApp extends Application {
     static boolean vozPagosOn() { return app == null || app.getSharedPreferences("vento", MODE_PRIVATE).getBoolean("pagosVoz", true); }
     /** 1.62.0: ¿suenan AQUÍ los avisos de pago? Lo elige el dueño o el administrador (Ajustes → Pagos → equipos). En los
      *  que no suenan, el pago llega igual a la lista de ORDEVA, sin voz, sin notificación y sin la ventana. */
+    static void ponerSuena(boolean si) { if (app != null) app.getSharedPreferences("vento", MODE_PRIVATE).edit().putBoolean("pagosSuena", si).apply(); }
     static boolean suenaAqui() { return app == null || app.getSharedPreferences("vento", MODE_PRIVATE).getBoolean("pagosSuena", true); }
     static void decirPago(final String frase) {
         if (!vozPagosOn() || !suenaAqui()) return;
@@ -1677,6 +1678,31 @@ public class VentoApp extends Application {
                 }
             }).start();
         }
+
+        // ---------------------------------------------------------------- 🔵 Lector de códigos Bluetooth (TecladoBT)
+        /** {soportado, bluetooth, permiso, prendido, registrado, conectado, computador, error} */
+        @JavascriptInterface
+        public String btTecladoEstado() { return TecladoBT.soportado() ? TecladoBT.de(VentoApp.this).estado() : "{\"soportado\":false}"; }
+        /** Prende el teclado Bluetooth (si falta el permiso «Dispositivos cercanos», lo pide; luego hay que volver a tocar). */
+        @JavascriptInterface
+        public void btTecladoPrender() {
+            ui.post(() -> {
+                if (!TecladoBT.soportado()) return;
+                if (!TecladoBT.permiso()) {
+                    if (ventana != null && Build.VERSION.SDK_INT >= 31) ventana.requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_ADVERTISE}, 7311);
+                    return;
+                }
+                TecladoBT.de(VentoApp.this).prender();
+            });
+        }
+        /** Que el computador encuentre este celular para emparejarlo. */
+        @JavascriptInterface
+        public void btTecladoMostrarse() { ui.post(() -> { if (TecladoBT.soportado() && TecladoBT.permiso()) TecladoBT.de(VentoApp.this).mostrarse(); }); }
+        @JavascriptInterface
+        public void btTecladoApagar() { if (TecladoBT.soportado()) TecladoBT.de(VentoApp.this).apagar(); }
+        /** Escribe el código en el computador y Enter. */
+        @JavascriptInterface
+        public boolean btTecladoEscribir(String texto) { return TecladoBT.soportado() && TecladoBT.de(VentoApp.this).escribir(texto); }
 
         /** Trabajar de fondo (pedidos y música con la app cerrada): estado y prender/apagar. */
         @JavascriptInterface

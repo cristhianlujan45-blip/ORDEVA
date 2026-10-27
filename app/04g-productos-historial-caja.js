@@ -491,6 +491,16 @@ document.getElementById('qsScanBtn').addEventListener('click', () => {
   }, { hint: i18nPut('Escanea el código del producto para agregarlo a la venta — puedes escanear varios seguidos.') });
 });
 
+// 📱 1.65.6: el celular lector (lib/vento-lector-cel.js) también manda a la cuenta abierta de una mesa y a la venta
+// rápida, sin abrir «🔳 Escanear»: lo mismo que hace leer el código con la cámara de este equipo.
+function scanEncimaDe(id){ const ov = document.getElementById(id); return !!ov && ov.classList.contains('show') && ![...document.querySelectorAll('.overlay.show')].some(x => x !== ov && !x.contains(ov) && x.id !== 'scanOverlay'); }
+(window.ventoLectorDestinos = window.ventoLectorDestinos || []).push(
+  { nombre: 'mesa', prioridad: 20, activo: () => (currentTable || currentTable === 0) && scanEncimaDe('overlay'),
+    hint: () => '🧾 ' + (typeof tableLabel === 'function' ? tableLabel(currentTable) : 'La cuenta') + ': cada código se suma a la cuenta',
+    leer: raw => { const p = findProductByScannedCode(raw); if(p){ addFavoriteToTable(p.id); return; } handleUnknownScannedCode(raw, prod => addFavoriteToTable(prod.id), { canCreate: true }); } },
+  { nombre: 'venta-rapida', prioridad: 20, activo: () => scanEncimaDe('quickSaleOverlay'), hint: '🛍️ Venta rápida: cada código se suma a la venta',
+    leer: raw => { const p = findProductByScannedCode(raw); if(p){ qsAddToCart(p, 1); showToast('✅ ' + p.name + ' agregado'); return; } handleUnknownScannedCode(raw, prod => { qsAddToCart(prod, 1); showToast('✅ ' + prod.name + ' agregado'); }); } });
+
 /* ---------- Producto nuevo por foto, directo desde la mesa ---------- */
 // Cuando buscas un producto en una mesa y no existe, en vez de tener que
 // salirte a Productos, tomarle o subirle una foto, la IA (o el código de
@@ -1908,59 +1918,43 @@ document.getElementById('guideSearchInput').addEventListener('input', renderGuid
 renderGuideResults();
 
 /* ---------- Ajustes: Apariencia ---------- */
-const mkPal = (name, fx, o) => ({ name, fx, vars: { '--bg': o.bg, '--surface': o.s, '--surface-2': o.s2, '--paper': o.s, '--paper-2': o.s2, '--ink': o.ink, '--ink-soft': o.soft, '--cream': o.ink, '--cream-soft': o.soft, '--amber': o.a, '--amber-deep': o.a2, '--brick': o.r, '--brick-soft': o.r2, '--line': o.line, '--paid': o.g, '--cat-1': o.a, '--cat-2': o.c2, '--cat-3': o.c3, '--cat-4': o.r, '--cat-5': o.c5, '--cat-6': o.g } });
+/* ---------- Ajustes: Apariencia ----------
+   1.65.6 · Las apariencias, rediseñadas como un sistema: ninguna se parece a otra (fondo y color de acento distintos,
+   medidos con la distancia de color CIE Lab) y en todas el texto se lee bien (contraste WCAG AA o más: letras sobre el
+   fondo 7:1 o más, texto secundario 4,5:1, texto de los botones sobre el acento 4,5:1). Antes «Cervecería» y «Velitas»
+   eran casi iguales (café oscuro y ámbar), y «Navidad» / «Turquesa» y «Noche» / «Halloween» tenían el mismo fondo.
+   Grupos: claras (para el mostrador con mucha luz), oscuras (de noche, bares) y fechas especiales. La verificación está en
+   pruebas/apariencias.test.js. Cada una dice qué color va encima de su acento (--on-amber): blanco u oscuro, el que se
+   lea mejor (antes los botones tenían letra blanca fija y en los acentos claros casi no se leía). */
+// o: g grupo · n nombre · bg fondo · s / s2 tarjetas · p / p2 papel (si no, las tarjetas) · ink letra · soft letra suave ·
+// a acento · a2 acento oscuro · cr acento de títulos · r rojo · line líneas · ok verde de pagado · c2 c3 c5 categorías.
+const pal = o => ({ name: o.n, grupo: o.g, fx: o.fx, recommended: !!o.rec, rain: false, vars: Object.assign(o.font ? { '--font-main': o.font } : {}, {
+  '--bg': o.bg, '--surface': o.s, '--surface-2': o.s2, '--paper': o.p || o.s, '--paper-2': o.p2 || o.s2,
+  '--ink': o.ink, '--ink-soft': o.soft, '--cream': o.cr || o.ink, '--cream-soft': o.crs || o.cr || o.soft,
+  '--amber': o.a, '--amber-deep': o.a2, '--on-amber': textoSobre(o.a), '--brick': o.r, '--brick-soft': o.r2 || o.r,
+  '--line': o.line, '--paid': o.ok, '--cat-1': o.a, '--cat-2': o.c2, '--cat-3': o.c3, '--cat-4': o.r, '--cat-5': o.c5, '--cat-6': o.ok }) });
+// Blanco u oscuro sobre un color: el que tenga más contraste (WCAG).
+function textoSobre(hex){
+  const l = h => { const c = parseInt(String(h).slice(1), 16), v = x => { x /= 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); };
+    return 0.2126 * v(c >> 16 & 255) + 0.7152 * v(c >> 8 & 255) + 0.0722 * v(c & 255); };
+  if(!/^#[0-9a-f]{6}$/i.test(String(hex))) return '#ffffff';
+  const L = l(hex); return (1.05 / (L + 0.05)) >= ((L + 0.05) / (l('#101114') + 0.05)) ? '#ffffff' : '#101114';
+}
+const PALETTE_GRUPOS = [['claro', '☀️ Claras · para el mostrador con mucha luz'], ['oscuro', '🌙 Oscuras · de noche, bares y discotecas'], ['fecha', '🎉 Fechas especiales']];
 const PALETTES = {
-  // Diseño por defecto de la app: fondo claro, tipografía tipo sistema
-  // (no la monoespaciada del resto de temas) y un solo color de acento
-  // (azul), como el lenguaje visual de un iPhone/Mac — limpio, con mucho
-  // blanco de por medio y fácil de leer de un vistazo. Es lo primero que
-  // ve cualquiera que instale la app desde cero.
-  // Rediseño 2026: paleta nueva de acento violeta con tipografía Manrope
-  // (moderna, geométrica, muy legible), pensada para que la app se vea
-  // como un producto nuevo — no un ajuste de colores sobre el diseño
-  // viejo. Queda como predeterminada; ver migración en loadData().
-  noche: {
-    name: '🌙 Noche violeta',
-    rain: false,
-    recommended: true,
-    vars: {
-      '--font-main': "'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-      '--bg':'#0f0f16', '--surface':'#17171f', '--surface-2':'#1e1e29',
-      '--paper':'#15151c', '--paper-2':'#1c1c26',
-      '--ink':'#f2f1f7', '--ink-soft':'#9a97ad',
-      '--cream':'#c4b5fd', '--cream-soft':'#a78bfa',
-      '--amber':'#7c3aed', '--amber-deep':'#5b21b6',
-      '--brick':'#fb7185', '--brick-soft':'#fda4af',
-      '--line':'#2a2a38', '--paid':'#34d399',
-      '--cat-1':'#7c3aed', '--cat-2':'#22d3ee', '--cat-3':'#fbbf24',
-      '--cat-4':'#fb7185', '--cat-5':'#60a5fa', '--cat-6':'#34d399'
-    }
-  },
-  apple: {
-    name: '🤍 Blanco moderno',
-    rain: false,
-    vars: {
-      '--font-main': "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Poppins', 'Segoe UI', Roboto, sans-serif",
-      '--bg':'#f2f2f7', '--surface':'#ffffff', '--surface-2':'#e9e9ef',
-      '--paper':'#ffffff', '--paper-2':'#f2f2f7',
-      '--ink':'#1c1c1e', '--ink-soft':'#8e8e93',
-      '--cream':'#0a84ff', '--cream-soft':'#5ac8fa',
-      '--amber':'#0a84ff', '--amber-deep':'#0060df',
-      '--brick':'#ff3b30', '--brick-soft':'#ff6961',
-      '--line':'#e5e5ea', '--paid':'#34c759',
-      '--cat-1':'#0a84ff', '--cat-2':'#af52de', '--cat-3':'#30b0c7',
-      '--cat-4':'#ff3b30', '--cat-5':'#5e5ce6', '--cat-6':'#34c759'
-    }
-  },
-  navidad: mkPal('🎄 Navidad', 'navidad', { bg:'#0b1a12', s:'#10281b', s2:'#16351f', ink:'#f6efe0', soft:'#b7c9b0', a:'#f4c542', a2:'#c99a1b', r:'#ff6b6b', r2:'#ff9a9a', line:'#2c5a3a', g:'#46c26a', c2:'#e63946', c3:'#ffffff', c5:'#8ecae6' }),
-  halloween: mkPal('🎃 Halloween', 'halloween', { bg:'#0d0713', s:'#170c24', s2:'#221233', ink:'#f5e9ff', soft:'#b79bd1', a:'#ff8a1f', a2:'#c96208', r:'#ff4d6d', r2:'#ff8fa3', line:'#3d2560', g:'#7bd88f', c2:'#b388ff', c3:'#ffd166', c5:'#4dd0e1' }),
-  // Fecha especial: San Valentín / Día del Amor (14 de febrero) — corazones
-  // cayendo suavemente con fxSet('sanvalentin').
-  sanvalentin: mkPal('💘 San Valentín', 'sanvalentin', { bg:'#1a0a12', s:'#241019', s2:'#2e1420', ink:'#ffeaf0', soft:'#d6a0b3', a:'#ff4d6d', a2:'#c9203f', r:'#e0264f', r2:'#ff8fa8', line:'#3d1a26', g:'#4cd97b', c2:'#f4c542', c3:'#b388ff', c5:'#ffd1dc' }),
-  // Fecha especial y muy local: Día de las Velitas (7 de diciembre, Bogotá) —
-  // toda la ciudad enciende velas para empezar la Navidad. Fondo cálido como
-  // un cuarto iluminado con velas, con destellos dorados con fxSet('velitas').
-  velitas: mkPal('🕯️ Día de las Velitas', 'velitas', { bg:'#140d08', s:'#1e140c', s2:'#281a0e', ink:'#fff3d6', soft:'#c9a877', a:'#ffa726', a2:'#e08a1a', r:'#d84315', r2:'#ff8a5c', line:'#3d2a17', g:'#8bc34a', c2:'#ffca28', c3:'#c1440e', c5:'#795548' }),
+  apple: pal({ n: '☁️ Blanco nube', g: 'claro', bg: '#f2f2f7', s: '#ffffff', s2: '#e9e9ef', ink: '#1c1c1e', soft: '#6e6e73', a: '#0a6cff', a2: '#0050c8', cr: '#0a6cff', r: '#e0352b', line: '#e3e3e8', ok: '#248a3d', c2: '#8e44ad', c3: '#b8740a', c5: '#00838f' }),
+  claro: pal({ n: '🍊 Mostrador mandarina', g: 'claro', bg: '#fbf8f4', s: '#ffffff', s2: '#f2ece4', ink: '#1f1a17', soft: '#6b625a', a: '#e8590c', a2: '#c2410c', cr: '#c2410c', r: '#d6293f', line: '#ebe3d8', ok: '#1f8a4c', c2: '#2563eb', c3: '#a87900', c5: '#7c3aed' }),
+  cafe: pal({ n: '☕ Café con leche', g: 'claro', bg: '#f3ebde', s: '#fffdf9', s2: '#eadfcc', ink: '#3b2a1d', soft: '#75604f', a: '#8b5a2b', a2: '#6f4520', cr: '#6f4520', r: '#b23a2e', line: '#dccdb5', ok: '#4d7c3a', c2: '#3f7f8a', c3: '#a57a10', c5: '#7a5c9e' }),
+  menta: pal({ n: '🌿 Menta fresca', g: 'claro', bg: '#eff7f3', s: '#ffffff', s2: '#e0efe7', ink: '#12261d', soft: '#4f665c', a: '#087a54', a2: '#066343', cr: '#066343', r: '#d33a3a', line: '#cfe3d8', ok: '#15803d', c2: '#2f6fd6', c3: '#b07a00', c5: '#8a4fd6' }),
+  noche: pal({ n: '🌙 Noche violeta', g: 'oscuro', bg: '#0f0f16', s: '#17171f', s2: '#1e1e29', p: '#15151c', p2: '#1c1c26', ink: '#f2f1f7', soft: '#9a97ad', a: '#7c3aed', a2: '#5b21b6', cr: '#c4b5fd', crs: '#a78bfa', r: '#fb7185', r2: '#fda4af', line: '#2a2a38', ok: '#34d399', c2: '#22d3ee', c3: '#fbbf24', c5: '#60a5fa', font: "'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", rec: true }),
+  nocturno: pal({ n: '🔷 Azul medianoche', g: 'oscuro', bg: '#0a1220', s: '#101a2c', s2: '#16233a', ink: '#e4eaf5', soft: '#93a3bf', a: '#2f6fe0', a2: '#1f55b8', cr: '#8fb8ff', r: '#f26d6d', line: '#22314d', ok: '#3fbf8f', c2: '#22c3e6', c3: '#e8b84a', c5: '#a78bfa' }),
+  moderno: pal({ n: '🌊 Laguna turquesa', g: 'oscuro', bg: '#061b1c', s: '#0b2627', s2: '#103032', ink: '#e3faf7', soft: '#86b8b2', a: '#0d9488', a2: '#0b766c', cr: '#6fe3d3', r: '#f47272', line: '#1a4143', ok: '#3ccf91', c2: '#5aa9f0', c3: '#f0c04a', c5: '#c58af0' }),
+  vito: pal({ n: '🍺 Cervecería ámbar', g: 'oscuro', bg: '#1b1208', s: '#241a0f', s2: '#2d2213', ink: '#fff3e0', soft: '#d2b48a', a: '#e39b2d', a2: '#b8770f', cr: '#ffcf6b', r: '#e2542d', line: '#3c2a17', ok: '#8bc34a', c2: '#4fb3bf', c3: '#ffd166', c5: '#c9a2ff' }),
+  grafito: pal({ n: '⚫ Grafito y lima', g: 'oscuro', bg: '#111113', s: '#19191c', s2: '#222226', ink: '#f1f1f3', soft: '#a1a1aa', a: '#a3e635', a2: '#7cb518', cr: '#d9f99d', r: '#f87171', line: '#2e2e33', ok: '#34d399', c2: '#38bdf8', c3: '#facc15', c5: '#e879f9' }),
+  navidad: pal({ n: '🎄 Navidad', g: 'fecha', fx: 'navidad', bg: '#0a1d14', s: '#0f2a1d', s2: '#153626', ink: '#f7f0e1', soft: '#b9cdb8', a: '#d62839', a2: '#a81d2b', cr: '#f4c542', r: '#ff7b8a', line: '#2a5a3e', ok: '#46c26a', c2: '#f4c542', c3: '#ffffff', c5: '#8ecae6' }),
+  halloween: pal({ n: '🎃 Halloween', g: 'fecha', fx: 'halloween', bg: '#150a1f', s: '#1f0f2e', s2: '#2a163d', ink: '#f6ecff', soft: '#bda3d6', a: '#ff5a1f', a2: '#d4420c', cr: '#ffb15c', r: '#ff4d6d', line: '#3d2560', ok: '#7bd88f', c2: '#b388ff', c3: '#ffd166', c5: '#4dd0e1' }),
+  sanvalentin: pal({ n: '💘 Amor y amistad', g: 'fecha', fx: 'sanvalentin', bg: '#1f0a14', s: '#2a0f1c', s2: '#361526', ink: '#ffeef3', soft: '#dba8b9', a: '#d42a78', a2: '#a81d5d', cr: '#ff8fa8', r: '#ff9f43', line: '#4a1b2e', ok: '#4cd97b', c2: '#f4c542', c3: '#b388ff', c5: '#ffd1dc' }),
+  velitas: pal({ n: '🕯️ Día de las Velitas', g: 'fecha', fx: 'velitas', bg: '#0d0c26', s: '#16143a', s2: '#1f1c4b', ink: '#fff5dc', soft: '#bdb4dd', a: '#f5b301', a2: '#d49500', cr: '#ffe08a', r: '#ff6b6b', line: '#2e2a63', ok: '#8bd17c', c2: '#ff8a3d', c3: '#ffe08a', c5: '#9ad0ff' }),
   matrix: {
     name: '🟢 Original (Matrix)',
     rain: true,
@@ -1969,93 +1963,13 @@ const PALETTES = {
       '--paper':'#061006', '--paper-2':'#0a1a0a',
       '--ink':'#00ff41', '--ink-soft':'#0d9e2f',
       '--cream':'#00ff41', '--cream-soft':'#3ecb5e',
-      '--amber':'#00ff41', '--amber-deep':'#00b32d',
+      '--amber':'#00ff41', '--amber-deep':'#00b32d', '--on-amber':'#101114',
       '--brick':'#ff3b3b', '--brick-soft':'#ff7a7a',
       '--line':'#0d3d16', '--paid':'#39d98a',
       '--cat-1':'#00ff41', '--cat-2':'#00d4ff', '--cat-3':'#ffd400',
       '--cat-4':'#ff3b3b', '--cat-5':'#b388ff', '--cat-6':'#ff9f1c'
     }
-  },
-  cafe: {
-    name: '☕ Café con leche',
-    rain: false,
-    vars: {
-      '--bg':'#f5eee2', '--surface':'#ffffff', '--surface-2':'#ece0cd',
-      '--paper':'#ffffff', '--paper-2':'#efe3d0',
-      '--ink':'#3d2f22', '--ink-soft':'#8a7561',
-      '--cream':'#6b4226', '--cream-soft':'#8f5f3a',
-      '--amber':'#b3702f', '--amber-deep':'#8f5824',
-      '--brick':'#b3453a', '--brick-soft':'#c97a70',
-      '--line':'#ddccb0', '--paid':'#4c8a52',
-      '--cat-1':'#b3702f', '--cat-2':'#4c8a8a', '--cat-3':'#a68a2e',
-      '--cat-4':'#b3453a', '--cat-5':'#6f5a9e', '--cat-6':'#8a6a3a'
-    }
-  },
-  nocturno: {
-    name: '🔷 Azul profundo',
-    rain: false,
-    vars: {
-      '--bg':'#10151c', '--surface':'#171f29', '--surface-2':'#1d2733',
-      '--paper':'#141b24', '--paper-2':'#1b2530',
-      '--ink':'#dde3ea', '--ink-soft':'#8b97a6',
-      '--cream':'#7fc4d6', '--cream-soft':'#5fa3b8',
-      '--amber':'#4fa3c9', '--amber-deep':'#3a7fa0',
-      '--brick':'#d1655c', '--brick-soft':'#e08d85',
-      '--line':'#2a3542', '--paid':'#5fb894',
-      '--cat-1':'#4fa3c9', '--cat-2':'#6fc9a8', '--cat-3':'#c9a24f',
-      '--cat-4':'#d1655c', '--cat-5':'#9a8bd6', '--cat-6':'#4f8fc9'
-    }
-  },
-  // Tres diseños pensados para que lo vea el negocio (empleados, clientes en
-  // el mostrador) — fondo claro y mucho contraste para leerse fácil de un
-  // vistazo, colores cálidos que dan buena imagen, nada del estilo "hacker"
-  // del diseño original (ese se deja aparte, solo para Cristhian).
-  claro: {
-    name: '☀️ Punto de venta claro',
-    rain: false,
-    vars: {
-      '--bg':'#f7f7f5', '--surface':'#ffffff', '--surface-2':'#eef0f2',
-      '--paper':'#ffffff', '--paper-2':'#f1f2f4',
-      '--ink':'#16181d', '--ink-soft':'#5b6270',
-      '--cream':'#c2560f', '--cream-soft':'#e07a2e',
-      '--amber':'#ff7a1a', '--amber-deep':'#d95f00',
-      '--brick':'#e11d48', '--brick-soft':'#f4728f',
-      '--line':'#e2e4e8', '--paid':'#16a34a',
-      '--cat-1':'#ff7a1a', '--cat-2':'#2563eb', '--cat-3':'#ca9a06',
-      '--cat-4':'#e11d48', '--cat-5':'#7c3aed', '--cat-6':'#0d9488'
-    }
-  },
-  vito: {
-    name: '🍺 Cervecería Vito',
-    rain: false,
-    vars: {
-      '--bg':'#1b1208', '--surface':'#241a0f', '--surface-2':'#2d2213',
-      '--paper':'#211709', '--paper-2':'#2a1f11',
-      '--ink':'#fff3e0', '--ink-soft':'#d8b98a',
-      '--cream':'#ffcf6b', '--cream-soft':'#f2a71b',
-      '--amber':'#f2a71b', '--amber-deep':'#c9860f',
-      '--brick':'#e2542d', '--brick-soft':'#f08a68',
-      '--line':'#3c2a17', '--paid':'#8bc34a',
-      '--cat-1':'#f2a71b', '--cat-2':'#4fb3bf', '--cat-3':'#ffd166',
-      '--cat-4':'#e2542d', '--cat-5':'#c9a2ff', '--cat-6':'#8bc34a'
-    }
-  },
-  moderno: {
-    name: '🌊 Turquesa fresco',
-    rain: false,
-    vars: {
-      '--bg':'#0d1512', '--surface':'#122019', '--surface-2':'#16281f',
-      '--paper':'#0f1a15', '--paper-2':'#152a20',
-      '--ink':'#eafff3', '--ink-soft':'#8fb7a6',
-      '--cream':'#7ee7c9', '--cream-soft':'#5cc9ac',
-      '--amber':'#2dd4bf', '--amber-deep':'#199e8f',
-      '--brick':'#f87171', '--brick-soft':'#fca5a5',
-      '--line':'#1f3a2e', '--paid':'#34d399',
-      '--cat-1':'#2dd4bf', '--cat-2':'#60a5fa', '--cat-3':'#fbbf24',
-      '--cat-4':'#f87171', '--cat-5':'#c084fc', '--cat-6':'#34d399'
-    }
-  }
-};
+  },};
 
 function applyPalette(key){
   const palette = PALETTES[key] || PALETTES.noche;
@@ -2103,11 +2017,17 @@ function applyEasyMode(){
 // para clientes/empleados) van juntos en la galería principal.
 const PALETTE_PERSONAL_KEYS = ['matrix'];
 function paletteCardHtml(key, p, current){
-  const swatchKeys = ['--bg','--paper','--amber','--cream'];
-  const swatches = swatchKeys.map(v=>`<div class="palette-swatch" style="background:${p.vars[v]}"></div>`).join('');
-  const badge = p.recommended ? '<span class="palette-badge">Predeterminado</span>' : '';
+  // 1.65.6: vista previa de verdad (su fondo, una tarjeta, la letra y un botón «Cobrar» con su acento), no solo cuadritos.
+  const v = p.vars, badge = p.recommended ? '<span class="palette-badge">Predeterminada</span>' : '';
+  const prev = `<div class="palette-prev" style="background:${v['--bg']};color:${v['--ink']}">
+      <div class="pp-card" style="background:${v['--surface']};border-color:${v['--line']}">
+        <span class="pp-l1" style="background:${v['--ink']}"></span><span class="pp-l2" style="background:${v['--ink-soft']}"></span>
+        <span class="pp-chips"><i style="background:${v['--cat-2']}"></i><i style="background:${v['--cat-3']}"></i><i style="background:${v['--paid']}"></i></span>
+      </div>
+      <span class="pp-btn" style="background:${v['--amber']};color:${v['--on-amber'] || '#fff'}">Cobrar</span>
+    </div>`;
   return `<button type="button" class="palette-card${key===current?' selected':''}" data-key="${key}">
-    ${badge}<div class="palette-swatches">${swatches}</div>
+    ${badge}${prev}
     <div class="palette-name">${p.name}<span class="palette-check">✓</span></div>
   </button>`;
 }
@@ -2115,7 +2035,11 @@ function renderPaletteOptions(){
   const grid = document.getElementById('paletteGrid');
   const personalGrid = document.getElementById('palettePersonalGrid');
   const current = data.theme || 'noche';
-  grid.innerHTML = Object.entries(PALETTES).filter(([key])=>!PALETTE_PERSONAL_KEYS.includes(key)).map(([key, p])=>paletteCardHtml(key, p, current)).join('');
+  // 1.65.6: por grupos (claras, oscuras, fechas especiales), cada uno con su título.
+  grid.innerHTML = PALETTE_GRUPOS.map(([g, titulo]) => {
+    const l = Object.entries(PALETTES).filter(([key, p]) => p.grupo === g && !PALETTE_PERSONAL_KEYS.includes(key));
+    return l.length ? '<div class="palette-grupo">' + titulo + '</div>' + l.map(([key, p]) => paletteCardHtml(key, p, current)).join('') : '';
+  }).join('');
   if(personalGrid){
     personalGrid.innerHTML = Object.entries(PALETTES).filter(([key])=>PALETTE_PERSONAL_KEYS.includes(key)).map(([key, p])=>paletteCardHtml(key, p, current)).join('');
   }

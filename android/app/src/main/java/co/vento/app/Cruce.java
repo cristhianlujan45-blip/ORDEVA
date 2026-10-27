@@ -30,6 +30,8 @@ final class Cruce {
     private static volatile boolean ocupado, otraVez;
     /** 1.65.3: canal en vivo del negocio («vp-…», lo da el servidor): VentoServicio deja abierta la conexión (EnVivo). */
     static volatile String vivo;
+    /** El id de ESTE equipo en el servidor (para atender solo la «🔔 Probar» que es para él). */
+    static volatile String yo;
 
     private static SharedPreferences sp(Context c) { return c.getSharedPreferences("vento", Context.MODE_PRIVATE); }
     static JSONObject cfg(Context c) { try { return new JSONObject(sp(c).getString(PREF_CFG, "{}")); } catch (Exception e) { return new JSONObject(); } }
@@ -123,6 +125,7 @@ final class Cruce {
                 // bloqueado la página duerme y su dato podía quedar viejo, y los pagos solo sonaban al desbloquear.
                 if (r.has("suena")) sp(c).edit().putBoolean("pagosSuena", r.optBoolean("suena", true)).apply();
                 if (r.optString("vivo").startsWith("vp-")) vivo = r.optString("vivo");
+                if (!r.optString("dispositivo").isEmpty()) yo = r.optString("dispositivo");
                 JSONArray l = r.optJSONArray("pagos");
                 boolean primera = desde.isEmpty(), jefe = "dueno".equals(r.optString("rol")) || "admin".equals(r.optString("rol"));
                 String yo = r.optString("dispositivo"), max = desde, ahora = r.optString("ahora");

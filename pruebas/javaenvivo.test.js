@@ -50,7 +50,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
   await new Promise(r => srv.listen(0, '127.0.0.1', r));
   const port = srv.address().port;
   const java = spawn('java', ['-cp', tmp, 'co.vento.app.EnVivoPrueba', String(port), TOPIC, '9000']);
-  const avisos = []; java.stdout.on('data', d => String(d).split('\n').forEach(l => { const m = /^AVISO (\d+)/.exec(l); if(m) avisos.push({ t: Date.now() }); }));
+  const avisos = [], pruebas = []; java.stdout.on('data', d => String(d).split('\n').forEach(l => { const m = /^AVISO (\d+)/.exec(l); if(m) avisos.push({ t: Date.now() }); const p = /^PRUEBA (\S+)/.exec(l); if(p) pruebas.push(p[1]); }));
   const hasta = async (f, ms) => { const t = Date.now(); while(Date.now() - t < ms){ if(f()) return true; await espera(20); } return false; };
   try{
     await hasta(() => conexiones.length && conexiones[0].msgs.some(m => m.event === 'phx_join'), 5000);
@@ -77,6 +77,10 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
     const a = Buffer.from(txt.slice(0, 20)), b = Buffer.from(txt.slice(20));
     c0.sock.write(Buffer.concat([Buffer.from([0x01, a.length]), a, Buffer.from([0x80, b.length]), b]));
     chk('4. Un aviso que llega en dos partes sí se entiende', await hasta(() => avisos.length === 3, 2000), avisos.length);
+    // 4b. «🔔 Probar» (1.65.6): llega como «prueba» con el id del equipo; no cuenta como pago (no pregunta por pagos)
+    const antesP = avisos.length;
+    c0.sock.write(marco(1, JSON.stringify({ topic: 'realtime:' + TOPIC, event: 'broadcast', payload: { event: 'prueba', payload: { d: 'equipo-123' }, type: 'broadcast' }, ref: null })));
+    chk('4. «🔔 Probar»: le llega a la app como prueba, con el id del equipo (y no pregunta por pagos)', await hasta(() => pruebas.includes('equipo-123'), 2000) && avisos.length === antesP, { pruebas, avisos: avisos.length });
     // 5. Se cae la conexión
     c0.sock.destroy();
     chk('5. Se cae la conexión: se vuelve a conectar y a unir solo', await hasta(() => conexiones.length >= 2 && conexiones[1].msgs.some(m => m.event === 'phx_join'), 5000), conexiones.length);

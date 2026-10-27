@@ -91,7 +91,7 @@ const EAN = '7702535011119', QR_TXT = 'PROD-QR-4471';
     const r2a = await pc.evaluate(() => { const b = document.querySelector('#scanCelBox [data-lcel="ver"]'); return b ? b.textContent : null; });
     chk('2. En «Escanear código» sale «📱 Usar el celular como lector»', /Usar el celular como lector/.test(r2a || ''), r2a);
     await pc.click('#scanCelBox [data-lcel="ver"]');
-    const r2 = await pc.evaluate(() => ({ qr: !!document.querySelector('#lcelQr canvas, #lcelQr img'), txt: document.getElementById('scanCelBox').textContent, link: window.ventoLectorCel.enlace(), ls: localStorage.getItem('vento_lector_cel') }));
+    const r2 = await pc.evaluate(() => ({ qr: !!document.querySelector('#scanCelBox .lcel-qr canvas, #scanCelBox .lcel-qr img'), txt: document.getElementById('scanCelBox').textContent, link: window.ventoLectorCel.enlace(), ls: localStorage.getItem('vento_lector_cel') }));
     chk('2. … muestra el QR para emparejar, cómo hacerlo inalámbrico y por cable USB', r2.qr && /Inalámbrico/.test(r2.txt) && /Por cable USB/.test(r2.txt) && /Cámara web/.test(r2.txt), r2);
     chk('2. … el enlace es lector.html#c=<canal secreto> y queda guardado en el equipo', /\/lector\.html#c=lc[A-Za-z0-9]{22}$/.test(r2.link) && JSON.parse(r2.ls).c === r2.link.split('#c=')[1], r2);
 
@@ -123,6 +123,36 @@ const EAN = '7702535011119', QR_TXT = 'PROD-QR-4471';
     await esperar(cel, () => /Otra vez/.test(document.getElementById('estSub').textContent));
     await pc.waitForTimeout(3500);
     chk('4. … y al volver a abrir «Escanear» no se suma lo viejo', await pc.evaluate(() => !window.__leidos.includes('99999') && !window.__leidos.includes('12345')), await pc.evaluate(() => window.__leidos));
+
+    // 7. 1.65.6: sin «Escanear», lo que esté abierto recibe lo que lee el celular: la caja (POS)…
+    await pc.evaluate(() => {
+      closeScanOverlay();
+      data.products = [{ id: 'pq', name: 'Gaseosa Lector', price: 3000, barcodes: ['7701111111111'] }, { id: 'pi', name: 'Arroz Lector', price: 5000, barcodes: ['7702222222222'] }];
+      saveData(); window.ventoPOS.vaciar(); window.ventoPOS.abrirCaja();
+    });
+    chk('7. Con la caja abierta (sin «Escanear»), el celular dice «🧾 Caja: cada código se suma a la venta»', await esperar(cel, () => /Caja: cada código se suma/.test(document.getElementById('estSub').textContent)),
+      await cel.evaluate(() => document.getElementById('estado').textContent));
+    await cel.fill('#manoTxt', '7701111111111'); await cel.click('#mano button[type=submit]');
+    chk('7. … y lo que lee el celular se suma a la venta de la caja', await esperar(pc, () => window.ventoPOS.carrito().some(l => l.name === 'Gaseosa Lector')), await pc.evaluate(() => window.ventoPOS.carrito()));
+    await pc.click('#pzCajaOv [data-lcel-abrir]');
+    chk('7. La caja tiene su botón «📱 Celular lector»: abre la ventana con el QR y cómo conectar (wifi, Bluetooth, USB)',
+      await esperar(pc, () => { const o = document.getElementById('lcelOv'); return !!o && o.classList.contains('show') && !!o.querySelector('.lcel-qr canvas, .lcel-qr img') && /Bluetooth/.test(o.textContent) && /USB/.test(o.textContent); }));
+    await pc.evaluate(() => { document.getElementById('lcelOv').classList.remove('show'); window.ventoPOS.cerrarCaja(); });
+    // 8. … y la toma de inventario
+    await pc.evaluate(() => {
+      const b = document.querySelector('nav [data-view="inventario"]'); if(b) b.click();
+      const d = document.getElementById('viPanel'); d.open = true; d.dispatchEvent(new Event('toggle'));
+      document.querySelector('#viPanel [data-vm="conteo"]').click();
+    });
+    chk('8. Con la toma de inventario abierta, el celular dice «📋 Toma de inventario: cada código suma 1»', await esperar(cel, () => /Toma de inventario/.test(document.getElementById('estSub').textContent)),
+      await cel.evaluate(() => document.getElementById('estado').textContent));
+    await cel.fill('#manoTxt', '7702222222222'); await cel.click('#mano button[type=submit]');
+    await cel.fill('#manoTxt', '7702222222222'); await cel.click('#mano button[type=submit]');
+    chk('8. … y cada código que lee el celular cuenta (Arroz: 2)', await esperar(pc, () => { const k = Object.keys(localStorage).find(x => x.startsWith('vento_conteo:')); const c = k && JSON.parse(localStorage.getItem(k)); return !!c && c.items.some(i => i.p === 'pi' && i.q === 2); }));
+    await pc.evaluate(() => { const d = document.getElementById('viPanel'); d.open = false; d.dispatchEvent(new Event('toggle')); const b = document.querySelector('nav [data-view="mesas"]'); if(b) b.click(); });
+    chk('8. Sin nada abierto, el celular vuelve a «El computador no está escaneando»', await esperar(cel, () => /no está escaneando/.test(document.getElementById('estTit').textContent)));
+    await pc.evaluate(() => { window.__leidos = []; openScanOverlay(raw => window.__leidos.push(raw), { hint: 'Otra vez' }); });
+    await esperar(cel, () => /Otra vez/.test(document.getElementById('estSub').textContent));
 
     // 5. Desconectar celulares
     pc.once('dialog', d => d.accept());

@@ -20,7 +20,11 @@ import java.security.SecureRandom;
  * Java puro (sin Android) para probarlo sin el celular: pruebas/java/EnVivoPrueba.java.
  */
 final class EnVivo {
-    interface Oyente { void aviso(); }
+    interface Oyente {
+        void aviso();
+        /** 1.65.6: «🔔 Probar» desde la lista de equipos (event «prueba», con el id del equipo que debe sonar). */
+        default void prueba(String mensaje) { }
+    }
 
     private final String url, key, topic;
     private final Oyente oyente;
@@ -142,7 +146,9 @@ final class EnVivo {
             if (primera) avisar();
             return;
         }
-        if (txt.contains("\"event\":\"broadcast\"") && txt.contains("realtime:" + topic)) avisar();
+        if (!txt.contains("realtime:" + topic)) return;
+        if (txt.contains("\"event\":\"prueba\"")) { try { oyente.prueba(txt); } catch (Throwable ignorado) { } return; }
+        if (txt.contains("\"event\":\"broadcast\"")) avisar();
     }
     private void avisar() { try { oyente.aviso(); } catch (Throwable ignorado) { } }
 

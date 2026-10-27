@@ -1,6 +1,6 @@
 // 🔊 El administrador elige en qué equipos SUENAN los avisos de pago (ORDEVA 1.62.0), de punta a punta (PostgreSQL REAL +
 // Servidor ORDEVA + la app de verdad), con un celular (app Android, lee los avisos), una tablet (app Android) y un computador:
-//  1. Ajustes → 💜 Pagos → «🔊 Celulares y dónde suenan los pagos»: los tres, con su botón «🔊 SUENA», su modelo y «ESTE CELULAR» y ✏️ para el nombre.
+//  1. Ajustes → 💜 Pagos → «🔊 Celulares y dónde suenan los pagos»: los tres, con su botón «🔊 SUENA», su modelo y «ESTE EQUIPO» y ✏️ para el nombre.
 //  2. El administrador le pone nombre a la tablet y elige que NO suene: la tablet se entera (también la app Android).
 //  3. Llega un pago: el computador suena (ventana con el valor); la tablet NO (ni voz, ni notificación, ni ventana),
 //     pero el pago igual queda en su lista.
@@ -84,7 +84,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     chk('1. «🔊 Celulares y dónde suenan los pagos»: los 3 equipos, todos con «🔊 SUENA»', await esperar(PC.p, () => document.querySelectorAll('#vpDevs [data-suena]').length === 3 && [...document.querySelectorAll('#vpDevs [data-suena]')].every(b => /🔊 SUENA/.test(b.textContent)), null, 20000),
       await PC.p.evaluate(() => (document.getElementById('vpDevs') || {}).textContent));
 
-    chk('1. «ESTE CELULAR» marca solo al equipo donde se mira, y cada uno dice si está conectado', await PC.p.evaluate(() => (document.getElementById('vpDevs').textContent.match(/ESTE CELULAR/g) || []).length === 1 && /Conectado ahora/.test(document.getElementById('vpDevs').textContent)));
+    chk('1. «ESTE EQUIPO» / «ESTE CELULAR» marca solo al equipo donde se mira, y cada uno dice si está conectado', await PC.p.evaluate(() => (document.getElementById('vpDevs').textContent.match(/ESTE (CELULAR|EQUIPO)/g) || []).length === 1 && /Conectado ahora/.test(document.getElementById('vpDevs').textContent)));
     // ===== 2. Nombre y «no suena» para la tablet =====
     await PC.p.evaluate(id => document.querySelector('#vpDevs [data-nom="' + id + '"]').click(), devTab);
     chk('2. ✏️ Le pone nombre a la tablet', await esperar(PC.p, () => /Tablet de la barra/.test(document.getElementById('vpDevs').textContent), null, 10000));

@@ -3,14 +3,14 @@
 <head>
 <link rel="preconnect" href="https://generativelanguage.googleapis.com">
 <meta charset="UTF-8">
-<script src="lib/vento-errores.js?v=1.65.5"></script><!-- errores de este equipo → ORDEVA Admin (🐞 Errores) -->
-<script src="lib/vento-colormix.js?v=1.65.5" defer></script><!-- iPhone con iOS 15/16.0: colores mezclados (no hace nada en los demás) -->
-<script src="app/01-menus-saltan-arriba.js?v=1.65.5"></script>
+<script src="lib/vento-errores.js?v=1.65.6"></script><!-- errores de este equipo → ORDEVA Admin (🐞 Errores) -->
+<script src="lib/vento-colormix.js?v=1.65.6" defer></script><!-- iPhone con iOS 15/16.0: colores mezclados (no hace nada en los demás) -->
+<script src="app/01-menus-saltan-arriba.js?v=1.65.6"></script>
 <script>
 // Un QR de mesa o link de domicilio que cae en la app del negocio abre la carta del cliente.
 (function(){var q=location.search;if(/[?&]c=\w/.test(q)&&/[?&](mesa=\d|dom=1)/.test(q))location.replace(location.pathname.replace(/[^/]*$/,'')+'pedido.html'+q+location.hash);})();
 </script>
-<script src="app/02-android-apk-dentro.js?v=1.65.5"></script>
+<script src="app/02-android-apk-dentro.js?v=1.65.6"></script>
 <!-- Evita que el navegador (sobre todo en el celular, con la app agregada a la
      pantalla de inicio) se quede pegado con una versión vieja de esta página
      guardada en caché — cada visita revisa que sea la última. -->
@@ -62,7 +62,7 @@
 window.ventoClave = (function(){ let ck = null, cv = ''; return function(k){ try{ const sid = localStorage.getItem('bar-current-sede') || 'default', raw = localStorage.getItem('bar-sedes-list') || '[]'; if(ck !== sid + raw){ ck = sid + raw; const s = (JSON.parse(raw) || []).find(x => x.id === sid); cv = s && s.cuenta && s.cuenta !== 'principal' ? '@' + s.cuenta : ''; } return k + cv; }catch(e){ return k; } }; })();
 window.esAndroid = function(){ var ua = navigator.userAgent || ''; if(/Android/i.test(ua)) return true; try{ if(navigator.userAgentData && /android/i.test(navigator.userAgentData.platform || '')) return true; }catch(e){} return /Linux/i.test(ua) && !/CrOS|Windows|Macintosh/i.test(ua) && (navigator.maxTouchPoints || 0) > 0; };
 </script>
-<script src="app/03-catalogo-tipos-negocio.js?v=1.65.5"></script>
+<script src="app/03-catalogo-tipos-negocio.js?v=1.65.6"></script>
 <script>
 /* Pantalla siempre al ancho del celular: si Chrome abre la página como «sitio para computadoras»
    (o el celular la dibuja más ancha que la pantalla), se agranda sola para no tener que hacer zoom. */
@@ -129,7 +129,7 @@ window.esAndroid = function(){ var ua = navigator.userAgent || ''; if(/Android/i
 body:not(.mod-k) [data-mod~="k"], body:not(.mod-p) [data-mod~="p"], body:not(.mod-w) [data-mod~="w"],
 body:not(.mod-d) [data-mod~="d"], body:not(.mod-q) [data-mod~="q"], body:not(.mod-n) [data-mod~="n"],
 body:not(.mod-b) [data-mod~="b"], body:not(.mod-r) [data-mod~="r"]{ display:none !important; }
-body.mod-v #quickSaleBtn{ order:-1; background:var(--amber); color:#fff; border-color:var(--amber); font-weight:700; }
+body.mod-v #quickSaleBtn{ order:-1; background:var(--amber); color:var(--on-amber,#fff); border-color:var(--amber); font-weight:700; }
 /* Herramientas según el negocio (aplicarModulos): tienda → sin «Venta rápida», con «📒 Fiados»; servicios → sin «Caja (POS)» */
 body.neg-tienda #quickSaleBtn, body:not(.neg-tienda) #fiadosBtn, body:not(.neg-tienda) .pz-herr [data-fiados], body.neg-sin-pos #posCajaBtn{ display:none !important; }
 
@@ -571,7 +571,7 @@ body.neg-tienda #quickSaleBtn, body:not(.neg-tienda) #fiadosBtn, body:not(.neg-t
   /* Vista mapa del local */
   .view-toggle-btn.active{
     background: var(--amber);
-    color: #1b1208;
+    color:var(--on-amber,#1b1208);
     border-color: var(--amber);
   }
   .floor-plan-controls{
@@ -598,7 +598,7 @@ body.neg-tienda #quickSaleBtn, body:not(.neg-tienda) #fiadosBtn, body:not(.neg-t
   }
   .calc-tab-btn.active{
     background: var(--amber);
-    color: #1b1208;
+    color:var(--on-amber,#1b1208);
     border-color: var(--amber);
   }
   .calc-panel{
@@ -1109,7 +1109,7 @@ body.neg-tienda #quickSaleBtn, body:not(.neg-tienda) #fiadosBtn, body:not(.neg-t
   .pay-quick button{ flex:1 1 0; min-height:38px; border-radius:999px; border:1px solid var(--line); background:var(--surface); color:var(--cream); font:inherit; font-weight:700; font-size:.88em; cursor:pointer; }
   .pay-methods{ display:grid; grid-template-columns:repeat(3, 1fr); }
   .pay-methods button{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; min-width:0; min-height:58px; padding:6px 4px; line-height:1.15; border-radius:12px; border:1.5px solid var(--line); background:var(--surface); color:var(--ink); font:inherit; font-weight:700; font-size:.82em; cursor:pointer; transition:background .15s, border-color .15s; }
-  .pay-methods button.on{ border-color:var(--amber); background:var(--amber); color:#fff; box-shadow:0 4px 14px color-mix(in srgb, var(--amber) 40%, transparent); }
+  .pay-methods button.on{ border-color:var(--amber); background:var(--amber); color:var(--on-amber,#fff); box-shadow:0 4px 14px color-mix(in srgb, var(--amber) 40%, transparent); }
   .pay-methods button[data-v="debe"].on{ border-color:var(--brick); background:color-mix(in srgb, var(--brick) 80%, #000); }
   .pay-extra button{ flex:1 1 0; min-height:42px; border-radius:12px; border:1px dashed color-mix(in srgb, var(--cream-soft) 60%, var(--line)); background:transparent; color:var(--cream); font:inherit; font-weight:700; font-size:.9em; cursor:pointer; }
   .pay-go{ min-height:54px; border:0; border-radius:14px; background:linear-gradient(135deg, var(--amber), var(--amber-deep)); color:#fff; font:inherit; font-weight:800; font-size:1.08em; cursor:pointer; box-shadow:0 6px 18px color-mix(in srgb, var(--amber) 35%, transparent); }
@@ -1192,7 +1192,7 @@ body.neg-tienda #quickSaleBtn, body:not(.neg-tienda) #fiadosBtn, body:not(.neg-t
     font-size: 15px; font-weight:700; line-height:1; width:24px; height:24px; border-radius:7px;
     display:flex; align-items:center; justify-content:center; padding:0;
   }
-  .li-qty-btn:active{ background: var(--amber); color:#fff; }
+  .li-qty-btn:active{ background: var(--amber); color:var(--on-amber,#fff); }
   .li-qty-val{ min-width: 22px; text-align:center; font-family: var(--font-main); font-size: 13px; color: var(--ink-soft); }
   .line-item-wrap{ border-bottom: 1px dashed var(--cream-soft); }
   .line-item-wrap .line-item{ border-bottom: none; }
@@ -1426,7 +1426,7 @@ body.neg-tienda #quickSaleBtn, body:not(.neg-tienda) #fiadosBtn, body:not(.neg-t
   .btn-primary{
     flex:1;
     background: var(--amber);
-    color: #1b1208;
+    color:var(--on-amber,#1b1208);
     border:none;
     border-radius: 6px;
     padding: 12px;
@@ -1530,7 +1530,7 @@ body.neg-tienda #quickSaleBtn, body:not(.neg-tienda) #fiadosBtn, body:not(.neg-t
     font-size:13px;
     cursor:pointer;
   }
-  .btn-warn{ background: var(--amber); color:#1b1208; }
+  .btn-warn{ background: var(--amber); color:var(--on-amber,#1b1208); }
   .btn-warn:hover{ background: var(--amber-deep); color:#fff; }
   .btn-danger-outline{
     background: transparent;
@@ -1567,9 +1567,18 @@ body.neg-tienda #quickSaleBtn, body:not(.neg-tienda) #fiadosBtn, body:not(.neg-t
     background: var(--surface);
     text-align:left;
   }
+  .palette-grupo{ grid-column:1/-1; font-size:12px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-soft); margin:10px 2px -2px }
+  .palette-grupo:first-child{ margin-top:0 }
+  .palette-prev{ display:flex; flex-direction:column; gap:7px; padding:9px; border-radius:8px; margin-bottom:8px; box-shadow:inset 0 0 0 1px rgba(128,128,128,.18) }
+  .palette-prev .pp-card{ display:flex; flex-direction:column; gap:5px; padding:7px 8px; border:1px solid; border-radius:7px }
+  .palette-prev .pp-l1{ display:block; height:6px; width:70%; border-radius:3px }
+  .palette-prev .pp-l2{ display:block; height:5px; width:45%; border-radius:3px; opacity:.9 }
+  .palette-prev .pp-chips{ display:flex; gap:4px; margin-top:2px }
+  .palette-prev .pp-chips i{ width:14px; height:6px; border-radius:3px }
+  .palette-prev .pp-btn{ align-self:flex-end; font:800 11px/1 var(--font-main); padding:6px 10px; border-radius:999px }
   .palette-badge{
     position:absolute; top:-8px; right:8px;
-    background: var(--amber); color:#fff;
+    background: var(--amber); color:var(--on-amber,#fff);
     font-size:10px; font-weight:700; letter-spacing:.02em;
     padding:2px 7px; border-radius:20px;
   }
@@ -1807,7 +1816,7 @@ body.neg-tienda #quickSaleBtn, body:not(.neg-tienda) #fiadosBtn, body:not(.neg-t
      esta regla es solo para el botón final "Agregar", que no tiene clase. */
   .product-form button:not([class]){
     background: var(--amber);
-    color: #1b1208;
+    color:var(--on-amber,#1b1208);
     border:none;
     border-radius: 8px;
     padding: 0 18px;
@@ -1846,7 +1855,7 @@ body.neg-tienda #quickSaleBtn, body:not(.neg-tienda) #fiadosBtn, body:not(.neg-t
   .btn-camera .cam-tx{ display:flex; flex-direction:column; gap:3px; min-width:0; }
   .btn-camera .cam-tx strong{ font-size:15px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
   .btn-camera .cam-tx small{ font-weight:500; font-size:12.5px; line-height:1.35; color: var(--ink-soft); }
-  .cam-ia{ font-style:normal; font-size:10.5px; font-weight:800; letter-spacing:.06em; padding:2px 7px; border-radius:999px; background: var(--amber); color:#fff; }
+  .cam-ia{ font-style:normal; font-size:10.5px; font-weight:800; letter-spacing:.06em; padding:2px 7px; border-radius:999px; background: var(--amber); color:var(--on-amber,#fff); }
   .cam-grid{ display:grid; grid-template-columns: repeat(auto-fit, minmax(min(250px, 100%), 1fr)); gap:10px; flex: 1 1 100%; width:100%; }
   .cam-config{ flex: 1 1 100%; }
   .cam-card{ margin:10px 0; padding:12px; border-radius:16px; border:1px solid color-mix(in srgb, var(--amber) 30%, var(--line)); background: color-mix(in srgb, var(--amber) 6%, var(--surface)); }
@@ -2081,7 +2090,7 @@ body.neg-tienda #quickSaleBtn, body:not(.neg-tienda) #fiadosBtn, body:not(.neg-t
   .ct-head{ margin-bottom:12px; }
   .ct-periodos{ display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; scrollbar-width:none; }
   .ct-periodos button{ flex:none; height:36px; padding:0 13px; border-radius:999px; border:1px solid var(--line); background:var(--surface); color:var(--ink); font:700 13px var(--font-main); cursor:pointer; }
-  .ct-periodos button.on{ background:var(--amber); border-color:var(--amber); color:#fff; }
+  .ct-periodos button.on{ background:var(--amber); border-color:var(--amber); color:var(--on-amber,#fff); }
   .ct-rango{ display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
   .ct-rango[hidden]{ display:none; }
   .ct-rango label{ display:flex; align-items:center; gap:6px; font-size:13px; color:var(--ink-soft); }
@@ -2212,7 +2221,7 @@ body.neg-tienda #quickSaleBtn, body:not(.neg-tienda) #fiadosBtn, body:not(.neg-t
   .sub-bar[data-k="vencida"], .sub-bar[data-k="gracia"]{ border-color:var(--brick); background:color-mix(in srgb, var(--brick) 14%, var(--surface)); }
   /* Suscripción en ORDEVA Nube (nube/vento-suscripcion.js) */
   .sub-bar[data-k="rechazada"]{ border-color:var(--brick); background:color-mix(in srgb, var(--brick) 14%, var(--surface)); }
-  .sub-bar b[data-sub="renovar"]{ padding:6px 12px; border-radius:999px; background:var(--amber); color:#fff; font-size:12px; letter-spacing:.06em; }
+  .sub-bar b[data-sub="renovar"]{ padding:6px 12px; border-radius:999px; background:var(--amber); color:var(--on-amber,#fff); font-size:12px; letter-spacing:.06em; }
   .lic-plan{ margin:8px 0 10px; padding:10px 12px; border-radius:12px; background:var(--surface-2); border:1px solid var(--line); font-size:13.5px; line-height:1.45; }
   .lic-plan b{ color:var(--cream); }
   .lic-code{ font:800 22px/1.2 var(--font-main); letter-spacing:.12em; color:var(--cream); text-align:center; margin:6px 0; user-select:all; }
@@ -2230,7 +2239,7 @@ body.neg-tienda #quickSaleBtn, body:not(.neg-tienda) #fiadosBtn, body:not(.neg-t
   .cast-apps button{ padding:12px 8px; font-size:14.5px; }
   .cast-app{ display:flex; gap:6px; margin:10px 0 4px; padding:4px; border-radius:12px; background:var(--surface-2); border:1px solid var(--line); }
   .cast-app button{ flex:1; padding:9px 6px; border-radius:9px; border:0; background:transparent; color:var(--ink-soft); font:700 13.5px var(--font-main); }
-  .cast-app button.on{ background:var(--amber); color:#fff; }
+  .cast-app button.on{ background:var(--amber); color:var(--on-amber,#fff); }
   .aj-buscar{ margin:0 0 12px; position:relative; }
   .aj-buscar input{ width:100%; box-sizing:border-box; }
   .aj-res{ display:flex; flex-direction:column; gap:6px; margin-top:8px; }
@@ -2271,7 +2280,7 @@ body.neg-tienda #quickSaleBtn, body:not(.neg-tienda) #fiadosBtn, body:not(.neg-t
   .cast-guide b{ color:var(--cream); }
   .pair-steps{ display:flex; flex-direction:column; gap:14px; margin-top:10px; text-align:left; }
   .pair-step{ display:flex; gap:12px; align-items:flex-start; }
-  .pair-n{ width:28px; height:28px; flex-shrink:0; border-radius:50%; display:grid; place-items:center; font-weight:800; font-size:14px; background:var(--amber); color:#fff; }
+  .pair-n{ width:28px; height:28px; flex-shrink:0; border-radius:50%; display:grid; place-items:center; font-weight:800; font-size:14px; background:var(--amber); color:var(--on-amber,#fff); }
   .pair-step p{ margin:3px 0 0; font-size:14px; line-height:1.45; }
   .pair-step b{ color:var(--cream); }
   #pairCode{ width:100%; box-sizing:border-box; margin-top:8px; padding:12px; border-radius:12px; border:1px solid var(--line); background:var(--bg); color:var(--ink); font:800 22px/1.2 var(--font-main); letter-spacing:.12em; text-align:center; }
@@ -2359,7 +2368,7 @@ body.neg-tienda #quickSaleBtn, body:not(.neg-tienda) #fiadosBtn, body:not(.neg-t
   .chip:hover{ border-color: var(--amber); color: var(--cream); }
   .chip.active{
     background: var(--amber);
-    color: #1b1208;
+    color:var(--on-amber,#1b1208);
     border-color: var(--amber);
     box-shadow: 0 3px 10px rgba(207,139,52,0.3);
   }
@@ -2394,7 +2403,7 @@ body.neg-tienda #quickSaleBtn, body:not(.neg-tienda) #fiadosBtn, body:not(.neg-t
     border: none;
     cursor:pointer;
   }
-  #confirmCategoryBtn{ background: var(--amber); color:#1b1208; }
+  #confirmCategoryBtn{ background: var(--amber); color:var(--on-amber,#1b1208); }
   #confirmCategoryBtn:hover{ background: var(--amber-deep); color:#fff; }
 
   .empty-state{
@@ -2560,7 +2569,7 @@ body.neg-tienda #quickSaleBtn, body:not(.neg-tienda) #fiadosBtn, body:not(.neg-t
   .asis-input{display:flex;gap:8px;padding:10px 12px calc(12px + env(safe-area-inset-bottom));align-items:flex-end;flex-shrink:0}
   .asis-input textarea{flex:1;min-width:0;resize:none;min-height:50px;max-height:130px;font:inherit;font-size:16px;padding:13px 16px;border-radius:25px;border:1px solid var(--line);background:var(--surface);color:var(--ink);outline:none}
   .asis-input textarea:focus{border-color:var(--amber-deep)}
-  .asis-go{flex-shrink:0;width:50px;height:50px;border-radius:50%;border:0;background:var(--amber);color:var(--bg);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform .12s ease}
+  .asis-go{flex-shrink:0;width:50px;height:50px;border-radius:50%;border:0;background:var(--amber);color:var(--on-amber,#1b1208);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform .12s ease}
   .asis-go:active{transform:scale(.92)}
   .asis-go.rec{background:#e5484d;color:#fff;animation:asisPulse 1.2s infinite}
   @keyframes asisPulse{0%{box-shadow:0 0 0 0 rgba(229,72,77,.5)}70%{box-shadow:0 0 0 14px rgba(229,72,77,0)}100%{box-shadow:0 0 0 0 rgba(229,72,77,0)}}
@@ -2733,7 +2742,7 @@ body.neg-tienda #quickSaleBtn, body:not(.neg-tienda) #fiadosBtn, body:not(.neg-t
   .mz-song>span{flex:1;font-size:14px}
   .mz-song button{padding:8px 12px}
   .atencion-sel{display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap;margin-left:4px}
-  .atencion-sel button.on{background:var(--amber);color:#fff;border-color:var(--amber)}
+  .atencion-sel button.on{background:var(--amber);color:var(--on-amber,#fff);border-color:var(--amber)}
   .mz-sonando{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0}
   .mz-sonando .mzs-t{font-size:15px;overflow:hidden;text-overflow:ellipsis}
   .mz-sonando .mzs-t span{color:var(--ink-soft);font-size:13px}
@@ -2895,7 +2904,7 @@ body.neg-tienda #quickSaleBtn, body:not(.neg-tienda) #fiadosBtn, body:not(.neg-t
 .pc-warn{margin-top:8px;padding:8px 10px;border-radius:8px;font-size:12px;background:rgba(255,90,90,.15);color:#ff5a5a}
 .st-per{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
 .st-per button{padding:7px 14px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink);font:inherit;cursor:pointer}
-.st-per button.on{background:var(--amber);color:#1a1207;border-color:var(--amber);font-weight:700}
+.st-per button.on{background:var(--amber);color:var(--on-amber,#1b1208);border-color:var(--amber);font-weight:700}
 .st-h{margin:16px 0 4px;font-size:16px}
 .st-kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:8px 0}
 .st-kpi{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--surface)}
@@ -3025,7 +3034,7 @@ html.ov-lock{ overflow:hidden; }
 /* Entrar: pestañas «Iniciar sesión | Crear cuenta», entrar con un código y recuperar con código */
 .auth-tabs{ display:grid; grid-template-columns:1fr 1fr; gap:4px; padding:4px; border-radius:12px; background:color-mix(in srgb, var(--ink) 6%, transparent); border:1px solid var(--line); }
 .auth-tabs button{ border:0; background:none; color:var(--ink-soft); font:inherit; font-weight:700; font-size:14px; padding:10px 6px; border-radius:9px; cursor:pointer; min-width:0; }
-.auth-tabs button.on{ background:var(--amber); color:#fff; box-shadow:0 2px 8px color-mix(in srgb, var(--amber) 35%, transparent); }
+.auth-tabs button.on{ background:var(--amber); color:var(--on-amber,#fff); box-shadow:0 2px 8px color-mix(in srgb, var(--amber) 35%, transparent); }
 .auth-codigo{ width:100%; padding:12px; border-radius:12px; font-weight:700; }
 #otpPaso2:not([hidden]){ display:flex; flex-direction:column; gap:12px; }
 #otpCode, #recCode{ letter-spacing:4px; font-size:20px; font-weight:800; text-align:center; }
@@ -3124,7 +3133,7 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
 #overlay .mesa-sec .persona-add{ margin:0 0 6px; }
 #overlay .mesa-sec + .section-divider{ margin-top:14px; }
 </style>
-<script src="lib/vento-canal.js?v=1.65.5"></script><!-- canales en vivo por el servidor de ORDEVA (pedidos QR, canciones, meseros, TV…) -->
+<script src="lib/vento-canal.js?v=1.65.6"></script><!-- canales en vivo por el servidor de ORDEVA (pedidos QR, canciones, meseros, TV…) -->
 </head>
 <body>
 <div id="splashScreen" role="img" aria-label="ORDEVA">
@@ -4729,7 +4738,7 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
       </div>
       <button id="qsAddBtn">Agregar</button>
     </div>
-    <button type="button" class="btn-camera" id="qsScanBtn" style="width:100%;margin-top:8px">🔳 Escanear código de barras / QR</button>
+    <div style="display:flex;gap:8px;margin-top:8px"><button type="button" class="btn-camera" id="qsScanBtn" style="flex:1">🔳 Escanear código de barras / QR</button><button type="button" class="btn-camera" data-lcel-abrir style="flex:0 0 auto" title="Escanea con la cámara del celular, sin cables">📱 Celular <span data-lcel-estado></span></button></div>
 
     <div id="qsItemsContainer"></div>
 
@@ -5049,34 +5058,34 @@ export default {
   </form>
 </div>
 <script src="nube/config.js"></script>
-<script src="nube/vento-nube.js?v=1.65.5"></script>
-<script src="nube/vento-usuarios.js?v=1.65.5" defer></script><!-- usuarios del equipo (solo con nombre) en todos los equipos del negocio -->
-<script src="nube/vento-pagos.js?v=1.65.5" defer></script>
-<script src="nube/vento-dian.js?v=1.65.5" defer></script><!-- 🧾 Facturación electrónica DIAN (P.O.S. electrónico, factura y notas crédito) -->
-<script src="nube/vento-suscripcion.js?v=1.65.5" defer></script>
-<script src="lib/vento-puerta.js?v=1.65.5" defer></script><!-- Puerta: la app solo funciona conectada a la base de datos de ORDEVA -->
-<script src="lib/vento-pos.js?v=1.65.5" defer></script><!-- Modos de trabajo (tienda/mixto) y modo fácil -->
-<script src="lib/vento-equipos.js?v=1.65.5" defer></script>
-<script src="lib/vento-turno.js?v=1.65.5" defer></script>
-<script src="lib/vento-tablero.js?v=1.65.5" defer></script><!-- 🛰️ Tablero de estadísticas --><script src="lib/vento-recetas.js?v=1.65.5" defer></script><!-- 🧾 Recetas e insumos (descuentan al vender) --><script src="lib/vento-inventario.js?v=1.65.5" defer></script><!-- 🔢 Inventario por código: consultar, entrada de mercancía, toma de inventario, kárdex y devoluciones --><!-- 💵 Caja con base, entradas / salidas y arqueo --><!-- 🔌 Balanza, impresora de facturas y cajón de dinero (USB, Bluetooth, red) -->
-<script src="lib/vento-confirma.js?v=1.65.5" defer></script><!-- Confirmación de pagos: ⏳ esperando el pago, mesa correcta, sin valor, mesero, cuadre -->
-<script src="lib/vento-guia.js?v=1.65.5" defer></script><!-- Modo fácil para mayores: guía paso a paso con voz, «Ayúdame» y recorrido -->
-<script src="lib/vento-cuenta.js?v=1.65.5" defer></script><!-- Soporte en la app, licencias del proveedor, recuperar por SMS, cuenta de cliente aparte del administrador -->
-<script src="lib/vento-sw.js?v=1.65.5" defer></script><!-- abrir al instante: guarda la app en este equipo (sw.js) -->
-<script src="lib/vento-sencilla.js?v=1.65.5" defer></script><!-- 🧭 Vista sencilla (Ajustes → Apariencia): opcional, por equipo -->
-<script src="lib/vento-modulos.js?v=1.65.5" defer></script><!-- 🧩 Funciones de este negocio (Ajustes → Negocio): prender o apagar módulos por negocio -->
+<script src="nube/vento-nube.js?v=1.65.6"></script>
+<script src="nube/vento-usuarios.js?v=1.65.6" defer></script><!-- usuarios del equipo (solo con nombre) en todos los equipos del negocio -->
+<script src="nube/vento-pagos.js?v=1.65.6" defer></script>
+<script src="nube/vento-dian.js?v=1.65.6" defer></script><!-- 🧾 Facturación electrónica DIAN (P.O.S. electrónico, factura y notas crédito) -->
+<script src="nube/vento-suscripcion.js?v=1.65.6" defer></script>
+<script src="lib/vento-puerta.js?v=1.65.6" defer></script><!-- Puerta: la app solo funciona conectada a la base de datos de ORDEVA -->
+<script src="lib/vento-pos.js?v=1.65.6" defer></script><!-- Modos de trabajo (tienda/mixto) y modo fácil -->
+<script src="lib/vento-equipos.js?v=1.65.6" defer></script>
+<script src="lib/vento-turno.js?v=1.65.6" defer></script>
+<script src="lib/vento-tablero.js?v=1.65.6" defer></script><!-- 🛰️ Tablero de estadísticas --><script src="lib/vento-recetas.js?v=1.65.6" defer></script><!-- 🧾 Recetas e insumos (descuentan al vender) --><script src="lib/vento-inventario.js?v=1.65.6" defer></script><!-- 🔢 Inventario por código: consultar, entrada de mercancía, toma de inventario, kárdex y devoluciones --><!-- 💵 Caja con base, entradas / salidas y arqueo --><!-- 🔌 Balanza, impresora de facturas y cajón de dinero (USB, Bluetooth, red) -->
+<script src="lib/vento-confirma.js?v=1.65.6" defer></script><!-- Confirmación de pagos: ⏳ esperando el pago, mesa correcta, sin valor, mesero, cuadre -->
+<script src="lib/vento-guia.js?v=1.65.6" defer></script><!-- Modo fácil para mayores: guía paso a paso con voz, «Ayúdame» y recorrido -->
+<script src="lib/vento-cuenta.js?v=1.65.6" defer></script><!-- Soporte en la app, licencias del proveedor, recuperar por SMS, cuenta de cliente aparte del administrador -->
+<script src="lib/vento-sw.js?v=1.65.6" defer></script><!-- abrir al instante: guarda la app en este equipo (sw.js) -->
+<script src="lib/vento-sencilla.js?v=1.65.6" defer></script><!-- 🧭 Vista sencilla (Ajustes → Apariencia): opcional, por equipo -->
+<script src="lib/vento-modulos.js?v=1.65.6" defer></script><!-- 🧩 Funciones de este negocio (Ajustes → Negocio): prender o apagar módulos por negocio -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script><!-- defer: antes frenaba todo lo de abajo (y si el CDN no respondía, ORDEVA se quedaba en blanco); solo se usa al tocar «imagen del recibo» -->
-<script src="lib/vento-codigos.js?v=1.65.5" defer></script><!-- 🔳 leer códigos de barras y QR también en el programa de PC (Windows) y en iPhone (ZXing) -->
-<script src="lib/vento-lector-cel.js?v=1.65.5" defer></script><!-- 📱 el celular como lector de códigos de este equipo (inalámbrico, por el servidor de ORDEVA) -->
-<script src="lib/vento-sonidos.js?v=1.65.5"></script>
-<script src="app/04a-inicio-cuentas-clientes.js?v=1.65.5"></script>
-<script src="app/04b-mesas-voz-cocina.js?v=1.65.5"></script>
-<script src="app/04c-personas-voz-ia.js?v=1.65.5"></script>
-<script src="app/04d-combos-estadisticas-carta.js?v=1.65.5"></script>
-<script src="app/04e-facturas-mostrador-domicilios.js?v=1.65.5"></script>
-<script src="app/04f-pedidos-escritos-categorias.js?v=1.65.5"></script>
-<script src="app/04g-productos-historial-caja.js?v=1.65.5"></script>
-<script src="app/04h-comprobantes-acceso-negocio.js?v=1.65.5"></script>
+<script src="lib/vento-codigos.js?v=1.65.6" defer></script><!-- 🔳 leer códigos de barras y QR también en el programa de PC (Windows) y en iPhone (ZXing) -->
+<script src="lib/vento-lector-cel.js?v=1.65.6" defer></script><!-- 📱 el celular como lector de códigos de este equipo (inalámbrico, por el servidor de ORDEVA) -->
+<script src="lib/vento-sonidos.js?v=1.65.6"></script>
+<script src="app/04a-inicio-cuentas-clientes.js?v=1.65.6"></script>
+<script src="app/04b-mesas-voz-cocina.js?v=1.65.6"></script>
+<script src="app/04c-personas-voz-ia.js?v=1.65.6"></script>
+<script src="app/04d-combos-estadisticas-carta.js?v=1.65.6"></script>
+<script src="app/04e-facturas-mostrador-domicilios.js?v=1.65.6"></script>
+<script src="app/04f-pedidos-escritos-categorias.js?v=1.65.6"></script>
+<script src="app/04g-productos-historial-caja.js?v=1.65.6"></script>
+<script src="app/04h-comprobantes-acceso-negocio.js?v=1.65.6"></script>
 
 <script>
 /* === TRANSFERENCIA / RESPALDO COMPLETO === */
@@ -5146,16 +5155,16 @@ export default {
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',wireBackupUI); else wireBackupUI();
 })();
 </script>
-<script src="app/05-pedidos-canciones-recibidos.js?v=1.65.5"></script>
+<script src="app/05-pedidos-canciones-recibidos.js?v=1.65.6"></script>
 
-<script src="app/06-campana-notificaciones-pedidos.js?v=1.65.5"></script>
+<script src="app/06-campana-notificaciones-pedidos.js?v=1.65.6"></script>
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <!-- qrcodejs 1.0.0 (MIT) incluido aquí mismo: las etiquetas y los QR de mesa funcionan sin internet -->
-<script src="app/07-qrcode-this-mode.js?v=1.65.5"></script>
+<script src="app/07-qrcode-this-mode.js?v=1.65.6"></script>
 <!-- JsBarcode 3.11.5 (MIT) incluido aquí mismo -->
-<script src="app/08-jsbarcode-return-exports.js?v=1.65.5"></script>
-<script src="app/09-cuentas-mesa-modulo.js?v=1.65.5"></script>
+<script src="app/08-jsbarcode-return-exports.js?v=1.65.6"></script>
+<script src="app/09-cuentas-mesa-modulo.js?v=1.65.6"></script>
 <script>
 /* Los motores pesados de lectura (OCR 10 MB y PDF 2 MB) ya no van dentro de esta página: se cargan
    solo cuando se lee una factura. Así ORDEVA abre más rápido y usa mucha menos memoria, y Android
@@ -5183,15 +5192,15 @@ document.addEventListener('click', function(ev){
   if(b) setTimeout(window.ventoPrecargarLibs, 1500);
 }, true);
 </script>
-<script src="app/10-tesseract-ocr-engine.js?v=1.65.5"></script>
+<script src="app/10-tesseract-ocr-engine.js?v=1.65.6"></script>
 <!-- lib/vento-ocr.js: se carga solo al leer una factura (ver ventoCargarLib) -->
 <!-- lib/vento-pdf.js: se carga solo al leer una factura (ver ventoCargarLib) -->
 <!-- lib/vento-pdf-worker.js: se carga solo al leer una factura (ver ventoCargarLib) -->
-<script src="app/11-precios-vito-motor.js?v=1.65.5"></script>
-<script src="app/12-fotos-productos-fondo.js?v=1.65.5"></script>
-<script src="app/13-libreta-abuela-cuaderno.js?v=1.65.5"></script>
-<script src="app/14-verificacion-pagos-nequi.js?v=1.65.5"></script>
-<script src="app/15-whatsapp-recibir-responder.js?v=1.65.5"></script>
+<script src="app/11-precios-vito-motor.js?v=1.65.6"></script>
+<script src="app/12-fotos-productos-fondo.js?v=1.65.6"></script>
+<script src="app/13-libreta-abuela-cuaderno.js?v=1.65.6"></script>
+<script src="app/14-verificacion-pagos-nequi.js?v=1.65.6"></script>
+<script src="app/15-whatsapp-recibir-responder.js?v=1.65.6"></script>
 <script>
 /* Celebración: una explosión de emojis que se desvanece (cobro, pago recibido, pedido enviado).
    No sale si el celular pide menos movimiento ni en el modo fácil. */
@@ -5233,13 +5242,13 @@ window.mesoraCelebrar = function(emojis){
   }, 800);
 })();
 </script>
-<script src="app/16-pago-dueno-sube.js?v=1.65.5"></script>
-<script src="app/17-unidades-combinadas-reinicio.js?v=1.65.5"></script>
-<script src="app/18-laya-asistente-cerebro.js?v=1.65.5"></script>
-<script src="app/19-historial-facturas-movimientos.js?v=1.65.5"></script>
-<script src="app/20-contabilidad-recibos-adjuntos.js?v=1.65.5"></script>
-<script src="app/21-bienvenida-adapta-cada.js?v=1.65.5"></script>
-<script src="app/22-primeros-pasos-tarjeta.js?v=1.65.5"></script>
+<script src="app/16-pago-dueno-sube.js?v=1.65.6"></script>
+<script src="app/17-unidades-combinadas-reinicio.js?v=1.65.6"></script>
+<script src="app/18-laya-asistente-cerebro.js?v=1.65.6"></script>
+<script src="app/19-historial-facturas-movimientos.js?v=1.65.6"></script>
+<script src="app/20-contabilidad-recibos-adjuntos.js?v=1.65.6"></script>
+<script src="app/21-bienvenida-adapta-cada.js?v=1.65.6"></script>
+<script src="app/22-primeros-pasos-tarjeta.js?v=1.65.6"></script>
 <script>
 /* Si Android/Chrome recarga la pestaña (por memoria, al volver de la cámara o de otra app), ORDEVA vuelve
    a la sección donde estabas en vez de dejarte en el inicio. Los datos ya están guardados siempre. */
@@ -5299,7 +5308,7 @@ window.mesoraCelebrar = function(emojis){
   setInterval(pinta, 5000); pinta();
 })();
 </script>
-<script src="app/23-cerebro-app-ventas.js?v=1.65.5"></script>
+<script src="app/23-cerebro-app-ventas.js?v=1.65.6"></script>
 <script>
 /* Ajustes → Voz: lista de voces en español (las más naturales primero) */
 (function(){
@@ -5319,10 +5328,10 @@ window.mesoraCelebrar = function(emojis){
   pintar();
 })();
 </script>
-<script src="app/24-pagos-nequi-daviplata.js?v=1.65.5"></script>
-<script src="app/25-vitrina-pagina-pedidos.js?v=1.65.5"></script>
-<script src="app/26-verificar-comprobantes-nequi.js?v=1.65.5"></script>
-<script src="app/27-roles-equipo-permisos.js?v=1.65.5"></script>
+<script src="app/24-pagos-nequi-daviplata.js?v=1.65.6"></script>
+<script src="app/25-vitrina-pagina-pedidos.js?v=1.65.6"></script>
+<script src="app/26-verificar-comprobantes-nequi.js?v=1.65.6"></script>
+<script src="app/27-roles-equipo-permisos.js?v=1.65.6"></script>
 <script>
 /* ================= ¿A quién le llega el aviso de un PAGO? =================
    Solo al DUEÑO, a los ADMINISTRADORES y a quien está COBRANDO o ATENDIENDO esa mesa (mesero, empleado o cajero).
@@ -5436,8 +5445,8 @@ window.mesoraCelebrar = function(emojis){
   setTimeout(() => { armar(); pintar(); }, 1500);
 })();
 </script>
-<script src="app/28-corregir-liberar-borrar.js?v=1.65.5"></script>
-<script src="app/29-clave-cerrar-caja.js?v=1.65.5"></script>
-<script src="app/30-actividad-equipo-huella.js?v=1.65.5"></script>
+<script src="app/28-corregir-liberar-borrar.js?v=1.65.6"></script>
+<script src="app/29-clave-cerrar-caja.js?v=1.65.6"></script>
+<script src="app/30-actividad-equipo-huella.js?v=1.65.6"></script>
 </body>
 </html>
