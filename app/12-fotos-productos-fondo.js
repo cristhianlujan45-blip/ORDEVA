@@ -418,7 +418,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-27 · v1.65.7';
+const MESORA_VERSION = '2026-10-27 · v1.65.8';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'ORDEVA · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 /* 🔄 La app Android se actualiza SOLA (Actualizador): revisa cada 3 h, baja la versión nueva y la instala cuando no se
@@ -2837,6 +2837,9 @@ function ctMovimientos(r){
     const t = new Date(pu.at || pu.date).getTime();
     if(t >= r.ini && t < r.fin && Number(pu.total) > 0) mov.push({ tipo: 'gasto', cat: 'proveedores', monto: Number(pu.total), metodo: 'otro', fecha: t, desc: 'Compra' + (pu.supplier ? ' a ' + pu.supplier : '') + ' (factura escaneada)', auto: true });
   });
+  // 1.65.7: lo de la 📒 Libreta (fiados cobrados, sueldos y pagos a proveedores) también es plata que entró o salió.
+  try{ (window.libretaConta ? window.libretaConta(r.ini, r.fin) : []).forEach(m => mov.push(m)); }catch(e){}
+  // Una factura escaneada que ya se pagó con la libreta: se sigue contando una sola vez (aquí, como compra).
   (data.contab || []).forEach(g => {
     const t = new Date(g.fecha + 'T12:00').getTime();
     if(t >= r.ini && t < r.fin) mov.push({ tipo: g.tipo, cat: g.cat, monto: Number(g.monto) || 0, metodo: g.metodo, fecha: t, desc: g.nota || ctCatNombre(g.tipo, g.cat).replace(/^\S+\s/, ''), id: g.id, adj: !!g.adj });
@@ -2860,7 +2863,10 @@ function renderConta(){
     k('res', resultado >= 0 ? '✅ Te quedó' : '⚠️ Faltó', ctFmt(Math.abs(resultado)), 'Entradas − gastos') +
     k('', '🧾 Vendido', ctFmt(x.vendido), x.nVentas + (x.nVentas === 1 ? ' cuenta' : ' cuentas')) +
     k('', '📈 Ganancia de lo vendido', ctFmt(x.vendido - x.costo), 'Vendido − costo de los productos' + (x.sinCosto ? ' (faltan costos)' : '')) +
-    k('', '🕒 Por cobrar (fiados)', ctFmt(x.porCobrar), 'De las ventas de este periodo');
+    k('', '🕒 Por cobrar (fiados)', ctFmt(x.porCobrar), 'De las ventas de este periodo') +
+    // 1.65.7: lo que debe la gente HOY (cuentas de mesa y libreta) y lo que le debes a los proveedores.
+    (() => { let t = null; try{ t = window.libretaTotales ? window.libretaTotales() : null; }catch(e){}
+      return t ? k('', '📕 Te deben hoy', ctFmt(t.meDeben), 'Fiados de las mesas y de la libreta') + (t.debo > 0 ? k('out', '🧾 Debes a proveedores', ctFmt(t.debo), 'Lo anotado en la libreta') : '') : ''; })();
   document.getElementById('ctAviso').textContent = (x.sinCosto ? '⚠️ Algunos productos vendidos no tienen costo: la ganancia de lo vendido sale más alta de lo real (ponlo en Productos → tocar el producto → Costo). ' : '') + 'Entradas = dinero cobrado (los fiados cuentan el día que los pagan). Las compras a proveedores entran solas al escanear sus facturas; los demás gastos regístralos aquí abajo.';
   const barras = (obj, cls, nombre) => { const ks = Object.keys(obj).sort((a, b) => obj[b] - obj[a]); const max = Math.max(1, ...ks.map(q => obj[q])); return ks.length ? ks.map(q => '<div class="ct-barra ' + cls + '"><span>' + invEsc(nombre(q)) + '</span><i style="width:' + Math.max(2, obj[q] / max * 100) + '%"></i><b>' + ctFmt(obj[q]) + '</b></div>').join('') : '<div class="empty-note">Nada en este periodo.</div>'; };
   const porMedio = {}, porCat = {};
