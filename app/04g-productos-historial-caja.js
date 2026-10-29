@@ -342,16 +342,18 @@ if(scanCodeAddBtnEl){
         return;
       }
       showToast('🔎 Código no reconocido en tu lista, buscando información…');
-      const off = await lookupOpenFoodFacts(raw).catch(() => null);
-      if(off && off.name){
+      // 1.65.0: lo que ORDEVA ya aprendió de otros negocios, las bases libres y, con la IA, internet (vento-escaner.js).
+      const info = window.ventoCodigos ? await window.ventoCodigos.buscar(raw).catch(() => null)
+        : await lookupOpenFoodFacts(raw).then(o => o && o.name ? { nombre: o.name, marca: o.brand, tamano: o.size, fuente: 'Open Food Facts' } : null).catch(() => null);
+      if(info && info.nombre){
         closeScanOverlay();
-        document.getElementById('prodName').value = [off.brand, off.name].filter(Boolean).join(' ').trim();
-        if(off.size) document.getElementById('prodSize').value = off.size;
+        document.getElementById('prodName').value = [info.marca && info.nombre.toLowerCase().indexOf(String(info.marca).toLowerCase()) < 0 ? info.marca : '', info.nombre].filter(Boolean).join(' ').trim();
+        if(info.tamano) document.getElementById('prodSize').value = info.tamano;
         document.getElementById('prodSpecs').value = 'Código: ' + raw;
         document.getElementById('prodPrice').focus();
-        showToast('Detectado: ' + off.name + '. Revisa y agrega el precio.');
+        showToast('Detectado: ' + info.nombre + (info.fuente ? ' (' + info.fuente + ')' : '') + '. Revisa y agrega el precio.', 7000);
       } else {
-        showToast('❌ No encontré información de ese código. Escribe el producto a mano.');
+        showToast('❌ No encontré ese código. Escribe el producto a mano' + (typeof hasAIKey === 'function' && hasAIKey() ? ' o tómale una foto con «📷 Foto con IA».' : '.'), 7000);
       }
     }, { hint: i18nPut('Escanea el código de barras o QR de un producto para agregarlo o encontrarlo.') });
   });
@@ -376,10 +378,10 @@ async function handleUnknownScannedCode(raw, onPick, opts){
   lcRenderList('');
   // Si hay internet, se intenta averiguar el nombre (Open Food Facts) para
   // sugerir el producto correcto sin que tengas que escribir.
-  if(/^\d{8,14}$/.test(lcCode) && typeof lookupOpenFoodFacts === 'function'){
-    const off = await lookupOpenFoodFacts(lcCode).catch(() => null);
+  if(/^\d{8,14}$/.test(lcCode) && (window.ventoCodigos || typeof lookupOpenFoodFacts === 'function')){
+    const off = window.ventoCodigos ? await window.ventoCodigos.buscar(lcCode).then(i => i && i.nombre ? { name: i.nombre, brand: i.marca } : null).catch(() => null) : await lookupOpenFoodFacts(lcCode).catch(() => null);
     if(off && off.name && ov.classList.contains('show') && !search.value){
-      lcSuggestName = [off.brand, off.name].filter(Boolean).join(' ').trim();
+      lcSuggestName = [off.brand && off.name.toLowerCase().indexOf(String(off.brand).toLowerCase()) < 0 ? off.brand : '', off.name].filter(Boolean).join(' ').trim();
       document.getElementById('lcSub').textContent = 'Parece que es: "' + lcSuggestName + '". ¿Cuál de tus productos es? Elígelo una sola vez y desde ahí se reconoce solo.';
       lcRenderList(lcSuggestName);
     }
@@ -405,6 +407,7 @@ function lcRenderList(query){
     if(!Array.isArray(prod.barcodes)) prod.barcodes = [];
     if(!prod.barcodes.includes(lcCode)) prod.barcodes.push(lcCode);
     saveData();
+    try{ window.ventoCodigos && window.ventoCodigos.aportar(lcCode, prod); }catch(e){}   // 1.65.0: ORDEVA aprende el código
     const cb = lcOnPick;
     closeLinkCodeOverlay();
     showToast('🔗 Listo: ese código ahora es "' + prod.name + '".');
