@@ -335,6 +335,7 @@ public class VentoApp extends Application {
     static boolean vozPagosOn() { return app == null || app.getSharedPreferences("vento", MODE_PRIVATE).getBoolean("pagosVoz", true); }
     /** 1.62.0: ¿suenan AQUÍ los avisos de pago? Lo elige el dueño o el administrador (Ajustes → Pagos → equipos). En los
      *  que no suenan, el pago llega igual a la lista de ORDEVA, sin voz, sin notificación y sin la ventana. */
+    static void ponerSuena(boolean si) { if (app != null) app.getSharedPreferences("vento", MODE_PRIVATE).edit().putBoolean("pagosSuena", si).apply(); }
     static boolean suenaAqui() { return app == null || app.getSharedPreferences("vento", MODE_PRIVATE).getBoolean("pagosSuena", true); }
     static void decirPago(final String frase) {
         if (!vozPagosOn() || !suenaAqui()) return;
@@ -367,6 +368,23 @@ public class VentoApp extends Application {
     static void prepararVozPagos() {
         if (app == null) return;
         ui.post(() -> { if (ttsPago == null) crearVoz(); });
+    }
+
+    /** 1.65.7: ¿el motor de voz de los pagos sigue vivo? Se le pide un silencio de 1 ms (no se oye): si no lo acepta, Android
+     *  lo cerró por su cuenta y se prepara uno nuevo YA, no cuando llegue el próximo pago (que esperaba segundos). */
+    static void revisarVozPagos() {
+        if (app == null) return;
+        ui.post(() -> {
+            if (ttsPago == null) { crearVoz(); return; }
+            if (!ttsPagoListo || pagosHablando > 0) return;
+            int r;
+            try { r = Build.VERSION.SDK_INT >= 21 ? ttsPago.playSilentUtterance(1, TextToSpeech.QUEUE_ADD, "vivo" + System.nanoTime()) : TextToSpeech.SUCCESS; }
+            catch (Throwable e) { r = TextToSpeech.ERROR; }
+            if (r == TextToSpeech.SUCCESS) return;
+            try { ttsPago.shutdown(); } catch (Throwable ignorado) { }
+            ttsPago = null; ttsPagoListo = false;
+            crearVoz();
+        });
     }
 
     // ---------- Qué motor de voz usar (1.52.0) ----------
@@ -441,9 +459,10 @@ public class VentoApp extends Application {
                 try { ttsPago.setAudioAttributes(atributosPago()); } catch (Exception ignorado) { }
                 try { ttsPago.setSpeechRate(AvisoPago.VELOCIDAD); } catch (Exception ignorado) { }
                 ttsPago.setOnUtteranceProgressListener(new UtteranceProgressListener() {
-                    @Override public void onStart(String u) { vozEmpezo = System.currentTimeMillis(); }
-                    @Override public void onDone(String u) { vozEmpezo = System.currentTimeMillis(); ui.post(() -> terminoVoz(u, true)); }
-                    @Override public void onError(String u) { vozEmpezo = System.currentTimeMillis(); ui.post(() -> terminoVoz(u, false)); }
+                    // «vivo…»: la revisión de que el motor sigue vivo (revisarVozPagos), no es un pago.
+                    @Override public void onStart(String u) { if (u != null && u.startsWith("vivo")) return; vozEmpezo = System.currentTimeMillis(); }
+                    @Override public void onDone(String u) { if (u != null && u.startsWith("vivo")) return; vozEmpezo = System.currentTimeMillis(); ui.post(() -> terminoVoz(u, true)); }
+                    @Override public void onError(String u) { if (u != null && u.startsWith("vivo")) return; vozEmpezo = System.currentTimeMillis(); ui.post(() -> terminoVoz(u, false)); }
                 });
                 for (String f : fila) hablarPago(f);
             }), motor);
@@ -1646,8 +1665,29 @@ public class VentoApp extends Application {
         @JavascriptInterface
         public String pagosCruceEstado() { return getSharedPreferences("vento", MODE_PRIVATE).getString(Cruce.PREF_ESTADO, "{}"); }
         /** true = este pago todavía no se había avisado aquí (y queda reclamado); false = ya lo avisó Android. */
+        /** 1.65.7: la cámara no tiene permiso y Android ya NO lo vuelve a preguntar («No volver a preguntar» o negado dos
+         *  veces): se abren los permisos de ORDEVA en Ajustes del celular para activar la cámara (true). Si Android todavía
+         *  lo pregunta, no se hace nada (false): al volver a pedir la cámara, sale la pregunta normal. */
+        @JavascriptInterface
+        public boolean camaraPermiso() {
+            MainActivity a = ventana;
+            if (a == null || tiene(Manifest.permission.CAMERA) || Build.VERSION.SDK_INT < 23) return false;
+            if (!getSharedPreferences("vento", MODE_PRIVATE).getBoolean("camaraPreguntada", false) || a.shouldShowRequestPermissionRationale(Manifest.permission.CAMERA)) return false;
+            ui.post(() -> { try { a.startActivity(new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:" + getPackageName()))); } catch (Exception ignorado) { } });
+            return true;
+        }
+
         @JavascriptInterface
         public boolean pagoReclamar(String id) { return Cruce.reclamar(VentoApp.this, id); }
+        /** 1.65.7: la página vio un pago nuevo en vivo: Android pregunta YA y lo hace sonar él (voz, notificación y
+         *  ventana), igual que con el celular bloqueado. Antes, con ORDEVA abierta, la página lo reclamaba y lo sonaba ella;
+         *  si algo de la página fallaba (voz de la página apagada, otro aviso parecido), ese pago quedaba en silencio. */
+        @JavascriptInterface
+        public boolean pagosCruceYa() {
+            if (Cruce.cfg(VentoApp.this).optString("token").length() < 20) return false;
+            Cruce.revisar(VentoApp.this);
+            return true;
+        }
 
         @JavascriptInterface
         public void callar() { ui.post(() -> { try { if (tts != null) tts.stop(); } catch (Exception ignorado) { } }); }
@@ -1677,6 +1717,31 @@ public class VentoApp extends Application {
                 }
             }).start();
         }
+
+        // ---------------------------------------------------------------- 🔵 Lector de códigos Bluetooth (TecladoBT)
+        /** {soportado, bluetooth, permiso, prendido, registrado, conectado, computador, error} */
+        @JavascriptInterface
+        public String btTecladoEstado() { return TecladoBT.soportado() ? TecladoBT.de(VentoApp.this).estado() : "{\"soportado\":false}"; }
+        /** Prende el teclado Bluetooth (si falta el permiso «Dispositivos cercanos», lo pide; luego hay que volver a tocar). */
+        @JavascriptInterface
+        public void btTecladoPrender() {
+            ui.post(() -> {
+                if (!TecladoBT.soportado()) return;
+                if (!TecladoBT.permiso()) {
+                    if (ventana != null && Build.VERSION.SDK_INT >= 31) ventana.requestPermissions(new String[]{Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_ADVERTISE}, 7311);
+                    return;
+                }
+                TecladoBT.de(VentoApp.this).prender();
+            });
+        }
+        /** Que el computador encuentre este celular para emparejarlo. */
+        @JavascriptInterface
+        public void btTecladoMostrarse() { ui.post(() -> { if (TecladoBT.soportado() && TecladoBT.permiso()) TecladoBT.de(VentoApp.this).mostrarse(); }); }
+        @JavascriptInterface
+        public void btTecladoApagar() { if (TecladoBT.soportado()) TecladoBT.de(VentoApp.this).apagar(); }
+        /** Escribe el código en el computador y Enter. */
+        @JavascriptInterface
+        public boolean btTecladoEscribir(String texto) { return TecladoBT.soportado() && TecladoBT.de(VentoApp.this).escribir(texto); }
 
         /** Trabajar de fondo (pedidos y música con la app cerrada): estado y prender/apagar. */
         @JavascriptInterface

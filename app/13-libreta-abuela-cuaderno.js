@@ -11,7 +11,9 @@
   // varios comandos de voz seguidos («súmame 13.400», luego «súmame 15.200»…),
   // sin guardarse en los datos del negocio — se reinicia si recargas la app.
   let lbCuenta = null;   // { total, pasos:[{op:'+'|'-', valor, total}] }
-  const TIPOS = { debe: '📕 Me debe', abono: '✅ Me pagó', emp: '👷 Pagué a' };
+  // 1.65.7: 📦 pagos a PROVEEDORES (gasto «Proveedores» en Contabilidad) y 🧾 lo que le DEBO a un proveedor (cuentas por
+  // pagar). Los pagos a empleados van a «Nómina» y lo que me pagan los que me deben, a las entradas (lbConta).
+  const TIPOS = { debe: '📕 Me debe', abono: '✅ Me pagó', emp: '👷 Pagué a', prov: '📦 Pagué al proveedor', pdeb: '🧾 Le debo a' };
   const $l = id => document.getElementById(id);
   const esc2 = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const plata = n => '$' + Math.round(n || 0).toLocaleString('es-CO');
@@ -158,7 +160,7 @@
   }
 
   // ---------- Personas ----------
-  const QUITAR = /\b(me|le|les|lo|la|los|las|a|al|el|de|del|que|y|por|para|pesos?|plata|hoy|ayer|ya|se|todo|toda|completo|completa|la deuda|deuda|empleado|empleada|trabajador|trabajadora|sueldo|nomina|quincena|salario|dia|semana|jornal|pago|pague|pagado|pagaron|pagar|paga|debe|deben|debia|debiendo|quedo|queda|fiado|fiada|fie|fiar|fiale|fiele|preste|prestamo|prestado|abono|abonó|abonar|dio|di|devolvio|trajo|cancelo|saldo|anota|anotale|apunta|apuntale|cuanto|cuantos|quien|quienes|mas|otra|otro|vez|tambien|senor|senora|mi|mis|su|sus|un|una|pesitos|lucas?|mil|con|en|total|entonces|bueno|ok|listo|oye|mira|he|has|ha|hemos|hice|hizo|le he|este|mes|cuanto)\b/g;
+  const QUITAR = /\b(me|le|les|lo|la|los|las|a|al|el|de|del|que|y|por|para|pesos?|plata|hoy|ayer|ya|se|todo|toda|completo|completa|la deuda|deuda|empleado|empleada|trabajador|trabajadora|sueldo|nomina|quincena|salario|dia|semana|jornal|pago|pague|pagado|pagaron|pagar|paga|debe|deben|debia|debiendo|quedo|queda|fiado|fiada|fie|fiar|fiale|fiele|preste|prestamo|prestado|abono|abonó|abonar|dio|di|devolvio|trajo|cancelo|saldo|anota|anotale|apunta|apuntale|cuanto|cuantos|quien|quienes|mas|otra|otro|vez|tambien|senor|senora|mi|mis|su|sus|un|una|pesitos|lucas?|mil|con|en|total|entonces|bueno|ok|listo|oye|mira|he|has|ha|hemos|hice|hizo|le he|este|mes|cuanto|proveedor|proveedora|proveedores|factura|facturas|pedido|mercancia|surtido|distribuidor|distribuidora|debo|compra|compras|credito|mesero|mesera|cocinero|cocinera|ayudante|cajero|cajera|domiciliario|domiciliaria)\b/g;
   function lbNombre(resto){
     const n = resto.replace(QUITAR, ' ').replace(/\s+/g, ' ').trim();
     if(!n || n.length < 2) return '';
@@ -203,6 +205,7 @@
     return LB().movs.filter(m => m.tipo === 'emp' && m.persona === p && new Date(m.fecha).getTime() >= ini).reduce((s, m) => s + m.monto, 0);
   }
   function lbQuitarMov(m){
+    if(m.compra){ const pu = ((typeof data !== 'undefined' && data && data.purchases) || []).find(x => x.pagadoMov === m.id); if(pu) delete pu.pagadoMov; }
     (m.aplic || []).forEach(x => {
       const h = lbHist().find(y => y.id === x.hid); if(!h) return;
       h.debt = (h.debt || 0) + x.m;
@@ -211,6 +214,61 @@
       if(h.debt > 0 && h.paidLater === m.fecha) delete h.paidLater;
     });
   }
+  // ---------- Proveedores ----------
+  // Marcas y distribuidores que casi todo negocio tiene: «le pagué a Postobón» es un proveedor, no un empleado.
+  const MARCAS = { 'postobon': 'Postobón', 'coca cola': 'Coca-Cola', 'cocacola': 'Coca-Cola', 'femsa': 'Coca-Cola FEMSA', 'bavaria': 'Bavaria', 'alpina': 'Alpina', 'colanta': 'Colanta',
+    'nutresa': 'Nutresa', 'zenu': 'Zenú', 'quala': 'Quala', 'bimbo': 'Bimbo', 'ramo': 'Ramo', 'noel': 'Noel', 'colombina': 'Colombina', 'familia': 'Familia', 'diana': 'Diana', 'roa': 'Roa',
+    'pepsi': 'Pepsi', 'aguila': 'Bavaria', 'central cervecera': 'Central Cervecera', 'nestle': 'Nestlé', 'unilever': 'Unilever', 'colgate': 'Colgate', 'super ricas': 'Super Ricas',
+    'frito lay': 'Frito Lay', 'margarita': 'Frito Lay', 'tosh': 'Nutresa', 'gloria': 'Gloria', 'parmalat': 'Parmalat', 'pietran': 'Pietrán', 'rica': 'Rica', 'kokoriko': 'Kokoriko', 'surtimax': 'Surtimax',
+    'makro': 'Makro', 'exito': 'Éxito', 'ara': 'Ara', 'd1': 'D1', 'olimpica': 'Olímpica', 'gas': 'Gas', 'licorera': 'Licorera', 'dislicores': 'Dislicores', 'industria licorera': 'Industria Licorera' };
+  const PROV_PAL = /\b(proveedor|proveedora|proveedores|factura|facturas|pedido|mercancia|surtido|distribuidor|distribuidora|distribuidores|compra|compras)\b/;
+  const EMP_PAL = /\b(sueldo|salario|nomina|quincena|jornal|empleado|empleada|trabajador|trabajadora|mesero|mesera|cocinero|cocinera|ayudante|cajero|cajera)\b/;
+  function lbProveedores(){
+    const de = (typeof data !== 'undefined' && data && data.purchases || []).map(x => String(x.supplier || '').trim()).filter(Boolean);
+    return [...new Set(LB().movs.filter(m => m.tipo === 'prov' || m.tipo === 'pdeb').map(m => m.persona).concat(de))];
+  }
+  function lbMarca(t){ const k = Object.keys(MARCAS).sort((a, b) => b.length - a.length).find(m => new RegExp('\\b' + m + '\\b').test(t)); return k ? MARCAS[k] : null; }
+  function lbEsProveedor(t, persona){
+    if(PROV_PAL.test(t) || lbMarca(t)) return true;
+    const n = lbNorm(persona || '');
+    return !!n && lbProveedores().some(p => lbNorm(p) === n || lbNorm(p).split(' ')[0] === n.split(' ')[0]);
+  }
+  function lbNombreProv(resto, t){
+    const m = lbMarca(t); if(m) return lbProveedores().find(p => lbNorm(p) === lbNorm(m)) || m;
+    const n = lbNombre(resto); if(!n) return '';
+    return lbProveedores().find(p => lbNorm(p) === lbNorm(n) || lbNorm(p).split(' ')[0] === lbNorm(n).split(' ')[0]) || n;
+  }
+  // Lo que le debo: en orden; un pago cuando no se le debía nada es una compra de contado (no deja saldo a favor).
+  const lbDeboProv = p => LB().movs.filter(m => m.persona === p && (m.tipo === 'pdeb' || m.tipo === 'prov'))
+    .sort((a, b) => new Date(a.fecha) - new Date(b.fecha)).reduce((s, m) => m.tipo === 'pdeb' ? s + m.monto : Math.max(0, s - m.monto), 0);
+  function lbPorPagar(){ return lbProveedores().map(p => [p, lbDeboProv(p)]).filter(x => x[1] > 0).sort((a, b) => b[1] - a[1]); }
+  function lbPagadoProvMes(){
+    const d = new Date(), ini = new Date(d.getFullYear(), d.getMonth(), 1).getTime(), o = {};
+    LB().movs.filter(m => m.tipo === 'prov' && new Date(m.fecha).getTime() >= ini).forEach(m => { o[m.persona] = (o[m.persona] || 0) + m.monto; });
+    return Object.entries(o).sort((a, b) => b[1] - a[1]);
+  }
+  // El pago de una factura que ya se escaneó (la compra ya está en Contabilidad): se enlaza y NO se cuenta otra vez.
+  function lbEnlazarCompra(m){
+    const l = (typeof data !== 'undefined' && data && data.purchases) || [], n = lbNorm(m.persona), hace = Date.now() - 60 * 864e5;
+    const pu = l.find(x => !x.pagadoMov && Number(x.total) > 0 && Math.abs(Number(x.total) - m.monto) <= Math.max(100, m.monto * 0.01) && new Date(x.at || x.date).getTime() >= hace &&
+      (lbNorm(x.supplier || '') === n || lbNorm(x.supplier || '').split(' ')[0] === n.split(' ')[0] || (lbNorm(x.supplier || '').includes(n) && n.length >= 4)));
+    if(pu){ pu.pagadoMov = m.id; m.compra = pu.id || true; }
+    return pu || null;
+  }
+  // Productos fiados por nombre («José me debe 2 cervezas»): el valor sale del precio del producto.
+  function lbProductosEn(t){
+    const ps = (typeof data !== 'undefined' && data && data.products) || [];
+    const sing = w => w.replace(/(es|s)$/, '');
+    const pal = t.split(' ').map(sing);
+    let mejor = null, punt = 0;
+    ps.forEach(p => {
+      const ws = lbNorm(p.name).split(' ').filter(w => w.length > 2).map(sing);
+      const n = ws.filter(w => pal.includes(w)).length;
+      if(n > punt && Number(p.price) > 0){ punt = n; mejor = p; }
+    });
+    return mejor;
+  }
+
   function lbDeudores(){ return lbPersonas().map(p => [p, lbSaldo(p)]).filter(x => x[1] > 0).sort((a, b) => b[1] - a[1]); }
   function lbEmpleadosMes(){ return [...new Set(LB().movs.filter(m => m.tipo === 'emp').map(m => m.persona))].map(p => [p, lbPagadoMes(p)]).filter(x => x[1] > 0); }
 
@@ -228,7 +286,9 @@
       });
       m.aMesas = m.monto - resto;
     }
+    if(tipo === 'prov') m.enlazada = lbEnlazarCompra(m);
     LB().movs.push(m); saveData(); lbPintar();
+    try{ typeof renderConta === 'function' && renderConta(); }catch(e){}
     return m;
   }
 
@@ -269,6 +329,12 @@
       lbQuitarMov(m); saveData(); lbPintar();
       return { texto: 'Listo, borré: ' + TIPOS[m.tipo].replace(/^\S+ /, '') + ' ' + m.persona + ', ' + plata(m.monto) + '.' };
     }
+    // 1.65.7: «súmale a Juan 5 mil» con Juan en la libreta = Juan me debe 5 mil más (antes se iba a la calculadora).
+    { const pc = lbPersonas().find(p => new RegExp('\\b' + lbNorm(p).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b').test(t));
+      if(pc && /\b(sumale|sumele|agregale|agreguele|cargale|carguele|anotale|apuntale|ponle|metele)\b/.test(t) && !/\b(pago|pagos|abono|abonale|me pago)\b/.test(t)){
+        const { monto } = lbMonto(t);
+        if(monto >= 50){ lbNombre.crudo = raw; return lbEntender(pc + ' me debe ' + monto, soloSeguro); }
+      } }
     // Calculadora de cuenta suelta (no se guarda): «cuánto es 20 mil más 15 mil»,
     // «calcula 45 por 3», «cuánto vale 800 entre 4»… Se resuelve aquí mismo (sin
     // IA), así responde al instante.
@@ -316,7 +382,19 @@
       }
     }
     // Preguntas
-    if(/\b(cuanto|cuantos|quien|quienes|que)\b/.test(t)){
+    // Preguntas: «cuánto…», «quién…» o empezando con «qué…». (Antes cualquier «que» era pregunta: «anota que Camilo debe
+    // 6 mil» respondía «Camilo 6 no te debe nada».)
+    if(/\b(cuanto|cuantos|quien|quienes)\b/.test(t) || /^que\b/.test(t)){
+      if(/\b(cuanto|que) (le )?debo\b|\ba quien(es)? le debo\b|\bpor pagar\b|\bdebo a (los )?proveedores\b/.test(t)){
+        const quienP = lbNombreProv(t.replace(/\b(cuanto|que|le|les|debo|a|al|quien|quienes|por pagar)\b/g, ' '), t);
+        if(quienP && lbProveedores().some(p => lbNorm(p) === lbNorm(quienP))) return { texto: lbDeboProv(quienP) > 0 ? 'Le debes ' + plata(lbDeboProv(quienP)) + ' a ' + quienP + '.' : 'No le debes nada a ' + quienP + '.' };
+        const l = lbPorPagar(); if(!l.length) return { texto: 'No le debes nada a ningún proveedor. 🎉' };
+        return { texto: 'Les debes ' + plata(l.reduce((a, x) => a + x[1], 0)) + ' a los proveedores: ' + l.slice(0, 6).map(x => x[0] + ' ' + plata(x[1])).join(', ') + '.' };
+      }
+      if(/\b(pague|pagado|pagamos)\b/.test(t) && /\b(proveedor|proveedores)\b/.test(t)){
+        const l = lbPagadoProvMes(); if(!l.length) return { texto: 'Este mes no has anotado pagos a proveedores.' };
+        return { texto: 'Este mes les has pagado ' + plata(l.reduce((a, x) => a + x[1], 0)) + ' a los proveedores: ' + l.slice(0, 6).map(x => x[0] + ' ' + plata(x[1])).join(', ') + '.' };
+      }
       if(/\b(quien|quienes)\b.*\bdeben?\b|\bcuanto me deben\b|\bcuanto me estan debiendo\b|\bcuanto hay (por|en) (cobrar|fiados?)\b/.test(t)){
         const d = lbDeudores(); if(!d.length) return { texto: 'Nadie te debe nada. 🎉' };
         const tot = d.reduce((s, x) => s + x[1], 0);
@@ -340,8 +418,16 @@
         return { texto: quien + ': ' + ev.map(e => e.t.replace(/^\S+ /, '').toLowerCase() + ' ' + plata(e.m) + ' el ' + new Date(e.f).toLocaleDateString('es-CO', { day: 'numeric', month: 'long' })).join('; ') + '. Hoy te debe ' + plata(lbSaldo(quien)) + '.' };
       }
     }
-    const { monto, resto } = lbMonto(t);
+    let { monto, resto } = lbMonto(t);
     const todo = /\b(todo|toda la deuda|completo|completa|lo que debia|lo que me debia)\b/.test(t);
+    // 🧾 Le debo a un proveedor (compré fiado / a crédito): «le debo a Postobón 300 mil», «me fiaron en Alpina 80 mil».
+    if(/\b(le debo|les debo|debo a|debo al|quede debiendo|quedamos debiendo|me fiaron|me fio|compre fiado|compre a credito|me dejaron fiado|me dejo fiado)\b/.test(t) && !/\bme debe\b/.test(t)){
+      const prov = lbNombreProv(resto, t);
+      if(!prov) return soloSeguro ? null : { texto: '¿A quién le debes? Di por ejemplo: «Le debo a Postobón 300 mil».' };
+      if(!(monto >= 50)) return soloSeguro ? null : { texto: '¿Cuánto le debes a ' + prov + '?' };
+      lbAgregar('pdeb', prov, monto);
+      return { texto: '🧾 Anotado: le debes ' + plata(monto) + ' a ' + prov + '. En total le debes ' + plata(lbDeboProv(prov)) + '.' };
+    }
     // Pagos a empleados: «le pagué a Pedro», «pagué a María», «pago a Pedro», «le di a Juan», «sueldo de Pedro»
     const emp = /\b(le pague|les pague|pague a|pague al|pague la|pago a|pago al|le di|di a|sueldo|salario|nomina|quincena|jornal)\b/.test(t) || (/\bpague\b/.test(t) && !/\bme\b/.test(t));
     // Me pagaron: «Juan me pagó», «Juan pagó», «Juan abonó», «me dio», «me devolvió», «canceló»
@@ -349,6 +435,26 @@
     // Me debe: «Juan me debe», «quedó debiendo», «le fié», «fiado», «le presté»
     const debe = !emp && !abono && /\b(me debe|debe|deben|debiendo|fiado|fiada|fie|fiar|fiale|fiele|preste|prestado|prestamo|anota|anotale|apunta|apuntale)\b/.test(t);
     if(!emp && !abono && !debe) return null;
+    // 📦 ¿Le pagué a un PROVEEDOR (no a un empleado)? «le pagué al proveedor de Postobón», «pagué la factura de Alpina».
+    if(emp && !EMP_PAL.test(t) && lbEsProveedor(t, lbNombre(resto))){
+      const prov = lbNombreProv(resto, t);
+      if(!prov) return soloSeguro ? null : { texto: '¿A cuál proveedor? Di por ejemplo: «Le pagué a Postobón 200 mil».' };
+      if(!(monto >= 50)){
+        const d0 = lbDeboProv(prov);
+        if(todo && d0 > 0) monto = d0;
+        else return soloSeguro ? null : { texto: '¿Cuánto le pagaste a ' + prov + '?' + (d0 > 0 ? ' Le debes ' + plata(d0) + '.' : '') };
+      }
+      const debia = lbDeboProv(prov), m = lbAgregar('prov', prov, monto), queda = lbDeboProv(prov);
+      return { texto: '📦 Anotado: le pagaste ' + plata(monto) + ' a ' + prov + '.' + (m.enlazada ? ' Es la factura escaneada del ' + new Date(m.enlazada.at || m.enlazada.date).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }) + ' (queda pagada; no se cuenta dos veces en Contabilidad).' : ' Queda como gasto de proveedores en Contabilidad.') +
+        (debia > 0 ? (queda > 0 ? ' Todavía le debes ' + plata(queda) + '.' : ' Ya no le debes nada.') : '') };
+    }
+    // «José me debe 2 cervezas»: sin valor en plata, pero con un producto de la lista → cantidad × precio.
+    let notaProd = '';
+    if(debe && !(monto >= 50)){
+      const pr = lbProductosEn(t);
+      if(pr){ const q = monto > 0 && monto < 50 ? monto : 1; notaProd = q + ' × ' + pr.name; monto = Math.round(q * Number(pr.price));
+        resto = resto.split(' ').filter(w => !lbNorm(pr.name).split(' ').some(x => x.length > 2 && (w === x || w.replace(/(es|s)$/, '') === x.replace(/(es|s)$/, '')))).join(' '); }
+    }
     const persona = lbNombre(resto);
     if(!persona) return soloSeguro ? null : { texto: '¿De quién? Di por ejemplo: «Juan me debe 20 mil».' };
     if(abono && (todo || !monto)){
@@ -361,8 +467,8 @@
     }
     if(!(monto >= 50)) return soloSeguro ? null : { texto: '¿Cuánta plata? Di por ejemplo: «' + persona + ' me debe 20 mil».' };
     if(debe){
-      lbAgregar('debe', persona, monto);
-      return { texto: '📕 Anotado: ' + persona + ' te debe ' + plata(monto) + '. En total te debe ' + plata(lbSaldo(persona)) + '.' };
+      lbAgregar('debe', persona, monto, notaProd);
+      return { texto: '📕 Anotado: ' + persona + ' te debe ' + plata(monto) + (notaProd ? ' (' + notaProd + ')' : '') + '. En total te debe ' + plata(lbSaldo(persona)) + '.' };
     }
     if(abono){
       const antes = lbSaldo(persona);
@@ -396,9 +502,10 @@
     ov.className = 'overlay'; ov.id = 'libretaOverlay';
     ov.innerHTML = '<div class="modal lb-modal"><div class="modal-title-row"><h2>📒 Mi libreta</h2><button class="rename-table-btn" id="lbCerrar" title="Cerrar">✕</button></div>' +
       '<button type="button" class="lb-mic" id="lbMic">🎤 Toca y habla</button>' +
-      '<div class="lb-ej">Di, por ejemplo:<br>«Juan me debe 20 mil» · «Juan me pagó 10 mil»<br>«Agrégame a la lista negra 30 mil para Julián» · «Julián quedó debiendo 30 mil»<br>«Saca a Pedro de la lista negra» (pagó todo)<br>«Le pagué a Pedro 50 mil» · «¿Quién me debe?»<br>«Cuánto es 20 mil más 15 mil» (cuenta suelta)<br>«Súmame 13.400», y después «súmame 15.200» (se va sumando solo)<br>«Cuánto llevo» · «Réstame» o «corrige» (si algo quedó mal)</div>' +
+      '<div class="lb-ej">Di, por ejemplo:<br>«Juan me debe 20 mil» · «Juan me pagó 10 mil»<br>«Agrégame a la lista negra 30 mil para Julián» · «Julián quedó debiendo 30 mil»<br>«Saca a Pedro de la lista negra» (pagó todo)<br>«Le pagué a Pedro 50 mil» · «¿Quién me debe?»<br>«Le pagué a Postobón 200 mil» · «Le debo a Alpina 80 mil» · «¿Cuánto le debo a los proveedores?»<br>«Cuánto es 20 mil más 15 mil» (cuenta suelta)<br>«Súmame 13.400», y después «súmame 15.200» (se va sumando solo)<br>«Cuánto llevo» · «Réstame» o «corrige» (si algo quedó mal)</div>' +
       '<div class="lb-resp" id="lbRespuesta" hidden></div>' +
-      '<div class="lb-btns"><button type="button" class="lb-b lb-debe" data-t="debe">📕 Alguien<br>me debe</button><button type="button" class="lb-b lb-abono" data-t="abono">✅ Me<br>pagaron</button><button type="button" class="lb-b lb-emp" data-t="emp">👷 Pagué a un<br>empleado</button></div>' +
+      '<div class="lb-btns"><button type="button" class="lb-b lb-debe" data-t="debe">📕 Alguien<br>me debe</button><button type="button" class="lb-b lb-abono" data-t="abono">✅ Me<br>pagaron</button><button type="button" class="lb-b lb-emp" data-t="emp">👷 Pagué a un<br>empleado</button>' +
+      '<button type="button" class="lb-b lb-prov" data-t="prov">📦 Pagué a un<br>proveedor</button><button type="button" class="lb-b lb-pdeb" data-t="pdeb">🧾 Le debo a un<br>proveedor</button></div>' +
       '<button type="button" class="lb-calc-btn" id="lbCalcAbrir">🧮 Calculadora</button>' +
       '<div class="lb-calc" id="lbCalcBox" hidden>' +
       '<div class="lb-calc-pant" id="lbCalcPant">0</div>' +
@@ -415,6 +522,8 @@
       '<div class="lb-form-a"><button type="button" class="btn-close" id="lbFormNo">Cancelar</button><button type="button" class="btn-primary" id="lbFormSi">Guardar</button></div></div>' +
       '<div class="lb-sec"><div class="lb-sec-t">📕 Me deben <b id="lbTotDeben"></b></div><div id="lbDeben"></div></div>' +
       '<div class="lb-sec"><div class="lb-sec-t">👷 Pagos a empleados este mes <b id="lbTotEmp"></b></div><div id="lbEmp"></div></div>' +
+      '<div class="lb-sec"><div class="lb-sec-t">🧾 Le debo a proveedores <b id="lbTotDebo"></b></div><div id="lbDebo"></div></div>' +
+      '<div class="lb-sec"><div class="lb-sec-t">📦 Pagado a proveedores este mes <b id="lbTotProv"></b></div><div id="lbProv"></div></div>' +
       '<div class="lb-sec"><div class="lb-sec-t">🕘 Lo último que anoté</div><div id="lbMovs"></div></div></div>';
     document.body.appendChild(ov);
     ov.addEventListener('click', e => { if(e.target === ov) ov.classList.remove('show'); });
@@ -422,8 +531,8 @@
     let tipoForm = null;
     ov.querySelectorAll('.lb-b').forEach(b => b.onclick = () => {
       tipoForm = b.dataset.t;
-      $l('lbFormT').textContent = { debe: '📕 ¿Quién te debe y cuánto?', abono: '✅ ¿Quién te pagó y cuánto?', emp: '👷 ¿A quién le pagaste y cuánto?' }[tipoForm];
-      $l('lbPersonasList').innerHTML = (tipoForm === 'emp' ? [...new Set(LB().movs.filter(m => m.tipo === 'emp').map(m => m.persona))] : tipoForm === 'abono' ? lbDeudores().map(x => x[0]) : lbPersonas()).map(p => '<option value="' + esc2(p) + '">').join('');
+      $l('lbFormT').textContent = { debe: '📕 ¿Quién te debe y cuánto?', abono: '✅ ¿Quién te pagó y cuánto?', emp: '👷 ¿A quién le pagaste y cuánto?', prov: '📦 ¿A qué proveedor le pagaste y cuánto?', pdeb: '🧾 ¿A qué proveedor le debes y cuánto?' }[tipoForm];
+      $l('lbPersonasList').innerHTML = (tipoForm === 'emp' ? [...new Set(LB().movs.filter(m => m.tipo === 'emp').map(m => m.persona))] : tipoForm === 'abono' ? lbDeudores().map(x => x[0]) : tipoForm === 'prov' || tipoForm === 'pdeb' ? lbProveedores() : lbPersonas()).map(p => '<option value="' + esc2(p) + '">').join('');
       $l('lbPersona').value = ''; $l('lbMonto').value = '';
       $l('lbForm').hidden = false; $l('lbPersona').focus();
     });
@@ -464,9 +573,17 @@
       const p = $l('lbPersona').value.trim().replace(/\s+/g, ' '), n = Number($l('lbMonto').value);
       if(!p) return lbResponder('Escribe el nombre.');
       if(!(n > 0)) return lbResponder('Escribe cuánta plata.');
-      const nombre = lbPersonas().find(x => lbNorm(x) === lbNorm(p)) || p.charAt(0).toUpperCase() + p.slice(1);
-      const frase = tipoForm === 'debe' ? nombre + ' me debe ' + n : tipoForm === 'abono' ? nombre + ' me pagó ' + n : 'le pagué a ' + nombre + ' ' + n;
+      const nombre = (tipoForm === 'prov' || tipoForm === 'pdeb' ? lbProveedores() : lbPersonas()).find(x => lbNorm(x) === lbNorm(p)) || p.charAt(0).toUpperCase() + p.slice(1);
       $l('lbForm').hidden = true;
+      // Con los botones se sabe qué es: se anota directo (sin adivinar por las palabras).
+      if(tipoForm === 'prov' || tipoForm === 'pdeb' || tipoForm === 'emp'){
+        const debia = lbDeboProv(nombre), m = lbAgregar(tipoForm, nombre, n);
+        lbResponder(tipoForm === 'pdeb' ? '🧾 Anotado: le debes ' + plata(n) + ' a ' + nombre + '. En total le debes ' + plata(lbDeboProv(nombre)) + '.'
+          : tipoForm === 'prov' ? '📦 Anotado: le pagaste ' + plata(n) + ' a ' + nombre + '.' + (m.enlazada ? ' Es la factura escaneada (no se cuenta dos veces).' : ' Queda como gasto de proveedores en Contabilidad.') + (debia > 0 ? (lbDeboProv(nombre) > 0 ? ' Todavía le debes ' + plata(lbDeboProv(nombre)) + '.' : ' Ya no le debes nada.') : '')
+          : '👷 Anotado: le pagaste ' + plata(n) + ' a ' + nombre + '. Este mes van ' + plata(lbPagadoMes(nombre)) + '.');
+        return;
+      }
+      const frase = tipoForm === 'debe' ? nombre + ' me debe ' + n : nombre + ' me pagó ' + n;
       const r = lbEntender(frase); if(r) lbResponder(r.texto);
     };
     ov.addEventListener('click', e => {
@@ -495,9 +612,34 @@
     const e = lbEmpleadosMes();
     $l('lbTotEmp').textContent = e.length ? plata(e.reduce((s, x) => s + x[1], 0)) : '';
     $l('lbEmp').innerHTML = e.length ? e.map(([p, s]) => '<div class="lb-fila"><span>' + esc2(p) + '</span><b>' + plata(s) + '</b></div>').join('') : '<div class="lb-vacio">Todavía no hay pagos este mes.</div>';
+    const pp = lbPorPagar();
+    $l('lbTotDebo').textContent = pp.length ? plata(pp.reduce((a, x) => a + x[1], 0)) : '';
+    $l('lbDebo').innerHTML = pp.length ? pp.map(([p, s]) => '<div class="lb-fila"><span>' + esc2(p) + '</span><b>' + plata(s) + '</b></div>').join('') : '<div class="lb-vacio">No le debes a ningún proveedor.</div>';
+    const pv = lbPagadoProvMes();
+    $l('lbTotProv').textContent = pv.length ? plata(pv.reduce((a, x) => a + x[1], 0)) : '';
+    $l('lbProv').innerHTML = pv.length ? pv.map(([p, s]) => '<div class="lb-fila"><span>' + esc2(p) + '</span><b>' + plata(s) + '</b></div>').join('') : '<div class="lb-vacio">Todavía no hay pagos a proveedores este mes.</div>';
     const ult = LB().movs.slice(-12).reverse();
-    $l('lbMovs').innerHTML = ult.length ? ult.map(m => '<div class="lb-fila lb-mov"><span>' + TIPOS[m.tipo] + ' ' + (m.tipo === 'emp' ? esc2(m.persona) : '· ' + esc2(m.persona)) + '<small>' + new Date(m.fecha).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }) + '</small></span><b>' + plata(m.monto) + '</b><button type="button" class="lb-x" data-borrar="' + m.id + '" title="Borrar">🗑</button></div>').join('') : '<div class="lb-vacio">Aquí van a salir tus apuntes.</div>';
+    $l('lbMovs').innerHTML = ult.length ? ult.map(m => '<div class="lb-fila lb-mov"><span>' + TIPOS[m.tipo] + ' ' + (m.tipo === 'emp' || m.tipo === 'prov' || m.tipo === 'pdeb' ? esc2(m.persona) : '· ' + esc2(m.persona)) + (m.nota && m.nota !== 'pagó todo' ? ' · ' + esc2(m.nota) : '') + '<small>' + new Date(m.fecha).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }) + '</small></span><b>' + plata(m.monto) + '</b><button type="button" class="lb-x" data-borrar="' + m.id + '" title="Borrar">🗑</button></div>').join('') : '<div class="lb-vacio">Aquí van a salir tus apuntes.</div>';
   }
+  /* 📊 Lo de la libreta en Contabilidad (1.65.7), en el periodo [ini, fin):
+     • ✅ lo que me pagaron los que me debían → entradas («Fiado cobrado»);
+     • 👷 los pagos a empleados → gasto «Nómina / sueldos»;
+     • 📦 los pagos a proveedores → gasto «Proveedores / mercancía» (si es una factura ya escaneada, esa compra ya está
+       contada: no se cuenta otra vez).
+     «📕 Me debe» y «🧾 Le debo a» no son plata que entró o salió: salen aparte (por cobrar / por pagar). */
+  window.libretaConta = function(ini, fin){
+    const out = [];
+    if(typeof data === 'undefined' || !data || !data.libreta) return out;
+    LB().movs.forEach(m => {
+      const t = new Date(m.fecha).getTime(); if(!(t >= ini && t < fin)) return;
+      if(m.tipo === 'abono') out.push({ tipo: 'venta', monto: m.monto, metodo: m.metodo || 'efectivo', fecha: t, desc: 'Fiado cobrado · ' + m.persona + ' (libreta)', auto: true });
+      else if(m.tipo === 'emp') out.push({ tipo: 'gasto', cat: 'nomina', monto: m.monto, metodo: m.metodo || 'efectivo', fecha: t, desc: 'Pago a ' + m.persona + ' (libreta)', auto: true });
+      else if(m.tipo === 'prov' && !m.compra) out.push({ tipo: 'gasto', cat: 'proveedores', monto: m.monto, metodo: m.metodo || 'efectivo', fecha: t, desc: 'Pago al proveedor ' + m.persona + ' (libreta)', auto: true });
+    });
+    return out;
+  };
+  window.libretaTotales = () => ({ meDeben: lbDeudores().reduce((a, x) => a + x[1], 0), debo: lbPorPagar().reduce((a, x) => a + x[1], 0) });
+
   window.libretaAbrir = function(){ lbCrear(); lbPintar(); $l('libretaOverlay').classList.add('show'); };
   window.libretaPintar = lbPintar;
   window.libretaSaldo = p => lbSaldo(p);
@@ -556,7 +698,7 @@
     '.lb-calc-grid .lb-calc-ig{background:#27ae60;color:#fff;grid-column:span 2}' +
     '.lb-calc-grid .lb-calc-0{grid-column:span 1}' +
     '.lb-b{padding:16px 6px;border-radius:14px;border:2px solid var(--line,#555);background:transparent;color:inherit;font:700 16px system-ui;line-height:1.25;cursor:pointer}' +
-    '.lb-debe{border-color:#c0392b}.lb-abono{border-color:#27ae60}.lb-emp{border-color:#2980b9}' +
+    '.lb-debe{border-color:#c0392b}.lb-abono{border-color:#27ae60}.lb-emp{border-color:#2980b9}.lb-prov{border-color:#8e44ad}.lb-pdeb{border-color:#d35400}' +
     '.lb-form{padding:12px;border-radius:14px;background:rgba(127,127,127,.12);display:flex;flex-direction:column;gap:8px}.lb-form-t{font-weight:700;font-size:17px}' +
     '.lb-form input{font-size:20px!important;padding:12px!important}.lb-form-a{display:flex;gap:8px}.lb-form-a button{flex:1;padding:14px;font-size:18px}' +
     '.lb-sec{margin-top:14px}.lb-sec-t{font-size:17px;font-weight:700;margin-bottom:6px;display:flex;justify-content:space-between}' +

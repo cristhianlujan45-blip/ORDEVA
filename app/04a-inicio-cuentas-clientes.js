@@ -4,6 +4,9 @@
 function modsNegocio(){
   const t = tipoNegocio(), d = typeof data !== 'undefined' && data ? data : null;
   let m = (d && d.modoCompleto) ? MOD_TODO : (t ? t.mod : MOD_TODO);   // sin tipo elegido (negocios viejos): se ve todo, como siempre
+  // 1.65.7 (pedido del dueño): 🧂 Insumos y recetas es solo para los que PREPARAN comida (restaurantes, cafeterías…): no
+  // se prende con «Mostrar todas las funciones» ni en un negocio sin tipo elegido. Se puede prender a mano (abajo).
+  if(m.includes('r') && !(t && String(t.mod || '').includes('r'))) m = m.replace('r', '');
   // 1.64.0: un negocio que YA usa insumos o recetas los sigue viendo aunque su tipo no los traiga (nada deja de descontarse).
   if(!m.includes('r') && recetasEnUso()) m += 'r';
   // La pantalla de preparación (k) la decide cada local en Ajustes: activada o desactivada.

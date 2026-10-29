@@ -514,11 +514,14 @@ function pagoHuella(t){
       if(lentos.length){ pgSaludReportar('bateria-banco', 'Apps de banco con ahorro de batería (avisos de pago retrasados): ' + lentos.map(b => b.nombre).join(', ')); if(Date.now() > luego) k = 'bancos'; }
     }
     // Y la 🪟 ventana del pago fuera de ORDEVA: falta «encima de otras apps» o «pantalla completa» (celular bloqueado).
+    // 1.65.7: también en los celulares que solo RECIBEN los pagos (antes solo en el que lee los avisos del banco): al
+    // Xiaomi que recibía, usándolo, no le salía la ventana del pago y nunca se le pidió el permiso.
     let faltaVent = '';
-    if(!k && e.on && A.ventanaPagoEstado && pgVentanaOn()){
+    if(!k && A.ventanaPagoEstado && pgVentanaOn()){
       let v = {}; try{ v = JSON.parse(A.ventanaPagoEstado() || '{}'); }catch(x){}
       faltaVent = v.encima === false ? 'encima' : v.completa === false ? 'completa' : v.xiaomi && (v.segundoPlano === false || v.bloqueo === false) ? 'xiaomi' : '';
       let luego = 0; try{ luego = Number(localStorage.getItem('vento-ventana-luego')) || 0; }catch(x){}
+      if(faltaVent) pgSaludReportar('ventana-' + faltaVent, 'Falta el permiso de la ventana del pago («' + faltaVent + '»): usando otra app o bloqueado no sale la ventana');
       if(faltaVent && Date.now() > luego) k = 'ventana';
     }
     pgSaludPintar(Date.now() < pgSaludOculto ? '' : k, lentos, faltaVent);

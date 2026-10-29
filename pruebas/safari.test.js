@@ -5,7 +5,10 @@
 const pw = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 (async () => {
-  let ok = 0, mal = 0; const errs = [];
+  let ok = 0, mal = 0; const errs0 = [];
+  // La prueba bloquea todo lo que no es de este equipo (el servidor de ORDEVA, Google…): WebKit avisa ese bloqueo como
+  // «… due to access control checks». En un iPhone de verdad esas llamadas sí llegan: no son errores de la app.
+  const errs = { push: m => { if(!/due to access control checks/.test(String(m)) || /localhost/.test(String(m))) errs0.push(m); }, get length(){ return errs0.length; }, join: s => errs0.join(s) };
   const chk = (n, c, x) => { if(c){ ok++; console.log('✅ ' + n); } else { mal++; console.log('❌ ' + n + (x !== undefined ? ' → ' + JSON.stringify(x).slice(0, 700) : '')); } };
   let b = null;
   try{ b = await pw.webkit.launch(); }catch(e){ console.log('ℹ️ Sin WebKit en este equipo: se omite (en GitHub sí corre).'); console.log('RESULTADO 0 bien 0 mal'); process.exit(0); }
@@ -41,7 +44,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
       chk(pg + ' abre en Safari', await q.evaluate(() => document.body && document.body.innerText.length > 20));
       await q.close();
     }
-    chk('Sin errores de página en Safari', !errs.length, errs);
+    chk('Sin errores de página en Safari', !errs0.length, errs0);
   }catch(e){ mal++; console.log('❌ Error: ' + (e && e.stack || e)); }
   await b.close();
   console.log('RESULTADO ' + ok + ' bien ' + mal + ' mal');

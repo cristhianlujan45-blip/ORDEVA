@@ -38,6 +38,7 @@ Límites del canal (servidor): 240 mensajes/min por canal, 300/min por conexión
 | `preparacion.html` | Pantalla de preparación en una tablet o TV. Su nombre es configurable (Cocina, Barra, Despacho…). |
 | `tv.html` | El TV reproduce la cola de canciones sola y muestra el tiempo real, la mesa y la siguiente canción. |
 | `mesero.html` | App de los meseros en su celular, por un canal privado. |
+| `lector.html` | 📱 El celular como lector de códigos de barras y QR de otro equipo (programa de PC, tablet): se empareja con el QR de «🔳 Escanear código» y manda lo que lee por un canal del servidor. |
 | `licencias.html` | Códigos para sedes adicionales, firmados con una llave privada que no está en el repositorio. |
 | `puente/laya-worker.js` | Puente seguro (Cloudflare Worker) hacia el motor de decisiones Laya. |
 | `puente/youtube-tv-worker.js` | Puente para la opción "YouTube del TV" (vincular con código de TV). |

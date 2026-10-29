@@ -572,6 +572,7 @@ public class VentoEscucha extends NotificationListenerService {
     // si el BANCO mandó el aviso tarde (Vento lo dice en el instante en que llega). Así se sabe de dónde viene una demora.
     private static volatile long tBanco = 0, tLlego = 0;
     static void tiempos(long banco, long llego) { tBanco = banco; tLlego = llego; }
+    static long horaBanco() { return tBanco; }
     static String demora() {
         long b = tBanco, l = tLlego, ahora = System.currentTimeMillis();
         StringBuilder x = new StringBuilder();

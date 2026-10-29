@@ -418,7 +418,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-29 · v1.65.0';
+const MESORA_VERSION = '2026-10-29 · v1.65.9';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'ORDEVA · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 /* 🔄 La app Android se actualiza SOLA (Actualizador): revisa cada 3 h, baja la versión nueva y la instala cuando no se
@@ -503,17 +503,52 @@ function mesoraRevisarVersionNueva(){
       if(v && v.length < 60 && v.indexOf('·') > 0 && v !== MESORA_VERSION) mesoraAvisoVersionNueva(v);
     }).catch(() => {});
 }
+/* 1.65.6: la versión nueva se pone SOLA (pedido del dueño), sin tocar nada:
+   • Con ORDEVA en segundo plano (otra app, pantalla apagada, minimizada): se recarga de una vez.
+   • En pantalla: aviso arriba «Se actualiza sola en 15 s» y se recarga al terminar. Si la persona está escribiendo, tiene
+     una ventana abierta (cobro, cuenta, ajustes…) o está el aviso de un pago, espera a que termine. «Actualizar ahora» sigue.
+   • Antes de recargar se guarda todo. Si después de recargar sigue la versión vieja (la página nueva todavía no llega a
+     todos los servidores), no vuelve a intentarlo en 10 minutos: nunca se queda recargando en vueltas. */
+const MESORA_AUTO_KEY = 'vento-actualizando';
+function mesoraOcupado(){
+  const a = document.activeElement;
+  if(a && (/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) || a.isContentEditable) && a.offsetParent !== null) return true;
+  return !!document.querySelector('.overlay.show, #pgVentana, #lcelOv, .vs-sheet.show');
+}
+async function mesoraRecargarYa(nueva){
+  try{ const r = JSON.parse(sessionStorage.getItem(MESORA_AUTO_KEY) || 'null');
+    if(r && r.v === nueva && Date.now() - r.t < 10 * 60000) return false;          // ya se intentó: no más vueltas
+    sessionStorage.setItem(MESORA_AUTO_KEY, JSON.stringify({ v: nueva, t: Date.now() })); }catch(e){}
+  try{ if(typeof saveData === 'function') saveData(); if(typeof guardadoAhora === 'function') await guardadoAhora(); }catch(e){}
+  location.reload();
+  return true;
+}
+function mesoraYaIntentada(nueva){
+  try{ const r = JSON.parse(sessionStorage.getItem(MESORA_AUTO_KEY) || 'null'); return !!(r && r.v === nueva && Date.now() - r.t < 10 * 60000); }catch(e){ return false; }
+}
 function mesoraAvisoVersionNueva(nueva){
+  if(document.hidden && !mesoraYaIntentada(nueva)){ mesoraRecargarYa(nueva); return; }
   if(document.getElementById('mesoraNuevaVersion')) return;
   const b = document.createElement('div');
   b.id = 'mesoraNuevaVersion';
   // Arriba, no abajo: abajo es donde vive el botón flotante del micrófono (que además se
   // puede arrastrar a cualquier lado), así este aviso nunca lo tapa ni se le monta encima.
   b.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:99999;background:#2d7d46;color:#fff;padding:12px 16px;display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;font:600 14px system-ui;box-shadow:0 4px 16px rgba(0,0,0,.3)';
-  b.innerHTML = '<span>🔄 Hay una versión nueva de ORDEVA (' + String(nueva).split('·').pop().trim() + '). Actualízala para que todo funcione bien.</span>' +
+  const auto = !mesoraYaIntentada(nueva);
+  b.innerHTML = '<span>🔄 Versión nueva de ORDEVA (' + String(nueva).split('·').pop().trim() + '). <span id="mesoraNuevaCuenta"></span></span>' +
     '<button type="button" style="background:#fff;color:#2d7d46;border:0;border-radius:8px;padding:8px 16px;font:700 14px system-ui;cursor:pointer">Actualizar ahora</button>';
-  b.querySelector('button').onclick = () => location.reload();
+  b.querySelector('button').onclick = () => { try{ sessionStorage.removeItem(MESORA_AUTO_KEY); }catch(e){} mesoraRecargarYa(nueva); };
   document.body.appendChild(b);
+  const txt = b.querySelector('#mesoraNuevaCuenta');
+  if(!auto){ txt.textContent = 'Toca «Actualizar ahora».'; return; }
+  let falta = 15;
+  const t = setInterval(() => {
+    if(document.hidden){ clearInterval(t); mesoraRecargarYa(nueva); return; }
+    if(mesoraOcupado()){ txt.textContent = 'Se actualiza sola cuando termines lo que estás haciendo.'; return; }
+    txt.textContent = 'Se actualiza sola en ' + falta + ' s (no se pierde nada).';
+    if(--falta < 0){ clearInterval(t); mesoraRecargarYa(nueva); }
+  }, 1000);
+  window.mesoraActualizacion = { nueva, parar: () => clearInterval(t) };
 }
 setInterval(() => { if(document.visibilityState === 'visible') mesoraRevisarVersionNueva(); }, 5 * 60000);
 document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') mesoraRevisarVersionNueva(); });
@@ -1126,6 +1161,38 @@ function tvSinLista(msg){
   showToast('📺 ' + msg, 9000);
   const d = document.getElementById('tvOptCodigo'); if(d){ d.open = true; setTimeout(() => d.scrollIntoView({ block: 'start', behavior: 'smooth' }), 300); }
 }
+/* 1.65.1 · Con el celular bloqueado no llegaban ni pedidos ni pagos (en todos los celulares): los avisos del banco quedaban
+   en la barra y se leían todos juntos al desbloquear. Eso pasa cuando el «trabajo de fondo» (el aviso fijo «ORDEVA está
+   trabajando») no está prendido o el celular tiene a ORDEVA con ahorro de batería: Android congela la app al bloquear.
+   Cada vez que se abre ORDEVA (o se vuelve a ella) se revisa: si el trabajo de fondo se apagó sin que el dueño lo apagara
+   a propósito en Ajustes (por ejemplo con «Detener» en el aviso fijo, o después de reinstalar la app), se prende solo;
+   y si tiene ahorro de batería, se avisa con el botón para quitarlo. Las dos cosas quedan en 🐞 Errores del panel. */
+const FONDO_APAGADO_KEY = 'vento-fondo-apagado';   // '1' = el dueño lo apagó a propósito en Ajustes
+let fondoAvisoBat = 0;
+function revisarFondoApp(){
+  const A = window.VentoAndroid;
+  if(!A || typeof A.fondo !== 'function' || typeof A.fondoActivar !== 'function' || document.hidden) return;
+  if(typeof authUser === 'undefined' || !authUser) return;
+  let aPropos = false; try{ aPropos = localStorage.getItem(FONDO_APAGADO_KEY) === '1'; }catch(e){}
+  let p = {}; try{ p = JSON.parse(A.permisos ? A.permisos() || '{}' : '{}'); }catch(e){}
+  const reportar = (k, msg) => { try{ window.ventoError && window.ventoError('otro', msg, { bateria: p.bateria, fondo: p.fondo }, 'fondo|' + k); }catch(e){} };
+  if(!A.fondo() && !aPropos){
+    A.fondoActivar(true);
+    reportar('apagado', 'El trabajo de fondo estaba apagado en la app (se prendió solo): con el celular bloqueado no llegaban pedidos ni pagos');
+    showToast('🔋 ORDEVA vuelve a trabajar de fondo: con el celular bloqueado te siguen llegando los pedidos y los pagos.', 7000);
+  }
+  if(p.bateria === false && Date.now() - fondoAvisoBat > 6 * 3600e3){
+    fondoAvisoBat = Date.now();
+    reportar('bateria', 'ORDEVA con ahorro de batería: con el celular bloqueado Android la congela (no llegan pedidos ni pagos)');
+    if(typeof showConfirm === 'function' && typeof A.ajustesBateria === 'function'){
+      showConfirm({ icon: '🔋', title: 'Para que te lleguen los avisos con el celular bloqueado',
+        message: 'Este celular tiene a ORDEVA con ahorro de batería: al bloquearlo, Android la congela y no te llegan los pedidos ni los pagos hasta desbloquearlo. Toca «Arreglar» y elige «Sin restricciones» (o «Permitir»).',
+        confirmText: 'Arreglar', cancelText: 'Luego' }).then(ok => { if(ok) try{ A.ajustesBateria(); }catch(e){} });
+    }
+  }
+}
+document.addEventListener('visibilitychange', () => { if(!document.hidden) setTimeout(() => { try{ revisarFondoApp(); }catch(e){} }, 1500); });
+setTimeout(() => { try{ revisarFondoApp(); }catch(e){} }, 6000);
 function iniCast(){
   if(!document.getElementById('castPres')) return;
   const tb = document.getElementById('tvTransmitir'); if(tb) tb.onclick = tvTransmitirToque;
@@ -1134,7 +1201,7 @@ function iniCast(){
     if(A && typeof A.fondo === 'function' && fila && sw){
       fila.hidden = false; bat.hidden = false;
       sw.checked = !!A.fondo();
-      sw.onchange = () => { A.fondoActivar(sw.checked); showToast(sw.checked ? '🔋 ORDEVA seguirá trabajando con la app cerrada (verás un aviso fijo en la barra).' : 'ORDEVA solo trabajará con la app abierta.', 6000); setTimeout(() => { try{ sw.checked = !!A.fondo(); }catch(e){} }, 1500); };
+      sw.onchange = () => { try{ if(sw.checked) localStorage.removeItem(FONDO_APAGADO_KEY); else localStorage.setItem(FONDO_APAGADO_KEY, '1'); }catch(e){} A.fondoActivar(sw.checked); showToast(sw.checked ? '🔋 ORDEVA seguirá trabajando con la app cerrada (verás un aviso fijo en la barra).' : 'ORDEVA solo trabajará con la app abierta.', 6000); setTimeout(() => { try{ sw.checked = !!A.fondo(); }catch(e){} }, 1500); };
       bat.onclick = () => { try{ A.ajustesBateria(); }catch(e){} };
       const pb = document.getElementById('apkPermisos'), pt = document.getElementById('apkPermisosTxt');
       if(pb && typeof A.permisos === 'function'){
@@ -2770,6 +2837,9 @@ function ctMovimientos(r){
     const t = new Date(pu.at || pu.date).getTime();
     if(t >= r.ini && t < r.fin && Number(pu.total) > 0) mov.push({ tipo: 'gasto', cat: 'proveedores', monto: Number(pu.total), metodo: 'otro', fecha: t, desc: 'Compra' + (pu.supplier ? ' a ' + pu.supplier : '') + ' (factura escaneada)', auto: true });
   });
+  // 1.65.7: lo de la 📒 Libreta (fiados cobrados, sueldos y pagos a proveedores) también es plata que entró o salió.
+  try{ (window.libretaConta ? window.libretaConta(r.ini, r.fin) : []).forEach(m => mov.push(m)); }catch(e){}
+  // Una factura escaneada que ya se pagó con la libreta: se sigue contando una sola vez (aquí, como compra).
   (data.contab || []).forEach(g => {
     const t = new Date(g.fecha + 'T12:00').getTime();
     if(t >= r.ini && t < r.fin) mov.push({ tipo: g.tipo, cat: g.cat, monto: Number(g.monto) || 0, metodo: g.metodo, fecha: t, desc: g.nota || ctCatNombre(g.tipo, g.cat).replace(/^\S+\s/, ''), id: g.id, adj: !!g.adj });
@@ -2793,7 +2863,10 @@ function renderConta(){
     k('res', resultado >= 0 ? '✅ Te quedó' : '⚠️ Faltó', ctFmt(Math.abs(resultado)), 'Entradas − gastos') +
     k('', '🧾 Vendido', ctFmt(x.vendido), x.nVentas + (x.nVentas === 1 ? ' cuenta' : ' cuentas')) +
     k('', '📈 Ganancia de lo vendido', ctFmt(x.vendido - x.costo), 'Vendido − costo de los productos' + (x.sinCosto ? ' (faltan costos)' : '')) +
-    k('', '🕒 Por cobrar (fiados)', ctFmt(x.porCobrar), 'De las ventas de este periodo');
+    k('', '🕒 Por cobrar (fiados)', ctFmt(x.porCobrar), 'De las ventas de este periodo') +
+    // 1.65.7: lo que debe la gente HOY (cuentas de mesa y libreta) y lo que le debes a los proveedores.
+    (() => { let t = null; try{ t = window.libretaTotales ? window.libretaTotales() : null; }catch(e){}
+      return t ? k('', '📕 Te deben hoy', ctFmt(t.meDeben), 'Fiados de las mesas y de la libreta') + (t.debo > 0 ? k('out', '🧾 Debes a proveedores', ctFmt(t.debo), 'Lo anotado en la libreta') : '') : ''; })();
   document.getElementById('ctAviso').textContent = (x.sinCosto ? '⚠️ Algunos productos vendidos no tienen costo: la ganancia de lo vendido sale más alta de lo real (ponlo en Productos → tocar el producto → Costo). ' : '') + 'Entradas = dinero cobrado (los fiados cuentan el día que los pagan). Las compras a proveedores entran solas al escanear sus facturas; los demás gastos regístralos aquí abajo.';
   const barras = (obj, cls, nombre) => { const ks = Object.keys(obj).sort((a, b) => obj[b] - obj[a]); const max = Math.max(1, ...ks.map(q => obj[q])); return ks.length ? ks.map(q => '<div class="ct-barra ' + cls + '"><span>' + invEsc(nombre(q)) + '</span><i style="width:' + Math.max(2, obj[q] / max * 100) + '%"></i><b>' + ctFmt(obj[q]) + '</b></div>').join('') : '<div class="empty-note">Nada en este periodo.</div>'; };
   const porMedio = {}, porCat = {};

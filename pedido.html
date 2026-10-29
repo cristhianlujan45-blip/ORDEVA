@@ -103,7 +103,7 @@ h1{
 }
 .t svg{width:18px;height:18px;flex:none}
 .t.on{
-  color:#ffffff;background:linear-gradient(180deg,var(--gold-hi),var(--gold-lo));
+  color:var(--on-gold,#fff);background:linear-gradient(180deg,var(--gold-hi),var(--gold-lo));
   box-shadow:0 6px 18px rgba(236,72,153,.32),inset 0 1px 0 rgba(255,255,255,.35);
 }
 
@@ -231,7 +231,7 @@ h1{
 #m.ok{color:#5eead4}
 #m.err{color:#fda4af}
 .cta{
-  width:100%;padding:18px;border:1px solid rgba(255,255,255,.55);border-radius:16px;color:#ffffff;font:700 18px var(--sans);
+  width:100%;padding:18px;border:1px solid rgba(255,255,255,.55);border-radius:16px;color:var(--on-gold,#fff);font:700 18px var(--sans);
   background:linear-gradient(180deg,var(--gold-hi),var(--gold) 55%,var(--gold-lo));
   box-shadow:0 10px 28px rgba(236,72,153,.38),inset 0 1px 0 rgba(255,255,255,.45);
   transition:transform .12s,opacity .2s;
@@ -255,7 +255,7 @@ h1{
 .cat-tabs{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 12px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
 .cat-tabs::-webkit-scrollbar{display:none}
 .cat-tab{flex:none;display:inline-flex;align-items:center;gap:6px;padding:9px 15px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink2);font:600 13.5px var(--sans);white-space:nowrap}
-.cat-tab.on{background:linear-gradient(180deg,var(--gold-hi),var(--gold-lo));color:#ffffff;border-color:transparent;box-shadow:0 6px 16px rgba(236,72,153,.3)}
+.cat-tab.on{background:linear-gradient(180deg,var(--gold-hi),var(--gold-lo));color:var(--on-gold,#fff);border-color:transparent;box-shadow:0 6px 16px rgba(236,72,153,.3)}
 
 /* Tarjetas de producto en cuadrícula: más visuales y fáciles de tocar que una lista de texto */
 .cardgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(148px,100%),1fr));gap:10px}
@@ -312,7 +312,7 @@ button:active{transform:scale(.97)}button:hover{filter:brightness(1.1)}
 .lang{display:block;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font:inherit;font-size:13px}
 .curNote{margin:6px 0 0;text-align:center;font-size:12px;color:var(--ink2)}
 .prefBtn{display:block;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font:inherit;font-size:13px;cursor:pointer}
-.prefBtn[aria-pressed="true"]{background:var(--gold);color:#ffffff;border-color:var(--gold);font-weight:700}
+.prefBtn[aria-pressed="true"]{background:var(--gold);color:var(--on-gold,#fff);border-color:var(--gold);font-weight:700}
 
 /* ---------- Modo fácil: letra y botones más grandes, sin animaciones.
    Pensado para gente mayor o pantallas táctiles; no cambia el diseño
@@ -343,11 +343,11 @@ h1{font-weight:700;letter-spacing:0;background:linear-gradient(90deg,var(--gold-
 .generos .gtit{width:100%;font-size:13px;color:var(--ink2)}
 .gen{border:1px solid rgba(192,132,252,.35);background:rgba(124,58,237,.16);color:var(--ink);border-radius:999px;padding:9px 14px;font:700 14px var(--sans);min-height:42px}
 .gen:active{transform:scale(.96)}
-.gen.on{background:linear-gradient(90deg,var(--gold-hi),var(--gold));border-color:transparent;color:#fff}
+.gen.on{background:linear-gradient(90deg,var(--gold-hi),var(--gold));border-color:transparent;color:var(--on-gold,#fff)}
 .ytfila{display:flex;align-items:center;border-top:1px solid var(--line2)}
 .ytfila:first-of-type{border-top:0}
 .ytfila .ytrow{border-top:0;flex:1;min-width:0}
-.ytpedir{flex:none;margin-right:10px;min-height:42px;min-width:84px;padding:0 14px;border:0;border-radius:999px;color:#fff;font:800 14px var(--sans);
+.ytpedir{flex:none;margin-right:10px;min-height:42px;min-width:84px;padding:0 14px;border:0;border-radius:999px;color:var(--on-gold,#fff);font:800 14px var(--sans);
   background:linear-gradient(90deg,var(--gold-hi),var(--gold));box-shadow:0 6px 16px rgba(236,72,153,.35)}
 .ytpedir:active{transform:scale(.95)}
 .ytpedir.ok{background:linear-gradient(90deg,#10b981,#22d3ee)}
@@ -1704,16 +1704,19 @@ function fxSet(kind){
 /* ---------- Temática (la elige el local en Ajustes → Apariencia de su app;
    llega por el canal en vivo de ORDEVA junto con la carta, ver cargarCat()) ---------- */
 const TH = {
-  apple: { '--bg':'#f2f2f7', '--card':'#ffffff', '--card2':'#e9e9ef', '--line':'rgba(10,132,255,.28)', '--line2':'rgba(28,28,30,.08)', '--ink':'#1c1c1e', '--ink2':'rgba(28,28,30,.62)', '--gold':'#0a84ff', '--gold-hi':'#5ac8fa', '--gold-lo':'#0060df' },
-  navidad: { '--bg':'#0b1a12', '--card':'#10281b', '--card2':'#16351f', '--line':'rgba(244,197,66,.28)', '--line2':'rgba(246,239,224,.10)', '--ink':'#f6efe0', '--ink2':'rgba(246,239,224,.7)', '--gold':'#f4c542', '--gold-hi':'#ffe08a', '--gold-lo':'#c99a1b' },
-  halloween: { '--bg':'#0d0713', '--card':'#170c24', '--card2':'#221233', '--line':'rgba(255,138,31,.30)', '--line2':'rgba(245,233,255,.10)', '--ink':'#f5e9ff', '--ink2':'rgba(245,233,255,.7)', '--gold':'#ff8a1f', '--gold-hi':'#ffb15c', '--gold-lo':'#c96208' },
-  sanvalentin: { '--bg':'#1a0a12', '--card':'#241019', '--card2':'#2e1420', '--line':'rgba(255,77,109,.30)', '--line2':'rgba(255,234,240,.10)', '--ink':'#ffeaf0', '--ink2':'rgba(255,234,240,.7)', '--gold':'#ff4d6d', '--gold-hi':'#ff8fa8', '--gold-lo':'#c9203f' },
-  velitas: { '--bg':'#140d08', '--card':'#1e140c', '--card2':'#281a0e', '--line':'rgba(255,167,38,.28)', '--line2':'rgba(255,243,214,.10)', '--ink':'#fff3d6', '--ink2':'rgba(255,243,214,.7)', '--gold':'#ffa726', '--gold-hi':'#ffcc80', '--gold-lo':'#e08a1a' },
-  cafe: { '--bg':'#f5eee2', '--card':'#ffffff', '--card2':'#efe3d0', '--line':'rgba(179,112,47,.26)', '--line2':'rgba(61,47,34,.08)', '--ink':'#3d2f22', '--ink2':'rgba(61,47,34,.62)', '--gold':'#b3702f', '--gold-hi':'#d9975a', '--gold-lo':'#8f5824' },
-  nocturno: { '--bg':'#10151c', '--card':'#171f29', '--card2':'#1d2733', '--line':'rgba(79,163,201,.28)', '--line2':'rgba(221,227,234,.10)', '--ink':'#dde3ea', '--ink2':'rgba(221,227,234,.7)', '--gold':'#4fa3c9', '--gold-hi':'#7fc4d6', '--gold-lo':'#3a7fa0' },
-  claro: { '--bg':'#f7f7f5', '--card':'#ffffff', '--card2':'#f1f2f4', '--line':'rgba(255,122,26,.26)', '--line2':'rgba(22,24,29,.08)', '--ink':'#16181d', '--ink2':'rgba(22,24,29,.62)', '--gold':'#ff7a1a', '--gold-hi':'#ffab6b', '--gold-lo':'#d95f00' },
-  vito: { '--bg':'#1b1208', '--card':'#241a0f', '--card2':'#2d2213', '--line':'rgba(242,167,27,.28)', '--line2':'rgba(255,243,224,.10)', '--ink':'#fff3e0', '--ink2':'rgba(255,243,224,.7)', '--gold':'#f2a71b', '--gold-hi':'#ffcf6b', '--gold-lo':'#c9860f' },
-  moderno: { '--bg':'#0d1512', '--card':'#122019', '--card2':'#16281f', '--line':'rgba(45,212,191,.28)', '--line2':'rgba(234,255,243,.10)', '--ink':'#eafff3', '--ink2':'rgba(234,255,243,.7)', '--gold':'#2dd4bf', '--gold-hi':'#7ee7c9', '--gold-lo':'#199e8f' }
+  // 1.65.6: los mismos colores de las apariencias de ORDEVA (app/04g-productos-historial-caja.js, PALETTES).
+  apple: { '--bg':'#f2f2f7', '--card':'#ffffff', '--card2':'#e9e9ef', '--line':'rgba(10,108,255,.28)', '--line2':'rgba(28,28,30,.08)', '--ink':'#1c1c1e', '--ink2':'rgba(28,28,30,.62)', '--gold':'#0a6cff', '--gold-hi':'#609fff', '--gold-lo':'#0050c8', '--on-gold':'#ffffff' },
+  claro: { '--bg':'#fbf8f4', '--card':'#ffffff', '--card2':'#f2ece4', '--line':'rgba(232,89,12,.28)', '--line2':'rgba(31,26,23,.08)', '--ink':'#1f1a17', '--ink2':'rgba(31,26,23,.62)', '--gold':'#e8590c', '--gold-hi':'#f09361', '--gold-lo':'#c2410c', '--on-gold':'#101114' },
+  cafe: { '--bg':'#f3ebde', '--card':'#fffdf9', '--card2':'#eadfcc', '--line':'rgba(139,90,43,.28)', '--line2':'rgba(59,42,29,.08)', '--ink':'#3b2a1d', '--ink2':'rgba(59,42,29,.62)', '--gold':'#8b5a2b', '--gold-hi':'#b49475', '--gold-lo':'#6f4520', '--on-gold':'#ffffff' },
+  menta: { '--bg':'#eff7f3', '--card':'#ffffff', '--card2':'#e0efe7', '--line':'rgba(8,122,84,.28)', '--line2':'rgba(18,38,29,.08)', '--ink':'#12261d', '--ink2':'rgba(18,38,29,.62)', '--gold':'#087a54', '--gold-hi':'#5ea990', '--gold-lo':'#066343', '--on-gold':'#ffffff' },
+  nocturno: { '--bg':'#0a1220', '--card':'#101a2c', '--card2':'#16233a', '--line':'rgba(47,111,224,.28)', '--line2':'rgba(228,234,245,.10)', '--ink':'#e4eaf5', '--ink2':'rgba(228,234,245,.7)', '--gold':'#2f6fe0', '--gold-hi':'#78a1eb', '--gold-lo':'#1f55b8', '--on-gold':'#ffffff' },
+  moderno: { '--bg':'#061b1c', '--card':'#0b2627', '--card2':'#103032', '--line':'rgba(13,148,136,.28)', '--line2':'rgba(227,250,247,.10)', '--ink':'#e3faf7', '--ink2':'rgba(227,250,247,.7)', '--gold':'#0d9488', '--gold-hi':'#62b9b2', '--gold-lo':'#0b766c', '--on-gold':'#101114' },
+  vito: { '--bg':'#1b1208', '--card':'#241a0f', '--card2':'#2d2213', '--line':'rgba(227,155,45,.28)', '--line2':'rgba(255,243,224,.10)', '--ink':'#fff3e0', '--ink2':'rgba(255,243,224,.7)', '--gold':'#e39b2d', '--gold-hi':'#edbe76', '--gold-lo':'#b8770f', '--on-gold':'#101114' },
+  grafito: { '--bg':'#111113', '--card':'#19191c', '--card2':'#222226', '--line':'rgba(163,230,53,.28)', '--line2':'rgba(241,241,243,.10)', '--ink':'#f1f1f3', '--ink2':'rgba(241,241,243,.7)', '--gold':'#a3e635', '--gold-hi':'#c3ef7c', '--gold-lo':'#7cb518', '--on-gold':'#101114' },
+  navidad: { '--bg':'#0a1d14', '--card':'#0f2a1d', '--card2':'#153626', '--line':'rgba(214,40,57,.28)', '--line2':'rgba(247,240,225,.10)', '--ink':'#f7f0e1', '--ink2':'rgba(247,240,225,.7)', '--gold':'#d62839', '--gold-hi':'#e4737e', '--gold-lo':'#a81d2b', '--on-gold':'#ffffff' },
+  halloween: { '--bg':'#150a1f', '--card':'#1f0f2e', '--card2':'#2a163d', '--line':'rgba(255,90,31,.28)', '--line2':'rgba(246,236,255,.10)', '--ink':'#f6ecff', '--ink2':'rgba(246,236,255,.7)', '--gold':'#ff5a1f', '--gold-hi':'#ff946d', '--gold-lo':'#d4420c', '--on-gold':'#101114' },
+  sanvalentin: { '--bg':'#1f0a14', '--card':'#2a0f1c', '--card2':'#361526', '--line':'rgba(212,42,120,.28)', '--line2':'rgba(255,238,243,.10)', '--ink':'#ffeef3', '--ink2':'rgba(255,238,243,.7)', '--gold':'#d42a78', '--gold-hi':'#e375a7', '--gold-lo':'#a81d5d', '--on-gold':'#ffffff' },
+  velitas: { '--bg':'#0d0c26', '--card':'#16143a', '--card2':'#1f1c4b', '--line':'rgba(245,179,1,.28)', '--line2':'rgba(255,245,220,.10)', '--ink':'#fff5dc', '--ink2':'rgba(255,245,220,.7)', '--gold':'#f5b301', '--gold-hi':'#f8ce5a', '--gold-lo':'#d49500', '--on-gold':'#101114' }
 };
 function applyTh(th){
   const r = document.documentElement.style, all = TH.navidad;

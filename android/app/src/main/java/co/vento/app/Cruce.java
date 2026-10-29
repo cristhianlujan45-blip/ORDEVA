@@ -27,7 +27,11 @@ final class Cruce {
     static final String PREF_CFG = "cruceCfg", PREF_DESDE = "cruceDesde", PREF_VISTOS = "cruceVistos", PREF_ESTADO = "cruceEstado";
     /** Cada cuánto pregunta el servicio de fondo (VentoServicio). */
     static final long CADA_MS = 2500;
-    private static volatile boolean ocupado;
+    private static volatile boolean ocupado, otraVez;
+    /** 1.65.3: canal en vivo del negocio («vp-…», lo da el servidor): VentoServicio deja abierta la conexión (EnVivo). */
+    static volatile String vivo;
+    /** El id de ESTE equipo en el servidor (para atender solo la «🔔 Probar» que es para él). */
+    static volatile String yo;
 
     private static SharedPreferences sp(Context c) { return c.getSharedPreferences("vento", Context.MODE_PRIVATE); }
     static JSONObject cfg(Context c) { try { return new JSONObject(sp(c).getString(PREF_CFG, "{}")); } catch (Exception e) { return new JSONObject(); } }
@@ -68,7 +72,12 @@ final class Cruce {
             if (in != null) { byte[] buf = new byte[4096]; int n; while ((n = in.read(buf)) > 0) b.append(new String(buf, 0, n, StandardCharsets.UTF_8)); in.close(); }
             if (st >= 500) throw new java.io.IOException("servidor " + st);
             return b.toString();
-        } finally { h.disconnect(); }
+            // 1.65.3: sin disconnect() cuando salió bien: Android reutiliza la conexión segura ya abierta (keep-alive) y el
+            // siguiente aviso o pregunta sale sin volver a negociar el cifrado (unos 200-400 ms menos con datos móviles).
+        } catch (Exception e) {
+            h.disconnect();
+            throw e;
+        }
     }
 
     // ---------------------------------------------------------------- Este celular → servidor
@@ -79,9 +88,13 @@ final class Cruce {
         if (k.optString("url").isEmpty() || k.optString("token").length() < 20) return;
         final long monto = AvisoPago.monto(txt);
         if (monto <= 0) return;                                          // sin valor: la página decide (frases del administrador)
+        final long leido = System.currentTimeMillis(), banco = VentoEscucha.horaBanco();
         new Thread(() -> {
             try {
-                JSONObject pista = new JSONObject().put("monto", monto).put("app", txt.split("\\|")[0].trim());
+                // t / tb (1.65.7): cuándo lo leyó este celular y la hora que trae el aviso del banco: el servidor las guarda y el
+                // diagnóstico dice de dónde viene una demora (el banco, el celular o el internet).
+                JSONObject pista = new JSONObject().put("monto", monto).put("app", txt.split("\\|")[0].trim()).put("t", leido);
+                if (banco > 0) pista.put("tb", banco);
                 if (revisar != null) pista.put("nivel", "revisar"); else if (smsOk) pista.put("nivel", "app");
                 JSONObject j = new JSONObject().put("text", txt.length() > 1000 ? txt.substring(0, 1000) : txt).put("id", "and-" + id).put("pista", pista);
                 for (int i = 0; i < 3; i++) {
@@ -94,7 +107,10 @@ final class Cruce {
 
     // ---------------------------------------------------------------- Otros equipos → este celular
     static void revisar(final Context c) {
-        if (c == null || ocupado) return;
+        if (c == null) return;
+        // Si ya hay una pregunta en camino, se hace otra apenas termine: el aviso en vivo puede llegar justo después de que
+        // esa pregunta salió (y el pago nuevo no venía en ella).
+        if (ocupado) { otraVez = true; return; }
         final JSONObject k = cfg(c);
         if (k.optString("url").isEmpty() || k.optString("key").isEmpty() || k.optString("token").length() < 20) return;
         ocupado = true;
@@ -109,6 +125,11 @@ final class Cruce {
                     VentoApp.js("try{window.ventoPagosCruceMal&&window.ventoPagosCruceMal(" + VentoApp.q(r.optString("error")) + ")}catch(e){}");
                     return;
                 }
+                // 1.65.2: si ESTE celular suena lo dice el servidor (lo elige el dueño), no la página: con el celular
+                // bloqueado la página duerme y su dato podía quedar viejo, y los pagos solo sonaban al desbloquear.
+                if (r.has("suena")) sp(c).edit().putBoolean("pagosSuena", r.optBoolean("suena", true)).apply();
+                if (r.optString("vivo").startsWith("vp-")) vivo = r.optString("vivo");
+                if (!r.optString("dispositivo").isEmpty()) yo = r.optString("dispositivo");
                 JSONArray l = r.optJSONArray("pagos");
                 boolean primera = desde.isEmpty(), jefe = "dueno".equals(r.optString("rol")) || "admin".equals(r.optString("rol"));
                 String yo = r.optString("dispositivo"), max = desde, ahora = r.optString("ahora");
@@ -128,7 +149,10 @@ final class Cruce {
                 if (nuevos > 0) VentoApp.js("try{window.ventoPagos&&window.ventoPagos.sincronizar()}catch(e){}");
             } catch (Exception e) {
                 try { sp(c).edit().putString(PREF_ESTADO, new JSONObject().put("t", System.currentTimeMillis()).put("ok", false).put("error", String.valueOf(e.getMessage())).toString()).apply(); } catch (Exception ignorado) { }
-            } finally { ocupado = false; }
+            } finally {
+                ocupado = false;
+                if (otraVez) { otraVez = false; revisar(c); }
+            }
         }).start();
     }
     private static long segundos(String iso) {

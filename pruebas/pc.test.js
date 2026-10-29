@@ -38,6 +38,9 @@ if(exe && process.platform === 'linux' && !process.env.DISPLAY && !process.env.V
     const pc = await w.evaluate(() => window.ventoPC ? { v: window.ventoPC.version(), p: window.ventoPC.plataforma, i: typeof window.ventoPC.inicioConWindows } : null);
     chk('1. window.ventoPC: versión, plataforma y «abrir al prender el computador»', pc && /^\d+\.\d+\.\d+$/.test(pc.v) && pc.p && pc.i === 'function', pc);
     chk('1. La página NO tiene acceso a Node (seguro)', await w.evaluate(() => typeof require === 'undefined' && typeof process === 'undefined'));
+    // 1.65.5: con la pantalla bloqueada Windows suspendía el computador y los pagos llegaban al desbloquear.
+    chk('1. Mientras ORDEVA está abierto el computador no se suspende (para que los pagos lleguen con la pantalla bloqueada)',
+      await app.evaluate(({ powerSaveBlocker }) => [0, 1, 2, 3, 4, 5].some(i => powerSaveBlocker.isStarted(i))));
     const inst = await w.evaluate(() => ({ t: (document.getElementById('instAqui') || {}).textContent || '', pc: getComputedStyle(document.getElementById('instPc')).display, apk: getComputedStyle(document.getElementById('instApk')).display }));
     chk('1. La app lo reconoce: «✅ Este computador ya tiene ORDEVA para PC» (y no ofrece descargarlo otra vez)', /ya tiene ORDEVA para PC \(versión \d+\.\d+\.\d+\)/.test(inst.t) && inst.pc === 'none' && inst.apk !== 'none', inst);
 

@@ -52,10 +52,13 @@ async function cupo(clave: string, porMin: number, porDia: number): Promise<{ ok
 }
 async function sinCupo(ip: string): Promise<string | null> {
   const n = (k: string, d: number) => Number(Deno.env.get(k) || d);
-  const c = await cupo("vento-ia:" + ip, n("VENTO_IA_IP_MIN", POR_MINUTO), n("VENTO_IA_IP_DIA", 600));
+  // 1.65.7 (pedido del dueño: «la IA sin límite»): los topes del día son tan altos que un negocio no los toca (5.000 lecturas
+  // al día por conexión, 200.000 en total). Queda el freno por minuto: sin él, cualquiera en internet podría gastar la
+  // clave de la IA del dueño. Se pueden cambiar sin tocar el código (VENTO_IA_IP_DIA, VENTO_IA_DIA).
+  const c = await cupo("vento-ia:" + ip, n("VENTO_IA_IP_MIN", POR_MINUTO), n("VENTO_IA_IP_DIA", 5000));
   if (c && !c.ok) return c.tope === "dia" ? "Llegaste al límite de hoy de la IA de ORDEVA en esta conexión. Pon tu propia clave de Gemini en Ajustes → IA, o vuelve mañana." : "Demasiadas peticiones seguidas. Espera un momento.";
   if (!c && demasiados(ip)) return "Demasiadas peticiones seguidas. Espera un momento.";
-  const g = await cupo("vento-ia:todos", 0, n("VENTO_IA_DIA", 20000));
+  const g = await cupo("vento-ia:todos", 0, n("VENTO_IA_DIA", 200000));
   if (g && !g.ok) return "La IA de ORDEVA llegó al límite de hoy. Pon tu propia clave de Gemini en Ajustes → IA, o vuelve mañana.";
   return null;
 }

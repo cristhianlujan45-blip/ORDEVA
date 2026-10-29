@@ -18,7 +18,7 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
   try{
     const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
     await ctx.route('**/*', r => new URL(r.request().url()).hostname === 'localhost' ? r.continue() : r.abort());
-    await ctx.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('vento-guia-tour', '1'); }catch(e){} });   // sin el recorrido automático
+    await ctx.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('vento-guia-tour', '1'); localStorage.setItem('vento_vista_sencilla', '0'); }catch(e){} });   // sin el recorrido automático; la vista completa (en la sencilla el cierre está en «💵 Caja»: vistasencilla.test.js)
     const p = await ctx.newPage(); p.on('pageerror', e => errs.push(e.message));
     await p.goto(BASE, { waitUntil: 'load' }); await p.waitForTimeout(2500);
     await p.evaluate(async () => { await enterApp('test', null); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento-pp-oculta', '1');

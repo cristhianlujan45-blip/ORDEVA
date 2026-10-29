@@ -38,7 +38,10 @@ public class MainActivity extends Activity {
     private ValueCallback<Uri[]> archivoCb;
     private WebChromeClient.FileChooserParams archivoParams;
     private Uri camaraUri;
-    private PermissionRequest permisoWeb;
+    // 1.65.7: las peticiones de cámara/micrófono de la página que esperan la respuesta de Android, EN FILA. Antes se guardaba
+    // una sola: al tocar «Escanear» dos veces, la primera quedaba colgada para siempre (la cámara nunca abría) y la segunda
+    // recibía una respuesta «cancelada» que se tomaba como «no»: «No se pudo abrir la cámara».
+    private final java.util.ArrayList<PermissionRequest> permisosWeb = new java.util.ArrayList<>();
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -192,7 +195,10 @@ public class MainActivity extends Activity {
     }
 
     void pedirPermisosWeb(PermissionRequest req, ArrayList<String> faltan) {
-        permisoWeb = req;
+        boolean yaPreguntando = !permisosWeb.isEmpty();
+        permisosWeb.add(req);
+        if (yaPreguntando) return;                      // se responde junto con la que ya está preguntando
+        if (faltan.contains(Manifest.permission.CAMERA)) getSharedPreferences("vento", MODE_PRIVATE).edit().putBoolean("camaraPreguntada", true).apply();
         if (Build.VERSION.SDK_INT >= 23) requestPermissions(faltan.toArray(new String[0]), RC_PERM_WEB);
     }
 
@@ -274,9 +280,54 @@ public class MainActivity extends Activity {
         } else if (camaraUri != null) {
             try { getContentResolver().delete(camaraUri, null, null); } catch (Exception ignorado) { }
         }
-        archivoCb.onReceiveValue(res);
+        // 1.65.7: se le pasa a la página una COPIA del archivo dentro de ORDEVA (con su tamaño y su nombre de verdad), no la
+        // dirección de la app de donde vino. Con WhatsApp, Drive, Descargas y otros, el visor web de Android leía el PDF
+        // como «vacío (0 bytes)» y la factura no se podía leer. La foto recién tomada con la cámara ya es de ORDEVA.
+        final ValueCallback<Uri[]> cb = archivoCb;
+        final Uri[] originales = res;
+        final Uri propia = camaraUri;
         archivoCb = null;
         camaraUri = null;
+        if (originales == null) { cb.onReceiveValue(null); return; }
+        new Thread(() -> {
+            Uri[] copias = new Uri[originales.length];
+            for (int i = 0; i < originales.length; i++) copias[i] = originales[i] != null && !originales[i].equals(propia) ? copiaPropia(originales[i]) : originales[i];
+            VentoApp.ui.post(() -> cb.onReceiveValue(copias));
+        }, "vento-archivo").start();
+    }
+
+    /** Copia lo elegido a la caché de ORDEVA («elegidos/», se borra a la hora) y devuelve su dirección propia. Si no se pudo
+     *  copiar, la de antes. */
+    private Uri copiaPropia(Uri u) {
+        try {
+            java.io.File dir = new java.io.File(getCacheDir(), "elegidos");
+            if (!dir.exists()) dir.mkdirs();
+            java.io.File[] viejos = dir.listFiles();
+            if (viejos != null) for (java.io.File f : viejos) if (System.currentTimeMillis() - f.lastModified() > 3600_000L) f.delete();
+            String nombre = null;
+            try (android.database.Cursor c = getContentResolver().query(u, new String[]{android.provider.OpenableColumns.DISPLAY_NAME}, null, null, null)) {
+                if (c != null && c.moveToFirst()) nombre = c.getString(0);
+            } catch (Exception ignorado) { }
+            if (nombre == null || nombre.trim().isEmpty()) nombre = u.getLastPathSegment();
+            nombre = (nombre == null ? "archivo" : nombre).replaceAll("[^A-Za-z0-9._ ()-]", "_");
+            if (!nombre.contains(".")) {
+                String ext = android.webkit.MimeTypeMap.getSingleton().getExtensionFromMimeType(getContentResolver().getType(u));
+                if (ext != null) nombre += "." + ext;
+            }
+            java.io.File sub = new java.io.File(dir, Long.toString(System.nanoTime(), 36));
+            sub.mkdirs();
+            java.io.File f = new java.io.File(sub, nombre);
+            long n = 0;
+            try (java.io.InputStream in = getContentResolver().openInputStream(u); java.io.OutputStream out = new java.io.FileOutputStream(f)) {
+                if (in == null) return u;
+                byte[] b = new byte[64 * 1024]; int r;
+                while ((r = in.read(b)) > 0) { out.write(b, 0, r); n += r; }
+            }
+            if (n <= 0) return u;
+            return androidx.core.content.FileProvider.getUriForFile(this, getPackageName() + ".archivos", f);
+        } catch (Throwable e) {
+            return u;
+        }
     }
 
     @Override
@@ -285,9 +336,17 @@ public class MainActivity extends Activity {
         boolean ok = resultados.length > 0;
         for (int r : resultados) if (r != PackageManager.PERMISSION_GRANTED) ok = false;
         if (rc == Equipos.RC_BT) { Equipos.permisoBluetooth(ok); return; }   // impresora o balanza Bluetooth
-        if (rc == RC_PERM_WEB && permisoWeb != null) {
-            if (ok) permisoWeb.grant(permisoWeb.getResources()); else permisoWeb.deny();
-            permisoWeb = null;
+        if (rc == RC_PERM_WEB) {
+            // Se mira el permiso de VERDAD (no la respuesta, que llega vacía si se canceló por otra pregunta encima).
+            for (PermissionRequest r : new java.util.ArrayList<>(permisosWeb)) {
+                boolean todos = true;
+                for (String x : r.getResources()) {
+                    if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(x) && !VentoApp.tiene(Manifest.permission.CAMERA)) todos = false;
+                    if (PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(x) && !VentoApp.tiene(Manifest.permission.RECORD_AUDIO)) todos = false;
+                }
+                try { if (todos) r.grant(r.getResources()); else r.deny(); } catch (Exception ignorado) { }
+            }
+            permisosWeb.clear();
         } else if (rc == RC_PERM_ARCHIVO) {
             abrirSelector();
         } else if (rc == RC_PERM_INICIO) {

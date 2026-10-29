@@ -599,6 +599,17 @@ async function webhookWompi(req: Request, env: Env, token: string) {
   }
 }
 
+// 1.65.7: cuándo lo leyó el celular (t_cel) y la hora del aviso del banco (t_banco), en ms: el diagnóstico de pagos dice de
+// dónde viene una demora (el banco, el celular o el internet). Solo números razonables (de las últimas 24 h).
+function tiemposDe(p: Pista | null): Record<string, number> {
+  const o: Record<string, number> = {}, ahora = Date.now();
+  for (const [k, n] of [["t", "t_cel"], ["tb", "t_banco"]] as const) {
+    const v = p ? Number(p[k]) : NaN;
+    if (Number.isFinite(v) && v > ahora - 864e5 && v < ahora + 3e5) o[n] = Math.round(v);
+  }
+  return o;
+}
+
 // ---------- /aviso (celular autorizado) ----------
 async function aviso(req: Request, env: Env, tokenRuta: string | null) {
   const db = servidor(env);
@@ -623,7 +634,7 @@ async function aviso(req: Request, env: Env, tokenRuta: string | null) {
   // no cuenta dos veces.
   const ventana = idAviso ? "id:" + idAviso : String(Math.floor(Date.now() / 120000));
   const huella = "aviso:" + await sha256(d.negocio_id + ":" + txt.replace(/\s+/g, " ").trim().toLowerCase() + ":" + ventana);
-  const nuevo = await db.rpc<boolean>("srv_evento", { p_proveedor: "dispositivo", p_huella: huella, p_negocio: d.negocio_id, p_tipo: "notificacion", p_id_externo: null, p_referencia: null, p_firma_valida: true, p_resultado: a ? "recibido" : "ignorado", p_cuerpo: { texto: txt, dispositivo: d.id }, p_ip: req.headers.get("x-forwarded-for") || "", p_error: null });
+  const nuevo = await db.rpc<boolean>("srv_evento", { p_proveedor: "dispositivo", p_huella: huella, p_negocio: d.negocio_id, p_tipo: "notificacion", p_id_externo: null, p_referencia: null, p_firma_valida: true, p_resultado: a ? "recibido" : "ignorado", p_cuerpo: { texto: txt, dispositivo: d.id, ...tiemposDe(pista) }, p_ip: req.headers.get("x-forwarded-for") || "", p_error: null });
   if (!nuevo) return json(200, { ok: true, duplicado: true });
   if (!a) return json(200, { ok: true, ignorado: "no_es_un_pago_recibido" });
   const r = await actualizar(env, db, d.negocio_id, "dispositivo", {

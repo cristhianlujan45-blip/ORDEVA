@@ -12,7 +12,7 @@
    • Se actualiza solo (el programa) desde las Descargas de Vento (release «pc»).
    ===================================================================== */
 'use strict';
-const { app, BrowserWindow, shell, session, Menu, Tray, dialog, nativeImage, ipcMain, Notification } = require('electron');
+const { app, BrowserWindow, shell, session, Menu, Tray, dialog, nativeImage, ipcMain, Notification, powerSaveBlocker, powerMonitor } = require('electron');
 const path = require('path');
 
 const URL_VENTO = 'https://cristhianlujan45-blip.github.io/ORDEVA/';   // 1.55.2: el repositorio ahora es ORDEVA (antes …/cuentas/)
@@ -158,6 +158,22 @@ function elegir(titulo, lista, listo){
     .then(r => listo(r.response < lista.length ? lista[r.response].id : '')).catch(() => listo(''));
 }
 
+// ---------- ⚡ Despierto para los pagos (1.65.5) ----------
+// Con la pantalla bloqueada, Windows suspende el computador a los pocos minutos, y un computador suspendido no recibe
+// nada: los pagos le llegaban al desbloquearlo. Mientras ORDEVA está abierto (también junto al reloj), el computador no se
+// suspende; la pantalla sí se apaga y se bloquea como siempre. Se puede quitar en el icono junto al reloj.
+const archivoAjustes = () => path.join(app.getPath('userData'), 'ajustes-programa.json');
+function leerAjustes(){ try{ return JSON.parse(fs.readFileSync(archivoAjustes(), 'utf8')) || {}; }catch(e){ return {}; } }
+function guardarAjuste(k, v){ try{ const a = leerAjustes(); a[k] = v; fs.writeFileSync(archivoAjustes(), JSON.stringify(a)); }catch(e){} }
+let despierto = null;
+const despiertoOn = () => leerAjustes().despierto !== false;
+function ponerDespierto(si){
+  if(si && despierto == null) despierto = powerSaveBlocker.start('prevent-app-suspension');
+  if(!si && despierto != null){ try{ powerSaveBlocker.stop(despierto); }catch(e){} despierto = null; }
+}
+// Al volver de una suspensión (si el dueño la permitió) o al desbloquear: la página revisa los pagos de una vez.
+function despertarPagina(){ try{ if(ventana) ventana.webContents.executeJavaScript('try{window.ventoPagos&&window.ventoPagos.sincronizar()}catch(e){}', true).catch(() => {}); }catch(e){} }
+
 // ---------- Icono junto al reloj ----------
 function crearBandeja(){
   try{
@@ -169,6 +185,8 @@ function crearBandeja(){
     { type: 'separator' },
     { label: 'Abrir ORDEVA al prender el computador', type: 'checkbox', checked: app.getLoginItemSettings().openAtLogin,
       click: it => { app.setLoginItemSettings({ openAtLogin: it.checked, openAsHidden: true, args: ['--escondido'] }); } },
+    { label: 'No dejar que el computador se suspenda (para que lleguen los pagos)', type: 'checkbox', checked: despiertoOn(),
+      click: it => { guardarAjuste('despierto', it.checked); ponerDespierto(it.checked); } },
     { label: 'Buscar actualización del programa', click: () => actualizar(true) },
     { type: 'separator' },
     { label: 'Salir', click: () => { saliendo = true; app.quit(); } }
@@ -209,6 +227,8 @@ app.whenReady().then(() => {
   permisos();
   crearBandeja();
   crearVentana();
+  ponerDespierto(despiertoOn());
+  try{ powerMonitor.on('resume', despertarPagina); powerMonitor.on('unlock-screen', despertarPagina); }catch(e){}
   setTimeout(() => actualizar(false), 15000);
   setInterval(() => actualizar(false), 6 * 3600e3);
 });

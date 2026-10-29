@@ -15,7 +15,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 
  // ---------------- 1) Panel de la mesa en celular (390×844) ----------------
  { const ctx=await b.newContext({viewport:{width:390,height:844}, hasTouch:true, isMobile:true});
-  await ctx.addInitScript(()=>{ localStorage.setItem('cm-tutorial-seen','1'); localStorage.setItem('vento-hola','0'); });
+  await ctx.addInitScript(()=>{ localStorage.setItem('cm-tutorial-seen','1'); localStorage.setItem('vento-hola','0'); localStorage.setItem('vento_vista_sencilla','0'); });   // la vista completa (la sencilla viene prendida desde 1.65.6)
   const p=await entrar(ctx);
   await p.evaluate(()=>{ document.querySelectorAll('.overlay.show').forEach(o=>o.classList.remove('show'));
    data.modoCompleto=true; try{ aplicarModulos(); }catch(e){}
@@ -91,7 +91,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 
  // ---------------- 2) Computador (1440×900): se ve bien y los iconos van en la línea del nombre ----------------
  { const ctx=await b.newContext({viewport:{width:1440,height:900}});
-  await ctx.addInitScript(()=>{ localStorage.setItem('cm-tutorial-seen','1'); localStorage.setItem('vento-hola','0'); });
+  await ctx.addInitScript(()=>{ localStorage.setItem('cm-tutorial-seen','1'); localStorage.setItem('vento-hola','0'); localStorage.setItem('vento_vista_sencilla','0'); });   // la vista completa (la sencilla viene prendida desde 1.65.6)
   const p=await entrar(ctx);
   await p.evaluate(()=>{ document.querySelectorAll('.overlay.show').forEach(o=>o.classList.remove('show'));
    data.products=[{id:'pk',name:'Poker',price:3800,stock:50,favorite:true}]; data.tables={1:{items:[],people:[],payments:[]}}; saveData(); renderMesas(); openTableModal(1); });
@@ -112,7 +112,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 
  // ---------------- 2b) Celular angosto (360×640): todo cabe sin partirse ----------------
  { const ctx=await b.newContext({viewport:{width:360,height:640}, hasTouch:true, isMobile:true});
-  await ctx.addInitScript(()=>{ localStorage.setItem('cm-tutorial-seen','1'); localStorage.setItem('vento-hola','0'); });
+  await ctx.addInitScript(()=>{ localStorage.setItem('cm-tutorial-seen','1'); localStorage.setItem('vento-hola','0'); localStorage.setItem('vento_vista_sencilla','0'); });   // la vista completa (la sencilla viene prendida desde 1.65.6)
   const p=await entrar(ctx);
   await p.evaluate(()=>{ document.querySelectorAll('.overlay.show').forEach(o=>o.classList.remove('show'));
    data.modoCompleto=true; try{ aplicarModulos(); }catch(e){}

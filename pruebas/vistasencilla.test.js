@@ -1,5 +1,5 @@
-// 🧭 Vista sencilla (Ajustes → Apariencia, ORDEVA 1.63.0): opcional, el diseño de siempre sigue igual.
-//  1. De fábrica está apagada: la barra de abajo y los menús quedan como siempre.
+// 🧭 Vista sencilla (Ajustes → Apariencia, ORDEVA 1.63.0): el diseño de siempre sigue igual al apagarla.
+//  1. Desde 1.65.6 viene PRENDIDA de fábrica; se apaga en Ajustes y la barra de abajo y los menús quedan como siempre.
 //  2. Se prende en Ajustes → Apariencia: abajo solo Cuentas · Productos · Caja · Más; «Más» por grupos con su nombre.
 //  3. 💵 Caja: lo vendido desde el último cierre (efectivo, transferencias, fiado) y lo que falta en las cuentas abiertas,
 //     con las mismas cifras del cierre de caja; «Cerrar caja del día» pregunta como siempre.
@@ -38,7 +38,11 @@ const FOTOS = process.env.VENTO_FOTOS || '';
 
       // 1. Apagada de fábrica
       let v = await p.evaluate(() => ({ on: window.ventoVistaSencilla.on(), clase: document.body.classList.contains('vs-on') }));
-      chk(nom + ' · 1. De fábrica la vista sencilla está apagada', !v.on && !v.clase, v);
+      chk(nom + ' · 1. De fábrica la vista sencilla está PRENDIDA', v.on && v.clase, v);
+      chk(nom + ' · 1. Prendida de fábrica: abajo solo 4, con «Caja»', (await visibles()).length === 4 && (await visibles()).includes('Caja'), await visibles());
+      await p.evaluate(() => window.ventoVistaSencilla.poner(false)); await p.waitForTimeout(250);
+      v = await p.evaluate(() => ({ on: window.ventoVistaSencilla.on(), clase: document.body.classList.contains('vs-on'), guardada: localStorage.getItem('vento_vista_sencilla') }));
+      chk(nom + ' · 1. Se puede apagar (y queda guardado que la apagó)', !v.on && !v.clase && v.guardada === '0', v);
       const antes = await visibles();
       chk(nom + ' · 1. Apagada: la barra de siempre (sin «Caja»)', !antes.includes('Caja') && antes.length >= 3, antes);
 
@@ -109,6 +113,10 @@ const FOTOS = process.env.VENTO_FOTOS || '';
         document.querySelector('nav button[data-view="mesas"]').click();
         return new Promise(z => setTimeout(() => { const vis = document.getElementById('vsCajaNav').offsetParent !== null; if(r) r.esJefe = orig; document.querySelector('nav button[data-view="mesas"]').click(); z({ vis, hay: !!r }); }, 300)); });
       chk(nom + ' · 5. Un empleado (no dueño ni administrador) no ve la Caja', v.hay && !v.vis, v);
+      v = await p.evaluate(() => { document.body.classList.add('rol-equipo'); const h = document.querySelector('#navMoreSheet .more-tile[data-go="historial"]'); h.hidden = true;
+        const r = { ajustes: getComputedStyle(document.querySelector('#navMoreSheet .more-tile[data-go="ajustes"]')).display, oculto: getComputedStyle(h).display };
+        document.body.classList.remove('rol-equipo'); h.hidden = false; return r; });
+      chk(nom + ' · 5. … ni «Ajustes» en «Más», y lo escondido sigue escondido (la lista de «Más» no lo vuelve a mostrar)', v.ajustes === 'none' && v.oculto === 'none', v);
 
       // 6. Se apaga y vuelve todo
       await p.evaluate(() => window.ventoVistaSencilla.poner(false)); await p.waitForTimeout(250);

@@ -45,7 +45,7 @@ export function leerAviso(txt: string): Aviso | null {
 // administrador; la del servidor puede ir atrás: «$ 50 000», «movimiento recibido», «+$20.000»). Llega de un celular
 // autorizado por el dueño. El valor de la app manda; «falso» de cualquiera de los dos gana; si no, el nivel de la app
 // (p. ej. el dueño eligió confirmar los SMS del banco).
-export type Pista = { monto?: unknown; app?: unknown; de?: unknown; nivel?: unknown };
+export type Pista = { monto?: unknown; app?: unknown; de?: unknown; nivel?: unknown; t?: unknown; tb?: unknown };
 export function conPista(a: Aviso | null, pista: Pista | null, txt: string): Aviso | null {
   const monto = pista ? Number(pista.monto) : 0;
   if (!pista || !Number.isInteger(monto) || monto <= 0 || monto > 100000000) return a;

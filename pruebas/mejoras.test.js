@@ -71,6 +71,8 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
     await p.fill('#viCod', '1002'); await p.press('#viCod', 'Enter');
     chk('2. 🔎 Consultar «1002»: Gaseosa con precio, costo, existencias y kárdex', /Gaseosa/.test(await p.textContent('#viZona')) && /Existencias\s*5/.test(await p.textContent('#viZona')) && /Kárdex/.test(await p.textContent('#viZona')));
     // Entrada de mercancía
+    // 1.65.9: de fábrica pregunta «¿Cuántas llegaron?» (pruebas/codigoproducto.test.js); aquí, con eso apagado, cada lectura suma 1.
+    await p.evaluate(() => window.ventoProductoCodigo.preguntar(false));
     await p.click('[data-vm="entrada"]');
     for(const c of ['7702004003508', '7702004003508', '12*1001']){ await p.fill('#viCod', c); await p.press('#viCod', 'Enter'); }
     chk('2. 📥 Entrada: cada lectura suma (2 Águila) y «12*1001» suma 12 empanadas', await D(() => { const c = JSON.parse(localStorage.getItem('vento_entrada:local')); return c.items.find(x => x.p === 'ag').q === 2 && c.items.find(x => x.p === 'em').q === 12; }));

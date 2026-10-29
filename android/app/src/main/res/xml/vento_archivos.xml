@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Archivos que Vento le pasa a otra app: el APK de la actualización (en la caché) para el instalador de Android. -->
+<!-- Archivos de Vento por FileProvider: el APK de la actualización (para el instalador de Android) y, desde la 1.65.7, la
+     copia de lo que se elige con «Galería o PDF» (caché «elegidos/»), que se le pasa a la página con su tamaño real. -->
 <paths>
     <cache-path name="act" path="." />
 </paths>

@@ -660,7 +660,7 @@
     '.vs-estado.ok{border-color:color-mix(in srgb,var(--paid) 55%,var(--line));background:color-mix(in srgb,var(--paid) 10%,var(--surface-2))}' +
     '.vs-estado.esp{border-color:color-mix(in srgb,#f5a524 55%,var(--line));background:color-mix(in srgb,#f5a524 10%,var(--surface-2))}' +
     '.vs-estado.mal{border-color:color-mix(in srgb,var(--brick) 55%,var(--line));background:color-mix(in srgb,var(--brick) 10%,var(--surface-2))}' +
-    '.vs-chip{display:inline-block;font:800 11px/1 var(--font-main);letter-spacing:.1em;padding:5px 9px;border-radius:999px;background:var(--amber);color:#fff;margin-bottom:8px}' +
+    '.vs-chip{display:inline-block;font:800 11px/1 var(--font-main);letter-spacing:.1em;padding:5px 9px;border-radius:999px;background:var(--amber);color:var(--on-amber,#fff);margin-bottom:8px}' +
     '.vs-planes{display:grid;gap:10px}.vs-plan{border:1.5px solid var(--line);border-radius:16px;padding:14px;background:var(--surface)}' +
     '.vs-plan.pago{border-color:var(--amber);box-shadow:0 0 0 3px color-mix(in srgb,var(--amber) 16%,transparent)}' +
     '.vs-plan h3{margin:0;font-size:14px;letter-spacing:.12em;display:flex;justify-content:space-between;align-items:center;gap:8px}.vs-plan h3 em{font:700 11px var(--font-main);letter-spacing:0;font-style:normal;color:var(--paid)}' +

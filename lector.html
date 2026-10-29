@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<script src="lib/vento-errores.js"></script><!-- errores de este equipo → ORDEVA Admin (🐞 Errores) -->
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0a12">
+<title>Lector de códigos · ORDEVA</title>
+<link rel="icon" type="image/png" href="icons/ordeva-64.png">
+<!--
+  ORDEVA · 📱 lector de códigos (1.65.0)
+  El celular hace de lector de códigos de barras y QR de otro equipo de ORDEVA (el programa de PC, una tablet…).
+  Se abre escaneando el QR de «📱 Usar el celular como lector» en la ventana «🔳 Escanear código» de ese equipo.
+  Cada código que lee la cámara va al equipo por el canal del servidor de ORDEVA (lib/vento-lector-cel.js explica los
+  mensajes) y el equipo lo toma solo mientras tiene «Escanear» abierto: aquí se ve si llegó (✅) o no (⚠️).
+  El emparejamiento queda guardado en este celular: la próxima vez basta con abrir esta página.
+-->
+<style>
+  :root{ --bg:#0b0a12; --sf:#17161f; --sf2:#1f1e2a; --line:#2c2b3a; --tx:#f3f1fa; --mut:#a9a6bb; --am:#f5b83d; --ok:#4cd97b; --bad:#ff6b6b; }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; background:var(--bg); color:var(--tx); font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; -webkit-text-size-adjust:100%; }
+  body{ min-height:100vh; padding:max(12px, env(safe-area-inset-top)) 14px max(16px, env(safe-area-inset-bottom)); }
+  .wrap{ max-width:520px; margin:0 auto; }
+  h1{ font-size:19px; margin:2px 0 10px; display:flex; align-items:center; gap:8px; }
+  h1 small{ font-weight:500; font-size:12.5px; color:var(--mut); margin-left:auto; }
+  .estado{ display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:12px; background:var(--sf); border:1px solid var(--line); font-size:14px; line-height:1.35; }
+  .estado .dot{ flex:0 0 12px; height:12px; border-radius:50%; background:#666; }
+  .estado.on{ border-color:rgba(76,217,123,.55); } .estado.on .dot{ background:var(--ok); box-shadow:0 0 0 4px rgba(76,217,123,.18); }
+  .estado.off .dot{ background:var(--am); }
+  .estado b{ display:block; }
+  .estado span{ color:var(--mut); font-size:13px; }
+  .cam{ position:relative; width:100%; aspect-ratio:1/1; max-height:58vh; margin:12px 0 10px; background:#000; border-radius:16px; overflow:hidden; }
+  .cam video{ width:100%; height:100%; object-fit:cover; display:block; }
+  .cam .marco{ position:absolute; inset:14%; border:3px solid var(--am); border-radius:16px; box-shadow:0 0 0 999px rgba(0,0,0,.35); pointer-events:none; transition:border-color .15s, transform .15s; }
+  .cam.leyo .marco{ border-color:var(--ok); transform:scale(1.03); }
+  .cam.nolee .marco{ border-color:var(--bad); }
+  .cam .msg{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; padding:20px; text-align:center; font-size:15px; line-height:1.4; background:rgba(0,0,0,.6); }
+  .cam .msg[hidden]{ display:none; }
+  button{ font:inherit; cursor:pointer; }
+  .btn{ padding:11px 16px; border-radius:12px; border:1px solid var(--line); background:var(--sf2); color:var(--tx); font-weight:600; font-size:15px; }
+  .btn.pri{ background:var(--am); border-color:var(--am); color:#1a1300; }
+  .fila{ display:flex; gap:8px; flex-wrap:wrap; }
+  .fila > *{ flex:1 1 auto; }
+  .fila[hidden], .btn[hidden]{ display:none; }
+  form.mano{ display:flex; gap:8px; margin-top:10px; }
+  form.mano input{ flex:1; min-width:0; padding:11px 12px; border-radius:12px; border:1px solid var(--line); background:var(--sf); color:var(--tx); font:inherit; font-size:16px; }
+  h2{ font-size:14px; color:var(--mut); font-weight:600; margin:16px 0 6px; }
+  ul.lista{ list-style:none; margin:0; padding:0; }
+  ul.lista li{ display:flex; align-items:center; gap:10px; padding:9px 12px; margin:0 0 6px; border-radius:11px; background:var(--sf); border:1px solid var(--line); font-size:14px; }
+  ul.lista li code{ flex:1; min-width:30%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14px; }
+  ul.lista li .e{ flex:0 0 auto; font-size:12.5px; color:var(--mut); }
+  ul.lista li.ok .e{ color:var(--ok); } ul.lista li.mal .e{ color:var(--bad); }
+  .vacio{ color:var(--mut); font-size:13.5px; padding:4px 2px; }
+  .pie{ margin-top:18px; font-size:12.5px; color:var(--mut); line-height:1.5; }
+  .pie button{ background:none; border:none; color:var(--mut); text-decoration:underline; padding:0; }
+  .sin{ padding:22px 16px; border-radius:16px; background:var(--sf); border:1px solid var(--line); text-align:center; line-height:1.5; margin-top:12px; }
+  .sin .ico{ font-size:46px; }
+  .modos{ display:flex; gap:8px; margin:0 0 10px; }
+  .modos .btn{ flex:1; padding:9px 10px; font-size:14px; }
+  .modos .btn.on{ background:var(--am); border-color:var(--am); color:#1a1300; }
+  #btAcc{ margin-top:8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📱 Lector de códigos <small id="neg">ORDEVA</small></h1>
+
+  <div id="sinPar" class="sin" hidden>
+    <div class="ico">🔳</div>
+    <b>Este celular todavía no está emparejado.</b>
+    <p>En el computador (o la tablet) con ORDEVA toca <b>📱 Celular lector</b> (en la caja o el inventario) o <b>📷 Escanear</b> → <b>📱 Usar el celular como lector</b>, y escanea ese código QR con la cámara de este celular.</p>
+    <button type="button" class="btn pri" id="btSolo" hidden>🔵 Usar Bluetooth (sin internet)</button>
+  </div>
+
+  <div id="app" hidden>
+    <div class="modos" id="modos" hidden><button type="button" class="btn" data-modo="internet">📶 Internet</button><button type="button" class="btn" data-modo="bt">🔵 Bluetooth</button></div>
+    <div class="estado off" id="estado" role="status" aria-live="polite"><i class="dot"></i><div><b id="estTit">Conectando…</b><span id="estSub"></span></div></div>
+    <div class="fila" id="btAcc" hidden><button type="button" class="btn" id="btVisible">📡 Emparejar con el computador</button></div>
+    <div class="cam" id="cam">
+      <video id="video" playsinline muted autoplay></video>
+      <div class="marco"></div>
+      <div class="msg" id="camMsg"><div id="camTxt">Abriendo la cámara…</div><button type="button" class="btn pri" id="camBtn" hidden>📷 Abrir la cámara</button></div>
+    </div>
+    <div class="fila">
+      <button type="button" class="btn" id="linterna" hidden>🔦 Linterna</button>
+      <button type="button" class="btn" id="otraCam" hidden>🔄 Otra cámara</button>
+    </div>
+    <form class="mano" id="mano" autocomplete="off">
+      <input id="manoTxt" inputmode="text" maxlength="120" placeholder="O escribe el código aquí" aria-label="Escribir el código a mano">
+      <button type="submit" class="btn">Enviar</button>
+    </form>
+    <h2>Leídos</h2>
+    <ul class="lista" id="lista"></ul>
+    <div class="vacio" id="vacio">Todavía nada. Apunta la cámara a un código de barras o QR.</div>
+    <div class="pie">Funciona con wifi o con datos: el celular y el computador no tienen que estar en la misma red.<br>
+      <button type="button" id="olvidar">Dejar de ser lector de ese equipo</button></div>
+  </div>
+</div>
+
+<script>
+// Sin el servidor no llega nada al computador: «Sin conexión con ORDEVA» y la pantalla no se apaga. Con 🔵 Bluetooth no se
+// necesita internet (va directo al computador), así que ahí no se tapa la pantalla.
+window.VENTO_REQUIERE_BD = (function(){ try{ return !(window.VentoAndroid && window.VentoAndroid.btTecladoEstado && localStorage.getItem('vento_lector_bt') === '1'); }catch(e){ return true; } })();
+</script>
+<script src="nube/config.js"></script>
+<script src="lib/vento-canal.js"></script><!-- canales en vivo por el servidor de ORDEVA -->
+<script src="lib/vento-codigos.js"></script><!-- lector de códigos: el del celular o ZXing (iPhone) -->
+<script>
+(function(){
+  'use strict';
+  var LS = 'vento_lector_par', CANAL = 'https://canal.vento.local/';
+  var FORMATOS = ['qr_code', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'itf', 'codabar'];
+  var $ = function(id){ return document.getElementById(id); };
+  var c = '', pc = { on: false, s: '', h: '', n: '', t: 0 }, items = [], stream = null, detector = null, vivo = false, vez = 0;
+  var ultimo = '', ultimoAt = 0, camaras = [], camIdx = -1;
+
+  // ---------- Emparejamiento: #c=… en la dirección (el QR del computador) o el guardado en este celular ----------
+  (function(){
+    var m = /[#&]c=(lc[A-Za-z0-9]{20,40})/.exec(location.hash || '');
+    if(m){ c = m[1]; try{ localStorage.setItem(LS, c); }catch(e){} }
+    else{ try{ var g = localStorage.getItem(LS) || ''; if(/^lc[A-Za-z0-9]{20,40}$/.test(g)) c = g; }catch(e){} }
+  })();
+  // 🔵 1.65.6: dentro de la app ORDEVA el celular también puede ser lector Bluetooth del computador (TecladoBT.java): se
+  // presenta como un teclado y escribe cada código con Enter, como una pistola lectora. No necesita internet ni el QR.
+  var A = window.VentoAndroid, hayBT = !!(A && A.btTecladoEstado && (function(){ try{ return JSON.parse(A.btTecladoEstado()).soportado; }catch(e){ return false; } })());
+  var modoBT = false; try{ modoBT = hayBT && localStorage.getItem('vento_lector_bt') === '1'; }catch(e){}
+  if(!c && !modoBT){
+    $('sinPar').hidden = false;
+    if(hayBT){ $('btSolo').hidden = false; $('btSolo').onclick = function(){ try{ localStorage.setItem('vento_lector_bt', '1'); }catch(e){} location.reload(); }; }
+    return;
+  }
+  $('app').hidden = false;
+
+  function azar(n){ var a = 'abcdefghijkmnopqrstuvwxyz23456789', r = ''; for(var i = 0; i < n; i++) r += a[Math.floor(Math.random() * a.length)]; return r; }
+  function esc(t){ return String(t).replace(/[&<>"]/g, function(x){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[x]; }); }
+  function publicar(o){ return fetch(CANAL + c, { method: 'POST', body: JSON.stringify(o) }).then(function(r){ if(!r.ok) throw new Error('HTTP ' + r.status); return r; }); }
+  function equipo(){ var u = navigator.userAgent || ''; return /iphone|ipad/i.test(u) ? 'iPhone' : /android/i.test(u) ? 'Celular Android' : 'Celular'; }
+
+  // ---------- Lo que dice el computador (canal <c>r): ¿está escaneando? y «✅ recibido» ----------
+  var bt = {};
+  function pintarEstado(){
+    var e = $('estado');
+    $('modos').hidden = !hayBT || !c;
+    [].forEach.call(document.querySelectorAll('[data-modo]'), function(b){ b.classList.toggle('on', (b.dataset.modo === 'bt') === modoBT); });
+    $('btAcc').hidden = !modoBT;
+    if(modoBT){
+      var listo = bt.conectado;
+      e.className = 'estado ' + (listo ? 'on' : 'off');
+      $('estTit').textContent = listo ? '🔵 Conectado por Bluetooth' + (bt.computador ? ' con ' + bt.computador : '') : !bt.bluetooth ? 'Prende el Bluetooth del celular' : !bt.permiso ? 'Falta el permiso «Dispositivos cercanos»' : 'Esperando al computador por Bluetooth';
+      $('estSub').textContent = listo ? 'Cada código se escribe en el computador con Enter, como una pistola lectora (sin internet). Ten abierta la caja o el inventario allá.'
+        : bt.error ? bt.error : 'La primera vez: toca «📡 Emparejar con el computador» y en el computador abre Bluetooth → «Agregar dispositivo» → el nombre de este celular. Después se conecta solo.';
+      return;
+    }
+    e.className = 'estado ' + (pc.on ? 'on' : 'off');
+    $('estTit').textContent = pc.on ? 'El computador está esperando códigos' : 'El computador no está escaneando';
+    $('estSub').textContent = pc.on ? (pc.h || 'Apunta la cámara al código.') : 'Allá abre la caja, el inventario por código, la cuenta de una mesa, la venta rápida o «📷 Escanear», y lo que leas aquí entra solo.';
+    if(pc.n) $('neg').textContent = pc.n;
+  }
+  function revisarBT(){
+    if(!hayBT) return;
+    try{ bt = JSON.parse(A.btTecladoEstado()) || {}; }catch(e){ bt = {}; }
+    if(modoBT && !bt.prendido && bt.bluetooth) try{ A.btTecladoPrender(); }catch(e){}
+    pintarEstado();
+  }
+  function ponerModo(siBT){
+    modoBT = !!siBT;
+    try{ localStorage.setItem('vento_lector_bt', modoBT ? '1' : '0'); }catch(e){}
+    window.VENTO_REQUIERE_BD = !modoBT;
+    if(modoBT){ var o = document.getElementById('vcSinConexion'); if(o) o.remove(); try{ A.btTecladoPrender(); }catch(e){} }
+    revisarBT();
+  }
+  [].forEach.call(document.querySelectorAll('[data-modo]'), function(b){ b.onclick = function(){ ponerModo(b.dataset.modo === 'bt'); }; });
+  $('btVisible').onclick = function(){ try{ A.btTecladoPrender(); A.btTecladoMostrarse(); }catch(e){} setTimeout(revisarBT, 800); };
+  if(hayBT){ setInterval(revisarBT, 1500); setTimeout(revisarBT, 200); }
+  function oir(){
+    var es;
+    try{ es = new EventSource(CANAL + c + 'r/sse?since=12h&rapido=1'); }catch(e){ return; }
+    es.onmessage = function(ev){
+      var m, o; try{ m = JSON.parse(ev.data); o = JSON.parse(m.message); }catch(e){ return; }
+      if(!o) return;
+      if(o.t === 'listo'){
+        var t = +m.id || 0; if(t < pc.t) return;
+        pc = { on: !!o.on, s: o.s || '', h: o.h || '', n: o.n || pc.n, t: t };
+        pintarEstado();
+      } else if(o.t === 'ok' || o.t === 'sin'){
+        items.forEach(function(it){ if(it.id === o.id && it.estado !== 'ok'){ it.estado = o.t; } });
+        pintarLista();
+      }
+    };
+  }
+  function hola(){ if(c && !document.hidden) publicar({ t: 'hola', d: equipo() }).catch(function(){}); }
+
+  // ---------- Mandar un código ----------
+  function pitar(bien){
+    try{
+      var Ctx = window.AudioContext || window.webkitAudioContext; if(!Ctx) return;
+      var ctx = new Ctx(), o = ctx.createOscillator(), g = ctx.createGain();
+      o.frequency.value = bien ? 880 : 300; o.type = 'sine';
+      g.gain.setValueAtTime(0.15, ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
+      o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime + 0.18);
+      setTimeout(function(){ ctx.close().catch(function(){}); }, 400);
+    }catch(e){}
+  }
+  function mandar(v){
+    v = String(v || '').trim().slice(0, 300); if(!v) return;
+    var it = { id: azar(10), v: v, estado: 'va', t: Date.now() };
+    items.unshift(it); items = items.slice(0, 30);
+    var cam = $('cam');
+    if(modoBT){
+      var ok = false; try{ ok = A.btTecladoEscribir(v); }catch(e){}
+      it.estado = ok ? 'bt' : 'nobt';
+      cam.classList.add(ok ? 'leyo' : 'nolee'); setTimeout(function(){ cam.classList.remove('leyo'); cam.classList.remove('nolee'); }, 400);
+      try{ navigator.vibrate && navigator.vibrate(ok ? 60 : [60, 60, 60]); }catch(e){}
+      pitar(ok); pintarLista(); return;
+    }
+    if(!pc.on){
+      it.estado = 'no';
+      cam.classList.add('nolee'); setTimeout(function(){ cam.classList.remove('nolee'); }, 500);
+      try{ navigator.vibrate && navigator.vibrate([60, 60, 60]); }catch(e){}
+      pitar(false);
+    } else {
+      cam.classList.add('leyo'); setTimeout(function(){ cam.classList.remove('leyo'); }, 350);
+      try{ navigator.vibrate && navigator.vibrate(60); }catch(e){}
+      pitar(true);
+      publicar({ t: 'cod', v: v, id: it.id, s: pc.s }).catch(function(){ it.estado = 'mal'; pintarLista(); });
+      // Sin «✅» en 10 s: el computador no lo tomó (se cerró «Escanear», se fue el internet…).
+      setTimeout(function(){ if(it.estado === 'va'){ it.estado = 'mal'; pintarLista(); } }, 10000);
+    }
+    pintarLista();
+  }
+  function pintarLista(){
+    var E = { va: '⏳ enviando…', ok: '✅ recibido', mal: '⚠️ no llegó', no: '⚠️ no se envió', sin: '⚠️ allá no había nada abierto', bt: '✅ escrito por Bluetooth', nobt: '⚠️ sin conexión Bluetooth' };   // arriba dice el porqué
+    $('lista').innerHTML = items.map(function(it){ return '<li class="' + (it.estado === 'ok' || it.estado === 'bt' ? 'ok' : it.estado === 'va' ? '' : 'mal') + '"><code>' + esc(it.v) + '</code><span class="e">' + E[it.estado] + '</span></li>'; }).join('');
+    $('vacio').hidden = items.length > 0;
+  }
+  $('mano').addEventListener('submit', function(e){ e.preventDefault(); var v = $('manoTxt').value; $('manoTxt').value = ''; mandar(v); });
+
+  // ---------- Cámara ----------
+  function camMsg(t, boton){ $('camTxt').textContent = t || ''; $('camBtn').hidden = !boton; $('camMsg').hidden = !t; }
+  function parar(){ vivo = false; vez++; if(stream){ stream.getTracks().forEach(function(t){ t.stop(); }); stream = null; } }
+  function abrir(){
+    parar();
+    var mia = vez, video = $('video');
+    if(!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)){ camMsg('Este navegador no deja usar la cámara. Ábrelo en Chrome (Android) o Safari (iPhone). Puedes escribir los códigos abajo.'); return; }
+    camMsg('Abriendo la cámara…');
+    var lector = window.ventoCodigos.detector(FORMATOS); lector.catch(function(){});
+    var buena = { width: { ideal: 1280 }, height: { ideal: 720 }, advanced: [{ focusMode: 'continuous' }] };
+    var dev = camIdx >= 0 && camaras[camIdx] ? { deviceId: { exact: camaras[camIdx].deviceId } } : { facingMode: 'environment' };
+    navigator.mediaDevices.getUserMedia({ video: Object.assign({}, dev, buena) })
+      .catch(function(){ return navigator.mediaDevices.getUserMedia({ video: dev }); })
+      .then(function(s){
+        if(mia !== vez){ s.getTracks().forEach(function(t){ t.stop(); }); return; }
+        stream = s; video.srcObject = s;
+        return video.play().catch(function(){}).then(function(){ return lector; }).then(function(d){
+          if(mia !== vez) return;
+          detector = d; camMsg('');
+          linterna(); otrasCamaras();
+          vivo = true; leer(mia);
+        }, function(){ camMsg('No se pudo preparar el lector de códigos. Revisa el internet y vuelve a abrir.', true); });
+      }, function(){
+        if(mia !== vez) return;
+        camMsg('No se pudo abrir la cámara. Dale permiso a esta página para usar la cámara y toca el botón.', true);
+      });
+  }
+  function leer(mia){
+    if(!vivo || mia !== vez) return;
+    var video = $('video'), sigue = function(){
+      if(!vivo || mia !== vez) return;
+      if(detector && detector.zxing) setTimeout(function(){ leer(mia); }, 120);
+      else if(video.requestVideoFrameCallback) video.requestVideoFrameCallback(function(){ leer(mia); });
+      else requestAnimationFrame(function(){ leer(mia); });
+    };
+    if(!detector || !video.videoWidth) return sigue();
+    detector.detect(video).then(function(l){
+      var x = l && l.find(function(b){ return b && b.rawValue; });
+      if(x && mia === vez){
+        var now = Date.now();
+        // Mientras el mismo código siga en cámara no se repite: para sumar otro, se retira un momento y se vuelve a mostrar.
+        if(!(x.rawValue === ultimo && now - ultimoAt < 800)){ ultimo = x.rawValue; ultimoAt = now; mandar(x.rawValue); }
+        else ultimoAt = now;
+      }
+    }, function(){}).then(sigue);
+  }
+  function linterna(){
+    var b = $('linterna'); b.hidden = true;
+    try{
+      var tr = stream && stream.getVideoTracks()[0], cap = tr && tr.getCapabilities ? tr.getCapabilities() : {};
+      if(!cap || !cap.torch) return;
+      b.hidden = false; b.textContent = '🔦 Linterna'; b.classList.remove('on');
+      b.onclick = function(){ var on = !b.classList.contains('on'); tr.applyConstraints({ advanced: [{ torch: on }] }).then(function(){ b.classList.toggle('on', on); b.textContent = on ? '🔦 Apagar linterna' : '🔦 Linterna'; }, function(){}); };
+    }catch(e){}
+  }
+  function otrasCamaras(){
+    navigator.mediaDevices.enumerateDevices().then(function(l){
+      camaras = l.filter(function(d){ return d.kind === 'videoinput'; });
+      $('otraCam').hidden = camaras.length < 2;
+      if(camIdx < 0 && stream){ var id = stream.getVideoTracks()[0].getSettings().deviceId; camIdx = camaras.findIndex(function(d){ return d.deviceId === id; }); }
+    }, function(){});
+  }
+  $('otraCam').addEventListener('click', function(){ if(camaras.length < 2) return; camIdx = (camIdx + 1) % camaras.length; abrir(); });
+  $('camBtn').addEventListener('click', abrir);
+  $('olvidar').addEventListener('click', function(){
+    if(!confirm('¿Dejar de ser lector de ese equipo? Para volver, escanea otra vez su código QR.')) return;
+    try{ localStorage.removeItem(LS); }catch(e){}
+    parar(); location.replace(location.pathname);
+  });
+  // En segundo plano el celular apaga la cámara: al volver se abre de nuevo y se avisa «aquí estoy».
+  document.addEventListener('visibilitychange', function(){
+    if(document.hidden){ parar(); return; }
+    hola(); abrir();
+  });
+
+  pintarEstado(); pintarLista();
+  if(c){ oir(); hola(); setInterval(hola, 30000); }   // solo Bluetooth (sin emparejar por QR): no hay canal
+  abrir();
+})();
+</script>
+</body>
+</html>
