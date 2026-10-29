@@ -55,6 +55,13 @@ async function aplicarTodas() {
 
 (async () => {
   let mal = 0;
+  // 1.65.9: dos migraciones con la MISMA versión (el número del principio) hacen que «supabase db push» se confunda:
+  // cree que una ya está aplicada y vuelve a correr la otra (pasó con 20261118000000). Cada versión, una sola vez.
+  const porVersion = {};
+  fs.readdirSync(MIG).filter((f) => f.endsWith('.sql')).forEach((f) => { const v = f.split('_')[0]; (porVersion[v] = porVersion[v] || []).push(f); });
+  const repetidas = Object.keys(porVersion).filter((v) => porVersion[v].length > 1);
+  if (repetidas.length) { mal++; console.log('❌ Migraciones con la misma versión (renombra una con un número nuevo): ' + repetidas.map((v) => porVersion[v].join(' y ')).join('; ')); }
+  else console.log('✅ Cada migración tiene su propia versión');
   const nuevas = process.argv.slice(2).filter((f) => /\.sql$/.test(f) && fs.existsSync(path.resolve(RAIZ, f)));
   for (const f of nuevas) {
     const r = destructivas(path.resolve(RAIZ, f));

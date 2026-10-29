@@ -49,9 +49,17 @@ Se busca en este orden y se usa el primero que lo tenga:
 - Para un producto nuevo, la ficha ya trae «¿Cuántas llegaron?».
 
 ### 5. Servidor
-- Migración nueva `20261118000000_catalogo_codigos.sql`: **solo agrega** tablas y funciones. No borra ni cambia
+- Migración nueva `20261122000000_catalogo_codigos.sql`: **solo agrega** tablas y funciones. No borra ni cambia
   nada.
 - Las tablas tienen RLS y sin acceso directo; solo se usan las dos funciones.
+
+## Despliegue (corrección)
+- El primer despliegue falló sin aplicar nada nuevo. La migración del catálogo tenía la misma versión que otra ya
+  aplicada (`20261118000000_pagos_dispositivo_suena`), y el CLI intentó correr esa otra de nuevo.
+- Se renombró a `20261122000000_catalogo_codigos.sql`.
+- Se agregó `20261122000001_pagos_dispositivo_reafirmar.sql`. Deja `pagos_dispositivo` igual a su última versión, por
+  si ese intento hubiera alcanzado a cambiarla. Es «create or replace» y no borra nada.
+- `pruebas/servidor/revisar-migraciones.js` ahora no deja desplegar si dos migraciones tienen la misma versión.
 
 ## Pruebas
 - `pruebas/codigoproducto.test.js` (22 ✅), con una base libre de mentira. Cubre:
