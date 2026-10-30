@@ -245,7 +245,6 @@ Las de la sección 9. Enter en el campo de lo recibido cobra en efectivo.
     | facturascan | 33 | facturacategorias | 11 | salidas | 19 |
     | libreta | 24 | recetas | 21 | entrar | 35 |
     | iphone | 9 | erroresreal | 33 | tablero | 26 |
-    | hola | 15 | | | | |
 
 - **Servidor, PostgreSQL real (22 pruebas, 916 revisiones, 0 fallas):**
 
