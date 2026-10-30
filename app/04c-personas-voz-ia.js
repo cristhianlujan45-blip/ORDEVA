@@ -507,10 +507,13 @@ function payVuPintar(scope){
   const box = document.querySelector('.pay-vu[data-vu="' + scope + '"]'); if(!box) return;
   const inp = document.getElementById(scope === 'person' ? 'personPaymentAmount' : 'paymentAmount'), sel = document.getElementById(scope === 'person' ? 'personPaymentMethod' : 'paymentMethod');
   const v = Math.round(Number(inp && inp.value) || 0);
-  let saldo = 0; try{ saldo = Math.max(0, Math.round(scope === 'person' ? personBalanceAmt(currentPersonId) : tableBalance(currentTable))); }catch(e){}
-  if(!v || !sel || sel.value !== 'efectivo' || !saldo){ box.textContent = ''; box.className = 'pay-vu'; return; }
-  box.innerHTML = v === saldo ? '✅ <b>PAGO EXACTO</b>' : v > saldo ? 'Cambio que debe devolver: <b>' + fmt(v - saldo) + '</b>' : 'Abono · queda por pagar <b>' + fmt(saldo - v) + '</b>';
-  box.className = 'pay-vu ' + (v === saldo ? 'exacto' : v > saldo ? 'vueltas' : 'falta');
+  let saldo = 0, mesa = 0;
+  try{ mesa = Math.max(0, Math.round(tableBalance(currentTable))); saldo = scope === 'person' ? Math.max(0, Math.round(personBalanceAmt(currentPersonId))) : mesa; }catch(e){}
+  if(!v || !sel || sel.value !== 'efectivo' || !mesa){ box.textContent = ''; box.className = 'pay-vu'; return; }
+  // Una persona que paga de más cubre a los demás de la mesa; vueltas solo si pasa del saldo de toda la mesa.
+  box.innerHTML = v > mesa ? 'Cambio que debe devolver: <b>' + fmt(v - mesa) + '</b>' : v === saldo ? '✅ <b>PAGO EXACTO</b>'
+    : v > saldo ? 'Paga lo suyo y <b>' + fmt(v - saldo) + '</b> de los demás' : 'Abono · queda por pagar <b>' + fmt(saldo - v) + '</b>';
+  box.className = 'pay-vu ' + (v > mesa ? 'vueltas' : v === saldo ? 'exacto' : v > saldo ? 'exacto' : 'falta');
 }
 document.addEventListener('input', ev => { const id = ev.target && ev.target.id; if(id === 'paymentAmount') payVuPintar('table'); else if(id === 'personPaymentAmount') payVuPintar('person'); });
 document.addEventListener('change', ev => { const id = ev.target && ev.target.id; if(id === 'paymentMethod') payVuPintar('table'); else if(id === 'personPaymentMethod') payVuPintar('person'); });
@@ -533,7 +536,9 @@ document.getElementById('addPaymentBtn').addEventListener('click', async ()=>{
   // «¿Quién paga?» con el nombre de una persona de la mesa: el pago queda a nombre de ella (no de la cuenta general).
   const quien = fiAscii(noteInput.value.trim()).toLowerCase();
   const persona = quien ? (t.people || []).find(x => fiAscii(String(x.name || '')).toLowerCase().trim() === quien) : null;
-  const aj = await pagoAjustarAlSaldo(amount, methodSelect.value, persona ? personBalanceAmt(persona.id) : tableBalance(currentTable));
+  // Lo que una persona paga de más cubre lo de los demás de la mesa (se reparte como siempre): las vueltas son solo lo
+  // que pasa del saldo de TODA la mesa.
+  const aj = await pagoAjustarAlSaldo(amount, methodSelect.value, tableBalance(currentTable));
   if(!aj) return;
   amount = aj.amount;
   t.payments.push({ note: noteInput.value.trim(), amount, method: methodSelect.value, ...(aj.recibido ? { recibido: aj.recibido, vueltas: aj.vueltas } : {}), ...(persona ? { personId: persona.id } : {}), ...(payPick.table ? { items: payPick.table } : {}), ...receiptField('table') });
@@ -1010,7 +1015,7 @@ document.getElementById('personAddPaymentBtn').addEventListener('click', async (
   }
   const t = data.tables[currentTable];
   if(!t.payments) t.payments = [];
-  const aj = await pagoAjustarAlSaldo(amount, methodSelect.value, personBalanceAmt(currentPersonId));
+  const aj = await pagoAjustarAlSaldo(amount, methodSelect.value, tableBalance(currentTable));
   if(!aj) return;
   amount = aj.amount;
   t.payments.push({ note: noteInput.value.trim(), amount, method: methodSelect.value, ...(aj.recibido ? { recibido: aj.recibido, vueltas: aj.vueltas } : {}), personId: currentPersonId, ...(payPick.person ? { items: payPick.person } : {}), ...receiptField('person') });
