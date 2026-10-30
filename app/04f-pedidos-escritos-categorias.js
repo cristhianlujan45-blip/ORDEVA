@@ -440,7 +440,8 @@ function asisBot(text, extra){
 function asisMargin(p){
   const c = Number(p.cost), pr = Number(p.price);
   if(!(c > 0) || !(pr > 0)) return null;
-  return { pct: Math.round((pr - c) / pr * 100), gan: pr - c };
+  const F = window.ventoFinanzas;   // 🧮 motor financiero
+  return { pct: Math.round(F ? F.margen(pr, c) : (pr - c) / pr * 100), gan: pr - c };
 }
 function asisSales(){
   const now = Date.now(), start = new Date(); start.setHours(0, 0, 0, 0);

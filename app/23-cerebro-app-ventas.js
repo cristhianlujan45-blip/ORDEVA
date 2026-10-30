@@ -224,7 +224,8 @@
       const p = buscarProducto(mp[1]);
       if(p && precio > 0){
         if(!esAdmin()) return { text: '🔒 Cambiar precios es solo para un administrador.' };
-        const margen = p.cost > 0 ? ' Con costo ' + plata(p.cost) + ' te quedaría ' + Math.round((precio - p.cost) / precio * 100) + '% de margen.' : '';
+        const F = window.ventoFinanzas;   // 🧮 motor financiero
+        const margen = p.cost > 0 ? ' Con costo ' + plata(p.cost) + ' te quedaría ' + Math.round(F ? F.margen(precio, p.cost) : (precio - p.cost) / precio * 100) + '% de margen.' : '';
         return { text: '¿Cambio el precio de ' + p.name + ' de ' + plata(p.price) + ' a ' + plata(precio) + '?' + margen + (p.cost > 0 && precio <= p.cost ? ' ⚠️ Ojo: quedaría por debajo del costo.' : ''), actions: [{ tipo: 'laya', op: 'precio', id: p.id, precio, label: '✅ Sí, a ' + plata(precio) }] };
       }
     }

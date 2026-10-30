@@ -439,11 +439,24 @@ function renderStats(){
     else{ const pc = Math.round((total - prevTotal) / prevTotal * 100); cmpValue = (pc >= 0 ? '▲ ' : '▼ ') + Math.abs(pc) + '%'; }
   }
   const marginPct = knownRevenue > 0 ? Math.round(margin / knownRevenue * 100) : 0;
+  /* 🧮 1.67.2: rentabilidad con el motor financiero (lib/vento-finanzas.js): utilidad bruta y margen, gastos operativos
+     (sin las compras de mercancía, que ya están en el costo de lo vendido), resultado neto estimado, margen por categoría,
+     los más rentables y los de menor margen. Con el costo guardado en cada venta (el pasado no cambia). */
+  const F = window.ventoFinanzas, R0 = { ini: from, fin: Date.now() + 1 };
+  const RT = F ? F.rentabilidad(data.history, data.products, data.categories, R0) : null;
+  let RS = null; try{ if(F && typeof ctMovimientos === 'function'){ const mv = ctMovimientos(R0); RS = F.resultado(knownRevenue, knownRevenue - margin, mv.mov.filter(m => m.tipo === 'gasto')); } }catch(e){}
+  const pct = v => v == null ? '—' : (Math.round(v * 10) / 10).toString().replace('.', ',') + ' %';
+  const conM = RT ? RT.productos.filter(x => x.margen != null && x.ventas > 0) : [];
   const profitCard = !hasCostData
     ? stCard('💹 Rentabilidad', '<div class="empty-state">Configura el costo de tus productos (en Productos → Editar) para ver aquí el margen de ganancia.</div>')
-    : stCard('💹 Rentabilidad', '<div class="st-kpis">' + stKpi('🧮 Margen bruto', stMoney(margin)) + stKpi('📊 Margen %', marginPct + '%') + '</div>' +
-        '<div class="st-sub">🥇 Más rentable (margen)</div>' +
-        stRows(top(profit, 8, x => x.g).map(([n, x]) => ({ l: n, v: Math.max(0, x.g), t: stMoney(x.g) + ' · ' + x.q + ' u' }))));
+    : stCard('💹 Rentabilidad', '<div class="st-kpis">' + stKpi('🧮 Utilidad bruta', stMoney(margin)) + stKpi('📊 Margen bruto', marginPct + '%') +
+        (RS ? stKpi('💸 Gastos operativos', stMoney(RS.gastosOperativos)) + stKpi('✅ Resultado neto estimado', stMoney(RS.resultadoNeto)) : '') + '</div>' +
+        (RT && RT.categorias.some(c => c.margen != null) ? '<div class="st-sub">🗂️ Margen por categoría</div>' +
+          stRows(RT.categorias.filter(c => c.margen != null).sort((a, b) => b.utilidad - a.utilidad).slice(0, 8).map(c => ({ l: c.nombre, v: Math.max(0, c.utilidad), t: stMoney(c.utilidad) + ' · ' + pct(c.margen) }))) : '') +
+        '<div class="st-sub">🥇 Más rentable (utilidad)</div>' +
+        stRows(top(profit, 8, x => x.g).map(([n, x]) => ({ l: n, v: Math.max(0, x.g), t: stMoney(x.g) + ' · ' + x.q + ' u' }))) +
+        (conM.length > 1 ? '<div class="st-sub">⚠️ Menor margen</div>' + stRows(conM.slice().sort((a, b) => a.margen - b.margen).slice(0, 5).map(x => ({ l: x.nombre, v: Math.max(0.01, 100 - x.margen), t: pct(x.margen) + ' · ' + stMoney(x.utilidad) }))) : '') +
+        (RT && RT.ventasSinCosto > 0 ? '<div class="st-sub" style="font-weight:500">⚠️ ' + stMoney(RT.ventasSinCosto) + ' vendidos sin costo: no entran en el margen.</div>' : ''));
   const sales = !H.length ? '<div class="empty-state">No hay ventas cobradas en este período. Las estadísticas se llenan cuando cierras cuentas.</div>' : [
     '<div class="st-kpis">' + stKpi('💰 Ventas', stMoney(total)) + stKpi('🧾 Cuentas', H.length) + stKpi('🎟️ Ticket promedio', stMoney(total / H.length)) + stKpi('🍺 Unidades vendidas', units) + stKpi('📒 Fiado (debe)', stMoney(debt)) + stKpi('📅 Promedio por día', stMoney(total / Math.max(1, stPer === 'todo' ? new Set(H.map(h => new Date(h.date).toDateString())).size : stPer === 'hoy' ? 1 : +stPer))) + (cmpValue != null ? stKpi('📊 Vs. período anterior', cmpValue) : '') + '</div>',
     stCard(i18nPut('📈 Ventas ' + (stPer === 'hoy' ? 'por hora' : stPer === 'todo' ? 'por mes' : 'por día')), stBars(tItems)),
@@ -457,7 +470,9 @@ function renderStats(){
   ].join('');
   const tr = data.products.filter(p => p.stock != null), cnt = s2 => data.products.filter(p => invStatus(p) === s2).length;
   const key = p => invDays(p) == null ? 1e6 + p.stock : invDays(p), COL = { out: '#ff5a5a', low: '#f5b83d', ok: '#4cd97b' };
-  const inv = '<div class="st-kpis">' + stKpi('📦 Valor del stock (a precio de venta)', stMoney(tr.reduce((a, p) => a + p.stock * p.price, 0))) + stKpi('🧮 Productos con control', tr.length + ' de ' + data.products.length) + stKpi('🚫 Agotados', cnt('out')) + stKpi('⚠️ Por agotarse', cnt('low')) + '</div>' +
+  const IV = window.ventoFinanzas ? window.ventoFinanzas.inventario(data.products) : null;   // 🧮 inventario valorizado
+  const inv = '<div class="st-kpis">' + stKpi('📦 Valor del stock (a precio de venta)', stMoney(tr.reduce((a, p) => a + p.stock * p.price, 0))) +
+    (IV && IV.inversion > 0 ? stKpi('💼 Plata invertida (a costo)', stMoney(IV.inversion)) + stKpi('📈 Ganancia potencial', stMoney(IV.gananciaPotencial)) : '') + stKpi('🧮 Productos con control', tr.length + ' de ' + data.products.length) + stKpi('🚫 Agotados', cnt('out')) + stKpi('⚠️ Por agotarse', cnt('low')) + '</div>' +
     (tr.length ? stCard('📉 Se agotan primero', stRows(tr.slice().sort((a, b) => key(a) - key(b)).slice(0, 10).map(p => { const d = invDays(p); return { l: p.name, v: p.stock, c: COL[invStatus(p)], t: p.stock + ' u' + (d != null ? ' · ≈' + (d < 1 ? 'hoy' : Math.round(d) + ' d') : '') }; })))
       : '<div class="empty-state">Aún no controlas stock. Configúralo en Inventario para ver estas gráficas.</div>');
   box.innerHTML = '<h3 class="st-h">💵 Ventas</h3>' + sales + calendarComparisonCard() + '<h3 class="st-h">📦 Inventario</h3>' + inv;
@@ -673,15 +688,15 @@ const INVOICE_TARGET_MARGIN = 0.35;
 // se comporten igual.
 function invoiceInferMargin(product){
   if(product && product.cost != null && product.cost > 0 && product.price > 0){
-    const m = (product.price - product.cost) / product.price;
+    const F = window.ventoFinanzas, m = F ? F.margen(product.price, product.cost) / 100 : (product.price - product.cost) / product.price;   // 🧮 motor financiero
     if(m >= 0.05 && m < 0.95) return m;
   }
   return INVOICE_TARGET_MARGIN;
 }
 function invoicePriceFromMargin(cost, marginPct){
   if(!cost || cost <= 0) return 0;
-  const m = Math.max(0, Math.min(0.9, marginPct));
-  return Math.round(cost / (1 - m) / 100) * 100;
+  const m = Math.max(0, Math.min(0.9, marginPct)), F = window.ventoFinanzas;   // 🧮 motor financiero
+  return Math.round((F ? F.precioParaMargen(cost, m * 100) : cost / (1 - m)) / 100) * 100;
 }
 function invoiceSuggestPrice(cost, product){
   if(!cost || cost <= 0) return product ? product.price : 0;

@@ -150,10 +150,11 @@ relacionales que se llenan solas + RLS) sirve, y la transición a registros rela
 | P2 | En las cuentas, el efectivo de más se anotaba como cobrado | `app/04c-personas-voz-ia.js` | **Alta** | ✅ Corregido en 1.67.0 |
 | P3 | «¿Con cuánto paga?» estaba escondido | `lib/vento-pos.js` | Media (operación) | ✅ Corregido en 1.67.0 |
 | P4 | Lo recibido y las vueltas no quedaban en la venta | `app/04f`, `app/04a` | Media (trazabilidad) | ✅ Corregido en 1.67.0 |
-| P5 | Fórmula del margen repetida en 7 sitios | `app/04d`, `04e`, `04f`, `23` | Baja | 🟡 Motor único creado; la ficha ya lo usa. Faltan las demás pantallas |
+| P5 | Fórmula del margen repetida en 7 sitios | `app/04d`, `04e`, `04f`, `23` | Baja | ✅ Unificadas con el motor en la 1.67.2 |
 | P6 | Sin costo promedio ponderado: el último costo pisa al anterior | `app/04e` | Media | Pendiente (fase 5) |
 | P7 | Sincronización del documento completo en cada cambio | `nube/vento-nube.js` | Media (rendimiento con negocios grandes) | Pendiente (fase 10) |
 | P8 | `javaavisos`: la revisión del servicio de fondo y `Cruce.java` no compilan en la prueba | `pruebas/javaavisos.test.js` | Baja (solo la prueba) | Viene de antes (M1). Pendiente |
+| P10 | La utilidad del Inicio restaba dos veces las compras de mercancía (factura + costo de lo vendido) | `lib/ordeva2.js` | **Alta** (utilidad más baja de la real) | ✅ Corregido en la 1.67.2 |
 | P9 | `equiposprobar` falló una vez en GitHub sin el resultado final; aquí pasa siempre | | Baja | Ahora el registro de pruebas muestra la causa si se repite |
 
 ## 4. Riesgos de seguridad
@@ -177,7 +178,7 @@ Las vueltas nunca suman como venta ni como gasto (comprobado en la prueba `vuelt
 | Fase | Qué | Estado |
 |---|---|---|
 | 1. Seguridad y estabilidad | Revisar RLS, funciones y canales con las pruebas negativas. Arreglar P8. Diagnóstico de P9 | 🟡 Sin hallazgos nuevos; P8 y P9 abiertos |
-| 2. Motor financiero | Motor único (`lib/vento-finanzas.js`): margen, recargo, precio para no perder, para el margen objetivo y comercial. Llevarlo a facturas, Laya y estadísticas. Alertas de pérdida y de costo que sube | 🟡 Motor y ficha del producto hechos |
+| 2. Motor financiero | Motor único (`lib/vento-finanzas.js`): margen y recargo, precios sugeridos, resultado sin doble conteo de compras, rentabilidad por producto y categoría, inventario valorizado, 5 alertas. Pantallas y fórmulas repetidas unificadas | ✅ 1.67.0–1.67.2 (pendiente: IVA detallado y filtros por categoría/producto) |
 | 3. Diseño | Terminar ORDEVA 2.0 en Compras/Facturas, Clientes/Libreta, Laya y Ajustes | Pendiente |
 | 4. Cobro y vueltas | Campo siempre visible, billetes, pago exacto, mixto, sin pago incompleto, guardar recibido y vueltas, cuentas | ✅ Hecho (1.67.0) |
 | 5. Inventario y compras | Costo promedio ponderado (configurable), variación entre compras, comparación de proveedores, lotes y vencimientos | Pendiente |

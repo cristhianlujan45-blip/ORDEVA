@@ -418,7 +418,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-30 · v1.67.1';
+const MESORA_VERSION = '2026-10-30 · v1.67.2';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'ORDEVA · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 /* 🔄 La app Android se actualiza SOLA (Actualizador): revisa cada 3 h, baja la versión nueva y la instala cuando no se
@@ -2860,14 +2860,19 @@ function renderConta(){
   document.getElementById('ctKpis').innerHTML =
     k('in', '💰 Entradas', ctFmt(entradas), 'Cobrado ' + ctFmt(ventas) + (otrosIn ? ' + otros ' + ctFmt(otrosIn) : '')) +
     k('out', '💸 Gastos', ctFmt(gastos), 'Compras y gastos registrados') +
-    k('res', resultado >= 0 ? '✅ Te quedó' : '⚠️ Faltó', ctFmt(Math.abs(resultado)), 'Entradas − gastos') +
+    k('res', resultado >= 0 ? '✅ Te quedó (caja)' : '⚠️ Faltó (caja)', ctFmt(Math.abs(resultado)), 'Flujo de caja: entradas − salidas') +
     k('', '🧾 Vendido', ctFmt(x.vendido), x.nVentas + (x.nVentas === 1 ? ' cuenta' : ' cuentas')) +
     k('', '📈 Ganancia de lo vendido', ctFmt(x.vendido - x.costo), 'Vendido − costo de los productos' + (x.sinCosto ? ' (faltan costos)' : '')) +
+    // 🧮 1.67.2: resultado estimado (motor financiero): ganancia de lo vendido − gastos operativos. Las compras de
+    // mercancía no se restan otra vez (ya están en el costo de lo vendido).
+    (() => { const F = window.ventoFinanzas; if(!F) return '';
+      const R = F.resultado(x.vendido, x.costo, x.mov.filter(m => m.tipo === 'gasto'));
+      return k(R.resultadoNeto >= 0 ? 'res' : 'out', '🧮 Resultado estimado', ctFmt(R.resultadoNeto), 'Ganancia de lo vendido − gastos operativos (' + ctFmt(R.gastosOperativos) + ')' + (x.sinCosto ? ' · faltan costos' : '')); })() +
     k('', '🕒 Por cobrar (fiados)', ctFmt(x.porCobrar), 'De las ventas de este periodo') +
     // 1.65.7: lo que debe la gente HOY (cuentas de mesa y libreta) y lo que le debes a los proveedores.
     (() => { let t = null; try{ t = window.libretaTotales ? window.libretaTotales() : null; }catch(e){}
       return t ? k('', '📕 Te deben hoy', ctFmt(t.meDeben), 'Fiados de las mesas y de la libreta') + (t.debo > 0 ? k('out', '🧾 Debes a proveedores', ctFmt(t.debo), 'Lo anotado en la libreta') : '') : ''; })();
-  document.getElementById('ctAviso').textContent = (x.sinCosto ? '⚠️ Algunos productos vendidos no tienen costo: la ganancia de lo vendido sale más alta de lo real (ponlo en Productos → tocar el producto → Costo). ' : '') + 'Entradas = dinero cobrado (los fiados cuentan el día que los pagan). Las compras a proveedores entran solas al escanear sus facturas; los demás gastos regístralos aquí abajo.';
+  document.getElementById('ctAviso').textContent = (x.sinCosto ? '⚠️ Algunos productos vendidos no tienen costo: la ganancia de lo vendido sale más alta de lo real (ponlo en Productos → tocar el producto → Costo). ' : '') + 'Entradas = dinero cobrado (los fiados cuentan el día que los pagan). «Te quedó (caja)» es la plata que entró menos la que salió; «Resultado estimado» es lo que el negocio ganó: ganancia de lo vendido menos gastos operativos (las compras de mercancía no se restan dos veces). Las compras a proveedores entran solas al escanear sus facturas; los demás gastos regístralos aquí abajo.';
   const barras = (obj, cls, nombre) => { const ks = Object.keys(obj).sort((a, b) => obj[b] - obj[a]); const max = Math.max(1, ...ks.map(q => obj[q])); return ks.length ? ks.map(q => '<div class="ct-barra ' + cls + '"><span>' + invEsc(nombre(q)) + '</span><i style="width:' + Math.max(2, obj[q] / max * 100) + '%"></i><b>' + ctFmt(obj[q]) + '</b></div>').join('') : '<div class="empty-note">Nada en este periodo.</div>'; };
   const porMedio = {}, porCat = {};
   x.mov.forEach(m => { if(m.tipo === 'gasto') porCat[m.cat || 'otros'] = (porCat[m.cat || 'otros'] || 0) + m.monto; else porMedio[m.metodo || 'otro'] = (porMedio[m.metodo || 'otro'] || 0) + m.monto; });
