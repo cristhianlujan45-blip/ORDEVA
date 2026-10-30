@@ -1365,7 +1365,9 @@ const YT_CID_VENTO='896233860758-56pu0r79ff4ld5buf5a56goqb1892i7r.apps.googleuse
 // Una vez: si quedó guardado otro Client ID (de pruebas anteriores), se cambia por el del negocio, que
 // es el que tiene el Client Secret y la dirección de regreso registrados.
 try{const c0=JSON.parse(localStorage.getItem('vito_yt')||'null');if(c0&&c0.cid&&c0.cid!==YT_CID_VENTO&&!c0.cidVento){c0.cid=YT_CID_VENTO;c0.cidVento=1;delete c0.srv;localStorage.setItem('vito_yt',JSON.stringify(c0));}}catch(e){}
-const yCfg=()=>{const c=Object.assign({cid:'',pl:'',len:0,on:false,key:'AIzaSyCQ_IKzsP2TEPc7jiIfV3prwc6VYvgq1xY'},LS('vito_yt',{}));if(!c.cid)c.cid=YT_CID_VENTO;return c;};
+// ORDEVA 2.0: sin clave de YouTube escrita en el código (estaba a la vista de todos). La búsqueda va primero por el
+// Servidor ORDEVA (vento-ia/yt, sin clave en la página); la clave propia del negocio se pone en Ajustes → Música.
+const yCfg=()=>{const c=Object.assign({cid:'',pl:'',len:0,on:false,key:''},LS('vito_yt',{}));if(!c.cid)c.cid=YT_CID_VENTO;return c;};
 const yTok=()=>{try{const t=JSON.parse(localStorage.getItem('vito_ytok')||sessionStorage.getItem('vito_ytok'));return t&&t.exp>Date.now()?t.t:null;}catch(e){return null;}};
 let yTC=null,cadena=Promise.resolve();
 /* Con qué cuenta de Google quedó conectada la app. Importa porque la lista se crea en

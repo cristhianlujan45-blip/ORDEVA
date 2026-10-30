@@ -1829,7 +1829,7 @@ async function resetAll(){
   await saveData();
   renderAll();
   renderHistorial();
-  applyPalette(data.theme || 'noche');
+  applyPalette(data.theme || 'ordeva2');
   showToast('La aplicación fue restablecida por completo.');
 }
 
@@ -1991,11 +1991,14 @@ function textoSobre(hex){
 }
 const PALETTE_GRUPOS = [['claro', '☀️ Claras · para el mostrador con mucha luz'], ['oscuro', '🌙 Oscuras · de noche, bares y discotecas'], ['fecha', '🎉 Fechas especiales']];
 const PALETTES = {
+  // ORDEVA 2.0: la identidad de la marca. Blanco, negro y grises; el color solo dice algo (verde = bien / pagado, rojo =
+  // error, naranja = pendiente, azul = información). La navegación lateral oscura la pone lib/ordeva2.js.
+  ordeva2: pal({ n: '◐ ORDEVA 2.0', g: 'claro', rec: true, bg: '#f4f5f7', s: '#ffffff', s2: '#f1f2f4', ink: '#0d0e10', soft: '#5f6672', a: '#111214', a2: '#000000', cr: '#111214', r: '#dc2626', line: '#e4e6ea', ok: '#16a34a', c2: '#2563eb', c3: '#ea580c', c5: '#475569', font: "'Inter', 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }),
   apple: pal({ n: '☁️ Blanco nube', g: 'claro', bg: '#f2f2f7', s: '#ffffff', s2: '#e9e9ef', ink: '#1c1c1e', soft: '#6e6e73', a: '#0a6cff', a2: '#0050c8', cr: '#0a6cff', r: '#e0352b', line: '#e3e3e8', ok: '#248a3d', c2: '#8e44ad', c3: '#b8740a', c5: '#00838f' }),
   claro: pal({ n: '🍊 Mostrador mandarina', g: 'claro', bg: '#fbf8f4', s: '#ffffff', s2: '#f2ece4', ink: '#1f1a17', soft: '#6b625a', a: '#e8590c', a2: '#c2410c', cr: '#c2410c', r: '#d6293f', line: '#ebe3d8', ok: '#1f8a4c', c2: '#2563eb', c3: '#a87900', c5: '#7c3aed' }),
   cafe: pal({ n: '☕ Café con leche', g: 'claro', bg: '#f3ebde', s: '#fffdf9', s2: '#eadfcc', ink: '#3b2a1d', soft: '#75604f', a: '#8b5a2b', a2: '#6f4520', cr: '#6f4520', r: '#b23a2e', line: '#dccdb5', ok: '#4d7c3a', c2: '#3f7f8a', c3: '#a57a10', c5: '#7a5c9e' }),
   menta: pal({ n: '🌿 Menta fresca', g: 'claro', bg: '#eff7f3', s: '#ffffff', s2: '#e0efe7', ink: '#12261d', soft: '#4f665c', a: '#087a54', a2: '#066343', cr: '#066343', r: '#d33a3a', line: '#cfe3d8', ok: '#15803d', c2: '#2f6fd6', c3: '#b07a00', c5: '#8a4fd6' }),
-  noche: pal({ n: '🌙 Noche violeta', g: 'oscuro', bg: '#0f0f16', s: '#17171f', s2: '#1e1e29', p: '#15151c', p2: '#1c1c26', ink: '#f2f1f7', soft: '#9a97ad', a: '#7c3aed', a2: '#5b21b6', cr: '#c4b5fd', crs: '#a78bfa', r: '#fb7185', r2: '#fda4af', line: '#2a2a38', ok: '#34d399', c2: '#22d3ee', c3: '#fbbf24', c5: '#60a5fa', font: "'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", rec: true }),
+  noche: pal({ n: '🌙 Noche violeta', g: 'oscuro', bg: '#0f0f16', s: '#17171f', s2: '#1e1e29', p: '#15151c', p2: '#1c1c26', ink: '#f2f1f7', soft: '#9a97ad', a: '#7c3aed', a2: '#5b21b6', cr: '#c4b5fd', crs: '#a78bfa', r: '#fb7185', r2: '#fda4af', line: '#2a2a38', ok: '#34d399', c2: '#22d3ee', c3: '#fbbf24', c5: '#60a5fa', font: "'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }),
   nocturno: pal({ n: '🔷 Azul medianoche', g: 'oscuro', bg: '#0a1220', s: '#101a2c', s2: '#16233a', ink: '#e4eaf5', soft: '#93a3bf', a: '#2f6fe0', a2: '#1f55b8', cr: '#8fb8ff', r: '#f26d6d', line: '#22314d', ok: '#3fbf8f', c2: '#22c3e6', c3: '#e8b84a', c5: '#a78bfa' }),
   moderno: pal({ n: '🌊 Laguna turquesa', g: 'oscuro', bg: '#061b1c', s: '#0b2627', s2: '#103032', ink: '#e3faf7', soft: '#86b8b2', a: '#0d9488', a2: '#0b766c', cr: '#6fe3d3', r: '#f47272', line: '#1a4143', ok: '#3ccf91', c2: '#5aa9f0', c3: '#f0c04a', c5: '#c58af0' }),
   vito: pal({ n: '🍺 Cervecería ámbar', g: 'oscuro', bg: '#1b1208', s: '#241a0f', s2: '#2d2213', ink: '#fff3e0', soft: '#d2b48a', a: '#e39b2d', a2: '#b8770f', cr: '#ffcf6b', r: '#e2542d', line: '#3c2a17', ok: '#8bc34a', c2: '#4fb3bf', c3: '#ffd166', c5: '#c9a2ff' }),
@@ -2083,7 +2086,7 @@ function paletteCardHtml(key, p, current){
 function renderPaletteOptions(){
   const grid = document.getElementById('paletteGrid');
   const personalGrid = document.getElementById('palettePersonalGrid');
-  const current = data.theme || 'noche';
+  const current = data.theme || 'ordeva2';
   // 1.65.6: por grupos (claras, oscuras, fechas especiales), cada uno con su título.
   grid.innerHTML = PALETTE_GRUPOS.map(([g, titulo]) => {
     const l = Object.entries(PALETTES).filter(([key, p]) => p.grupo === g && !PALETTE_PERSONAL_KEYS.includes(key));

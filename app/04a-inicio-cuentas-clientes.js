@@ -239,12 +239,15 @@ async function loadData(){
   if(!data.history) data.history = [];
   if(!data.categories) data.categories = [];
   if(!data.closures) data.closures = [];
-  if(!data.theme) data.theme = 'noche';
+  if(!data.theme) data.theme = 'ordeva2';
+  // ORDEVA 2.0: quien seguía con el diseño que venía de fábrica (Noche violeta) pasa UNA vez al nuevo. Los demás diseños
+  // elegidos se respetan, y Noche violeta sigue en Ajustes → Apariencia para volver a ponerla.
+  if(!data.o2Tema){ if(data.theme === 'noche') data.theme = 'ordeva2'; data.o2Tema = 1; }
   // El diseño original (Matrix) se deja solo como opción personal en Ajustes,
   // no como lo que ve el negocio por defecto: si alguien lo tenía puesto sin
   // haber elegido conscientemente uno de los diseños nuevos, se pasa una
   // sola vez al nuevo predeterminado.
-  if(data.theme === 'matrix' && !data.themeChosen) data.theme = 'noche';
+  if(data.theme === 'matrix' && !data.themeChosen) data.theme = 'ordeva2';
   data.themeChosen = true;
   if(!data.tableViewMode) data.tableViewMode = 'list';
   if(data.easyMode === undefined) data.easyMode = false;

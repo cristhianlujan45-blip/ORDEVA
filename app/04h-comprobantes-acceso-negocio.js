@@ -115,8 +115,8 @@ function setupColorPickers(){
   pb.oninput = pa.oninput = onInput;
   pb.onchange = pa.onchange = () => saveData();
   rain.checked = !data.rainOff;
-  rain.onchange = () => { data.rainOff = !rain.checked; applyPalette(data.theme || 'noche'); saveData(); };
-  reset.onclick = () => { delete data.customColors; applyPalette(data.theme || 'noche'); saveData(); showToast('Colores originales restablecidos.'); };
+  rain.onchange = () => { data.rainOff = !rain.checked; applyPalette(data.theme || 'ordeva2'); saveData(); };
+  reset.onclick = () => { delete data.customColors; applyPalette(data.theme || 'ordeva2'); saveData(); showToast('Colores originales restablecidos.'); };
   applyCustomColors();
 }
 

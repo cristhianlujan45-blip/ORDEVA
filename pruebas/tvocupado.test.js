@@ -23,6 +23,8 @@ const mock = require('./ntfymock.js')();
   await ctx.exposeFunction('__lounge', (ruta, query, cuerpo) => resp(ruta, query, cuerpo));
   await ctx.exposeFunction('__abrio', (url, codigo) => { tv.abrir++; return 201; });   // YouTube ya abierto con otro celular: ignora el código nuevo
   await ctx.addInitScript(() => {
+    // ORDEVA 2.0: ya no hay clave de YouTube en el código; aquí el negocio tiene la suya (Ajustes → Música).
+    try{ const c = JSON.parse(localStorage.getItem('vito_yt') || '{}'); c.key = 'AIzaClaveDelNegocio00000000000000000'; localStorage.setItem('vito_yt', JSON.stringify(c)); }catch(e){}
     window.VentoAndroid = { info: () => '{}', vozIniciar(){}, vozParar(){}, vozCancelar(){}, hablar(){}, callar(){}, guardarArchivo(){}, fondo: () => true, fondoActivar(){}, ajustesBateria(){}, notificar(){ return true; }, avisosEstado: () => '{"prendidos":true}',
       buscarTVs: () => { setTimeout(() => window.__ventoTV({ id: 'uuid:lg::dial', nombre: '[LG] webOS TV', fabricante: 'LG Electronics', ip: '192.168.1.40', tipo: 'lg', appUrl: 'http://192.168.1.40:36866/apps/', youtube: true, screenId: 'scr-lg' }), 150); setTimeout(() => window.__ventoTVfin(1, {}), 400); },
       abrirYouTube: (id, appUrl, codigo) => { window.__abrio(appUrl, codigo).then(st => setTimeout(() => window.__ventoCb(id, { status: st }), 80)); },

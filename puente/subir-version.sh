@@ -15,6 +15,7 @@ done
 sed -i -E "s#(src=\"app/[^\"?]+\.js)\?v=[0-9.]+\"#\1?v=$NUEVA\"#g" index.html
 # 1.61.0: también lib/ y nube/ (menos nube/config.js): con versión, el equipo los guarda y abre al instante (sw.js)
 sed -i -E "s#(src=\"(lib|nube)/[^\"?]+\.js)(\?v=[0-9.]+)?\"#\1?v=$NUEVA\"#g" index.html
+sed -i -E "s#(href=\"lib/[^\"?]+\.css)(\?v=[0-9.]+)?\"#\1?v=$NUEVA\"#g" index.html   # ORDEVA 2.0: también las hojas de estilo (lib/ordeva2.css)
 sed -i -E "s#src=\"nube/config\.js\?v=[0-9.]+\"#src=\"nube/config.js\"#" index.html
 sed -i "s/var ADMIN_VERSION = '[^']*'/var ADMIN_VERSION = '$TXT'/" admin.html
 printf '%s\n' "$TXT" > version.txt

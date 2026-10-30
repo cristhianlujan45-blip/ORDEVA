@@ -888,7 +888,9 @@ $('s').addEventListener('focus',()=>{ if(!$('s').value.trim()){ const box=$('sug
    leyendo su canal). YouTube no da álbum/sencillo por su API pública —eso
    es interno de la app YouTube Music—, así que "lo más pedido del artista"
    es lo más cerca que se puede llegar sin esa información. */
-const YT_KEY='AIzaSyCQ_IKzsP2TEPc7jiIfV3prwc6VYvgq1xY';
+// ORDEVA 2.0: sin clave de YouTube en la página pública. Todo va por el Servidor ORDEVA (vento-ia/yt/…); la API de
+// Google con clave queda solo si algún día se configura una restringida a este sitio (YT_KEY), y si no, no se usa.
+const YT_KEY='';
 /* Búsqueda SIN cupo: el Servidor ORDEVA lee la página pública de resultados de YouTube (vento-ia/yt/buscar). Antes cada
    búsqueda gastaba 200 de las 10.000 unidades diarias de la API (canciones + artistas) y con ~50 búsquedas al día YouTube
    respondía «se alcanzó el límite»: ya no aparecía nada. La API queda solo de respaldo. */
@@ -951,6 +953,7 @@ function ytPintarCanciones(wrap,q,songs,titulo){
 async function ytBuscarArtistas(q){
   const sj=await ytSrvBuscar(q,'canal');
   if(sj) return sj.items.filter(it=>it.id&&it.id.channelId).slice(0,6).map(it=>({ id:it.id.channelId, name:((it.snippet&&it.snippet.title)||'').replace(/\s*-\s*Topic$/i,''), thumb:ytThumb(it.snippet) }));
+  if(!YT_KEY) return [];
   try{
     const url='https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&maxResults=6&q='+encodeURIComponent(q)+'&key='+YT_KEY;
     const r=await fetch(url); if(!r.ok) return [];
@@ -979,6 +982,7 @@ async function ytCancionesDeArtista(channelId,nombre){
   return r2;
 }
 async function ytCancionesDeArtistaApi(channelId){
+  if(!YT_KEY) return [];
   try{
     const chJ=await fetch('https://www.googleapis.com/youtube/v3/channels?part=contentDetails&id='+channelId+'&key='+YT_KEY).then(r=>r.json());
     const uploads=chJ.items&&chJ.items[0]&&chJ.items[0].contentDetails&&chJ.items[0].contentDetails.relatedPlaylists&&chJ.items[0].contentDetails.relatedPlaylists.uploads;
@@ -1015,7 +1019,7 @@ async function ytBuscar(q,genero){
   try{
     [artistas,cancionesJson]=await Promise.all([
       genero?[]:ytBuscarArtistas(q),
-      ytSrvBuscar(q,'video').then(j=>j?{items:j.items.slice(0,N)}:fetch('https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoCategoryId=10&maxResults='+N+'&q='+encodeURIComponent(q)+'&key='+YT_KEY).then(r=>r.ok?r.json():null).catch(()=>null))
+      ytSrvBuscar(q,'video').then(j=>j?{items:j.items.slice(0,N)}:!YT_KEY?null:fetch('https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoCategoryId=10&maxResults='+N+'&q='+encodeURIComponent(q)+'&key='+YT_KEY).then(r=>r.ok?r.json():null).catch(()=>null))
     ]);
   }catch(err){}
   if(myId!==ytSeq) return;
@@ -1705,6 +1709,7 @@ function fxSet(kind){
    llega por el canal en vivo de ORDEVA junto con la carta, ver cargarCat()) ---------- */
 const TH = {
   // 1.65.6: los mismos colores de las apariencias de ORDEVA (app/04g-productos-historial-caja.js, PALETTES).
+  ordeva2: { '--bg':'#f4f5f7', '--card':'#ffffff', '--card2':'#f1f2f4', '--line':'rgba(17,18,20,.22)', '--line2':'rgba(13,14,16,.08)', '--ink':'#0d0e10', '--ink2':'rgba(13,14,16,.62)', '--gold':'#111214', '--gold-hi':'#3a3d42', '--gold-lo':'#000000', '--on-gold':'#ffffff' },
   apple: { '--bg':'#f2f2f7', '--card':'#ffffff', '--card2':'#e9e9ef', '--line':'rgba(10,108,255,.28)', '--line2':'rgba(28,28,30,.08)', '--ink':'#1c1c1e', '--ink2':'rgba(28,28,30,.62)', '--gold':'#0a6cff', '--gold-hi':'#609fff', '--gold-lo':'#0050c8', '--on-gold':'#ffffff' },
   claro: { '--bg':'#fbf8f4', '--card':'#ffffff', '--card2':'#f2ece4', '--line':'rgba(232,89,12,.28)', '--line2':'rgba(31,26,23,.08)', '--ink':'#1f1a17', '--ink2':'rgba(31,26,23,.62)', '--gold':'#e8590c', '--gold-hi':'#f09361', '--gold-lo':'#c2410c', '--on-gold':'#101114' },
   cafe: { '--bg':'#f3ebde', '--card':'#fffdf9', '--card2':'#eadfcc', '--line':'rgba(139,90,43,.28)', '--line2':'rgba(59,42,29,.08)', '--ink':'#3b2a1d', '--ink2':'rgba(59,42,29,.62)', '--gold':'#8b5a2b', '--gold-hi':'#b49475', '--gold-lo':'#6f4520', '--on-gold':'#ffffff' },

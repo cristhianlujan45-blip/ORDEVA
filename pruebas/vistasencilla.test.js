@@ -17,7 +17,7 @@ const FOTOS = process.env.VENTO_FOTOS || '';
     for(const [ancho, alto, nom] of [[390, 844, 'celular'], [1280, 800, 'pc']]){
       const ctx = await b.newContext({ viewport: { width: ancho, height: alto } });
       await ctx.route('**/*', r => new URL(r.request().url()).hostname === 'localhost' ? r.continue() : r.abort());
-      await ctx.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '' })); }catch(e){} });
+      await ctx.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '' })); localStorage.setItem('vento_o2_lado', '0'); }catch(e){} });   // ORDEVA 2.0: la barra de siempre (la lateral se prueba en ordeva2.test.js)
       const p = await ctx.newPage(); p.on('pageerror', e => errs.push(nom + ': ' + e.message));
       await p.goto(BASE + '/index.html'); await p.waitForTimeout(1200);
       await p.fill('#authBiz', 'Bar Sencillo'); await p.fill('#authUser', 'ana'); await p.fill('#authPass', 'clave123'); await p.click('#authBtn'); await p.waitForTimeout(1500);

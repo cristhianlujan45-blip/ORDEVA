@@ -95,6 +95,8 @@ const LISTA = 'PLsalsabaul0000000000000001';
 
     // ===== 5. Servidor caído → API =====
     srvCaido = true;
+    // ORDEVA 2.0: ya no hay clave de YouTube escrita en el código; la API con clave es la que el negocio pone en Ajustes.
+    await p.evaluate(() => { const k = window.ventoClave('vito_yt'), c = JSON.parse(localStorage.getItem(k) || '{}'); c.key = 'AIzaClaveDelNegocio00000000000000000'; localStorage.setItem(k, JSON.stringify(c)); });
     await p.evaluate(() => window.vitoMusica.fondo.poner('PLporapi00000000000000003', 'X', null));
     const porApi = await p.evaluate(() => { const f = JSON.parse(localStorage.getItem(window.ventoClave('vito_fondo'))); return { on: f.on, n: f.vids.length, nombre: f.nombre }; });
     chk('5. Sin servidor, la playlist se lee con la API de YouTube (barata: 1 unidad por cada 50)', porApi.on && porApi.n === 5 && porApi.nombre === 'Lista por API' && api.includes('playlistItems'), { porApi, api });

@@ -48,6 +48,7 @@ const AHORA = new Date('2026-10-22T15:30:00-05:00');
       data.history = H.sort((a, c) => Date.parse(c.date) - Date.parse(a.date));
       window.__pedidosFalsos = [{ estado: 'cancelado', at: Date.parse(at(0, 11, 50)), items: [] }, { estado: 'entregado', at: Date.parse(at(0, 12, 0)), items: [] }];
       window.vitoPedidos = Object.assign(window.vitoPedidos || {}, { lista: () => window.__pedidosFalsos });
+      data.theme = 'noche'; applyPalette('noche');   // ORDEVA 2.0 viene clara de fábrica: aquí se prueba con la oscura
       await saveData(); renderAll();
       document.querySelector('nav button[data-view="estadisticas"]').click();
       const b2 = document.querySelector('#stPer button[data-p="hoy"]'); b2 && b2.click();

@@ -3,7 +3,7 @@
 //     el texto de los botones sobre el acento 4,5:1 (blanco u oscuro, el que se lea mejor), rojo y verde 3:1.
 //  2. Ninguna se parece a otra: fondo y acento distintos (distancia de color CIE Lab), y nombres sin repetir.
 //  3. La galería sale por grupos (claras, oscuras, fechas especiales) con una vista previa de verdad de cada una.
-//  4. Al elegir una, la app toma sus colores (también el del texto sobre el acento); la predeterminada es «🌙 Noche violeta».
+//  4. Al elegir una, la app toma sus colores (también el del texto sobre el acento); la predeterminada es «◐ ORDEVA 2.0» (desde ORDEVA 2.0; antes «🌙 Noche violeta»).
 //  5. La página de pedidos de los clientes (pedido.html) conoce todas las apariencias (con «Noche» y la personal usa su
 //     diseño propio).
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
@@ -67,7 +67,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 
     // ===== 4. Elegir una =====
     const raiz = () => p.evaluate(() => { const s = getComputedStyle(document.documentElement); return { bg: s.getPropertyValue('--bg').trim(), amber: s.getPropertyValue('--amber').trim(), on: s.getPropertyValue('--on-amber').trim(), tema: data.theme }; });
-    chk('4. La predeterminada es «🌙 Noche violeta» (marcada «Predeterminada»)', P.noche.recommended && Object.values(P).filter(x => x.recommended).length === 1 && await p.evaluate(() => !!document.querySelector('#paletteGrid .palette-card[data-key="noche"] .palette-badge')));
+    chk('4. La predeterminada es «◐ ORDEVA 2.0» (marcada «Predeterminada»)', P.ordeva2.recommended && Object.values(P).filter(x => x.recommended).length === 1 && await p.evaluate(() => !!document.querySelector('#paletteGrid .palette-card[data-key="ordeva2"] .palette-badge')));
     for(const k of ['grafito', 'claro', 'velitas']){
       await p.evaluate(k => document.querySelector('#paletteGrid .palette-card[data-key="' + k + '"]').click(), k);
       await p.waitForTimeout(200);

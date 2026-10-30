@@ -3,14 +3,14 @@
 <head>
 <link rel="preconnect" href="https://generativelanguage.googleapis.com">
 <meta charset="UTF-8">
-<script src="lib/vento-errores.js?v=1.65.10"></script><!-- errores de este equipo → ORDEVA Admin (🐞 Errores) -->
-<script src="lib/vento-colormix.js?v=1.65.10" defer></script><!-- iPhone con iOS 15/16.0: colores mezclados (no hace nada en los demás) -->
-<script src="app/01-menus-saltan-arriba.js?v=1.65.10"></script>
+<script src="lib/vento-errores.js?v=1.66.0"></script><!-- errores de este equipo → ORDEVA Admin (🐞 Errores) -->
+<script src="lib/vento-colormix.js?v=1.66.0" defer></script><!-- iPhone con iOS 15/16.0: colores mezclados (no hace nada en los demás) -->
+<script src="app/01-menus-saltan-arriba.js?v=1.66.0"></script>
 <script>
 // Un QR de mesa o link de domicilio que cae en la app del negocio abre la carta del cliente.
 (function(){var q=location.search;if(/[?&]c=\w/.test(q)&&/[?&](mesa=\d|dom=1)/.test(q))location.replace(location.pathname.replace(/[^/]*$/,'')+'pedido.html'+q+location.hash);})();
 </script>
-<script src="app/02-android-apk-dentro.js?v=1.65.10"></script>
+<script src="app/02-android-apk-dentro.js?v=1.66.0"></script>
 <!-- Evita que el navegador (sobre todo en el celular, con la app agregada a la
      pantalla de inicio) se quede pegado con una versión vieja de esta página
      guardada en caché — cada visita revisa que sea la última. -->
@@ -62,7 +62,7 @@
 window.ventoClave = (function(){ let ck = null, cv = ''; return function(k){ try{ const sid = localStorage.getItem('bar-current-sede') || 'default', raw = localStorage.getItem('bar-sedes-list') || '[]'; if(ck !== sid + raw){ ck = sid + raw; const s = (JSON.parse(raw) || []).find(x => x.id === sid); cv = s && s.cuenta && s.cuenta !== 'principal' ? '@' + s.cuenta : ''; } return k + cv; }catch(e){ return k; } }; })();
 window.esAndroid = function(){ var ua = navigator.userAgent || ''; if(/Android/i.test(ua)) return true; try{ if(navigator.userAgentData && /android/i.test(navigator.userAgentData.platform || '')) return true; }catch(e){} return /Linux/i.test(ua) && !/CrOS|Windows|Macintosh/i.test(ua) && (navigator.maxTouchPoints || 0) > 0; };
 </script>
-<script src="app/03-catalogo-tipos-negocio.js?v=1.65.10"></script>
+<script src="app/03-catalogo-tipos-negocio.js?v=1.66.0"></script>
 <script>
 /* Pantalla siempre al ancho del celular: si Chrome abre la página como «sitio para computadoras»
    (o el celular la dibuja más ancha que la pantalla), se agranda sola para no tener que hacer zoom. */
@@ -234,7 +234,7 @@ body.neg-tienda #quickSaleBtn, body:not(.neg-tienda) #fiadosBtn, body:not(.neg-t
 <meta name="application-name" content="ORDEVA">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&family=Poppins:wght@600;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&family=Poppins:wght@600;800&family=Manrope:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root{
     /* Valores por defecto = paleta "Noche violeta" (la nueva predeterminada),
@@ -2184,6 +2184,7 @@ body.neg-tienda #quickSaleBtn, body:not(.neg-tienda) #fiadosBtn, body:not(.neg-t
   body.no-productos nav button[data-view="productos"], body.no-productos .more-tile[data-go="productos"],
   body.no-inventario nav button[data-view="inventario"], body.no-inventario .more-tile[data-go="inventario"],
   body.no-estadisticas nav button[data-view="estadisticas"], body.no-estadisticas .more-tile[data-go="estadisticas"],
+  body.no-estadisticas nav button[data-view="inicio"], body.no-estadisticas .more-tile[data-go="inicio"], body.modo-mesero nav button[data-view="inicio"], body.modo-mesero .more-tile[data-go="inicio"],
   body.no-contabilidad nav button[data-view="contabilidad"], body.no-contabilidad .more-tile[data-go="contabilidad"],
   body.rol-equipo nav button[data-view="ajustes"], body.rol-equipo .more-tile[data-go="ajustes"], body.rol-equipo .more-tile[data-go="ia"],
   body.rol-equipo #asisFab, body.rol-equipo #voiceFabAI{ display:none !important; }
@@ -3135,7 +3136,8 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
 #overlay .mesa-sec .persona-add{ margin:0 0 6px; }
 #overlay .mesa-sec + .section-divider{ margin-top:14px; }
 </style>
-<script src="lib/vento-canal.js?v=1.65.10"></script><!-- canales en vivo por el servidor de ORDEVA (pedidos QR, canciones, meseros, TV…) -->
+<script src="lib/vento-canal.js?v=1.66.0"></script><!-- canales en vivo por el servidor de ORDEVA (pedidos QR, canciones, meseros, TV…) -->
+<link rel="stylesheet" href="lib/ordeva2.css?v=1.66.0"><!-- ◐ ORDEVA 2.0: sistema de diseño (variables, navegación lateral, componentes) -->
 </head>
 <body>
 <div id="splashScreen" role="img" aria-label="ORDEVA">
@@ -3180,6 +3182,7 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
     </div>
     <div class="tabbar" id="tabbar">
       <nav>
+        <button data-view="inicio" class="nav-extra" id="o2InicioNav"><svg class="nav-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 10.5 12 4l8.5 6.5"/><path d="M5.5 9v10.5h13V9"/><path d="M10 19.5v-5h4v5"/></svg><span class="nav-lbl">Inicio</span></button>
         <button class="active" data-view="mesas"><svg class="nav-ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="4" rx="1.5"/><path d="M6 11v8M18 11v8M9 15h6"/></svg><span class="nav-lbl">Mesas</span></button>
         <button data-view="cocina" data-mod="k"><svg class="nav-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11h16v2a7 7 0 0 1-7 7h-2a7 7 0 0 1-7-7z"/><path d="M2 11h20M9 7.5c0-1.5 1-2 1-3.5M14 7.5c0-1.5 1-2 1-3.5"/></svg><span class="nav-lbl" id="prepNavLbl" data-novocab>Pantalla</span><span id="kdsBadge" class="nav-badge"></span></button>
         <button data-view="productos"><svg class="nav-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 2.5h4V6l2 3v11a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2V9l2-3z"/><path d="M8 12.5h8M8 17h8"/></svg><span class="nav-lbl">Productos</span></button>
@@ -3195,6 +3198,9 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
     </div>
   </header>
 
+  <!-- ORDEVA 2.0 · 🏠 Inicio: resumen del negocio con datos reales (lib/ordeva2.js). Lo ve el dueño, el administrador y quien
+       tenga el permiso de estadísticas. -->
+  <section id="view-inicio"><div id="o2Inicio"></div></section>
   <section id="view-mesas" class="active">
     <div id="primerosPasos" hidden></div>
     <div id="posPanel" hidden data-novocab></div><!-- Caja (POS) del modo tienda / mixto: lib/vento-pos.js -->
@@ -4269,6 +4275,7 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
     <div class="more-grip"></div>
     <div class="more-title">Más secciones</div>
     <div class="more-grid">
+      <button type="button" class="more-tile" data-go="inicio" id="o2InicioMas"><span class="more-ic">🏠</span><strong>Inicio</strong><small>Resumen del negocio de hoy</small></button>
       <button type="button" class="more-tile" data-go="contabilidad"><span class="more-ic">📒</span><strong>Contabilidad</strong><small>Entradas, gastos y ganancia</small></button>
       <button type="button" class="more-tile" data-go="estadisticas"><span class="more-ic">📊</span><strong>Estadísticas</strong><small>Ventas y ganancias</small></button>
       <button type="button" class="more-tile" data-go="carta"><span class="more-ic" id="moreCartaIc">📖</span><strong id="moreCartaLbl">Carta</strong><small>Lo que ven tus clientes</small></button>
@@ -5067,35 +5074,36 @@ export default {
   </form>
 </div>
 <script src="nube/config.js"></script>
-<script src="nube/vento-nube.js?v=1.65.10"></script>
-<script src="nube/vento-usuarios.js?v=1.65.10" defer></script><!-- usuarios del equipo (solo con nombre) en todos los equipos del negocio -->
-<script src="nube/vento-pagos.js?v=1.65.10" defer></script>
-<script src="nube/vento-dian.js?v=1.65.10" defer></script><!-- 🧾 Facturación electrónica DIAN (P.O.S. electrónico, factura y notas crédito) -->
-<script src="nube/vento-suscripcion.js?v=1.65.10" defer></script>
-<script src="lib/vento-puerta.js?v=1.65.10" defer></script><!-- Puerta: la app solo funciona conectada a la base de datos de ORDEVA -->
-<script src="lib/vento-pos.js?v=1.65.10" defer></script><!-- Modos de trabajo (tienda/mixto) y modo fácil -->
-<script src="lib/vento-equipos.js?v=1.65.10" defer></script>
-<script src="lib/vento-turno.js?v=1.65.10" defer></script>
-<script src="lib/vento-tablero.js?v=1.65.10" defer></script><!-- 🛰️ Tablero de estadísticas --><script src="lib/vento-recetas.js?v=1.65.10" defer></script><!-- 🧾 Recetas e insumos (descuentan al vender) --><script src="lib/vento-inventario.js?v=1.65.10" defer></script><!-- 🔢 Inventario por código: consultar, entrada de mercancía, toma de inventario, kárdex y devoluciones --><!-- 💵 Caja con base, entradas / salidas y arqueo --><!-- 🔌 Balanza, impresora de facturas y cajón de dinero (USB, Bluetooth, red) -->
-<script src="lib/vento-confirma.js?v=1.65.10" defer></script><!-- Confirmación de pagos: ⏳ esperando el pago, mesa correcta, sin valor, mesero, cuadre -->
-<script src="lib/vento-guia.js?v=1.65.10" defer></script><!-- Modo fácil para mayores: guía paso a paso con voz, «Ayúdame» y recorrido -->
-<script src="lib/vento-cuenta.js?v=1.65.10" defer></script><!-- Soporte en la app, licencias del proveedor, recuperar por SMS, cuenta de cliente aparte del administrador -->
-<script src="lib/vento-sw.js?v=1.65.10" defer></script><!-- abrir al instante: guarda la app en este equipo (sw.js) -->
-<script src="lib/vento-sencilla.js?v=1.65.10" defer></script><!-- 🧭 Vista sencilla (Ajustes → Apariencia): opcional, por equipo -->
-<script src="lib/vento-modulos.js?v=1.65.10" defer></script><!-- 🧩 Funciones de este negocio (Ajustes → Negocio): prender o apagar módulos por negocio -->
+<script src="nube/vento-nube.js?v=1.66.0"></script>
+<script src="nube/vento-usuarios.js?v=1.66.0" defer></script><!-- usuarios del equipo (solo con nombre) en todos los equipos del negocio -->
+<script src="nube/vento-pagos.js?v=1.66.0" defer></script>
+<script src="nube/vento-dian.js?v=1.66.0" defer></script><!-- 🧾 Facturación electrónica DIAN (P.O.S. electrónico, factura y notas crédito) -->
+<script src="nube/vento-suscripcion.js?v=1.66.0" defer></script>
+<script src="lib/vento-puerta.js?v=1.66.0" defer></script><!-- Puerta: la app solo funciona conectada a la base de datos de ORDEVA -->
+<script src="lib/vento-pos.js?v=1.66.0" defer></script><!-- Modos de trabajo (tienda/mixto) y modo fácil -->
+<script src="lib/vento-equipos.js?v=1.66.0" defer></script>
+<script src="lib/vento-turno.js?v=1.66.0" defer></script>
+<script src="lib/vento-tablero.js?v=1.66.0" defer></script><!-- 🛰️ Tablero de estadísticas --><script src="lib/vento-recetas.js?v=1.66.0" defer></script><!-- 🧾 Recetas e insumos (descuentan al vender) --><script src="lib/vento-inventario.js?v=1.66.0" defer></script><!-- 🔢 Inventario por código: consultar, entrada de mercancía, toma de inventario, kárdex y devoluciones --><!-- 💵 Caja con base, entradas / salidas y arqueo --><!-- 🔌 Balanza, impresora de facturas y cajón de dinero (USB, Bluetooth, red) -->
+<script src="lib/vento-confirma.js?v=1.66.0" defer></script><!-- Confirmación de pagos: ⏳ esperando el pago, mesa correcta, sin valor, mesero, cuadre -->
+<script src="lib/vento-guia.js?v=1.66.0" defer></script><!-- Modo fácil para mayores: guía paso a paso con voz, «Ayúdame» y recorrido -->
+<script src="lib/vento-cuenta.js?v=1.66.0" defer></script><!-- Soporte en la app, licencias del proveedor, recuperar por SMS, cuenta de cliente aparte del administrador -->
+<script src="lib/vento-sw.js?v=1.66.0" defer></script><!-- abrir al instante: guarda la app en este equipo (sw.js) -->
+<script src="lib/vento-sencilla.js?v=1.66.0" defer></script><!-- 🧭 Vista sencilla (Ajustes → Apariencia): opcional, por equipo -->
+<script src="lib/vento-modulos.js?v=1.66.0" defer></script><!-- 🧩 Funciones de este negocio (Ajustes → Negocio): prender o apagar módulos por negocio -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script><!-- defer: antes frenaba todo lo de abajo (y si el CDN no respondía, ORDEVA se quedaba en blanco); solo se usa al tocar «imagen del recibo» -->
-<script src="lib/vento-codigos.js?v=1.65.10" defer></script><!-- 🔳 leer códigos de barras y QR también en el programa de PC (Windows) y en iPhone (ZXing) -->
-<script src="lib/vento-lector-cel.js?v=1.65.10" defer></script><!-- 📱 el celular como lector de códigos de este equipo (inalámbrico, por el servidor de ORDEVA) -->
-<script src="lib/vento-producto-codigo.js?v=1.65.10" defer></script><!-- 🏷️ producto reconocido por su código: catálogo que aprende, bases libres, IA; ficha llena y «¿cuántas llegaron?» -->
-<script src="lib/vento-sonidos.js?v=1.65.10"></script>
-<script src="app/04a-inicio-cuentas-clientes.js?v=1.65.10"></script>
-<script src="app/04b-mesas-voz-cocina.js?v=1.65.10"></script>
-<script src="app/04c-personas-voz-ia.js?v=1.65.10"></script>
-<script src="app/04d-combos-estadisticas-carta.js?v=1.65.10"></script>
-<script src="app/04e-facturas-mostrador-domicilios.js?v=1.65.10"></script>
-<script src="app/04f-pedidos-escritos-categorias.js?v=1.65.10"></script>
-<script src="app/04g-productos-historial-caja.js?v=1.65.10"></script>
-<script src="app/04h-comprobantes-acceso-negocio.js?v=1.65.10"></script>
+<script src="lib/vento-codigos.js?v=1.66.0" defer></script><!-- 🔳 leer códigos de barras y QR también en el programa de PC (Windows) y en iPhone (ZXing) -->
+<script src="lib/vento-lector-cel.js?v=1.66.0" defer></script><!-- 📱 el celular como lector de códigos de este equipo (inalámbrico, por el servidor de ORDEVA) -->
+<script src="lib/vento-producto-codigo.js?v=1.66.0" defer></script><!-- 🏷️ producto reconocido por su código: catálogo que aprende, bases libres, IA; ficha llena y «¿cuántas llegaron?» -->
+<script src="lib/ordeva2.js?v=1.66.0" defer></script><!-- ◐ ORDEVA 2.0: navegación lateral, apariencia y 🏠 Inicio (resumen del negocio con datos reales) -->
+<script src="lib/vento-sonidos.js?v=1.66.0"></script>
+<script src="app/04a-inicio-cuentas-clientes.js?v=1.66.0"></script>
+<script src="app/04b-mesas-voz-cocina.js?v=1.66.0"></script>
+<script src="app/04c-personas-voz-ia.js?v=1.66.0"></script>
+<script src="app/04d-combos-estadisticas-carta.js?v=1.66.0"></script>
+<script src="app/04e-facturas-mostrador-domicilios.js?v=1.66.0"></script>
+<script src="app/04f-pedidos-escritos-categorias.js?v=1.66.0"></script>
+<script src="app/04g-productos-historial-caja.js?v=1.66.0"></script>
+<script src="app/04h-comprobantes-acceso-negocio.js?v=1.66.0"></script>
 
 <script>
 /* === TRANSFERENCIA / RESPALDO COMPLETO === */
@@ -5165,16 +5173,16 @@ export default {
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',wireBackupUI); else wireBackupUI();
 })();
 </script>
-<script src="app/05-pedidos-canciones-recibidos.js?v=1.65.10"></script>
+<script src="app/05-pedidos-canciones-recibidos.js?v=1.66.0"></script>
 
-<script src="app/06-campana-notificaciones-pedidos.js?v=1.65.10"></script>
+<script src="app/06-campana-notificaciones-pedidos.js?v=1.66.0"></script>
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <!-- qrcodejs 1.0.0 (MIT) incluido aquí mismo: las etiquetas y los QR de mesa funcionan sin internet -->
-<script src="app/07-qrcode-this-mode.js?v=1.65.10"></script>
+<script src="app/07-qrcode-this-mode.js?v=1.66.0"></script>
 <!-- JsBarcode 3.11.5 (MIT) incluido aquí mismo -->
-<script src="app/08-jsbarcode-return-exports.js?v=1.65.10"></script>
-<script src="app/09-cuentas-mesa-modulo.js?v=1.65.10"></script>
+<script src="app/08-jsbarcode-return-exports.js?v=1.66.0"></script>
+<script src="app/09-cuentas-mesa-modulo.js?v=1.66.0"></script>
 <script>
 /* Los motores pesados de lectura (OCR 10 MB y PDF 2 MB) ya no van dentro de esta página: se cargan
    solo cuando se lee una factura. Así ORDEVA abre más rápido y usa mucha menos memoria, y Android
@@ -5202,15 +5210,15 @@ document.addEventListener('click', function(ev){
   if(b) setTimeout(window.ventoPrecargarLibs, 1500);
 }, true);
 </script>
-<script src="app/10-tesseract-ocr-engine.js?v=1.65.10"></script>
+<script src="app/10-tesseract-ocr-engine.js?v=1.66.0"></script>
 <!-- lib/vento-ocr.js: se carga solo al leer una factura (ver ventoCargarLib) -->
 <!-- lib/vento-pdf.js: se carga solo al leer una factura (ver ventoCargarLib) -->
 <!-- lib/vento-pdf-worker.js: se carga solo al leer una factura (ver ventoCargarLib) -->
-<script src="app/11-precios-vito-motor.js?v=1.65.10"></script>
-<script src="app/12-fotos-productos-fondo.js?v=1.65.10"></script>
-<script src="app/13-libreta-abuela-cuaderno.js?v=1.65.10"></script>
-<script src="app/14-verificacion-pagos-nequi.js?v=1.65.10"></script>
-<script src="app/15-whatsapp-recibir-responder.js?v=1.65.10"></script>
+<script src="app/11-precios-vito-motor.js?v=1.66.0"></script>
+<script src="app/12-fotos-productos-fondo.js?v=1.66.0"></script>
+<script src="app/13-libreta-abuela-cuaderno.js?v=1.66.0"></script>
+<script src="app/14-verificacion-pagos-nequi.js?v=1.66.0"></script>
+<script src="app/15-whatsapp-recibir-responder.js?v=1.66.0"></script>
 <script>
 /* Celebración: una explosión de emojis que se desvanece (cobro, pago recibido, pedido enviado).
    No sale si el celular pide menos movimiento ni en el modo fácil. */
@@ -5252,13 +5260,13 @@ window.mesoraCelebrar = function(emojis){
   }, 800);
 })();
 </script>
-<script src="app/16-pago-dueno-sube.js?v=1.65.10"></script>
-<script src="app/17-unidades-combinadas-reinicio.js?v=1.65.10"></script>
-<script src="app/18-laya-asistente-cerebro.js?v=1.65.10"></script>
-<script src="app/19-historial-facturas-movimientos.js?v=1.65.10"></script>
-<script src="app/20-contabilidad-recibos-adjuntos.js?v=1.65.10"></script>
-<script src="app/21-bienvenida-adapta-cada.js?v=1.65.10"></script>
-<script src="app/22-primeros-pasos-tarjeta.js?v=1.65.10"></script>
+<script src="app/16-pago-dueno-sube.js?v=1.66.0"></script>
+<script src="app/17-unidades-combinadas-reinicio.js?v=1.66.0"></script>
+<script src="app/18-laya-asistente-cerebro.js?v=1.66.0"></script>
+<script src="app/19-historial-facturas-movimientos.js?v=1.66.0"></script>
+<script src="app/20-contabilidad-recibos-adjuntos.js?v=1.66.0"></script>
+<script src="app/21-bienvenida-adapta-cada.js?v=1.66.0"></script>
+<script src="app/22-primeros-pasos-tarjeta.js?v=1.66.0"></script>
 <script>
 /* Si Android/Chrome recarga la pestaña (por memoria, al volver de la cámara o de otra app), ORDEVA vuelve
    a la sección donde estabas en vez de dejarte en el inicio. Los datos ya están guardados siempre. */
@@ -5318,7 +5326,7 @@ window.mesoraCelebrar = function(emojis){
   setInterval(pinta, 5000); pinta();
 })();
 </script>
-<script src="app/23-cerebro-app-ventas.js?v=1.65.10"></script>
+<script src="app/23-cerebro-app-ventas.js?v=1.66.0"></script>
 <script>
 /* Ajustes → Voz: lista de voces en español (las más naturales primero) */
 (function(){
@@ -5338,10 +5346,10 @@ window.mesoraCelebrar = function(emojis){
   pintar();
 })();
 </script>
-<script src="app/24-pagos-nequi-daviplata.js?v=1.65.10"></script>
-<script src="app/25-vitrina-pagina-pedidos.js?v=1.65.10"></script>
-<script src="app/26-verificar-comprobantes-nequi.js?v=1.65.10"></script>
-<script src="app/27-roles-equipo-permisos.js?v=1.65.10"></script>
+<script src="app/24-pagos-nequi-daviplata.js?v=1.66.0"></script>
+<script src="app/25-vitrina-pagina-pedidos.js?v=1.66.0"></script>
+<script src="app/26-verificar-comprobantes-nequi.js?v=1.66.0"></script>
+<script src="app/27-roles-equipo-permisos.js?v=1.66.0"></script>
 <script>
 /* ================= ¿A quién le llega el aviso de un PAGO? =================
    Solo al DUEÑO, a los ADMINISTRADORES y a quien está COBRANDO o ATENDIENDO esa mesa (mesero, empleado o cajero).
@@ -5455,8 +5463,8 @@ window.mesoraCelebrar = function(emojis){
   setTimeout(() => { armar(); pintar(); }, 1500);
 })();
 </script>
-<script src="app/28-corregir-liberar-borrar.js?v=1.65.10"></script>
-<script src="app/29-clave-cerrar-caja.js?v=1.65.10"></script>
-<script src="app/30-actividad-equipo-huella.js?v=1.65.10"></script>
+<script src="app/28-corregir-liberar-borrar.js?v=1.66.0"></script>
+<script src="app/29-clave-cerrar-caja.js?v=1.66.0"></script>
+<script src="app/30-actividad-equipo-huella.js?v=1.66.0"></script>
 </body>
 </html>
