@@ -706,8 +706,9 @@ function cuentasProducto(p){
   const precioNeto = conIva ? precio / f : precio;
   const costoNeto = costo == null ? null : (conIva ? costo / f : costo);
   const utilidad = costoNeto == null ? null : precioNeto - costoNeto;
-  const margen = (utilidad == null || precioNeto <= 0) ? null : (utilidad / precioNeto * 100);
-  const sobreCosto = (utilidad == null || !costoNeto) ? null : (utilidad / costoNeto * 100);
+  const F = window.ventoFinanzas;   // 🧮 1.67.0: margen y recargo del motor financiero (lib/vento-finanzas.js)
+  const margen = (utilidad == null || precioNeto <= 0) ? null : F ? F.margen(precioNeto, costoNeto) : (utilidad / precioNeto * 100);
+  const sobreCosto = (utilidad == null || !costoNeto) ? null : F ? F.recargo(precioNeto, costoNeto) : (utilidad / costoNeto * 100);
   const cant = (p.stock == null || p.stock === '') ? null : Math.max(0, Number(p.stock) || 0);
   return {
     iva, conIva, precio, precioNeto, ivaVenta: precio - precioNeto,
@@ -742,8 +743,8 @@ function cuentasHtml(p){
   }
   if(c.utilidad != null){
     h += fila('Ganas por unidad', fmt(Math.round(c.utilidad)), ' ' + cls);
-    h += fila('Margen', fmtPct(c.margen), ' ' + cls);
-    if(c.sobreCosto != null) h += fila('Le ganas sobre el costo', fmtPct(c.sobreCosto));
+    h += fila('Margen bruto (sobre el precio)', fmtPct(c.margen), ' ' + cls);
+    if(c.sobreCosto != null) h += fila('Recargo sobre el costo', fmtPct(c.sobreCosto));
   }
   if(c.cant != null){
     h += '<div class="pr-num-sep">Por las ' + c.cant + ' unidades que tienes</div>';
@@ -1000,7 +1001,35 @@ function renderEditProdMargin(){
   const falso = { price, cost, iva: (ivaTxt == null || ivaTxt === '') ? null : Number(ivaTxt),
     stock: invNum(document.getElementById('editProdStock').value) };
   line.innerHTML = cuentasHtml(falso);
+  renderEditProdSugeridos();
 }
+// 💡 1.67.0: precio para no perder, para el margen objetivo y comercial. «Usar» solo lo pone en el campo del precio:
+// el precio cambia cuando la persona guarda el producto (nunca solo).
+function renderEditProdSugeridos(){
+  const box = document.getElementById('editProdSugeridos'), F = window.ventoFinanzas;
+  if(!box || !F) return;
+  const cost = parseFloat(document.getElementById('editProdCost').value);
+  if(!isFinite(cost) || cost <= 0){ box.hidden = true; box.innerHTML = ''; return; }
+  const ivaTxt = (document.getElementById('editProdIva') || {}).value;
+  const iva = ivaDeProducto({ iva: (ivaTxt == null || ivaTxt === '') ? null : Number(ivaTxt) });
+  const mo = Number(data.margenObjetivo) > 0 ? Number(data.margenObjetivo) : 30;
+  const s = F.preciosSugeridos(cost, { margenObjetivo: mo, ivaVenta: iva, responsable: !!data.ivaResponsable && iva > 0 });
+  if(!s){ box.hidden = true; return; }
+  const fila = (t, v, k) => '<div class="pr-sug-f"><span>' + t + '</span><b>' + fmt(Math.round(v)) + '</b><button type="button" class="btn-ghost" data-sug="' + k + '" data-v="' + Math.round(v) + '">Usar</button></div>';
+  box.hidden = false;
+  box.innerHTML = '<div class="pr-sug-h">💡 Precio sugerido · margen objetivo <input type="number" id="editProdMargenObj" min="1" max="90" step="1" value="' + s.margenObjetivo + '" aria-label="Margen objetivo en porcentaje">%</div>' +
+    fila('Para no perder plata', s.minimo, 'min') + fila('Para tu margen de ' + s.margenObjetivo + ' %', s.objetivo, 'obj') + fila('Precio comercial (redondeado)', s.comercial, 'com') +
+    '<small>«Usar» lo pone en el precio; cambia cuando guardes. Es una ayuda: no reemplaza la asesoría contable o tributaria.</small>';
+}
+document.getElementById('editProdSugeridos') && document.getElementById('editProdSugeridos').addEventListener('click', e => {
+  const b = e.target.closest('[data-sug]'); if(!b) return;
+  const pr = document.getElementById('editProdPrice'); pr.value = b.dataset.v; pr.dispatchEvent(new Event('input', { bubbles: true }));
+});
+document.getElementById('editProdSugeridos') && document.getElementById('editProdSugeridos').addEventListener('change', async e => {
+  if(e.target.id !== 'editProdMargenObj') return;
+  const v = Math.round(Number(e.target.value)); if(!(v >= 1 && v <= 90)) return;
+  data.margenObjetivo = v; renderEditProdSugeridos(); try{ await saveData(); }catch(x){}
+});
 document.getElementById('editProdPrice').addEventListener('input', renderEditProdMargin);
 document.getElementById('editProdCost').addEventListener('input', renderEditProdMargin);
 document.getElementById('editProdIva').addEventListener('input', renderEditProdMargin);

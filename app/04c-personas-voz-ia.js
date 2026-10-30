@@ -492,7 +492,31 @@ document.addEventListener('click', ev => {
 document.addEventListener('change', ev => { if(ev.target && /^(paymentMethod|personPaymentMethod)$/.test(ev.target.id)) paySync(); });
 setInterval(() => { if(document.querySelector('.overlay.show .pay-card')) paySync(); }, 1500);
 
-document.getElementById('addPaymentBtn').addEventListener('click', ()=>{
+// 💵 1.67.0: el efectivo que entrega el cliente NO es lo que se cobra. Si da más que el saldo, se anota el saldo (lo que se
+// aplica a la cuenta) y se dice el cambio que debe devolver; antes se anotaba todo lo recibido y lo cobrado quedaba inflado.
+// Por transferencia o tarjeta no hay vueltas: se pregunta si se anota solo el saldo.
+async function pagoAjustarAlSaldo(amount, method, saldo){
+  saldo = Math.max(0, Math.round(Number(saldo) || 0)); amount = Math.round(Number(amount) || 0);
+  if(method === 'debe' || saldo <= 0 || amount <= saldo) return { amount };
+  if(method === 'efectivo') return { amount: saldo, recibido: amount, vueltas: amount - saldo };
+  const ok = await showConfirm({ title: 'Pasa del saldo', message: 'El pago de ' + fmt(amount) + ' pasa del saldo (' + fmt(saldo) + ') por ' + fmt(amount - saldo) + '. Por transferencia no hay vueltas: ¿anotar solo el saldo?', confirmText: 'Sí, anotar ' + fmt(saldo), cancelText: 'Corregir', icon: '⚠️' });
+  return ok ? { amount: saldo } : null;
+}
+// Mientras se escribe con cuánto paga (en efectivo): cambio, pago exacto o lo que queda por pagar.
+function payVuPintar(scope){
+  const box = document.querySelector('.pay-vu[data-vu="' + scope + '"]'); if(!box) return;
+  const inp = document.getElementById(scope === 'person' ? 'personPaymentAmount' : 'paymentAmount'), sel = document.getElementById(scope === 'person' ? 'personPaymentMethod' : 'paymentMethod');
+  const v = Math.round(Number(inp && inp.value) || 0);
+  let saldo = 0; try{ saldo = Math.max(0, Math.round(scope === 'person' ? personBalanceAmt(currentPersonId) : tableBalance(currentTable))); }catch(e){}
+  if(!v || !sel || sel.value !== 'efectivo' || !saldo){ box.textContent = ''; box.className = 'pay-vu'; return; }
+  box.innerHTML = v === saldo ? '✅ <b>PAGO EXACTO</b>' : v > saldo ? 'Cambio que debe devolver: <b>' + fmt(v - saldo) + '</b>' : 'Abono · queda por pagar <b>' + fmt(saldo - v) + '</b>';
+  box.className = 'pay-vu ' + (v === saldo ? 'exacto' : v > saldo ? 'vueltas' : 'falta');
+}
+document.addEventListener('input', ev => { const id = ev.target && ev.target.id; if(id === 'paymentAmount') payVuPintar('table'); else if(id === 'personPaymentAmount') payVuPintar('person'); });
+document.addEventListener('change', ev => { const id = ev.target && ev.target.id; if(id === 'paymentMethod') payVuPintar('table'); else if(id === 'personPaymentMethod') payVuPintar('person'); });
+document.addEventListener('click', ev => { if(ev.target.closest && ev.target.closest('.pay-quick, .pay-methods')) setTimeout(() => { payVuPintar('table'); payVuPintar('person'); }, 0); });
+
+document.getElementById('addPaymentBtn').addEventListener('click', async ()=>{
   const noteInput = document.getElementById('paymentNote');
   const amountInput = document.getElementById('paymentAmount');
   const methodSelect = document.getElementById('paymentMethod');
@@ -509,11 +533,16 @@ document.getElementById('addPaymentBtn').addEventListener('click', ()=>{
   // «¿Quién paga?» con el nombre de una persona de la mesa: el pago queda a nombre de ella (no de la cuenta general).
   const quien = fiAscii(noteInput.value.trim()).toLowerCase();
   const persona = quien ? (t.people || []).find(x => fiAscii(String(x.name || '')).toLowerCase().trim() === quien) : null;
-  t.payments.push({ note: noteInput.value.trim(), amount, method: methodSelect.value, ...(persona ? { personId: persona.id } : {}), ...(payPick.table ? { items: payPick.table } : {}), ...receiptField('table') });
+  const aj = await pagoAjustarAlSaldo(amount, methodSelect.value, persona ? personBalanceAmt(persona.id) : tableBalance(currentTable));
+  if(!aj) return;
+  amount = aj.amount;
+  t.payments.push({ note: noteInput.value.trim(), amount, method: methodSelect.value, ...(aj.recibido ? { recibido: aj.recibido, vueltas: aj.vueltas } : {}), ...(persona ? { personId: persona.id } : {}), ...(payPick.table ? { items: payPick.table } : {}), ...receiptField('table') });
+  if(aj.vueltas) showToast('💵 Cambio que debe devolver: ' + fmt(aj.vueltas) + ' (recibió ' + fmt(aj.recibido) + ')', 7000);
   payPick.table = null; updatePayPickInfo('table');
   noteInput.value = '';
   amountInput.value = '';
   methodSelect.value = 'efectivo';
+  payVuPintar('table');
   saveData();
   renderModalItems();
   try{ renderPeople(); }catch(e){}
@@ -967,7 +996,7 @@ function renderPersonModalPayments(){
   });
 }
 
-document.getElementById('personAddPaymentBtn').addEventListener('click', ()=>{
+document.getElementById('personAddPaymentBtn').addEventListener('click', async ()=>{
   const noteInput = document.getElementById('personPaymentNote');
   const amountInput = document.getElementById('personPaymentAmount');
   const methodSelect = document.getElementById('personPaymentMethod');
@@ -981,11 +1010,16 @@ document.getElementById('personAddPaymentBtn').addEventListener('click', ()=>{
   }
   const t = data.tables[currentTable];
   if(!t.payments) t.payments = [];
-  t.payments.push({ note: noteInput.value.trim(), amount, method: methodSelect.value, personId: currentPersonId, ...(payPick.person ? { items: payPick.person } : {}), ...receiptField('person') });
+  const aj = await pagoAjustarAlSaldo(amount, methodSelect.value, personBalanceAmt(currentPersonId));
+  if(!aj) return;
+  amount = aj.amount;
+  t.payments.push({ note: noteInput.value.trim(), amount, method: methodSelect.value, ...(aj.recibido ? { recibido: aj.recibido, vueltas: aj.vueltas } : {}), personId: currentPersonId, ...(payPick.person ? { items: payPick.person } : {}), ...receiptField('person') });
+  if(aj.vueltas) showToast('💵 Cambio que debe devolver: ' + fmt(aj.vueltas) + ' (recibió ' + fmt(aj.recibido) + ')', 7000);
   payPick.person = null; updatePayPickInfo('person');
   noteInput.value = '';
   amountInput.value = '';
   methodSelect.value = 'efectivo';
+  payVuPintar('person');
   saveData();
   renderPersonModalItems();
 });

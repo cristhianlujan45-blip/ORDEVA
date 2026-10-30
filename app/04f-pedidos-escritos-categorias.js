@@ -96,6 +96,13 @@ function qsRegistrarVenta(cart, opts){
   // Lo que se descontó del inventario queda anotado en la venta (sin guardarlo): así «deshacer» devuelve lo mismo.
   Object.defineProperty(entry, '_inv', { value: cart.filter(it => it.productId).map(it => ({ productId: it.productId, qty: it.qty })), enumerable: false });
   if(opts.cliente){ entry.dianCliente = opts.cliente; entry.dianFactura = !!opts.factura; }
+  // 💵 1.67.0: el efectivo que entregó el cliente y las vueltas quedan en la venta (no son ingreso: el pago en efectivo
+  // sigue siendo lo que se aplicó a la venta, y las vueltas no son otra venta ni un gasto).
+  if(Number(opts.recibido) > 0 && method !== 'debe'){
+    const ef = entry.payments.find(p => p.method === 'efectivo');
+    if(ef){ ef.recibido = Math.round(Number(opts.recibido)); ef.vueltas = Math.max(0, Math.round(Number(opts.vueltas) || 0)); }
+    entry.efectivoRecibido = Math.round(Number(opts.recibido)); entry.vueltas = Math.max(0, Math.round(Number(opts.vueltas) || 0));
+  }
   data.history.unshift(entry);
   entry._inv.forEach(it => { try{ invOnSale({ productId: it.productId }, it.qty); }catch(e){} });
   try{ window.ventoDian && window.ventoDian.alVender(entry); }catch(e){}   // 🧾 a la DIAN (si está prendida)

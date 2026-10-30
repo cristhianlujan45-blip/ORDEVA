@@ -864,7 +864,8 @@ function closeTableToHistory(tableId){
     amount: p.amount,
     method: p.method || 'efectivo',
     items: p.items || null,
-    receiptId: p.receiptId || null
+    receiptId: p.receiptId || null,
+    ...(p.recibido ? { recibido: p.recibido, vueltas: p.vueltas || 0 } : {})   // 💵 1.67.0: efectivo entregado y cambio (no son ingreso)
   }));
   if(balance > 0){
     paymentsDetail.push({ note: 'Saldo sin registrar al cerrar', amount: balance, method: 'debe' });
