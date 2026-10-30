@@ -156,3 +156,40 @@ body.o2 header{ border-bottom-color: transparent; }
 @media (max-width: 340px){ .o2-kpis{ grid-template-columns: minmax(0, 1fr); } }
 .o2-tabla .o2-cuando{ white-space: nowrap; color: var(--ink-soft); }
 .o2-tabla td.num{ white-space: nowrap; }
+
+/* ---------- Productos e inventario como tabla (computador, apariencia ORDEVA 2.0) ----------
+   Producto · Existencias · Costo · Precio · Margen. Tocar un renglón lo abre como siempre (editar, entrada, contar…).
+   En el celular y con las demás apariencias, la lista de siempre. */
+.o2-col, #productList > .o2-tabla-h{ display: none; }
+@media (min-width: 1024px){
+  body.o2 #productList{ background: var(--surface); border: 1px solid var(--line); border-radius: var(--o2-r-l); box-shadow: var(--o2-sombra); overflow: hidden; gap: 0 !important; }
+  body.o2 #productList > .o2-tabla-h, body.o2 #productList > .product-row > .pr-sum{
+    display: grid; grid-template-columns: minmax(0, 1fr) 120px 120px 120px 92px 22px; column-gap: 14px; align-items: center;
+  }
+  body.o2 #productList > .o2-tabla-h{ padding: 12px 18px; font-size: 12px; font-weight: 700; color: var(--ink-soft); border-bottom: 1px solid var(--line); background: var(--surface-2); }
+  body.o2 #productList > .o2-tabla-h > span:not(:first-child){ text-align: right; }
+  body.o2 #productList > .product-row{ display: block; margin: 0; padding: 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; box-shadow: none; }
+  body.o2 #productList > .product-row:last-child{ border-bottom: 0; }
+  body.o2 #productList > .product-row:hover{ background: color-mix(in srgb, var(--ink) 3%, transparent); }
+  body.o2 #productList > .product-row > .pr-sum{ padding: 10px 18px; }
+  body.o2 #productList .p-right{ display: contents; }
+  body.o2 #productList .o2-col{ display: block; text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-soft); font-size: 14px; }
+  body.o2 #productList .o2-col small{ font-size: 11.5px; }
+  body.o2 #productList .p-price{ text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }
+  body.o2 #productList .p-margen{ justify-self: end; font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; }
+  body.o2 #productList .p-margen.pr-bien{ color: var(--o2-ok); background: var(--o2-ok-bg); }
+  body.o2 #productList .p-margen.pr-bajo{ color: var(--o2-ojo); background: var(--o2-ojo-bg); }
+  body.o2 #productList .p-margen.pr-mal{ color: var(--o2-mal); background: var(--o2-mal-bg); }
+  body.o2 #productList .pr-caret{ justify-self: end; }
+  body.o2 #productList > .product-row[open] > .pr-sum{ background: var(--surface-2); }
+}
+
+/* ---------- Acciones de Productos (Agregar, Inventario por código, Factura, Etiquetas…) en una fila ----------
+   En el computador, cerradas, son tarjetas compactas una al lado de la otra; la que se abre ocupa todo el ancho, como siempre. */
+@media (min-width: 1024px){
+  body.o2 #view-inventario > .pr-panel:not([open]){ display: inline-block; vertical-align: top; width: calc((100% - 52px) / 4); margin: 0 8px 10px 0; box-sizing: border-box; }
+  body.o2 #view-inventario > .pr-panel:not([open]) > summary{ flex-direction: column; align-items: flex-start; gap: 4px; min-height: 92px; padding: 14px 16px; }
+  body.o2 #view-inventario > .pr-panel:not([open]) > summary small{ font-size: 12px; line-height: 1.35; color: var(--ink-soft); }
+  body.o2 #view-inventario > .pr-panel:not([open]):hover{ border-color: var(--ink); }
+  body.o2 #view-inventario > .pr-panel[open]{ margin: 4px 0 12px; }
+}

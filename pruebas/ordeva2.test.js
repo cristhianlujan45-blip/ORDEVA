@@ -76,6 +76,11 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     await p.click('nav button[data-view="inicio"]'); await p.click('#o2Alertas button'); await p.waitForTimeout(200);
     chk('2. «Ver» en la alerta lleva a Productos / inventario', await p.evaluate(() => document.getElementById('view-inventario').classList.contains('active')));
 
+    // ===== 8. Productos como tabla en el computador =====
+    await p.evaluate(() => document.querySelector('nav button[data-view="inventario"]').click()); await p.waitForTimeout(400);
+    v = await p.evaluate(() => { const h = document.querySelector('#productList > .o2-tabla-h'), r = document.querySelector('#productList > .product-row'); return { cab: h ? getComputedStyle(h).display : null, txt: h ? h.textContent : '', costo: r ? (r.querySelector('.o2-c-costo') || {}).textContent : '', vis: r ? getComputedStyle(r.querySelector('.o2-c-costo')).display : '', grid: r ? getComputedStyle(r.querySelector('.pr-sum')).display : '' }; });
+    chk('8. Productos en el computador: tabla con Producto · Existencias · Costo · Precio · Margen', v.cab === 'grid' && /Producto.*Existencias.*Costo.*Precio.*Margen/.test(v.txt) && v.grid === 'grid' && v.vis === 'block' && /\$\s?2\.500/.test(v.costo), v);
+
     // ===== 5. Empleado sin permiso =====
     await p.evaluate(() => { document.body.classList.add('rol-equipo', 'no-estadisticas'); });
     vis = await visibles(p);
@@ -102,6 +107,9 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     await p.click('.nav-more'); await p.waitForTimeout(250); await p.click('.more-tile[data-go="inicio"]'); await p.waitForTimeout(300);
     v = await p.evaluate(() => ({ activa: document.getElementById('view-inicio').classList.contains('active'), ancho: document.documentElement.scrollWidth }));
     chk('1. Celular: «Más» → 🏠 Inicio abre el resumen, sin desbordar a lo ancho', v.activa && v.ancho <= 390, v);
+    await p.evaluate(() => { data.products = [{ id: 'x', name: 'Agua', price: 3000, cost: 1000, stock: 4 }]; saveData(); document.querySelector('nav button[data-view="inventario"]').click(); }); await p.waitForTimeout(400);
+    v = await p.evaluate(() => { const h = document.querySelector('#productList > .o2-tabla-h'), c = document.querySelector('#productList .o2-c-costo'); return { cab: h ? getComputedStyle(h).display : null, col: c ? getComputedStyle(c).display : null }; });
+    chk('8. En el celular la lista de productos sigue como siempre (sin columnas de tabla)', v.cab === 'none' && v.col === 'none', v);
     await ctx.close();
 
     // ===== 6. Diseños de antes =====

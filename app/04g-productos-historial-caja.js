@@ -793,6 +793,10 @@ function renderProductos(){
     return;
   }
 
+  // ORDEVA 2.0: en el computador, con la apariencia nueva, la lista se ve como tabla (lib/ordeva2.css); en el celular igual que siempre.
+  const cab = document.createElement('div'); cab.className = 'o2-tabla-h'; cab.setAttribute('aria-hidden', 'true');
+  cab.innerHTML = '<span>Producto</span><span>Existencias</span><span>Costo</span><span>Precio</span><span>Margen</span><span></span>';
+  list.appendChild(cab);
   products.forEach(p=>{
     const row = document.createElement('details');
     row.className = 'product-row pr-det';
@@ -815,6 +819,8 @@ function renderProductos(){
           ${tag}
           ${invChip(p)}
         </div>
+        <span class="o2-col o2-c-stock">${p.stock == null ? '—' : invEsc(Math.round(p.stock * 100) / 100) + ' <small>' + invEsc(invPalabra()[1]) + '</small>'}</span>
+        <span class="o2-col o2-c-costo">${p.cost > 0 ? fmt(p.cost) : '—'}</span>
         <div class="p-right">
           <span class="p-price">${fmt(p.price)}</span>
           ${margenChip}
