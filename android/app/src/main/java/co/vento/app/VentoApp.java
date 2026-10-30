@@ -1391,6 +1391,10 @@ public class VentoApp extends Application {
         @JavascriptInterface
         public String pagosAvisosTomar() { return VentoEscucha.tomar(getSharedPreferences("vento", MODE_PRIVATE)); }
 
+        /** 💸 Plata que salió de las apps del banco de este celular (lo que el dueño envió o pagó): [{id, app, txt, t}]. */
+        @JavascriptInterface
+        public String pagosSalidasTomar() { return VentoEscucha.tomarSalidas(getSharedPreferences("vento", MODE_PRIVATE)); }
+
         /** YouTube Premium en el reproductor de Vento: abre la página de Google para entrar con la cuenta (dentro de la app). */
         @JavascriptInterface
         public void youtubeEntrar() {

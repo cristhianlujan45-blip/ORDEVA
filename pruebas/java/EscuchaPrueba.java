@@ -188,6 +188,24 @@ public class EscuchaPrueba {
           chk("Bre-B real de Nequi: suena «Llegaron 300 pesos por Bre-B, en Nequi.»", rb && VentoApp.dichos.contains("Llegaron 300 pesos por Bre-B, en Nequi."), VentoApp.dichos);
           chk("Bre-B real de Nequi: notificación y 🪟 ventana con «$300» por «Bre-B en Nequi» (pago confirmado)", VentoApp.notifs.stream().anyMatch(n -> n[3].equals("$300") && n[4].equals("Bre-B en Nequi") && n[5].equals("ok")), VentoApp.notifs.size());
           chk("Bre-B real de Nequi: se dice con pausas y despacio: «Recibiste, 300 pesos, por Bre-B, en Nequi.»", AvisoPago.pausado("Recibiste 300 pesos por Bre-B, en Nequi.").equals("Recibiste, 300 pesos, por Bre-B, en Nequi."), ""); }
+        // 💸 1.66.5: plata que SALE (lo que el dueño envía o paga): no suena, no va a la cola de pagos ni al servidor,
+        // pero queda en ESTE celular para clasificarla en Contabilidad (proveedor u otro gasto).
+        { Preferencias spS = nuevo();
+          app(spS, "Nequi", "Envío", "Enviaste $250.000 a DISTRIBUIDORA EL SOL", "ks1:");
+          app(spS, "DaviPlata", "DaviPlata", "Pasaste $100 a otro DaviPlata. Para saber mas, consulta tus movimientos.", "ks2:");
+          VentoEscucha.leerSms(spS, "85888", "", conv(new Object[]{"DaviPlata: Compra exitosa en la Tienda Virtual por  20,000. Para saber mas, consulta tus movimientos", ahora - 1000}), "ks3:", false);
+          VentoEscucha.leerSms(spS, "85888", "", conv(new Object[]{"DaviPlata: Tu codigo de verificacion es 482913. No lo compartas.", ahora - 1000}), "ks4:", false);
+          VentoEscucha.leerSms(spS, "3001234567", "", conv(new Object[]{"Pagaste $50.000 a JUAN", ahora - 1000}), "ks5:", false);
+          app(spS, "Nequi", "Nequi", "Tu pago de $30.000 fue rechazado. Pagaste con saldo insuficiente", "ks6:");
+          VentoApp.ui.correr();
+          String sal = VentoEscucha.tomarSalidas(spS);
+          chk("💸 Salidas: «Enviaste $250.000 a DISTRIBUIDORA EL SOL» (Nequi) queda para Contabilidad", sal.contains("Enviaste $250.000 a DISTRIBUIDORA EL SOL") && sal.contains("\"app\":\"Nequi\""), sal);
+          chk("💸 Salidas: «Pasaste $100» (DaviPlata) y «Compra exitosa … 20,000» (SMS 85888) también", sal.contains("Pasaste $100") && sal.contains("Compra exitosa") && sal.contains("SMS 85888"), sal);
+          chk("💸 Salidas: NO los códigos, ni un SMS de un celular común, ni un pago rechazado", !sal.contains("482913") && !sal.contains("JUAN") && !sal.contains("rechazado"), sal);
+          chk("💸 Salidas: no suenan ni van a la cola de pagos (ni al servidor)", VentoApp.dichos.isEmpty() && VentoEscucha.tomar(spS).equals("[]"), VentoApp.dichos);
+          chk("💸 Salidas: la página las toma una vez (después la lista queda vacía)", VentoEscucha.tomarSalidas(spS).equals("[]"), "");
+          app(spS, "Nequi", "Envío", "Enviaste $250.000 a DISTRIBUIDORA EL SOL", "ks1:");
+          chk("💸 Salidas: el mismo aviso publicado otra vez no se guarda dos veces", VentoEscucha.tomarSalidas(spS).equals("[]"), ""); }
         System.out.println("RESULTADO " + ok + " bien " + mal + " mal");
         System.exit(mal > 0 ? 1 : 0);
     }

@@ -76,6 +76,16 @@ public final class AvisoPago {
     // Plata que SALE (nunca es un pago recibido, aunque el aviso diga «te»).
     static final Pattern SALE = Pattern.compile("enviaste|pagaste|pasaste|compra exitosa|transferiste|retiraste|compraste|sacaste|usted (envi|pag|transfiri|pas)|c[oó]digo (de )?(seguridad|verificaci)|clave din[aá]mica|\\botp\\b", Pattern.CASE_INSENSITIVE);
 
+    // 💸 1.66.5: plata que SALE de la cuenta del negocio (lo que el dueño envía o paga por Nequi, DaviPlata o el banco), para
+    // clasificarla en Contabilidad (proveedor u otro gasto). Nunca suena ni sale del celular: solo queda para la página.
+    // Nunca un código o clave, ni algo rechazado, fallido, programado o una solicitud.
+    static final Pattern SALIDA = Pattern.compile("enviaste|pagaste|pasaste|transferiste|compraste|compra exitosa|retiraste|sacaste|usted (envi|pag|transfiri|pas)", Pattern.CASE_INSENSITIVE);
+    static boolean esSalida(String todo) {
+        if (todo == null || !SALIDA.matcher(todo).find() || CODIGO.matcher(todo).find() || NUNCA.matcher(todo).find()) return false;
+        if (Pattern.compile("clave din[aá]mica|\\botp\\b|c[oó]digo (de )?(seguridad|verificaci)", Pattern.CASE_INSENSITIVE).matcher(todo).find()) return false;
+        return Pattern.compile("\\d").matcher(todo).find();   // con algún número (el valor lo lee la página)
+    }
+
     /** ¿El pago llegó por la llave Bre-B? (para decirlo: «… por Bre-B, en Nequi») */
     static boolean esBreB(String todo) { return todo != null && Pattern.compile("bre-?b|\\bllaves?\\b", Pattern.CASE_INSENSITIVE).matcher(todo).find(); }
 

@@ -224,6 +224,7 @@ public class VentoEscucha extends NotificationListenerService {
     static boolean procesarApp(SharedPreferences sp, String app, String titulo, String principal, String pref, boolean confiable, boolean callado) throws Exception {
         if (procesar(sp, app, titulo, principal, pref, confiable, callado)) return true;
         String t0 = titulo + " " + principal;
+        if (confiable && AvisoPago.esSalida(t0)) { guardarSalida(sp, app, app + " | " + titulo + " | " + principal, pref + "S:" + t0.hashCode()); return false; }
         if (!AvisoPago.esRecibido(t0) || (AvisoPago.monto(t0) <= 0 && !AvisoPago.esPlataSinValor(t0))) diagnostico(sp, app, t0);
         return !AvisoPago.esRecibido(t0) && AvisoPago.sirveCrudo(t0)
                 && crudo(sp, app, app + " | " + titulo + " | " + principal, pref, confiable ? null : "La app «" + app + "» de este celular no es la oficial: míralo en la app del banco", false, callado);
@@ -376,6 +377,12 @@ public class VentoEscucha extends NotificationListenerService {
      *  banco = «revísalo» (o «Pago confirmado» si el dueño eligió confirmar los SMS del banco). */
     private static boolean procesarSms(SharedPreferences sp, String remitente, String cuerpo, String prefijo, boolean callado) throws Exception {
         if (!AvisoPago.esSmsDePago(remitente, cuerpo)) {
+            // 💸 Plata que sale, en un SMS del banco (nunca de un contacto): queda para clasificarla en Contabilidad.
+            if (AvisoPago.remitenteBanco(remitente) && !"celular".equals(AvisoPago.tipoRemitente(remitente)) && AvisoPago.esSalida(cuerpo)) {
+                String b = AvisoPago.bancoDeCodigo(remitente);
+                guardarSalida(sp, "SMS " + remitente, "SMS | " + remitente + " | " + (b != null && !cuerpo.toLowerCase().contains(b.toLowerCase()) ? b + ": " : "") + cuerpo, prefijo + "S:" + cuerpo.hashCode());
+                return false;
+            }
             if (AvisoPago.pareceDePlata(cuerpo)) traza(sp, "SMS " + remitente, cuerpo, "🚫 " + AvisoPago.porQueNo(remitente + " " + cuerpo));
             // SMS de un código corto del banco que estas reglas no entendieron: a la página (ver crudo). Nunca de un contacto.
             if (AvisoPago.remitenteBanco(remitente) && !"celular".equals(AvisoPago.tipoRemitente(remitente)) && AvisoPago.sirveCrudo(cuerpo)) {
@@ -602,6 +609,30 @@ public class VentoEscucha extends NotificationListenerService {
             String r = l.length() > 0 ? l.getJSONObject(l.length() - 1).optString("r") : "";
             return new JSONObject().put("ok", ok).put("r", r).toString();
         } catch (Exception e) { return "{\"ok\":false,\"r\":\"error\"}"; }
+    }
+
+    // ---------- 💸 Plata que SALE (1.66.5) ----------
+    // Lo que el dueño envía o paga desde este celular, para clasificarlo en Contabilidad (proveedor u otro gasto). Se queda
+    // en ESTE celular (no va al Servidor Vento ni a los demás equipos) hasta que la página lo toma; nunca suena.
+    static final String PREF_SALIDAS = "pagosSalidas";
+    private static final long VIGENCIA_SALIDA = 7 * 24 * 3600_000L;
+    static synchronized void guardarSalida(SharedPreferences sp, String app, String txt, String id) {
+        try {
+            if (!id.startsWith("PRUEBA") && !marcarVisto(sp, id)) { traza(sp, app, txt, "↩️ salida repetida"); return; }
+            JSONArray l = new JSONArray(sp.getString(PREF_SALIDAS, "[]")), out = new JSONArray();
+            long ahora = System.currentTimeMillis();
+            for (int i = 0; i < l.length(); i++) { JSONObject o = l.getJSONObject(i); if (ahora - o.optLong("t") < VIGENCIA_SALIDA) out.put(o); }
+            out.put(new JSONObject().put("id", id).put("app", app).put("txt", txt).put("t", ahora));
+            while (out.length() > 60) out.remove(0);
+            sp.edit().putString(PREF_SALIDAS, out.toString()).apply();
+            traza(sp, app, txt, "💸 plata que sale: queda en Contabilidad para clasificarla");
+        } catch (Exception ignorado) { }
+    }
+    /** La página toma las salidas pendientes (y se borran de aquí). */
+    static synchronized String tomarSalidas(SharedPreferences sp) {
+        String s = sp.getString(PREF_SALIDAS, "[]");
+        sp.edit().putString(PREF_SALIDAS, "[]").apply();
+        return s;
     }
 
     /** La página toma los avisos pendientes (y quedan vistos). */
