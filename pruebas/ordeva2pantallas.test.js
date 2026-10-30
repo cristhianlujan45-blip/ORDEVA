@@ -6,6 +6,7 @@
 //  4. Cocina (computador): las 4 columnas de estados lado a lado, también la vacía; el botón sigue avanzando el pedido.
 //  5. Cocina en otra apariencia: igual que antes (las columnas no se ven como cajas).
 //  6. Estadísticas: el globo del gráfico escondido no se ve (antes quedaba una píldora blanca vacía) y sin «SALES//01».
+//  7. (1.67.4) Libreta: el micrófono se lee; factura: campos sin el borde del navegador; historial: «Borrar» como botón.
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 
@@ -104,6 +105,27 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     v = await p.evaluate(() => { const t = document.querySelector('#tableroVento .tb-tip'), c = document.querySelector('#tableroVento .tb-cod'); return { hay: !!t, hidden: t && t.hidden, display: t && getComputedStyle(t).display, cod: c ? getComputedStyle(c).display : 'none' }; });
     chk('6. Estadísticas: el globo del gráfico, escondido, no se ve', v.hay && v.hidden && v.display === 'none', v);
     chk('6. Sin los códigos «SALES//01» en ORDEVA 2.0', v.cod === 'none', v);
+
+    // ===== 7. Fase 3 (1.67.4): Libreta, factura e historial =====
+    v = await p.evaluate(() => {
+      const lum = c => { const m = c.match(/\d+(\.\d+)?/g).map(Number); const f = x => { x /= 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); }; return 0.2126 * f(m[0]) + 0.7152 * f(m[1]) + 0.0722 * f(m[2]); };
+      const contraste = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+      document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show'));
+      window.libretaAbrir();
+      const mic = document.querySelector('#libretaOverlay .lb-mic'), cm = getComputedStyle(mic);
+      const r = { mic: Math.round(contraste(cm.color, cm.backgroundColor) * 10) / 10 };
+      document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show'));
+      invoiceOpen({ supplier: 'Proveedor X', date: '2026-10-30', items: [] });
+      const inp = document.querySelector('#invoiceOverlay .ivh-f input'), ci = getComputedStyle(inp);
+      r.factura = { estilo: ci.borderTopStyle, ancho: ci.borderTopWidth };
+      document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show'));
+      const del = document.getElementById('deleteHistoryDayBtn'), cd = del ? getComputedStyle(del) : null;
+      r.borrar = cd ? { radio: cd.borderTopLeftRadius, fondo: cd.backgroundColor } : null;
+      return r;
+    });
+    chk('7. Libreta: «🎤 Toca y habla» se lee (contraste ≥ 4,5 sobre el botón negro; antes letra casi negra sobre negro)', v.mic >= 4.5, v);
+    chk('7. Revisión de factura: los campos ya no tienen el borde del navegador (1px, sin relieve)', v.factura.estilo === 'solid' && v.factura.ancho === '1px', v.factura);
+    chk('7. Historial: «Borrar historial de un día» es un botón (redondeado y con fondo), no un rectángulo suelto', v.borrar && v.borrar.radio === '10px' && v.borrar.fondo !== 'rgba(0, 0, 0, 0)', v.borrar);
 
     // ===== 5. Cocina en otra apariencia: como antes =====
     await p.evaluate(() => { data.theme = 'menta'; applyPalette('menta'); document.querySelector('nav button[data-view="cocina"]').click(); renderCocina(); });

@@ -684,7 +684,7 @@
   const st = document.createElement('style');
   st.textContent =
     '.lb-modal{max-width:460px;max-height:92vh;overflow:auto}' +
-    '.lb-mic{display:block;width:100%;padding:22px 12px;margin:6px 0 8px;border-radius:18px;border:0;font:700 24px system-ui;background:var(--amber,#c8a24a);color:#1a1410;cursor:pointer}' +
+    '.lb-mic{display:block;width:100%;padding:22px 12px;margin:6px 0 8px;border-radius:18px;border:0;font:700 24px system-ui;background:var(--amber,#c8a24a);color:var(--on-amber,#1a1410);cursor:pointer}' +
     '.lb-mic.on{background:#c0392b;color:#fff;animation:lbPulso 1s infinite}@keyframes lbPulso{50%{transform:scale(.97)}}' +
     '.lb-ej{font-size:14px;text-align:center;opacity:.8;line-height:1.5;margin-bottom:8px}' +
     '.lb-resp{font-size:19px;font-weight:700;padding:14px;border-radius:14px;background:rgba(200,162,74,.15);margin:8px 0;line-height:1.4}' +
@@ -694,7 +694,7 @@
     '.lb-calc-pant{background:rgba(0,0,0,.25);border-radius:12px;padding:16px 14px;text-align:right;font:800 32px system-ui;margin-bottom:10px;overflow-x:auto;white-space:nowrap}' +
     '.lb-calc-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}' +
     '.lb-calc-grid button{padding:18px 4px;border-radius:14px;border:0;background:rgba(127,127,127,.18);color:inherit;font:700 22px system-ui;cursor:pointer}' +
-    '.lb-calc-grid .lb-calc-op{background:var(--amber,#c8a24a);color:#1a1410}' +
+    '.lb-calc-grid .lb-calc-op{background:var(--amber,#c8a24a);color:var(--on-amber,#1a1410)}' +
     '.lb-calc-grid .lb-calc-ig{background:#27ae60;color:#fff;grid-column:span 2}' +
     '.lb-calc-grid .lb-calc-0{grid-column:span 1}' +
     '.lb-b{padding:16px 6px;border-radius:14px;border:2px solid var(--line,#555);background:transparent;color:inherit;font:700 16px system-ui;line-height:1.25;cursor:pointer}' +
@@ -706,7 +706,7 @@
     '.lb-deudor{cursor:pointer}.lb-hist{margin:0 0 8px 10px;padding:6px 10px;border-left:3px solid var(--amber,#c8a24a);background:rgba(127,127,127,.08);border-radius:0 10px 10px 0;animation:mzIn .25s ease-out}' +
     '.lb-ev{display:flex;gap:8px;padding:6px 0;font-size:15px}.lb-ev span{flex:1}.lb-ev small{display:block;font-size:12px;opacity:.65}' +
     '.lb-mov{font-size:15px}.lb-x{background:none;border:0;font-size:18px;cursor:pointer;padding:4px}.lb-vacio{opacity:.7;padding:8px 4px}' +
-    '#libretaFab{position:fixed;right:14px;bottom:92px;z-index:55;padding:16px 20px;border-radius:30px;border:0;font:800 20px system-ui;background:var(--amber,#c8a24a);color:#1a1410;box-shadow:0 6px 18px rgba(0,0,0,.35);cursor:pointer}';
+    '#libretaFab{position:fixed;right:14px;bottom:92px;z-index:55;padding:16px 20px;border-radius:30px;border:0;font:800 20px system-ui;background:var(--amber,#c8a24a);color:var(--on-amber,#1a1410);box-shadow:0 6px 18px rgba(0,0,0,.35);cursor:pointer}';
   document.head.appendChild(st);
   // Se muestra el botón cuando cargan los datos (y se revisa por si cambian el modo fácil).
   const t0 = setInterval(() => { if(typeof data !== 'undefined' && data){ lbFab(); } }, 1500);

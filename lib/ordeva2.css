@@ -320,3 +320,35 @@ body.o2 #customBackground{ display: none !important; }
 .o2-volver{ display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 14px; margin: 0 0 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2, var(--surface)); font-size: 14px; }
 .o2-volver span{ flex: 1 1 220px; }
 .o2-volver .btn-ghost{ width: auto; margin: 0; }
+
+/* ---------- 1.67.4 · Fase 3: Facturas, Libreta, Laya, Ajustes e Historial con ORDEVA 2.0 ----------
+   Campos sin estilo propio (los de la revisión de facturas y otras ventanas): antes salía el borde del navegador
+   (2px, con relieve). :where() les da especificidad 0: cualquier estilo que ya tenga un campo sigue ganando. */
+:where(body.o2) :where(.modal, .overlay, .settings-group) :where(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=file]), select, textarea){
+  border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; background: var(--surface); color: var(--ink); font: inherit; font-size: 15px;
+}
+:where(body.o2) :where(.modal, .overlay, .settings-group) :where(input, select, textarea):focus{ outline: 2px solid var(--ink); outline-offset: 0; border-color: var(--ink); }
+
+/* Revisión de factura */
+body.o2 .ivh-f label{ font-weight: 600; color: var(--ink-soft); }
+body.o2 .ivh-f.falta input{ border-color: var(--o2-ojo); background: var(--o2-ojo-bg); }
+body.o2 #invoiceOverlay details{ border-radius: var(--o2-r); }
+body.o2 #invoiceOverlay .iv-item{ border-radius: var(--o2-r); box-shadow: var(--o2-sombra); }
+
+/* 📒 Libreta */
+body.o2 #libretaOverlay .lb-mic{ border-radius: 16px; font-weight: 800; }
+body.o2 #libretaOverlay .lb-ej{ text-align: left; font-size: 13px; opacity: 1; color: var(--ink-soft); background: #f6f7f9; border-radius: var(--o2-r); padding: 10px 12px; }
+body.o2 #libretaOverlay .lb-b{ border-width: 1px 1px 1px 4px; border-radius: var(--o2-r); background: var(--surface); box-shadow: var(--o2-sombra); font-weight: 700; font-size: 15px; }
+body.o2 #libretaOverlay .lb-b:hover{ box-shadow: var(--o2-sombra-l); }
+
+/* 🤖 Laya */
+body.o2 #asisOverlay .modal{ border-radius: var(--o2-r-l); }
+
+/* ⚙️ Ajustes: tarjetas de acción (Configurar mi negocio, Primeros pasos…) planas y blancas */
+body.o2 .settings-group .btn-camera.cam-big{ background: var(--surface); border: 1px solid var(--line); border-radius: var(--o2-r); box-shadow: var(--o2-sombra); }
+body.o2 .settings-group .btn-camera.cam-big:hover{ border-color: #c9cdd3; box-shadow: var(--o2-sombra-l); }
+body.o2 .settings-group .btn-camera.cam-big .cam-ic{ background: #f1f2f4; border-radius: 10px; }
+
+/* 🕘 Historial: acciones peligrosas como botón (no como rectángulo rojo suelto) */
+body.o2 .btn-danger-outline{ border: 1px solid #fecaca; background: var(--o2-mal-bg); color: #b91c1c; border-radius: 10px; padding: 10px 14px; font-weight: 700; }
+body.o2 .btn-danger-outline:hover{ background: #fee2e2; }
