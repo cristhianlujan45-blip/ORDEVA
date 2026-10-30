@@ -223,3 +223,93 @@ body.o2 header{ border-bottom-color: transparent; }
   .o2-tile svg{ width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .o2-tile:active{ transform: scale(.97); }
 }
+
+/* ---------- Caja / Punto de venta (lib/vento-pos.js) ----------
+   Tarjetas con la foto grande arriba, nombre, precio y «+»; categorías en píldoras; carrito con miniaturas,
+   total grande y COBRAR negro a todo lo ancho (computador). Solo cambia cómo se ve. */
+body.o2 .pz-q{ border-radius: 12px; background: var(--surface); box-shadow: var(--o2-sombra); }
+body.o2 .pz-q:focus{ outline: 2px solid var(--ink); }
+body.o2 .pz .pz-scan{ border-radius: 12px; box-shadow: var(--o2-sombra); }
+body.o2 .pz .pz-cats button{ padding: 8px 16px; font-weight: 600; color: var(--ink); background: var(--surface); }
+body.o2 .pz .pz-cats button.on{ background: var(--o2-negro); border-color: var(--o2-negro); color: #fff; }
+body.o2 .pz-grid{ gap: 12px; }
+body.o2 .pz .pz-tile{ align-items: stretch; text-align: left; gap: 6px; padding: 8px 8px 10px; border-radius: var(--o2-r); box-shadow: var(--o2-sombra); transition: box-shadow var(--o2-rapido), border-color var(--o2-rapido); }
+body.o2 .pz .pz-tile:hover{ border-color: #c9cdd3; box-shadow: var(--o2-sombra-l); }
+body.o2 .pz .pz-tile.en{ background: var(--surface); border-color: var(--o2-negro); box-shadow: 0 0 0 1px var(--o2-negro); }
+body.o2 .pz .pz-cara{ width: 100%; height: auto; aspect-ratio: 4 / 3; border-radius: var(--o2-r-s); background: #f1f2f4; font-size: 40px; }
+body.o2 .pz .pz-letra{ font-size: 30px; color: #9aa0aa; }
+body.o2 .pz .pz-nom{ font-size: 13.5px; font-weight: 600; padding: 0 2px; }
+body.o2 .pz .pz-pre{ font-size: 15px; font-weight: 800; color: var(--ink); padding: 0 34px 0 2px; }
+body.o2 .pz .pz-tile::after{ content: '+'; position: absolute; right: 8px; bottom: 8px; width: 26px; height: 26px; border-radius: 999px; background: var(--o2-negro); color: #fff; font-size: 18px; font-weight: 700; line-height: 25px; text-align: center; }
+body.o2 .pz .pz-cant{ top: 12px; right: 12px; background: var(--o2-negro); color: #fff; box-shadow: 0 0 0 2px #fff; }
+body.o2 .pz .pz-stock{ top: 12px; left: 12px; background: #fff; color: var(--o2-mal); box-shadow: var(--o2-sombra); }
+body.o2 .pz-cart{ background: var(--surface); border-radius: var(--o2-r-l); box-shadow: var(--o2-sombra); padding: 14px; }
+body.o2 .pz-cart-h b{ font-size: 16px; font-weight: 800; }
+body.o2 .pz-lmini{ display: block; flex: none; }
+body.o2 .pz-lmini .pz-cara{ width: 40px; height: 40px; border-radius: var(--o2-r-s); background: #f1f2f4; font-size: 22px; }
+body.o2 .pz-lmini .pz-letra{ font-size: 16px; color: #9aa0aa; }
+body.o2 .pz-linea{ border-bottom: 1px solid var(--line); padding: 8px 0; }
+body.o2 .pz .pz-step button{ width: 32px; height: 32px; border-radius: 999px; font-size: 18px; font-weight: 700; }
+body.o2 .pz .pz-cobrar{ background: var(--o2-negro); border-radius: 12px; box-shadow: none; letter-spacing: 0; }
+body.o2 .pz .pz-cobrar:hover{ background: #23262b; }
+body.o2 .pz-caja-wrap{ background: var(--bg); }
+body.o2 .pz-caja-top{ background: var(--surface); }
+@media (max-width: 760px){
+  body.o2 .pz-grid{ grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
+  body.o2 .pz .pz-tile{ padding: 6px 6px 8px; }
+  body.o2 .pz .pz-cara{ aspect-ratio: 1 / 1; font-size: 34px; }
+  body.o2 .pz .pz-pre{ font-size: 14px; padding-right: 28px; }
+  body.o2 .pz .pz-tile::after{ width: 22px; height: 22px; line-height: 21px; font-size: 16px; right: 6px; bottom: 6px; }
+  body.o2 .pz-lmini{ display: none; }
+}
+@media (min-width: 900px){
+  body.o2 .pz-tienda{ grid-template-columns: minmax(0, 1fr) 380px; gap: 20px; }
+  body.o2 .pz-tienda .pz-grid{ grid-template-columns: repeat(auto-fill, minmax(156px, 1fr)); }
+  body.o2 .pz-tienda .pz-pie{ flex-direction: column; align-items: stretch; gap: 12px; border-top: 1px solid var(--line); padding-top: 12px; margin-top: 4px; }
+  body.o2 .pz-tienda .pz-total{ display: flex; align-items: baseline; justify-content: space-between; }
+  body.o2 .pz-tienda .pz-total span{ font-size: 13px; letter-spacing: .04em; }
+  body.o2 .pz-tienda .pz-total b{ font-size: 30px; }
+  body.o2 .pz-tienda .pz-cobrar{ width: 100%; min-height: 56px; }
+}
+/* La «+» no va en la fila compacta del modo mixto ni en el modo fácil (ahí la tarjeta entera ya dice «toque») */
+body.o2 .pz-mixto.pz .pz-tile::after, body.o2 .pz-grande.pz .pz-tile::after{ display: none; }
+body.o2 .pz-mixto.pz .pz-pre, body.o2 .pz-grande.pz .pz-pre{ padding-right: 2px; }
+body.o2 .pz-mixto.pz .pz-cara{ width: 100%; height: auto; aspect-ratio: 4 / 3; font-size: 28px; }
+
+/* ---------- Cocina / preparación por estados (renderCocina, app/04b) ----------
+   Tablero de columnas: Por aceptar · Recibidos · En preparación · Listos. Cada pedido es una tarjeta blanca con la
+   mesa, de dónde vino, hace cuánto, lo pedido y el botón para pasarlo al siguiente estado. */
+body.o2 .kds-ticket{ background: var(--surface); border-radius: var(--o2-r); box-shadow: var(--o2-sombra); padding: 14px; gap: 10px; }
+body.o2 .kds-ticket-h{ font-size: 17px; font-weight: 800; }
+body.o2 .kds-ticket .kds-meta b{ background: #f1f2f4; border-radius: 999px; padding: 1px 8px; font-weight: 700; color: var(--ink); }
+body.o2 .kds-ticket.tarde .kds-meta b{ background: var(--o2-mal-bg); color: var(--o2-mal); }
+body.o2 .kds-item{ border-bottom: 1px solid var(--line); padding: 4px 0; font-weight: 500; }
+body.o2 .kds-act .btn-warn{ background: var(--o2-negro); border-color: var(--o2-negro); color: #fff; }
+body.o2 .kds-ticket.e-nuevo, body.o2 .kds-ticket.e-preparacion, body.o2 .kds-ticket.e-listo{ box-shadow: var(--o2-sombra); border-color: var(--line); }
+body.o2 .kds-ticket.e-nuevo{ border-top: 4px solid var(--o2-mal); }
+body.o2 .kds-ticket.e-recibido{ border-top: 4px solid var(--o2-info); }
+body.o2 .kds-ticket.e-preparacion{ border-top: 4px solid var(--o2-ojo); }
+body.o2 .kds-ticket.e-listo{ border-top: 4px solid var(--o2-ok); }
+body.o2 .kds-col-h{ font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-soft); margin: 0; }
+body.o2 .kds-col-h i{ background: var(--surface); color: var(--ink); border: 1px solid var(--line); font-weight: 700; }
+@media (min-width: 900px){
+  body.o2 .kds-tablero{ grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; align-items: start; }
+  body.o2 .kds-col{ display: flex; flex-direction: column; gap: 10px; min-width: 0; background: #eceef1; border-radius: var(--o2-r-l); padding: 12px; min-height: 180px; }
+  body.o2 .kds-col-h0{ display: flex; }
+  body.o2 .kds-col-vacio{ display: block; color: var(--ink-soft); font-size: 13px; text-align: center; padding: 24px 0; border: 1px dashed #cfd3d9; border-radius: var(--o2-r); }
+}
+
+/* ---------- Contabilidad: «Gasto / Otro ingreso» como interruptor negro ---------- */
+body.o2 .ct-tipo button{ border-radius: 10px; font-weight: 600; }
+body.o2 .ct-tipo button.on{ background: var(--o2-negro); border-color: var(--o2-negro); color: #fff; box-shadow: none; }
+
+/* ---------- Estadísticas / reportes (lib/vento-tablero.js) ----------
+   Tarjetas blancas planas, sin los códigos de estilo neón («SALES//01»); los colores de los datos no cambian. */
+body.o2 #tableroVento .tb-kpi, body.o2 #tableroVento .tb-card{ background: var(--surface); border-color: var(--line); border-radius: var(--o2-r-l); box-shadow: var(--o2-sombra); }
+body.o2 #tableroVento .tb-cod{ display: none; }
+body.o2 #tableroVento .tb-card-h h3{ font-weight: 800; }
+body.o2 #tableroVento .tb-kpi-l{ font-weight: 600; letter-spacing: .03em; }
+body.o2 #tableroVento .tb-kpi-v{ font-weight: 800; }
+body.o2 #tableroVento .tb-tip{ background: var(--surface); box-shadow: var(--o2-sombra-l); }
+body.o2 #tableroVento .tb-pag button.on{ background: var(--o2-negro); border-color: var(--o2-negro); color: #fff; }
+body.o2 .st-per button.on, body.o2 .st-per button.active{ background: var(--o2-negro); color: #fff; }

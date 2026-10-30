@@ -1587,8 +1587,11 @@ function renderCocina(){
       '<div class="kds-act"><button type="button" class="btn-warn" data-e="' + SIG[p.estado][1] + '">' + i18nPut(SIG[p.estado][0]) + '</button>' +
       '<button type="button" class="btn-ghost kds-x" data-e="cancelado" title="Cancelar pedido">✕</button></div></div>';
   };
+  // Cada estado en su columna (.kds-col). Fuera de ORDEVA 2.0 la columna no se ve como caja (display:contents) y todo
+  // queda como siempre; en ORDEVA 2.0 son las columnas del tablero, también las que están vacías.
   const col = (e, titulo) => { const l = activos.filter(p => p.estado === e).sort((x, y) => (x.recibidoEn || x.at) - (y.recibidoEn || y.at));
-    return l.length ? '<div class="kds-col-h">' + titulo + ' <i>' + l.length + '</i></div>' + l.map(ticket).join('') : ''; };
+    return '<div class="kds-col kds-col-' + e + (l.length ? '' : ' vacia') + '">' + (l.length ? '<div class="kds-col-h">' + titulo + ' <i>' + l.length + '</i></div>' + l.map(ticket).join('')
+      : '<div class="kds-col-h kds-col-h0">' + titulo + ' <i>0</i></div><div class="kds-col-vacio">' + i18nPut('Nada aquí') + '</div>') + '</div>'; };
   const entregados = lista.filter(p => p.estado === 'entregado' && ahora - (p.hist[p.hist.length - 1] || {}).at < 6 * 36e5).slice(-10).reverse();
   // Lo que se anota a mano en las cuentas sigue visible abajo, como antes.
   const ack = kdsAckMap();
@@ -1597,7 +1600,7 @@ function renderCocina(){
     return '<div class="kds-ticket' + (isAck ? ' kds-ack' : '') + '"><div class="kds-ticket-h">' + invEsc(tableLabel(id)) + '</div><div class="kds-items">' +
       t.items.map(it => '<div class="kds-item">' + it.qty + '× ' + invEsc(it.name) + (it.size ? ' (' + invEsc(it.size) + ')' : '') + '</div>').join('') + '</div>' +
       '<button type="button" class="btn-ghost kds-ack-btn" data-tid="' + id + '">' + (isAck ? i18nPut('↩️ Reabrir') : i18nPut('✅ Visto')) + '</button></div>'; }).join('');
-  const html = col('nuevo', '🆕 Por aceptar') + col('recibido', '📥 Recibidos') + col('preparacion', '👩‍🍳 En preparación') + col('listo', '🔔 Listos para entregar');
+  const html = activos.length ? '<div class="kds-tablero">' + col('nuevo', '🆕 Por aceptar') + col('recibido', '📥 Recibidos') + col('preparacion', '👩‍🍳 En preparación') + col('listo', '🔔 Listos para entregar') + '</div>' : '';
   wrap.innerHTML = (html || '<div class="kds-empty">' + i18nPut('No hay pedidos pendientes en ' + prepNombre() + '. 🎉') + '</div>') +
     (entregados.length ? '<details class="kds-ent"><summary>🍽️ Entregados hoy (' + entregados.length + ')</summary><div class="kds-grid">' + entregados.map(p => '<div class="kds-ticket kds-ack"><div class="kds-ticket-h">' + invEsc(tableLabel(p.mesa)) + '</div><div class="kds-items">' + p.items.map(i => i.qty + '× ' + invEsc(i.name)).join('<br>') + '</div></div>').join('') + '</div></details>' : '') +
     (mesas ? '<details class="kds-ent"><summary>🧾 Cuentas abiertas (' + tIds.length + ')</summary><div class="kds-grid">' + mesas + '</div></details>' : '');
@@ -1737,10 +1740,17 @@ function renderMesasList(){
       if(paid > 0) subLine += ' · abonado ' + fmt(paid);
       if((t.people || []).length){ try{ const e = mesaEstado(id); if(e.partes > 1) subLine += ' · 👥 ' + e.pagaron + '/' + e.partes + ' pagaron'; }catch(x){} }
     }
+    // Desde cuándo está abierta: el primer producto anotado (item.history[].at). Sin ese dato no se muestra nada.
+    let desde = '';
+    if(isOpen){
+      const at = Math.min(...t.items.map(it => (it.history && it.history[0] && Number(it.history[0].at)) || Infinity));
+      if(isFinite(at)) try{ desde = new Date(at).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' }); }catch(x){}
+    }
     card.innerHTML = `
       <div class="num"><svg class="tk-ic" viewBox="0 0 24 24" aria-hidden="true">${iconoEsp()}</svg>${tableLabel(id)}</div>
       <div class="status ${isOpen ? '' : 'empty'}">${isOpen ? fmt(balance) : 'Vacía'}</div>
       <div class="items-count">${subLine}</div>
+      ${desde ? '<div class="tk-desde">⏱ Desde las ' + desde + '</div>' : ''}
       ${window.vitoGrupos && window.vitoGrupos.de(id) ? '<div class="grp-tag">🔗 ' + invEsc(window.vitoGrupos.etiqueta(window.vitoGrupos.de(id))) + ' · ' + fmt(window.vitoGrupos.total(window.vitoGrupos.de(id))) + '</div>' : ''}
     `;
     card.addEventListener('click', ()=> openTableModal(id));
