@@ -70,7 +70,7 @@ function qsRegistrarVenta(cart, opts){
     qty: it.qty,
     price: it.price,
     cost: (data.products.find(p=>p.id===it.productId)||{}).cost ?? null
-  }, it.unidad ? { unidad: it.unidad } : {}));      // ⚖️ vendido por kilo o por libra
+  }, it.unidad ? { unidad: it.unidad } : {}, it.productId ? { productId: it.productId } : {}, it.precioLista != null && it.precioLista !== it.price ? { precioLista: it.precioLista } : {}));      // ⚖️ por kilo/libra · 🏷️ precio antes del descuento
   // El valor del domicilio se suma como una línea más (igual que la propina),
   // así el total del recibo y de las estadísticas ya lo incluyen sin tener
   // que tocar nada más en la app.
@@ -96,6 +96,9 @@ function qsRegistrarVenta(cart, opts){
   // Lo que se descontó del inventario queda anotado en la venta (sin guardarlo): así «deshacer» devuelve lo mismo.
   Object.defineProperty(entry, '_inv', { value: cart.filter(it => it.productId).map(it => ({ productId: it.productId, qty: it.qty })), enumerable: false });
   if(opts.cliente){ entry.dianCliente = opts.cliente; entry.dianFactura = !!opts.factura; }
+  // 🏷️ 1.67.5: descuento (ya repartido en el precio de cada producto) y 📝 nota de la venta.
+  if(opts.descuento && opts.descuento.valor > 0) entry.descuento = { valor: Math.round(opts.descuento.valor), bruto: Math.round(opts.descuento.bruto || 0), tipo: opts.descuento.tipo, v: opts.descuento.v, por: opts.descuento.por || '', quien: opts.descuento.quien || '' };
+  if(opts.observacion) entry.observacion = String(opts.observacion).slice(0, 140);
   // 💵 1.67.0: el efectivo que entregó el cliente y las vueltas quedan en la venta (no son ingreso: el pago en efectivo
   // sigue siendo lo que se aplicó a la venta, y las vueltas no son otra venta ni un gasto).
   if(Number(opts.recibido) > 0 && method !== 'debe'){

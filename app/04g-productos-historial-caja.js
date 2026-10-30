@@ -1381,6 +1381,9 @@ function histFila(h, idx){
         <div class="hist-detail-title">Pagos</div>
         ${paymentsHtml}
         ${debtHtml}
+        ${h.descuento && h.descuento.valor > 0 ? `<div class="hist-detail-line"><span>🏷️ Descuento${h.descuento.tipo === '%' ? ' ' + h.descuento.v + ' %' : ''}${h.descuento.por ? ' (' + h.descuento.por + ')' : ''} · antes ${fmt(h.descuento.bruto)}</span><span>−${fmt(h.descuento.valor)}</span></div>` : ''}
+        ${(payments.find(p => p.vueltas > 0) || null) ? `<div class="hist-detail-line"><span>💵 Recibió ${fmt(payments.find(p => p.vueltas > 0).recibido)} · cambio</span><span>${fmt(payments.find(p => p.vueltas > 0).vueltas)}</span></div>` : ''}
+        ${h.observacion ? `<div class="hist-detail-line"><span>📝 ${invEsc(h.observacion)}</span><span></span></div>` : ''}
         ${window.ventoDian ? window.ventoDian.bloqueHistorial(h) : ''}
         <div class="hist-share-row">
           <button class="hist-share-image" data-idx="${idx}">🖼️ Enviar captura por WhatsApp</button>
