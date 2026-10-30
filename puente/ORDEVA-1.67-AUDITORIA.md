@@ -188,6 +188,7 @@ Las vueltas nunca suman como venta ni como gasto (comprobado en la prueba `vuelt
 | 9. Suscripciones | Conciliación y recuperación de pagos aprobados (revisar `vento-suscripciones`) | Pendiente |
 | 10. Rendimiento | Sincronización incremental; paginación del historial | Pendiente |
 | 11–12. Pruebas integrales y publicación | | Por versión |
+| Caja Inteligente 2.0 | Voz + teclado + táctil sobre la misma caja: intérprete propio en español de Colombia, confirmación obligatoria al cobrar, F1–F9, orden escrita sin internet | ✅ 1.68.0 (ver `puente/CAJA-INTELIGENTE-2.0.md`) |
 
 Suspender y recuperar ventas, descuentos autorizados y notas en la Caja: ✅ fase 4b (1.67.5).
 
