@@ -6,7 +6,8 @@
 //  3. Sin ventas: todo en $ 0 y «Todavía no hay ventas»; nada inventado.
 //  4. Período «7 días» suma también las ventas de días anteriores; el cambio % compara con el período anterior.
 //  5. Un empleado sin el permiso de estadísticas no ve Inicio (ni en la barra ni en «Más»).
-//  6. Quien tenía «Noche violeta» de fábrica pasa una vez a ORDEVA 2.0; otro diseño elegido se respeta.
+//  6. (1.66.6) Todos pasan UNA vez a ORDEVA 2.0 (Noche, Menta, 🎃 Halloween con su decoración); lo de antes queda guardado,
+//     «Volver a …» en Ajustes → Apariencia lo devuelve y ya no se vuelve a cambiar solo.
 //  7. «Navegación lateral» se puede apagar en Ajustes → Apariencia (vuelve la barra de siempre).
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
@@ -122,13 +123,25 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     await ctx.close();
 
     // ===== 6. Diseños de antes =====
-    for(const [tema, espera] of [['noche', 'ordeva2'], ['menta', 'menta']]){
+    const recargar = async () => { await p.reload(); await p.waitForTimeout(1800); await p.fill('#authUser', 'ana').catch(() => {}); await p.fill('#authPass', 'clave123').catch(() => {}); await p.click('#authBtn').catch(() => {}); await p.waitForTimeout(1200); };
+    for(const [tema, motivo] of [['noche', null], ['menta', null], ['halloween', 'halloween']]){
       ({ ctx, p } = await abrir(1280, 800));
-      v = await p.evaluate(async t => { data.theme = t; delete data.o2Tema; await saveData(); return true; }, tema);
-      await p.reload(); await p.waitForTimeout(1800);
-      await p.fill('#authUser', 'ana').catch(() => {}); await p.fill('#authPass', 'clave123').catch(() => {}); await p.click('#authBtn').catch(() => {}); await p.waitForTimeout(1200);
-      v = await p.evaluate(() => ({ tema: data.theme, marca: data.o2Tema, o2: document.body.classList.contains('o2') }));
-      chk('6. Tenía «' + tema + '» → queda «' + espera + '» (una sola vez)', v.tema === espera && v.marca === 1 && v.o2 === (espera === 'ordeva2'), v);
+      v = await p.evaluate(async x => { data.theme = x[0]; if(x[1]) data.motivo = x[1]; data.o2Tema = 1; delete data.o2Antes; await saveData(); return true; }, [tema, motivo]);
+      await recargar();
+      v = await p.evaluate(() => ({ tema: data.theme, marca: data.o2Tema, o2: document.body.classList.contains('o2'), antes: data.o2Antes, motivo: data.motivo || null, fx: document.querySelectorAll('.fx-layer *, #fxLayer *').length }));
+      chk('6. Tenía «' + tema + '»' + (motivo ? ' con decoración' : '') + ' → pasa a ORDEVA 2.0 y lo de antes queda guardado', v.tema === 'ordeva2' && v.marca === 2 && v.o2 && v.antes && v.antes.theme === tema && (v.antes.motivo || null) === motivo && !v.motivo, v);
+      if(tema === 'halloween'){
+        await p.evaluate(() => { data.backgroundImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='; applyCustomBackground(); });
+        v = await p.evaluate(() => { const e = document.getElementById('customBackground'); return { vis: !!e && getComputedStyle(e).display !== 'none', guardada: !!data.backgroundImage }; });
+        chk('6. La foto de fondo no se borra, pero con ORDEVA 2.0 no se muestra', !v.vis && v.guardada, v);
+        await p.evaluate(() => { renderPaletteOptions(); });
+        v = await p.evaluate(() => { const b = document.getElementById('o2VolverBtn'); return b ? b.textContent : null; });
+        chk('6. En Apariencia: «↩ Volver a 🎃 Halloween»', /Volver a 🎃 Halloween/.test(v || ''), v);
+        await p.evaluate(() => document.getElementById('o2VolverBtn').click()); await p.waitForTimeout(500);
+        await recargar();
+        v = await p.evaluate(() => ({ tema: data.theme, motivo: data.motivo, o2: document.body.classList.contains('o2'), antes: data.o2Antes || null, fondo: (e => !!e && getComputedStyle(e).display !== 'none')(document.getElementById('customBackground')) }));
+        chk('6. «Volver» devuelve Halloween con su decoración y su foto, y ya no se cambia solo al recargar', v.tema === 'halloween' && v.motivo === 'halloween' && !v.o2 && !v.antes && v.fondo, v);
+      }
       await ctx.close();
     }
     chk('Sin errores de página', !errs.length, errs);

@@ -240,9 +240,16 @@ async function loadData(){
   if(!data.categories) data.categories = [];
   if(!data.closures) data.closures = [];
   if(!data.theme) data.theme = 'ordeva2';
-  // ORDEVA 2.0: quien seguía con el diseño que venía de fábrica (Noche violeta) pasa UNA vez al nuevo. Los demás diseños
-  // elegidos se respetan, y Noche violeta sigue en Ajustes → Apariencia para volver a ponerla.
-  if(!data.o2Tema){ if(data.theme === 'noche') data.theme = 'ordeva2'; data.o2Tema = 1; }
+  // ORDEVA 2.0: todos los negocios pasan UNA vez al diseño nuevo (1.66.6; en la 1.66.0 solo pasaba quien tenía Noche
+  // violeta). Lo que tenían (apariencia y decoración: 🎃, 🎄…) queda guardado en data.o2Antes y en Ajustes → Apariencia
+  // está «Volver a la que tenía». La foto de fondo no se borra: con ORDEVA 2.0 solo no se muestra.
+  if((data.o2Tema || 0) < 2){
+    if((data.theme && data.theme !== 'ordeva2') || (data.motivo && data.motivo !== 'ninguno')){
+      data.o2Antes = { theme: data.theme || null, motivo: data.motivo || null, at: Date.now() };
+      data.theme = 'ordeva2'; delete data.motivo;
+    }
+    data.o2Tema = 2;
+  }
   // El diseño original (Matrix) se deja solo como opción personal en Ajustes,
   // no como lo que ve el negocio por defecto: si alguien lo tenía puesto sin
   // haber elegido conscientemente uno de los diseños nuevos, se pasa una

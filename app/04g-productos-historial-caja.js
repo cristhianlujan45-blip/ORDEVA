@@ -2098,6 +2098,19 @@ function renderPaletteOptions(){
     const l = Object.entries(PALETTES).filter(([key, p]) => p.grupo === g && !PALETTE_PERSONAL_KEYS.includes(key));
     return l.length ? '<div class="palette-grupo">' + titulo + '</div>' + l.map(([key, p]) => paletteCardHtml(key, p, current)).join('') : '';
   }).join('');
+  // 1.66.6: «Volver a la que tenía» (la apariencia y la decoración de antes de ORDEVA 2.0).
+  let volver = document.getElementById('o2Volver');
+  const ant = data.o2Antes, pa = ant && ant.theme && PALETTES[ant.theme];
+  if(pa && current === 'ordeva2'){
+    if(!volver){ volver = document.createElement('div'); volver.id = 'o2Volver'; volver.className = 'o2-volver'; grid.parentNode.insertBefore(volver, grid); }
+    volver.innerHTML = '<span>Tu negocio pasó al diseño <b>◐ ORDEVA 2.0</b>. ¿Prefieres la apariencia que tenías?</span><button type="button" class="btn-ghost" id="o2VolverBtn">↩ Volver a ' + pa.name + '</button>';
+    volver.querySelector('button').onclick = async () => {
+      data.theme = ant.theme; if(ant.motivo) data.motivo = ant.motivo; delete data.o2Antes;
+      applyPalette(data.theme); renderPaletteOptions(); await saveData();
+      showToast('↩ Volviste a ' + pa.name + '. ORDEVA 2.0 sigue en Apariencia para ponerlo cuando quieras.');
+      if(typeof window.vitoPublicarCatalogo === 'function') window.vitoPublicarCatalogo(true);
+    };
+  } else if(volver) volver.remove();
   if(personalGrid){
     personalGrid.innerHTML = Object.entries(PALETTES).filter(([key])=>PALETTE_PERSONAL_KEYS.includes(key)).map(([key, p])=>paletteCardHtml(key, p, current)).join('');
   }
@@ -2105,7 +2118,9 @@ function renderPaletteOptions(){
     card.addEventListener('click', async ()=>{
       const key = card.dataset.key;
       data.theme = key;
+      if(key !== 'ordeva2') delete data.o2Antes;   // ya eligió: no hace falta «Volver a la que tenía»
       applyPalette(key);
+      renderPaletteOptions();
       await saveData();
       // Avisa de una vez a la página de pedidos (pedido.html) del cambio de
       // diseño, para que el cliente lo vea a juego sin esperar horas.

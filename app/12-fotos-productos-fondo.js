@@ -418,7 +418,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-30 · v1.66.5';
+const MESORA_VERSION = '2026-10-30 · v1.66.6';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'ORDEVA · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 /* 🔄 La app Android se actualiza SOLA (Actualizador): revisa cada 3 h, baja la versión nueva y la instala cuando no se
@@ -443,7 +443,7 @@ try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent =
       el.hidden = false;
       el.innerHTML = '📲 App Android ' + (e.nombre || '') + ' · ' + (!e.permiso ? '⚠️ falta el permiso para actualizarse sola <button type="button" class="btn-ghost" data-act="permiso" style="padding:4px 10px">🔓 Permitir</button>'
         : hay ? '🔄 hay una nueva (' + (e.nuevaNombre || '') + '): se instala sola cuando no estés usando ORDEVA <button type="button" class="btn-ghost" data-act="ahora" style="padding:4px 10px">Actualizar ahora</button>'
-        : '✅ se actualiza sola') + (e.estado && /error|no se pudo|confirmes/.test(e.estado) ? '<br><small>' + String(e.estado).replace(/[<>&]/g, '') + '</small>' : '');
+        : '✅ se actualiza sola') + /* 1.66.6: un error viejo de un intento anterior no se muestra si ya está al día */ (e.estado && (hay || !e.permiso) && /error|no se pudo|confirmes/.test(e.estado) ? '<br><small>' + String(e.estado).replace(/[<>&]/g, '') + '</small>' : '');
     }
     let luego = 0; try{ luego = Number(localStorage.getItem(LUEGO)) || 0; }catch(x){}
     // Hay una versión nueva esperando (p. ej. Android pide confirmar «Actualizar» la primera vez): un toque la instala.

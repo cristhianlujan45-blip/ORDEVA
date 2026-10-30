@@ -313,3 +313,10 @@ body.o2 #tableroVento .tb-kpi-v{ font-weight: 800; }
 body.o2 #tableroVento .tb-tip{ background: var(--surface); box-shadow: var(--o2-sombra-l); }
 body.o2 #tableroVento .tb-pag button.on{ background: var(--o2-negro); border-color: var(--o2-negro); color: #fff; }
 body.o2 .st-per button.on, body.o2 .st-per button.active{ background: var(--o2-negro); color: #fff; }
+
+/* ---------- 1.66.6: la foto de fondo personalizada no se muestra con ORDEVA 2.0 (no se borra) ----------
+   y el aviso «Volver a la apariencia que tenía» en Ajustes → Apariencia. */
+body.o2 #customBackground{ display: none !important; }
+.o2-volver{ display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 14px; margin: 0 0 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2, var(--surface)); font-size: 14px; }
+.o2-volver span{ flex: 1 1 220px; }
+.o2-volver .btn-ghost{ width: auto; margin: 0; }
