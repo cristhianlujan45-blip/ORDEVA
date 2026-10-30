@@ -193,3 +193,33 @@ body.o2 header{ border-bottom-color: transparent; }
   body.o2 #view-inventario > .pr-panel:not([open]):hover{ border-color: var(--ink); }
   body.o2 #view-inventario > .pr-panel[open]{ margin: 4px 0 12px; }
 }
+
+/* ---------- 📱 Celular con la apariencia ORDEVA 2.0 (la «Aplicación Android» de la referencia) ----------
+   Encabezado oscuro con el negocio y la hora, barra de abajo blanca con el botón activo en negro, e Inicio con la tarjeta
+   oscura del negocio y los accesos grandes. En el computador no cambia nada de esto. */
+.o2-movil{ display: none; }
+@media (max-width: 1023px){
+  body.o2 .wrap > header{ background: var(--o2-negro); margin: -28px -20px 16px; padding: calc(18px + env(safe-area-inset-top)) 20px 16px; border: 0; border-radius: 0 0 22px 22px; }
+  body.o2 .wrap > header .brand-name{ color: #fff; -webkit-text-fill-color: #fff; }
+  body.o2 .wrap > header .brand-sub{ color: var(--o2-lado-soft); }
+  body.o2 .wrap > header .live-clock .lc-time{ color: #fff; }
+  body.o2 .wrap > header .live-clock .lc-date{ color: var(--o2-lado-soft); }
+  body.o2 .wrap > header .top-pill, body.o2 #topActions .vito-campana{ background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.14); color: #fff; }
+  body.o2 .wrap > header .top-pill, body.o2 .wrap > header .top-pill span{ color: #fff !important; }
+  body.o2 .wrap > header .top-pill svg{ stroke: #fff !important; }
+  body.o2 .tabbar{ background: #fff !important; border-top: 1px solid var(--line) !important; box-shadow: 0 -6px 24px rgba(16,24,40,.08) !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+  body.o2 nav button.active, body.o2 .nav-more.active{ background: var(--o2-negro); color: #fff; }
+  body.o2 nav button.active .nav-ic, body.o2 .nav-more.active .nav-ic{ color: #fff; }
+  .o2-movil{ display: block; background: var(--o2-negro); color: #fff; border-radius: 22px; padding: 16px; box-shadow: var(--o2-sombra-l); }
+  .o2-movil-top{ display: flex; align-items: center; gap: 10px; }
+  .o2-movil-top img{ width: 32px; height: 32px; border-radius: 50%; box-shadow: 0 0 0 1px rgba(255,255,255,.16); }
+  .o2-movil-top b{ display: block; font-size: 16px; letter-spacing: .04em; }
+  .o2-movil-top small{ display: block; font-size: 11px; color: var(--o2-lado-soft); }
+  .o2-movil-neg{ margin: 14px 2px 12px; }
+  .o2-movil-neg b{ display: block; font-size: 18px; font-weight: 800; }
+  .o2-movil-neg small{ display: block; font-size: 12.5px; color: var(--o2-lado-soft); margin-top: 2px; }
+  .o2-tiles{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .o2-tile{ display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-height: 76px; padding: 10px 6px; border: 0; border-radius: 14px; background: #fff; color: var(--o2-negro); font: 700 12.5px/1.15 var(--font-main); cursor: pointer; }
+  .o2-tile svg{ width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .o2-tile:active{ transform: scale(.97); }
+}
