@@ -181,6 +181,7 @@ document.getElementById('productLabelsBtn').addEventListener('click', () => {
    códigos de barras. Queda abierta para escanear varios seguidos: fácil de
    usar, sin tener que volver a tocar el botón cada vez. */
 let scanStream = null, scanDetector = null, scanTimer = null, scanLastCode = null, scanLastAt = 0, scanOnResult = null, scanVivo = false;
+const scanVistos = new Map();   // código → última vez que se vio en cámara (para no repetirlo mientras sigue ahí)
 let scanVez = 0;   // cada apertura/cierre suma 1: lo que termina tarde (cámara, lector) de una apertura vieja no se mete en la nueva
 // Formatos que se piden: los que el celular sí sabe leer (pedir uno que no soporta rompe el lector en algunos equipos).
 const SCAN_FORMATOS = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'qr_code', 'code_39', 'itf', 'codabar'];
@@ -224,7 +225,7 @@ function closeScanOverlay(){
   if(scanStream){ scanStream.getTracks().forEach(t => t.stop()); scanStream = null; }
   try{ const v = document.getElementById('scanVideo'); if(v){ v.pause(); v.srcObject = null; } }catch(e){}   // suelta la cámara del todo
   try{ if(window.ventoLectorCel) window.ventoLectorCel.cerrar(); }catch(e){}
-  scanDetector = null; scanOnResult = null; scanLastCode = null;
+  scanDetector = null; scanOnResult = null; scanLastCode = null; scanVistos.clear();
 }
 
 /* 1.65.0: 📱 el celular como lector (lib/vento-lector-cel.js): mientras esta ventana está abierta, lo que lea el celular
@@ -360,16 +361,18 @@ async function openScanOverlay(onResult, opts){
       ocupado = true;
       try{
         const codes = await scanDetector.detect(video);
-        const c0 = codes && codes.find(c => c && c.rawValue);
-        if(c0 && scanVez === vez){
-          const raw = c0.rawValue, now = Date.now();
-          // Mientras el código siga en cámara no se repite (antes se volvía a sumar cada 1,5 s si
-          // se dejaba quieto). Para sumar otra unidad del mismo, se retira un momento y se vuelve a mostrar.
-          if(!(raw === scanLastCode && (now - scanLastAt) < 800)){
-            scanLastCode = raw; scanLastAt = now;
-            scanLeido(raw);
-          } else scanLastAt = now;
-        }
+        // 1.67.1: TODOS los códigos que se vean a la vez (varios productos juntos frente a la cámara), cada uno una vez.
+        // Mientras un código siga en cámara no se repite (antes se volvía a sumar cada 1,5 s si se dejaba quieto). Para
+        // sumar otra unidad del mismo, se retira un momento y se vuelve a mostrar.
+        const vistos = [...new Set((codes || []).filter(c => c && c.rawValue).map(c => c.rawValue))];
+        const now = Date.now();
+        vistos.forEach(raw => {
+          if(scanVez !== vez) return;
+          const ult = scanVistos.get(raw) || 0;
+          scanVistos.set(raw, now);
+          if(now - ult >= 800){ scanLastCode = raw; scanLastAt = now; scanLeido(raw); }
+        });
+        if(scanVistos.size > 200) scanVistos.clear();
       }catch(e){}
       ocupado = false;
     }
