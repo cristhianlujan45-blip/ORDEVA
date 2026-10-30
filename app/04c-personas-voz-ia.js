@@ -2307,6 +2307,12 @@ function invOnSale(item, q){                 // se llama solo, cada vez que camb
   data.stockLog = data.stockLog || [];
   data.stockLog.push({ p: p.id, q, at: Date.now() });
   if(data.stockLog.length > 3000) data.stockLog = data.stockLog.slice(-2500);
+  // ⏳ 1.67.6: lotes con vencimiento: se vende primero el que vence antes; lo que se devuelve (deshacer) vuelve a ese lote.
+  if(Array.isArray(p.lotes) && p.lotes.length){
+    const F = window.ventoFinanzas;
+    if(q > 0 && F) p.lotes = F.descontarLotes(p.lotes, q);
+    else if(q < 0){ const l = p.lotes.slice().sort((a, b) => String(a.vence || '9999').localeCompare(String(b.vence || '9999')))[0]; if(l) l.q = (Number(l.q) || 0) - q; }
+  }
   if(p.stock == null) return;
   p.stock = Math.max(0, p.stock - q);
   invBadge();

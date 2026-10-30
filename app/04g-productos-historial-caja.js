@@ -1058,11 +1058,19 @@ function productCostHistoryHtml(productId, limit){
     const prev = lastN[i + 1];
     let arrow = '';
     if(prev && prev.cost != null && r.cost != null && prev.cost !== r.cost){
-      arrow = r.cost > prev.cost ? ' <b class="up">▲</b>' : ' <b class="down">▼</b>';
+      const pct = prev.cost > 0 ? Math.round((r.cost - prev.cost) / prev.cost * 100) : null;   // 📦 1.67.6: variación entre compras
+      arrow = (r.cost > prev.cost ? ' <b class="up">▲' : ' <b class="down">▼') + (pct != null ? ' ' + Math.abs(pct) + ' %' : '') + '</b>';
     }
     return '<div class="cost-hist-row"><span>' + invEsc(r.date || '—') + (r.supplier ? ' · ' + invEsc(r.supplier) : '') + '</span><span>' + fmt(r.cost) + arrow + '</span></div>';
   }).join('');
-  return '<div class="cost-hist"><div class="cost-hist-title">📈 Histórico de compra (últimas ' + lastN.length + ')</div>' + lines + '</div>';
+  // 🏭 Comparación de proveedores: el último costo de cada uno, del más barato al más caro.
+  let comp = '';
+  try{
+    const F = window.ventoFinanzas, l = F ? F.proveedores(data.purchases, data.products).comparar(productId) : [];
+    if(l.length > 1) comp = '<div class="cost-hist-title" style="margin-top:8px">🏭 Comparar proveedores (último costo)</div>' +
+      l.map((x, i) => '<div class="cost-hist-row' + (i === 0 ? ' cost-mejor' : '') + '"><span>' + (i === 0 ? '✅ ' : '') + invEsc(x.proveedor) + '</span><span>' + fmt(x.costo) + (i > 0 ? ' <small>+' + Math.round((x.costo / l[0].costo - 1) * 100) + ' %</small>' : ' <small>el más barato</small>') + '</span></div>').join('');
+  }catch(e){}
+  return '<div class="cost-hist"><div class="cost-hist-title">📈 Histórico de compra (últimas ' + lastN.length + ')</div>' + lines + comp + '</div>';
 }
 function renderProductCostHistory(productId){
   const box = document.getElementById('editProdHistory');

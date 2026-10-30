@@ -475,7 +475,15 @@ function renderStats(){
     (IV && IV.inversion > 0 ? stKpi('💼 Plata invertida (a costo)', stMoney(IV.inversion)) + stKpi('📈 Ganancia potencial', stMoney(IV.gananciaPotencial)) : '') + stKpi('🧮 Productos con control', tr.length + ' de ' + data.products.length) + stKpi('🚫 Agotados', cnt('out')) + stKpi('⚠️ Por agotarse', cnt('low')) + '</div>' +
     (tr.length ? stCard('📉 Se agotan primero', stRows(tr.slice().sort((a, b) => key(a) - key(b)).slice(0, 10).map(p => { const d = invDays(p); return { l: p.name, v: p.stock, c: COL[invStatus(p)], t: p.stock + ' u' + (d != null ? ' · ≈' + (d < 1 ? 'hoy' : Math.round(d) + ' d') : '') }; })))
       : '<div class="empty-state">Aún no controlas stock. Configúralo en Inventario para ver estas gráficas.</div>');
-  box.innerHTML = '<h3 class="st-h">💵 Ventas</h3>' + sales + calendarComparisonCard() + '<h3 class="st-h">📦 Inventario</h3>' + inv;
+  // 🏭 1.67.6: proveedores (de las facturas registradas) y ⏳ lotes por vencer.
+  let provHtml = '';
+  try{
+    const F2 = window.ventoFinanzas, PV = F2 ? F2.proveedores(data.purchases, data.products).lista : [], VN = F2 ? F2.vencimientos(data.products) : { vencidos: [], pronto: [] };
+    if(PV.length) provHtml += stCard('🏭 Proveedores (compras registradas)', stRows(PV.slice(0, 8).map(x => ({ l: x.nombre, v: x.total, t: stMoney(x.total) + ' · ' + x.compras + ' compra' + (x.compras === 1 ? '' : 's') + ' · ' + x.productos + ' producto' + (x.productos === 1 ? '' : 's') + (x.ultima ? ' · última ' + new Date(x.ultima).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }) : '') }))));
+    const vv = VN.vencidos.concat(VN.pronto);
+    if(vv.length) provHtml += stCard('⏳ Vencimientos', stRows(vv.slice(0, 10).map(x => ({ l: x.nombre + ' (' + x.q + ' u)', v: Math.max(1, 30 - x.dias), t: x.dias < 0 ? '⛔ venció hace ' + (-x.dias) + ' d' : x.dias === 0 ? '⚠️ vence hoy' : 'vence en ' + x.dias + ' d', c: x.dias < 0 ? '#ff5a5a' : '#f5b83d' }))));
+  }catch(e){}
+  box.innerHTML = '<h3 class="st-h">💵 Ventas</h3>' + sales + calendarComparisonCard() + '<h3 class="st-h">📦 Inventario</h3>' + inv + provHtml;
   try{ window.ventoTablero && window.ventoTablero.pintar(stPer); }catch(e){ console.error('vento-tablero', e); }
 }
 document.getElementById('stPer').addEventListener('click', e => { const b = e.target.closest('button[data-p]'); if(b){ stPer = b.dataset.p; renderStats(); } });

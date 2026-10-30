@@ -151,7 +151,7 @@ relacionales que se llenan solas + RLS) sirve, y la transición a registros rela
 | P3 | «¿Con cuánto paga?» estaba escondido | `lib/vento-pos.js` | Media (operación) | ✅ Corregido en 1.67.0 |
 | P4 | Lo recibido y las vueltas no quedaban en la venta | `app/04f`, `app/04a` | Media (trazabilidad) | ✅ Corregido en 1.67.0 |
 | P5 | Fórmula del margen repetida en 7 sitios | `app/04d`, `04e`, `04f`, `23` | Baja | ✅ Unificadas con el motor en la 1.67.2 |
-| P6 | Sin costo promedio ponderado: el último costo pisa al anterior | `app/04e` | Media | Pendiente (fase 5) |
+| P6 | Sin costo promedio ponderado: el último costo pisa al anterior | `app/04e` | Media | ✅ 1.67.6: Ajustes → «Costo de lo que compras» (último costo o promedio ponderado) |
 | P7 | Sincronización del documento completo en cada cambio | `nube/vento-nube.js` | Media (rendimiento con negocios grandes) | Pendiente (fase 10) |
 | P8 | `javaavisos`: la revisión del servicio de fondo y `Cruce.java` no compilan en la prueba | `pruebas/javaavisos.test.js` | Baja (solo la prueba) | Viene de antes (M1). Pendiente |
 | P10 | La utilidad del Inicio restaba dos veces las compras de mercancía (factura + costo de lo vendido) | `lib/ordeva2.js` | **Alta** (utilidad más baja de la real) | ✅ Corregido en la 1.67.2 |
@@ -179,9 +179,9 @@ Las vueltas nunca suman como venta ni como gasto (comprobado en la prueba `vuelt
 |---|---|---|
 | 1. Seguridad y estabilidad | Revisar RLS, funciones y canales con las pruebas negativas. Arreglar P8. Diagnóstico de P9 | 🟡 Sin hallazgos nuevos; P8 y P9 abiertos |
 | 2. Motor financiero | Motor único (`lib/vento-finanzas.js`): margen y recargo, precios sugeridos, resultado sin doble conteo de compras, rentabilidad por producto y categoría, inventario valorizado, 5 alertas. Pantallas y fórmulas repetidas unificadas | ✅ 1.67.0–1.67.2 (pendiente: IVA detallado y filtros por categoría/producto) |
-| 3. Diseño | Terminar ORDEVA 2.0 en Compras/Facturas, Clientes/Libreta, Laya y Ajustes | Pendiente |
+| 3. Diseño | Terminar ORDEVA 2.0 en Compras/Facturas, Clientes/Libreta, Laya y Ajustes | ✅ 1.67.4 |
 | 4. Cobro y vueltas | Campo siempre visible, billetes, pago exacto, mixto, sin pago incompleto, guardar recibido y vueltas, cuentas | ✅ Hecho (1.67.0) |
-| 5. Inventario y compras | Costo promedio ponderado (configurable), variación entre compras, comparación de proveedores, lotes y vencimientos | Pendiente |
+| 5. Inventario y compras | Costo promedio ponderado (configurable), variación entre compras, comparación de proveedores, lotes y vencimientos | ✅ 1.67.6 (ver `puente/REPORTE-1.67.6.md`) |
 | 6. Facturas y OCR | Detección de bordes y corrección de perspectiva antes del reconocimiento | Pendiente |
 | 7. Caja y gastos | Tipos de gasto (directo / operativo / administrativo / financiero), comparación de períodos, vueltas en el arqueo | Pendiente |
 | 8. Laya | Preguntas financieras con el motor (margen por categoría, gastos que subieron) | Pendiente |
@@ -189,8 +189,7 @@ Las vueltas nunca suman como venta ni como gasto (comprobado en la prueba `vuelt
 | 10. Rendimiento | Sincronización incremental; paginación del historial | Pendiente |
 | 11–12. Pruebas integrales y publicación | | Por versión |
 
-Suspender y recuperar ventas, descuentos autorizados y notas en la Caja van en la fase 4b, después del motor
-financiero.
+Suspender y recuperar ventas, descuentos autorizados y notas en la Caja: ✅ fase 4b (1.67.5).
 
 ## 7. Mejoras de diseño (en la 1.67.0)
 - El cobro de la Caja ahora tiene el bloque **«¿CON CUÁNTO PAGA EL CLIENTE?»** siempre a la vista:

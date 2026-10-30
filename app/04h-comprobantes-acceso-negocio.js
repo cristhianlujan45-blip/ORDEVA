@@ -1684,6 +1684,9 @@ function wireAccountUI(){
     bizNitInput.addEventListener('blur', () => { data.nit = bizNitInput.value.trim().slice(0, 40); bizNitInput.value = data.nit; saveData(); });
     bizAddressInput.addEventListener('blur', () => { data.bizAddress = bizAddressInput.value.trim().slice(0, 120); bizAddressInput.value = data.bizAddress; saveData(); });
     ivaOnToggle.onchange = () => { data.ivaResponsable = ivaOnToggle.checked; saveData(); };
+    // 📦 1.67.6: método de valoración del costo (último o promedio ponderado)
+    const cmSel = document.getElementById('costoMetodoSel');
+    if(cmSel){ cmSel.value = data.costoMetodo === 'promedio' ? 'promedio' : 'ultimo'; cmSel.onchange = () => { data.costoMetodo = cmSel.value === 'promedio' ? 'promedio' : 'ultimo'; saveData(); showToast(data.costoMetodo === 'promedio' ? '📦 El costo será el promedio ponderado desde la próxima compra.' : '📦 El costo será el de la última compra.'); }; }
     ivaRateInput.addEventListener('blur', () => {
       const v = parseFloat(ivaRateInput.value);
       data.ivaRate = (isFinite(v) && v >= 0) ? v : 19;

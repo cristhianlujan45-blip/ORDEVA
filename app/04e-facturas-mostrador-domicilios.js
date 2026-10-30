@@ -789,6 +789,7 @@ function fiCatCodigoHtml(it){
   return '<div class="iv-grid iv-catgrid">' +
       '<div><label>🏷️ Categoría</label><select class="iv-cat">' + fiCatOpciones(it.categoryId) + '</select></div>' +
       '<div><label>🔢 Código (barras o interno)</label><div class="iv-codewrap"><input type="text" class="iv-code" maxlength="40" autocomplete="off" autocapitalize="characters" placeholder="Opcional" value="' + invEsc(it.codigo || '') + '"><button type="button" class="iv-code-scan" title="Escanear el código con la cámara">📷</button></div></div>' +
+      '<div><label>⏳ Vence (opcional)</label><input type="date" class="iv-vence" value="' + invEsc(it.vence || '') + '" title="Si es perecedero: queda como lote y ORDEVA avisa antes de que venza"></div>' +
     '</div>' +
     '<div class="iv-catnew" hidden><input type="text" class="iv-catnew-in" maxlength="40" placeholder="Nombre de la nueva categoría"><button type="button" class="btn-primary iv-catnew-ok">Crear</button></div>';
 }
@@ -1132,6 +1133,7 @@ function invoiceReadRow(el){
     if(catEl && catEl.value !== '__nueva' && catEl.value !== String(it.categoryId || '')){ it.categoryId = catEl.value; it.catTocada = true; }
     if(codEl){ const v = codEl.value.trim().slice(0, 40); if(v !== (it.codigo || '')){ it.codigo = v; it.codTocado = true; } }
   }
+  const veEl = el.querySelector('.iv-vence'); if(veEl) it.vence = /^\d{4}-\d{2}-\d{2}$/.test(veEl.value) ? veEl.value : '';   // ⏳ 1.67.6: lote con vencimiento
   const qAntes = it.qty, cAntes = it.cost;
   it.qty = Math.max(0, Math.round(invNum(el.querySelector('.iv-qty').value) || 0));
   const cLeido = Math.max(0, invNum(el.querySelector('.iv-cost').value) || 0);
@@ -1428,10 +1430,14 @@ document.getElementById('invoiceApplyBtn').addEventListener('click', async () =>
         const pct = p.cost > 0 ? Math.round((it.cost - p.cost) / p.cost * 100) : null;
         raisedDetail.push({ name: p.name, from: p.cost, to: it.cost, pct });
       }
-      p.cost = it.cost;
+      // 📦 1.67.6: método de valoración del negocio (último costo o promedio ponderado con lo que ya había en bodega).
+      const F = window.ventoFinanzas;
+      p.cost = F ? F.costoTrasCompra(p.stock, p.cost, it.qty, it.cost, data.costoMetodo) : it.cost;
+      p.costoUltimo = it.cost;
       p.stock = (p.stock || 0) + it.qty;
+      if(it.vence){ p.lotes = (p.lotes || []).concat([{ q: it.qty, vence: it.vence, t: Date.now(), costo: it.cost }]); }
       if(it.ivaPct > 0 && (p.iva == null || p.iva === '')) p.iva = Math.round(it.ivaPct * 100);
-      p.costSinIva = Math.round(it.cost / (1 + (it.ivaPct || 0)) * 100) / 100;
+      p.costSinIva = Math.round(p.cost / (1 + (it.ivaPct || 0)) * 100) / 100;
       if(it.newPrice > 0){ p.price = it.newPrice; sincronizarProductoEnMesas(p); }
       // La categoría que elegiste en la revisión (si no la tocaste, solo se pone si el producto no tenía).
       if(it.categoryId !== undefined && (it.catTocada || !p.categoryId)){ const c = fiCatValida(it.categoryId); if(c || it.catTocada) p.categoryId = c; }
@@ -1441,6 +1447,8 @@ document.getElementById('invoiceApplyBtn').addEventListener('click', async () =>
         size: it.contentPerUnit || '', specifications: '', stock: it.qty, cost: it.cost,
         iva: it.ivaPct > 0 ? Math.round(it.ivaPct * 100) : undefined, costSinIva: Math.round(it.cost / (1 + (it.ivaPct || 0)) * 100) / 100 };
       if(it.presentation || it.unitsPerPackage) p.det = Object.assign({}, p.det, { presentacion: it.presentation || null, unidadesPorPaquete: it.unitsPerPackage || null });
+      p.costoUltimo = it.cost;
+      if(it.vence) p.lotes = [{ q: it.qty, vence: it.vence, t: Date.now(), costo: it.cost }];   // ⏳ 1.67.6
       data.products.push(p);
       created++;
     }
