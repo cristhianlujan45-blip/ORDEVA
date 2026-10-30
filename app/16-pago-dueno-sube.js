@@ -6,7 +6,7 @@
    el canal de fotos de la carta, así lo ven también los QR de mesa ya impresos. */
 (function(){
   const $q = id => document.getElementById(id);
-  const QP = () => data.qrPago || null;   // solo leer: antes ponía «qrPago: null» en los datos de todos los negocios sin QR
+  const QP = () => (typeof data !== 'undefined' && data && data.qrPago) || null;   // 1.65.10: sin «data» (cerrando sesión, cambiando de negocio) no se cae   // solo leer: antes ponía «qrPago: null» en los datos de todos los negocios sin QR
   const cargarImg = src => new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = src; });
   const leerArchivo = f => new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = no; r.readAsDataURL(f); });
   function canvasDe(img, lado){
@@ -110,5 +110,5 @@
   window.qrPagoPublicar = qpPublicar;
   window.leerTextoQR = leerTexto;   // reutilizado por «Fijar mis QR impresos» (subir foto del QR pegado en la mesa)
   const t0 = setInterval(() => { if(typeof data !== 'undefined' && data){ clearInterval(t0); qpIni(); qpPublicar(false); } }, 1000);
-  setInterval(() => qpPublicar(false), 30 * 60000);
+  setInterval(() => { if(typeof data !== 'undefined' && data) qpPublicar(false); }, 30 * 60000);
 })();

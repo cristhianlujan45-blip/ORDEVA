@@ -23,6 +23,16 @@
   // 1.50.0: sube a los 0,3 s del último cambio (antes 1 s) y revisa cada 3 s (antes 5 s): «cuando agrego cervezas en una
   // mesa, que se sincronice todo muy rápido».
   var POLL_MS = 3000, SUBIR_MS = 300;
+  // 1.65.10: ningún paso de la sincronización puede quedarse esperando para siempre. Si una llamada al servidor no
+  // contestaba (cambio de wifi a datos, celular dormido) o la copia local (IndexedDB) no respondía (Android con poca
+  // memoria), «subiendo» quedaba prendido y ese equipo dejaba de subir y de revisar la nube hasta cerrar la app: lo de
+  // una cuenta no se veía en los otros equipos. Ahora cada paso tiene un tope y, si algo queda trabado, se suelta solo.
+  var T = { rpc: 20000, base: 5000, trabada: 60000, reintento: 20000 };
+  function conTiempo(p, ms, que){
+    var t = null;
+    return Promise.race([p, new Promise(function(_, no){ t = setTimeout(function(){ no(new Error('sin respuesta (' + que + ')')); }, ms); })])
+      .then(function(v){ clearTimeout(t); return v; }, function(e){ clearTimeout(t); throw e; });
+  }
 
   // ---------- Estado guardado en el celular ----------
   function lsGet(k, d){ try{ var v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; }catch(e){ return d; } }
@@ -83,12 +93,14 @@
     for(var i = 0; i < mapa.length; i++) if(mapa[i][0].test(m)) return mapa[i][1];
     return m || 'Algo falló con la nube.';
   }
-  function rpc(nombre, args){ return cliente().then(function(c){ return c.rpc(nombre, args || {}); }).then(function(r){ if(r.error) throw r.error; return r.data; }); }
+  function rpc(nombre, args){ return conTiempo(cliente().then(function(c){ return c.rpc(nombre, args || {}); }), T.rpc, nombre).then(function(r){ if(r.error) throw r.error; return r.data; }); }
 
   // ---------- Copia «base» (lo último que se sincronizó) para poder mezclar ----------
   var idb = null;
   function base(op, val){
-    return new Promise(function(ok){
+    return new Promise(function(ok0){
+      var listo = false, ok = function(v){ if(!listo){ listo = true; ok0(v); } };
+      setTimeout(function(){ ok(null); }, T.base);   // 1.65.10: si IndexedDB no contesta, se sigue sin la copia (no se traba)
       try{
         var abrir = idb ? Promise.resolve(idb) : new Promise(function(a, b){ var r = indexedDB.open('vento-nube', 1); r.onupgradeneeded = function(){ r.result.createObjectStore('kv'); }; r.onsuccess = function(){ idb = r.result; a(idb); }; r.onerror = b; });
         abrir.then(function(db){
@@ -202,6 +214,18 @@
   function datosApp(){ try{ return typeof window.ventoDatosActuales === 'function' ? window.ventoDatosActuales() : null; }catch(e){ return null; } }
   function aplicar(obj, respaldar){ return typeof window.ventoAplicarDatosNube === 'function' ? Promise.resolve(window.ventoAplicarDatosNube(obj, respaldar)) : Promise.resolve(); }
   var subiendo = false, bajando = false, otraVez = false, tSubir = null, tPoll = null, ultimoError = '';
+  var subiendoDesde = 0, bajandoDesde = 0, trabadaAvisada = false;
+  // 1.65.10: si subir o bajar lleva más de un minuto sin terminar, se suelta y se vuelve a intentar (y queda anotado
+  // en los errores del equipo para el administrador, una vez por sesión).
+  function destrabar(){
+    var ahora = Date.now(), que = '';
+    if(subiendo && ahora - subiendoDesde > T.trabada){ subiendo = false; otraVez = false; que = 'subir'; }
+    if(bajando && ahora - bajandoDesde > T.trabada){ bajando = false; que = que ? que + ' y bajar' : 'bajar'; }
+    if(!que) return false;
+    if(!trabadaAvisada){ trabadaAvisada = true; try{ window.ventoError && window.ventoError('otro', 'La sincronización estaba trabada (' + que + '): se soltó sola', { sucio: !!st.sucio, version: st.version || 0 }, 'nube-trabada'); }catch(e){} }
+    if(st.sucio){ clearTimeout(tSubir); tSubir = setTimeout(subir, 50); }
+    return true;
+  }
   function aviso(t){ try{ window.showToast && window.showToast(t, 5000); }catch(e){} }
   function pintarEstado(){ try{ var el = document.getElementById('nubeEstadoAj'); if(el) el.textContent = textoEstado(); }catch(e){} }
   function textoEstado(){
@@ -230,17 +254,17 @@
     if(!st.negocio || !enSede()) return Promise.resolve();
     if(subiendo){ otraVez = true; return Promise.resolve(); }
     var d = datosApp(); if(!d) return Promise.resolve();
-    subiendo = true;
+    subiendo = true; subiendoDesde = Date.now();
     return rpc('guardar_datos', { p_negocio: st.negocio.id, p_datos: d, p_version: st.version || 0 })
       .then(function(v){ st.version = v; st.sucio = false; st.ultimo = Date.now(); ultimoError = ''; guardarSt(); avisarOtros(v); return base('put', clonar(d)); })
       .catch(function(e){
         if(/conflicto/.test(String(e && e.message))) return mezclarConNube();
-        ultimoError = msgError(e); clearTimeout(tSubir); tSubir = setTimeout(subir, 20000);
+        ultimoError = msgError(e); clearTimeout(tSubir); tSubir = setTimeout(subir, T.reintento);
       })
       .then(function(){ subiendo = false; pintarEstado(); if(otraVez){ otraVez = false; return subir(); } });
   }
   function leerNube(){
-    return cliente().then(function(c){ return c.from('datos_negocio').select('datos,version').eq('negocio_id', st.negocio.id).single(); })
+    return conTiempo(cliente().then(function(c){ return c.from('datos_negocio').select('datos,version').eq('negocio_id', st.negocio.id).single(); }), T.rpc, 'leer')
       .then(function(r){ if(r.error) throw r.error; return r.data; });
   }
   function mezclarConNube(){
@@ -286,8 +310,9 @@
     });
   }
   function revisarNube(){
+    destrabar();
     if(!st.negocio || !configurada() || document.hidden || subiendo || !enSede()) return;
-    cliente().then(function(c){ return c.from('datos_negocio').select('version').eq('negocio_id', st.negocio.id).maybeSingle(); })
+    conTiempo(cliente().then(function(c){ return c.from('datos_negocio').select('version').eq('negocio_id', st.negocio.id).maybeSingle(); }), T.rpc, 'revisar')
       .then(function(r){
         if(r.error) throw r.error;
         if(!r.data){ ultimoError = 'ya no eres miembro de este negocio'; pintarEstado(); return; }
@@ -310,7 +335,7 @@
       canal = c.channel('vento-datos-' + id, { config: { broadcast: { self: false } } })
         // Otro equipo guardó: si aquí no hay nada por subir, se baja de una (sin preguntar antes la versión: un viaje menos).
         .on('broadcast', { event: 'version' }, function(m){ var v = m && m.payload && m.payload.v; if(v && v <= (st.version || 0)) return;
-          if(v && !st.sucio && !subiendo && !bajando && enSede()){ bajando = true; bajar().then(function(){ avisoBajada(); }, function(){ revisarNube(true); }).then(function(){ bajando = false; }); return; }
+          if(v && !st.sucio && !subiendo && !bajando && enSede()){ bajando = true; bajandoDesde = Date.now(); bajar().then(function(){ avisoBajada(); }, function(){ revisarNube(true); }).then(function(){ bajando = false; }); return; }
           revisarNube(true); })
         .on('broadcast', { event: 'archivo' }, function(m){ var k = m && m.payload && m.payload.k; if(k) archivoCambiado(k); })
         .subscribe();
@@ -769,7 +794,7 @@
     codigoEntrar: codigoEntrar, entrarConCodigo: entrarConCodigo, entrarConEnlace: entrarConEnlace, celularDisponible: celularDisponible, celularUnir: celularUnir, celularConfirmar: celularConfirmar, celularDeCuenta: celularDeCuenta, celularE164: celularE164,
     msgError: msgError, codigoCorreo: codigoCorreo, enlaceClave: enlaceClave, correoDeEnlace: correoDeEnlace, claveConEnlace: claveConEnlace, soltarEnlace: soltarEnlace, verificarCorreo: verificarCorreo, nuevaClave: nuevaClave, soltarSesion: soltarSesion,
     claveVista: claveVista, cambiandoClave: function(){ return cambiandoClave > 0; }, claveMarca: claveMarca, cerrarOtrasSesiones: cerrarOtrasSesiones,
-    _fusionar: fusionar, juntarRepetidos: juntarRepetidos,
+    _fusionar: fusionar, juntarRepetidos: juntarRepetidos, _tiempos: T, _ocupado: function(){ return { subiendo: subiendo, bajando: bajando }; },
     // Fotos y archivos compartidos entre los equipos de la cuenta
     enNube: enNube,
     archivos: { subir: archivoSubir, bajar: archivoBajar, borrar: archivoBorrar, alCambiar: alCambiarArchivo, pendientes: function(){ return Object.keys(lsGet(K_PEND, {})).length; } }
