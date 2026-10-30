@@ -226,6 +226,42 @@ Las de la sección 9. Enter en el campo de lo recibido cobra en efectivo.
   - margen vs. recargo y precios sugeridos;
   - que «Usar» no cambie el precio guardado.
 - Los resultados de la suite y del servidor de esta versión están en el mensaje de publicación (`REPORTE-1.67.0.md`).
+### Resultados reales de esta versión (30-oct-2026)
+- **Navegador (33 pruebas):** 32 pasaron completas a la primera.
+  - `mesapersonas` falló 4 de 22 por un error de la 1.67.0: lo que una persona paga de más dejaba de cubrir a los
+    demás. Se corrigió (las vueltas cuentan solo sobre el saldo de toda la mesa) y ahora da 22 ✅.
+  - `safari` no corre en este equipo (0 de 0): no queda verificada.
+  - Las 31 restantes:
+
+    | Prueba | ✅ | Prueba | ✅ | Prueba | ✅ |
+    |---|---|---|---|---|---|
+    | vueltas | 25 | cajapos | 27 | cajaqr | 13 |
+    | confirmapago | 61 | dian | 29 | equipos | 35 |
+    | escanear | 13 | facil | 47 | facilpantallas | 28 |
+    | herramientas | 28 | lectorcel | 24 | mejoras | 32 |
+    | modos | 55 | divtest | 6 | practica | 25 |
+    | cerrarcaja | 26 | apariencias | 16 | ordeva2 | 30 |
+    | ordeva2pantallas | 17 | vistasencilla | 45 | codigoproducto | 22 |
+    | facturascan | 33 | facturacategorias | 11 | salidas | 19 |
+    | libreta | 24 | recetas | 21 | entrar | 35 |
+    | iphone | 9 | erroresreal | 33 | tablero | 26 |
+    | hola | 15 | | | | |
+
+- **Servidor, PostgreSQL real (22 pruebas, 916 revisiones, 0 fallas):**
+
+  | Prueba | ✅ | Prueba | ✅ | Prueba | ✅ |
+  |---|---|---|---|---|---|
+  | admin | 169 | aislamiento | 9 | avisos | 34 |
+  | bloqueos | 18 | canallimite | 5 | canalprivado | 17 |
+  | catalogo | 12 | daviplata | 102 | dian | 69 |
+  | equiponoreescribe | 29 | errores | 37 | iaclave | 34 |
+  | iacupo | 6 | nequiconecta | 16 | pagosprivados | 42 |
+  | permisos | 19 | proyeccion | 66 | repasos | 20 |
+  | respaldos | 15 | suscripciones | 154 | usuariosequipo | 25 |
+  | wompi | 18 (simulado) | | | | |
+
+- **Conclusión de la fase 1:** el aislamiento entre negocios y las pruebas negativas (otro negocio, empleado sin
+  permiso, QR sin código) siguen bien. No hay hallazgos nuevos.
 - **No probado aquí** (necesita equipos o llaves reales):
   - Wompi, Nequi y DaviPlata reales;
   - impresora y cajón físicos;
