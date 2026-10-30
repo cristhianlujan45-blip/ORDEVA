@@ -57,7 +57,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     ] }));
     await p.waitForSelector('#invoiceBody .iv-item');
     const sug = await p.evaluate(() => [...document.querySelectorAll('#invoiceBody .iv-item')].map(r => ({ cat: r.querySelector('.iv-cat').value, cod: r.querySelector('.iv-code').value })));
-    chk('1. Categoría sugerida por producto: Águila → Cervezas, Coca Cola → Gaseosas, Aguardiente → Licores, Papas → sin categoría', sug[0].cat === 'c-cer' && sug[1].cat === 'c-gas' && sug[2].cat === 'c-lic' && sug[3].cat === '', sug);
+    chk('1. Categoría sugerida por producto: Águila → Cervezas, Coca Cola → Gaseosas, Aguardiente → Licores, Papas → «🆕 Snacks» (1.66.1: se propone nueva si no existe)', sug[0].cat === 'c-cer' && sug[1].cat === 'c-gas' && sug[2].cat === 'c-lic' && sug[3].cat === 'nueva:Snacks', sug);
     chk('1. El código de barras que trae la factura ya aparece en «Código»', sug[0].cod === '7702004003508', sug);
     chk('1. Cada producto tiene su selector de categoría (con «➕ Nueva categoría…») y su botón 📷 para escanear el código', await p.evaluate(() => [...document.querySelectorAll('#invoiceBody .iv-item')].every(r => r.querySelector('.iv-cat option[value="__nueva"]') && r.querySelector('.iv-code-scan'))));
     // «Poner a todos la categoría» y luego cambiar uno por uno

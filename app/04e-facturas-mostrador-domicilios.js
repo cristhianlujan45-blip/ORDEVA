@@ -734,22 +734,28 @@ function fiDesgloseHtml(it){
    Cada renglón lleva su propia categoría (la del producto si ya existe; si es nuevo, la que se parezca: cervezas,
    gaseosas, licores…) y su código (de barras o interno: el que trae la factura, el del producto o uno escrito/escaneado). */
 const fiSinT = x => String(x || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+// [lo que dice el producto, cómo se llama la categoría si ya existe, nombre para crearla si no existe] (1.66.1)
 const FI_CAT_PISTAS = [
-  [/\b(cerveza|pilsen|lager|aguila|poker|club colombia|costena|corona|heineken|budweiser|stella|redds|andina|tres cordilleras|bbc)\b/, /cervez|pola/],
-  [/\b(gaseosa|coca|pepsi|postobon|sprite|colombiana|manzana postobon|quatro|uva|7up|seven up|big cola|ginger)\b/, /gaseos|bebida|refresc/],
-  [/\b(agua|cristal|brisa|manantial|h2o)\b/, /agua|bebida/],
-  [/\b(jugo|hit|tutti|del valle|frutto|natumalta|malta|pony)\b/, /jug|malta|bebida/],
-  [/\b(energizante|red bull|vive 100|speed|monster|volt)\b/, /energ|bebida/],
-  [/\b(aguardiente|antioqueno|nectar|ron|medellin|viejo de caldas|whisky|whiskey|old parr|buchanan|vodka|tequila|vino|ginebra|brandy|licor)\b/, /licor|trago|aguardient|ron|vino/],
-  [/\b(papas|margarita|chitos|de todito|doritos|tostacos|platanitos|mani|snack|natuchips|yupi|choclitos|cheetos)\b/, /snack|mecato|paquet|pasaboc/],
-  [/\b(cigarrillo|cigarro|marlboro|lucky|boston|belmont|pielroja)\b/, /cigarr|tabaco/],
-  [/\b(chocolatina|jet|jumbo|chicle|bombon|dulce|galleta|festival|ducales|wafer)\b/, /dulce|golosin|confit|galleta/],
-  [/\b(hielo)\b/, /hielo/]
+  [/\b(cerveza|pilsen|lager|aguila|poker|club colombia|costena|corona|heineken|budweiser|stella|redds|andina|tres cordilleras|bbc)\b/, /cervez|pola/, 'Cervezas'],
+  [/\b(gaseosa|coca|pepsi|postobon|sprite|colombiana|manzana postobon|quatro|uva|7up|seven up|big cola|ginger)\b/, /gaseos|bebida|refresc/, 'Gaseosas'],
+  [/\b(agua|cristal|brisa|manantial|h2o)\b/, /agua|bebida/, 'Aguas'],
+  [/\b(jugo|hit|tutti|del valle|frutto|natumalta|malta|pony|tampico|bretana|gatorade|powerade)\b/, /jug|malta|bebida/, 'Jugos y bebidas'],
+  [/\b(energizante|red bull|vive 100|speed|monster|volt)\b/, /energ|bebida/, 'Energizantes'],
+  [/\b(aguardiente|antioqueno|nectar|ron|medellin|viejo de caldas|whisky|whiskey|old parr|buchanan|vodka|tequila|vino|ginebra|brandy|licor|smirnoff)\b/, /licor|trago|aguardient|ron|vino/, 'Licores'],
+  [/\b(papas|margarita|chitos|de todito|doritos|tostacos|platanitos|mani|snack|natuchips|yupi|choclitos|cheetos)\b/, /snack|mecato|paquet|pasaboc/, 'Snacks'],
+  [/\b(cigarrillo|cigarro|marlboro|lucky|boston|belmont|pielroja)\b/, /cigarr|tabaco/, 'Cigarrillos'],
+  [/\b(chocolatina|jet|jumbo|chicle|bombon|dulce|galleta|festival|ducales|wafer|chocoramo|noel)\b/, /dulce|golosin|confit|galleta/, 'Dulces y galletas'],
+  [/\b(hielo)\b/, /hielo/, 'Hielo'],
+  [/\b(leche|yogurt|yogur|kumis|queso|mantequilla|crema de leche|alpina|colanta|alqueria|lechera|avena)\b/, /lact|leche/, 'Lácteos'],
+  [/\b(arroz|frijol|lenteja|garbanzo|azucar|sal refinada|aceite|harina|pasta|spaghetti|atun|cafe|chocolate|panela|maggi|knorr|caldo|sardina|mayonesa|salsa)\b/, /grano|abarrot|despensa|mercado/, 'Granos y abarrotes'],
+  [/\b(jabon|detergente|papel higienico|shampoo|champu|crema dental|colgate|cloro|limpido|suavizante|ariel|fab|dersa|familia|protex|desodorante|toalla)\b/, /aseo|limpi/, 'Aseo'],
+  [/\b(pollo|carne|cerdo|salchicha|jamon|chorizo|zenu|rica|mortadela|tocineta|res)\b/, /carne|embutid|charcut/, 'Carnes y embutidos'],
+  [/\b(pan|arepa|tostada|bimbo|ponque|mogolla|croissant)\b/, /pan|arepa/, 'Panadería']
 ];
 function fiCategoriaSugerida(it){
   const m = it.productId ? data.products.find(p => p.id === it.productId) : null;
   if(m) return m.categoryId || '';
-  const cats = data.categories || []; if(!cats.length) return '';
+  const cats = data.categories || [];
   const nom = fiSinT((it.name || '') + ' ' + (it.originalDescription || ''));
   // 1) La categoría de otro producto que empiece igual («Cerveza Águila…» → la de «Cerveza Póker»)
   const pal = nom.split(/[^a-z0-9]+/).filter(w => w.length > 3 && !/^(caja|paca|und|unid|unidad|botella|lata|litro|pet|vidrio|x\d+)$/.test(w));
@@ -758,16 +764,24 @@ function fiCategoriaSugerida(it){
     const mejor = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0];
     if(mejor && cats.some(c => c.id === mejor)) return mejor;
   }
-  // 2) Por el tipo de producto, si ya existe una categoría así
+  // 2) La que dijo la IA al leer la factura, si el negocio ya tiene una que se llame así (o casi)
+  const ia = fiSinT(it.categoriaIA || '');
+  if(ia){ const c = cats.find(k => { const n = fiSinT(k.name); return n === ia || n.startsWith(ia) || ia.startsWith(n) || n.replace(/s$/, '') === ia.replace(/s$/, ''); }); if(c) return c.id; }
+  // 3) Por el tipo de producto, si ya existe una categoría así
   for(const [re, cre] of FI_CAT_PISTAS){ if(re.test(nom)){ const c = cats.find(k => cre.test(fiSinT(k.name))); if(c) return c.id; } }
+  // 4) 1.66.1: no existe: se propone una nueva («🆕 Cervezas») que se crea al aplicar la factura (si se cancela, no se crea).
+  if(it.categoriaIA && it.categoriaIA.length >= 3) return 'nueva:' + fiNombreCat(it.categoriaIA);
+  for(const [re, , nombre] of FI_CAT_PISTAS){ if(re.test(nom) && nombre) return 'nueva:' + nombre; }
   return '';
 }
+const fiNombreCat = t => { t = String(t || '').trim().replace(/\s+/g, ' ').slice(0, 40); return t.charAt(0).toUpperCase() + t.slice(1); };
 function fiCodigoSugerido(it){
   const m = it.productId ? data.products.find(p => p.id === it.productId) : null;
   return String(it.barcode || (m && (m.codigo || (m.barcodes || [])[0])) || it.sku || '').trim();
 }
 function fiCatOpciones(sel){
-  return '<option value="">Sin categoría</option>' + (data.categories || []).filter(c => c.id !== (typeof PROMO_CAT !== 'undefined' ? PROMO_CAT : '')).map(c => '<option value="' + invEsc(c.id) + '"' + (String(c.id) === String(sel) ? ' selected' : '') + '>' + invEsc(c.name) + '</option>').join('') + '<option value="__nueva">➕ Nueva categoría…</option>';
+  const nueva = typeof sel === 'string' && sel.startsWith('nueva:') ? sel.slice(6) : '';
+  return (nueva ? '<option value="' + invEsc(sel) + '" selected>🆕 ' + invEsc(nueva) + ' (nueva, se crea al aplicar)</option>' : '') + '<option value="">Sin categoría</option>' + (data.categories || []).filter(c => c.id !== (typeof PROMO_CAT !== 'undefined' ? PROMO_CAT : '')).map(c => '<option value="' + invEsc(c.id) + '"' + (String(c.id) === String(sel) ? ' selected' : '') + '>' + invEsc(c.name) + '</option>').join('') + '<option value="__nueva">➕ Nueva categoría…</option>';
 }
 function fiCatCodigoHtml(it){
   if(it.categoryId === undefined) it.categoryId = fiCategoriaSugerida(it);
@@ -779,7 +793,7 @@ function fiCatCodigoHtml(it){
     '<div class="iv-catnew" hidden><input type="text" class="iv-catnew-in" maxlength="40" placeholder="Nombre de la nueva categoría"><button type="button" class="btn-primary iv-catnew-ok">Crear</button></div>';
 }
 // Crea la categoría (o usa la que ya se llame igual) y devuelve su id.
-const fiCatValida = id => { const c = id ? (data.categories || []).find(k => String(k.id) === String(id)) : null; return c ? c.id : null; };
+const fiCatValida = id => { if(typeof id === 'string' && id.startsWith('nueva:')) return fiCrearCategoria(id.slice(6)); const c = id ? (data.categories || []).find(k => String(k.id) === String(id)) : null; return c ? c.id : null; };
 function fiCrearCategoria(nombre){
   nombre = String(nombre || '').trim().slice(0, 40); if(!nombre) return null;
   data.categories = data.categories || [];
@@ -986,7 +1000,7 @@ function invoiceMatchItems(rawItems, proveedor){    // arma las filas de revisi�
         pesoNota, pesoOpc, pesoModo: pesoNota ? 'div' : 'tot', weightG: pesoNota ? pesoU : pres.pesoG, volumeMl: pesoNota ? volU : pres.volumenMl, discount: n01(x.discount), ivaPctLeido: ivaLeido, ivaValue: n01(x.iva_value), lineTotal,
         qtyDeColumna, qtyFalta: !!x.qty_falta, match, noCuadra: x.cuadra === false, ajustes: Array.isArray(x.ajustes) ? x.ajustes.slice(0, 4) : [],
         lineSubtotal: n01(x.line_subtotal), lineIva: n01(x.line_iva),
-        qty, cost, cajas, unidadesPorCaja, costoSinIva, ivaPct,
+        qty, cost, cajas, unidadesPorCaja, costoSinIva, ivaPct, categoriaIA: x.categoria || null,
         productId: match.productId || '',
         marginPct,
         newPrice: invoicePriceFromMargin(cost, marginPct) || (matched ? matched.price : 0),

@@ -703,16 +703,23 @@ function invoicePromptRules(){
     // Respuesta COMPACTA (listas en vez de nombres de campo largos y sin campos vacíos): la IA escribe
     // 3-4 veces menos texto y la factura sale en pocos segundos. fiExpandirCompacto() la vuelve al formato de siempre.
     'Devuelve SOLO JSON válido y COMPACTO (sin texto extra, sin ```, sin espacios ni saltos de línea de más), con esta forma: ' +
-    '{"p":"proveedor","f":"AAAA-MM-DD","h":{"n":"número de factura","nit":"NIT del proveedor","st":subtotal,"iva":iva,"d":descuentos,"t":total},"i":[[original,nombre,qty,und,precio_unit,total_renglon,iva_pct,subtotal_renglon,iva_valor,descuento,codigo,cajas,und_por_caja]]}. ' +
+    '{"p":"proveedor","f":"AAAA-MM-DD","h":{"n":"número de factura","nit":"NIT del proveedor","st":subtotal,"iva":iva,"d":descuentos,"t":total},"i":[[original,nombre,qty,und,precio_unit,total_renglon,iva_pct,subtotal_renglon,iva_valor,descuento,codigo,cajas,und_por_caja,categoria]]}. ' +
     'En "h" pon solo lo que esté impreso. Cada renglón de "i" es una LISTA con ese orden exacto: ' +
     'original = la descripción del renglón EXACTAMENTE como está impresa (con sus abreviaturas); ' +
     'nombre = el producto INTERPRETADO en limpio para un inventario, entendiendo las abreviaturas (ej. "AG LIGH LAT 330" → "Cerveza Águila Light lata 330 ml", "CLUB COL BOT X30" → "Cerveza Club Colombia botella", "MAGGI CALDO GALLINA 24X594G" → "Caldo de gallina Maggi"); si es un producto ya registrado (lista de abajo), usa EXACTAMENTE ese nombre registrado; ' +
     'qty = cantidad TOTAL de unidades individuales compradas (2 cajas de 24 → 48); und = unidad de medida impresa (UND, CJ, PQ, DISPLAY…) o null; ' +
     'precio_unit = lo que se paga por UNA unidad individual YA con IVA (si solo está el total del renglón, total ÷ qty); total_renglon = valor final impreso del renglón; ' +
     'iva_pct = 0, 5 o 19 si aparece, si no null; subtotal_renglon = valor antes de IVA impreso o null; iva_valor = IVA impreso del renglón o null; descuento = en pesos o null; codigo = código del proveedor o null; ' +
-    'cajas y und_por_caja = el desglose de empaque explicado arriba (1 y qty si es suelto; cajas × und_por_caja = qty). ' +
+    'cajas y und_por_caja = el desglose de empaque explicado arriba (1 y qty si es suelto; cajas × und_por_caja = qty); ' +
+    // 1.66.1: la categoría de cada producto, para que la factura ponga las categorías sola (pedido del dueño).
+    'categoria = la categoría del producto para el inventario, corta y en plural (ej. Cervezas, Gaseosas, Licores, Aguas, Jugos, Snacks, Dulces, Lácteos, Granos y abarrotes, Aseo, Carnes y embutidos, Panadería, Cigarrillos, Hielo)' + invCategoriasHint() + '. ' +
     'NO confundas la cantidad comprada (columna Cant.) con la presentación de la descripción ("24X594G" es presentación, no cantidad). ' +
     'Todo lo que no esté impreso va en null: NUNCA inventes valores. Números en pesos sin puntos ni símbolos. Fechas AAAA-MM-DD. ' + invCatalogHint();
+}
+// Las categorías que ya tiene el negocio: la IA usa una de esas si le sirve (no inventa otra parecida).
+function invCategoriasHint(){
+  try{ const l = (data.categories || []).filter(c => c && c.name && c.id !== (typeof PROMO_CAT !== 'undefined' ? PROMO_CAT : '')).map(c => c.name).slice(0, 40);
+    return l.length ? '; si una de estas categorías del negocio le sirve, usa EXACTAMENTE ese nombre: ' + l.join(', ') : ''; }catch(e){ return ''; }
 }
 function invoicePrompt(){
   return 'Esta es una foto de una factura, remisión o recibo de un PROVEEDOR (lo que el negocio compra, no lo que vende). ' +
@@ -733,7 +740,7 @@ function fiExpandirCompacto(info){
     original: String(r[0] || r[1] || ''), name: String(r[1] || r[0] || ''), nombreIA: !!r[1],
     qty: num(r[2]), unit: num(r[3]), unit_cost: num(r[4]), line_total: num(r[5]), iva_pct: num(r[6]),
     line_subtotal: num(r[7]), iva_value: num(r[8]), discount: num(r[9]), sku: num(r[10]),
-    cajas: num(r[11]), unidades_por_caja: num(r[12])
+    cajas: num(r[11]), unidades_por_caja: num(r[12]), categoria: r[13] ? String(r[13]).trim().slice(0, 40) : null
   }));
   return { supplier: info.p || '', date: info.f || '', items,
     header: { invoiceNumber: num(h.n), supplierNit: num(h.nit), subtotal: num(h.st), iva: num(h.iva), descuentos: num(h.d), total: num(h.t), issueDate: num(info.f) } };
