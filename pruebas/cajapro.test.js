@@ -131,7 +131,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 
     // ===== 4. Los demás medios =====
     const cobrarCon = async (m, id) => {
-      await p.evaluate(id => { window.ventoPOS.agregar(id); }, id); await p.waitForTimeout(80);
+      await p.evaluate(id => { window.ventoPOS.agregar(id); }, id); await p.waitForTimeout(200);   // 350 + 200 ms > los 0,45 s que la caja ignora toques tras cobrar
       await p.click(R + ' .pz-cobrar'); await p.waitForSelector('.pz-pago-ov.show');
       await p.click('.pz-pago-ov .pz-met[data-m="' + m + '"]'); await p.waitForTimeout(350);
       return p.evaluate(() => { const h = data.history[0]; return { total: h.total, met: h.payments[0].method, nota: h.payments[0].note, vu: h.payments[0].vueltas || 0 }; });
@@ -143,7 +143,8 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     v = await p.evaluate(() => document.querySelector('#pzCajaOv .pz-hecho').innerText);
     chk('4. La confirmación dice cómo pagó (💳 Tarjeta) y no inventa vuelto', /Tarjeta/.test(v) && !/VUELTO/.test(v), v);
     // Pago combinado: $5.000 en efectivo + el resto por Nequi
-    await p.evaluate(() => { window.ventoPOS.agregar('h'); }); await p.click(R + ' .pz-cobrar'); await p.waitForSelector('.pz-pago-ov.show');
+    // Tras cobrar, la caja ignora toques 0,45 s (el 2.º toque de un doble toque no cae en nada): se espera como una persona.
+    await p.evaluate(() => { window.ventoPOS.agregar('h'); }); await p.waitForTimeout(500); await p.click(R + ' .pz-cobrar'); await p.waitForSelector('.pz-pago-ov.show');
     await p.click('.pz-pago-ov .pz-mixto-btn'); await p.fill('.pz-pago-ov [data-mx="efectivo"]', '5000'); await p.fill('.pz-pago-ov [data-mx="nequi"]', '10000'); await p.waitForTimeout(100);
     await p.click('.pz-pago-ov .pz-mixto-ok'); await p.waitForTimeout(350);
     v = await p.evaluate(() => { const h = data.history[0]; return { total: h.total, pagos: h.payments.map(x => x.method + ':' + x.amount + ':' + x.note) }; });

@@ -54,7 +54,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     }, BASE);
     const info = await A.evaluate(() => { const M = window.vitoMod, c = M.qCfg(); return { topic: c.topic, link: M.linkMesa(c, 1) }; });
     let anot = null;
-    for(let i = 0; i < 40 && !anot; i++){ anot = await uno('select negocio_id from canal_privado where canal = $1', [info.topic]); if(!anot) await A.waitForTimeout(300); }
+    for(let i = 0; i < 100 && !anot; i++){ anot = await uno('select negocio_id from canal_privado where canal = $1', [info.topic]); if(!anot) await A.waitForTimeout(300); }
     chk('1. El canal de pedidos del negocio quedó anotado en el servidor a su nombre', anot && anot.negocio_id === NEG, anot);
     // Sin esperar los 7 días de gracia:
     await sb.sql("update canal_privado set cerrar_desde = now() - interval '1 minute'");

@@ -672,7 +672,7 @@ const confirmCancelBtn = document.getElementById('confirmCancelBtn');
 let confirmResolver = null;
 
 function showConfirm({ title = '¿Estás seguro?', message = '¿Deseas continuar?', confirmText = 'Sí, confirmar', cancelText = 'Cancelar', icon = '⚠️' } = {}){
-  try{ title = vocabTexto(title); message = vocabTexto(message); }catch(e){}
+  try{ title = vocabTexto(title); message = vocabTexto(message); confirmText = vocabTexto(confirmText); }catch(e){}   // también el botón («Sí, liberar mesa» → habitación, silla…)
   confirmTitleEl.textContent = title;
   confirmMessageEl.textContent = message;
   confirmIconEl.textContent = icon;

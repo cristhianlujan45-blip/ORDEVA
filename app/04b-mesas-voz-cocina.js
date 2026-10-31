@@ -1737,20 +1737,27 @@ function renderMesasList(){
     if(isOpen){
       const units = t.items.reduce((s, it) => s + (Number(it.qty) || 0), 0);
       subLine = units + (units===1?' producto':' productos');
+      try{ subLine = vocabTexto(subLine); }catch(x){}   // «3 tarifas y consumos», «3 servicios»…
       if(paid > 0) subLine += ' · abonado ' + fmt(paid);
       if((t.people || []).length){ try{ const e = mesaEstado(id); if(e.partes > 1) subLine += ' · 👥 ' + e.pagaron + '/' + e.partes + ' pagaron'; }catch(x){} }
     }
     // Desde cuándo está abierta: el primer producto anotado (item.history[].at). Sin ese dato no se muestra nada.
     let desde = '';
     if(isOpen){
-      const at = Math.min(...t.items.map(it => (it.history && it.history[0] && Number(it.history[0].at)) || Infinity));
-      if(isFinite(at)) try{ desde = new Date(at).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' }); }catch(x){}
+      let at = Math.min(...t.items.map(it => (it.history && it.history[0] && Number(it.history[0].at)) || Infinity));
+      if(Number(t.entrada) > 0) at = Number(t.entrada);   // 🛏️ hora de llegada corregida a mano (hotel)
+      if(isFinite(at)) try{
+        const d = new Date(at), hoy = new Date().toDateString() === d.toDateString();
+        // 1.72.3: si no es de hoy, con el día (una habitación de anoche o una cuenta que pasó la medianoche)
+        desde = (hoy ? 'las ' : 'el ' + d.toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' }) + ', ') + d.toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' });
+        if(window.ventoHotel && window.ventoHotel.activo()){ const n = window.ventoHotel.noches(at); desde += ' · ' + n + (n === 1 ? ' noche' : ' noches'); }
+      }catch(x){}
     }
     card.innerHTML = `
       <div class="num"><svg class="tk-ic" viewBox="0 0 24 24" aria-hidden="true">${iconoEsp()}</svg>${tableLabel(id)}</div>
       <div class="status ${isOpen ? '' : 'empty'}">${isOpen ? fmt(balance) : 'Vacía'}</div>
       <div class="items-count">${subLine}</div>
-      ${desde ? '<div class="tk-desde">⏱ Desde las ' + desde + '</div>' : ''}
+      ${desde ? '<div class="tk-desde">⏱ Desde ' + desde + '</div>' : ''}
       ${window.vitoGrupos && window.vitoGrupos.de(id) ? '<div class="grp-tag">🔗 ' + invEsc(window.vitoGrupos.etiqueta(window.vitoGrupos.de(id))) + ' · ' + fmt(window.vitoGrupos.total(window.vitoGrupos.de(id))) + '</div>' : ''}
     `;
     card.addEventListener('click', ()=> openTableModal(id));

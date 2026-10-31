@@ -496,7 +496,8 @@ const cartaIcon = () => { const t = data.businessType && window.VENTO_NEGOCIOS.g
 // productos (ej. Servicios y Servicios), se le pone «Lista de precios» para no repetir.
 function cartaTab(){
   try{ const pr = (typeof producto1 === 'function') ? producto1()[1] : 'Productos';
-    if(cartaTerm().toLowerCase() === String(pr).toLowerCase()) return 'Lista de precios'; }catch(e){}
+    const c = cartaTerm().toLowerCase(), q = String(pr).toLowerCase();
+    if(c === q || q.startsWith(c + ' ')) return 'Lista de precios'; }catch(e){}   // también «Tarifas» junto a «Tarifas y consumos» (hotel)
   return cartaTerm();
 }
 function cartaLabel(){
@@ -516,7 +517,7 @@ function cartaData(q){                          // [[categoría, [productos]]] e
 const cartaNom = p => p.name + (p.size ? ' ' + p.size : '');
 function renderCarta(){
   cartaLabel();
-  document.getElementById('cartaT').textContent = i18nPut(cartaIcon() + ' ' + cartaTerm()) + (data.businessName ? ' · ' + data.businessName : '');
+  document.getElementById('cartaT').textContent = i18nPut(cartaIcon() + ' ' + cartaTab()) + (data.businessName ? ' · ' + data.businessName : '');
   const q = cartaNrm(document.getElementById('cartaQ').value.trim()), gs = cartaData(q);
   document.getElementById('cartaList').innerHTML = gs.length ? gs.map(([k, ps], i) => '<details' + (i === 0 || q ? ' open' : '') + ' style="margin:8px 0"><summary style="cursor:pointer;font-weight:600;padding:6px 0">' + invEsc(k) + ' <small style="opacity:.7">(' + ps.length + ')</small></summary>' +
     ps.map(p => { const s = invStatus(p); return '<div class="inv-row"' + (s === 'out' ? ' style="opacity:.55"' : '') + '><div><b>' + invEsc(cartaNom(p)) + '</b>' + (s === 'out' ? '<small>🚫 Agotado</small>' : s === 'low' ? '<small>⚠️ Últimas unidades</small>' : '') + '</div><b>' + fmt(p.price) + '</b></div>'; }).join('') + '</details>').join('')
@@ -524,7 +525,7 @@ function renderCarta(){
   if(typeof renderPromos === 'function') renderPromos();
 }
 function cartaText(){
-  let t = i18nPut(cartaTerm()) + (data.businessName ? ' · ' + data.businessName : '') + '\n';
+  let t = i18nPut(cartaTab()) + (data.businessName ? ' · ' + data.businessName : '') + '\n';
   cartaData('').forEach(([k, ps]) => { t += '\n*' + k + '*\n'; ps.forEach(p => { t += '• ' + cartaNom(p) + ' — ' + fmt(p.price) + (invStatus(p) === 'out' ? ' (agotado)' : '') + '\n'; }); });
   return t;
 }
