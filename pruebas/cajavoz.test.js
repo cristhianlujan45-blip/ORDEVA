@@ -10,6 +10,7 @@
 //  7. Confirmaciones sensibles (vaciar), descuento solo con la ventana de autorización.
 //  8. Teclado: F1, F2 (Enter seguro), F4, F5, F8, F9, Esc. Micrófono flotante con la caja abierta.
 //  9. Sin «Pedidos por voz» en la suscripción, el micrófono de la caja no se abre.
+// 10. Peso por voz: «medio kilo de queso», «dos libras de carne», «300 gramos de jamón», «kilo y medio».
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 
@@ -229,6 +230,27 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
       Object.assign(S, guard); return res;
     }, R);
     chk('9. Sin «Pedidos por voz» en el plan: el micrófono de la caja no se abre y muestra el plan', v.creados === 0 && v.estado !== 'escuchando' && v.fp === 1, v);
+    // ===== 10. Peso por voz (1.69.0) =====
+    await p.evaluate(() => {
+      data.products.push({ id: 'q', name: 'Queso', price: 20000, porPeso: 'kg' }, { id: 'k', name: 'Carne', price: 12000, porPeso: 'lb' }, { id: 'j', name: 'Jamón', price: 30000, porPeso: 'kg' });
+      saveData(); window.ventoPOS.vaciar(); window.ventoCajaVoz.reiniciar();
+    });
+    await p.evaluate(() => window.ventoCajaVoz.procesar('medio kilo de queso')); await pausa(300);
+    await p.evaluate(() => window.ventoCajaVoz.procesar('dos libras de carne')); await pausa(300);
+    await p.evaluate(() => window.ventoCajaVoz.procesar('agrega 300 gramos de jamón')); await pausa(300);
+    v = await p.evaluate(() => ({ c: window.ventoPOS.carrito().map(l => [l.id, Math.round(l.qty * 1000) / 1000]), t: window.ventoPOS.resumen().total }));
+    chk('10. «medio kilo de queso», «dos libras de carne», «300 gramos de jamón» → 0,5 kg, 2 lb y 0,3 kg', JSON.stringify(v.c) === JSON.stringify([['q', 0.5], ['k', 2], ['j', 0.3]]), v);
+    chk('10. Total con el peso: $10.000 + $24.000 + $9.000 = $43.000', v.t === 43000, v);
+    await p.evaluate(() => window.ventoCajaVoz.procesar('kilo y medio de queso')); await pausa(300);
+    chk('10. «kilo y medio de queso» suma 1,5 kg (queso en 2 kg)', await p.evaluate(() => window.ventoPOS.carrito().find(l => l.id === 'q').qty === 2));
+    await p.evaluate(() => window.ventoCajaVoz.procesar('300 gramos de empanada')); await pausa(300);
+    v = await est();
+    chk('10. Peso para un producto por unidad: no lo agrega y dice «se vende por unidad»', /por unidad/.test(v.respuesta) && !(await carrito()).some(x => x[0] === 'e'), v.respuesta);
+    await p.evaluate(() => window.ventoCajaVoz.procesar('un queso')); await pausa(400);
+    v = await p.evaluate(() => ({ r: window.ventoCajaVoz.estado().respuesta, pesar: !!document.querySelector('.overlay.show [data-q="peso"], .overlay.show input[data-q]') }));
+    chk('10. «un queso» (sin peso): abre la ventana para pesarlo y lo dice', /se vende por peso/.test(v.r) && v.pesar, v);
+    await p.evaluate(() => document.querySelectorAll('.overlay.show').forEach(o => { if(o.id !== 'pzCajaOv') o.remove(); }));
+
     chk('Sin errores de página', !errs.length, errs);
   }catch(e){ mal++; console.log('❌ Excepción: ' + (e && e.stack || e)); }
   await b.close();
