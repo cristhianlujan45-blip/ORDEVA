@@ -463,7 +463,12 @@ async function iniciar(opts = {}) {
           codigos.set('c:' + tel, { codigo: cod, hasta: Date.now() + 600e3, uid: claims.sub });
           recuperaciones.push({ ruta: '/user', phone: tel, codigo: cod, en: Date.now() });
         }
-        if (b.password) await sql("update auth.users set encrypted_password = extensions.crypt($2, extensions.gen_salt('bf', 4)), updated_at = now() where id = $1", [claims.sub, String(b.password)]);
+        if (b.password) {
+          // Como GoTrue: la misma contraseña que ya tiene → 422 same_password («should be different from the old password»).
+          const igual = (await sql('select encrypted_password = extensions.crypt($2, encrypted_password) as igual from auth.users where id = $1', [claims.sub, String(b.password)]))[0];
+          if (igual && igual.igual) throw errAuth(422, 'same_password', 'New password should be different from the old password.');
+          await sql("update auth.users set encrypted_password = extensions.crypt($2, extensions.gen_salt('bf', 4)), updated_at = now() where id = $1", [claims.sub, String(b.password)]);
+        }
         if (b.data) await sql('update auth.users set raw_user_meta_data = raw_user_meta_data || $2::jsonb, updated_at = now() where id = $1', [claims.sub, JSON.stringify(b.data)]);
       }
       const usr = (await sql('select * from auth.users where id = $1', [claims.sub]))[0];

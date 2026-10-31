@@ -427,7 +427,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-31 · v1.72.3';
+const MESORA_VERSION = '2026-10-31 · v1.72.4';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'ORDEVA · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 /* 🔄 La app Android se actualiza SOLA (Actualizador): revisa cada 3 h, baja la versión nueva y la instala cuando no se
@@ -3088,6 +3088,8 @@ function iniMeseros(){
 function mesoraErrores(){
   let l = []; try{ l = JSON.parse(localStorage.getItem('vito_errlog') || '[]') || []; }catch(e){}
   if(!l.length && Array.isArray(window.__mesoraErrMem)) l = window.__mesoraErrMem;
+  // 1.72.4: lo que quedó anotado con versiones anteriores y es ruido (sonido bloqueado, cortes de red) ya no cuenta.
+  try{ if(window.mesoraRuido) l = l.filter(x => !window.mesoraRuido(x.msg)); }catch(e){}
   return l;
 }
 function mesoraMarcarVistos(){

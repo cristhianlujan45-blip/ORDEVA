@@ -252,9 +252,14 @@
     <h2 id="lockTit" style="margin-top:10px">ORDEVA Admin</h2>
     <p class="soft" id="lockTxt">Solo para el administrador de ORDEVA. Entra con tu correo y tu contraseña de administrador.</p>
     <div id="lkEntrar">
-      <input id="lkCorreo" type="email" autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false" placeholder="Correo del administrador">
-      <input id="lkClave" type="password" autocomplete="current-password" placeholder="Contraseña" style="margin-top:8px">
-      <div class="row"><button class="b p" id="lkGo" type="button">🔓 Entrar</button></div>
+      <!-- 1.72.4: formulario de verdad: así el celular o el computador ofrecen «¿Guardar contraseña?» y la próxima vez la
+           ponen solos (en el celular, con la huella o la cara). -->
+      <form id="lkForm" action="admin.html" method="post" autocomplete="on">
+      <input id="lkCorreo" name="username" type="email" autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false" placeholder="Correo del administrador">
+      <input id="lkClave" name="password" type="password" autocomplete="current-password" placeholder="Contraseña" style="margin-top:8px">
+      <div class="row"><button class="b p" id="lkGo" type="submit">🔓 Entrar</button></div>
+      </form>
+      <p class="soft" id="lkGuardarTxt" style="margin:6px 0 0;font-size:12.5px">💡 Al entrar, tu celular o computador te ofrece <b>guardar la contraseña</b>: la próxima vez la pone solo (en el celular, con tu huella).</p>
       <div class="row" style="margin-top:6px"><button class="b" id="lkOlvide" type="button">¿Olvidaste la contraseña?</button><button class="b" id="lkCrear" type="button">Crear mi cuenta</button></div>
     </div>
     <div id="lkCrearBox" hidden>
@@ -960,7 +965,7 @@
    Si después de recargar el servidor todavía entrega la versión vieja, no se queda recargando: deja el aviso. */
 (function(){
   'use strict';
-  var ADMIN_VERSION = '2026-10-31 · v1.72.3';
+  var ADMIN_VERSION = '2026-10-31 · v1.72.4';
   var ultima = 0, oculto = 0, inicio = Date.now();
   function corta(v){ return String(v).split('·').pop().trim(); }
   function libre(){
@@ -2127,8 +2132,19 @@
     const eqs = (u.equipos_lista || []).map(e => '<div>' + esc([e.plataforma === 'apk' ? '📱 App Android' : e.plataforma === 'web' ? '💻 Navegador' : (e.plataforma || 'Equipo'), e.modelo, e.version ? 'v' + e.version : ''].filter(Boolean).join(' · ')) + '<br><span class="soft">' + (e.usuario ? '👤 ' + esc(e.usuario) + (e.negocio ? ' en ' + esc(e.negocio) : '') + ' · ' : '') + 'Primera vez ' + fCo(e.primera) + ' · última ' + hace(e.ultima) + ' · ' + e.veces + ' veces</span></div>').join('');
     $('usCuerpo').innerHTML =
       '<dl class="kv">' + kv('Correo', u.email) + kv('Celular', u.telefono || 'no lo ha puesto') + kv('Registrado', fCoHora(u.creado_en)) + kv('Último ingreso', u.ultimo_ingreso ? fCoHora(u.ultimo_ingreso) : 'nunca') +
-        kv('Correo confirmado', u.confirmado ? 'Sí' : 'No') + kv('Estado', u.bloqueado ? '⛔ Bloqueada' : 'Activa') + kv('Plan', p[0]) + '</dl>' +
+        kv('Correo confirmado', u.confirmado ? 'Sí' : 'No') + kv('Estado', u.bloqueado ? '⛔ Bloqueada' : 'Activa') + kv('Plan', p[0]) +
+        // 1.72.4: más datos de la cuenta (perfil)
+        ((pf => kv('Nombre', pf.nombre || '—') + kv('Contraseña puesta', pf.clave_puesta_en ? fCoHora(pf.clave_puesta_en) : 'al crear la cuenta') +
+          kv('Debe cambiarla al entrar', pf.cambiar_clave ? 'Sí (se la puso el soporte)' : 'No') + kv('Sesiones cerradas', pf.sesiones_cerradas_en ? fCoHora(pf.sesiones_cerradas_en) : '—') +
+          kv('Aceptó la licencia', pf.acepto_licencia ? fCoHora(pf.acepto_licencia) : '—'))(u.perfil || {})) + '</dl>' +
+      '<p class="soft" style="margin:6px 0 0">🔒 La contraseña no se puede ver: el servidor solo guarda una huella cifrada de una sola vía (nadie la puede leer). Para darle una, usa «✏️ Ponerle una contraseña» abajo.</p>' +
       '<h3>🏪 Negocios</h3>' + (negs || '<div class="soft">Todavía no tiene negocio en la nube.</div>') +
+      ((u.negocios_resumen || []).length ? '<h3>📊 Cómo va su negocio</h3>' + u.negocios_resumen.map(r => '<div class="card" style="margin:6px 0;padding:10px 12px"><b>' + esc(r.nombre) + '</b>' + (r.tipo ? ' <span class="soft">· ' + esc(r.tipo) + '</span>' : '') +
+        '<dl class="kv" style="margin-top:6px">' + kv('Ventas de hoy', r.ventas_hoy + ' · ' + plata(r.total_hoy)) + kv('Ventas 30 días', r.ventas_30 + ' · ' + plata(r.total_30)) +
+        kv('Última venta', r.ultima_venta ? fCoHora(r.ultima_venta) + ' (' + hace(r.ultima_venta) + ')' : 'ninguna') + kv('Cuentas abiertas', r.cuentas_abiertas) + kv('Productos', r.productos) +
+        kv('Datos guardados', r.datos_guardados_en ? hace(r.datos_guardados_en) : 'nunca') + '</dl></div>').join('') : '') +
+      ((u.errores || []).length ? '<h3>🐞 Errores de sus equipos (' + u.errores.length + ')</h3><div class="list">' + u.errores.map(e => '<div class="item" data-error="' + esc(e.huella) + '"><div class="av">' + (e.resuelto ? '✅' : '🐞') + '</div><div class="t"><b>' + esc(String(e.mensaje || '').slice(0, 140)) + '</b><small>' +
+        esc([e.veces + (e.veces === 1 ? ' vez' : ' veces'), PLAT[e.plataforma] || e.plataforma || '', e.modelo || '', e.version ? 'v' + e.version : '', hace(e.ultimo)].filter(Boolean).join(' · ')) + '</small></div></div>').join('') + '</div>' : '') +
       '<h3>📱 Equipos donde usa ORDEVA (' + (u.equipos_lista || []).length + ')</h3><div class="hist">' + (eqs || '<div class="soft">Ninguno registrado.</div>') + '</div>' +
       '<h3>🔑 Licencias</h3><div class="chips">' + ((u.licencias || []).map(l => '<span class="chip ok">' + esc(l.codigo + ' · ' + nomPlan(l.plan_id) + ' hasta ' + fCo(l.hasta)) + '</span>').join('') +
         (u.licencias_pendientes || []).map(c => '<span class="chip">⏳ ' + esc(c) + ' (se activa al entrar)</span>').join('') || '<span class="soft">Ninguna.</span>') + '</div>' +
@@ -2153,12 +2169,16 @@
     if(a === 'bloq' && !confirm(u.bloqueado ? '¿Desbloquear ' + u.email + '?' : '¿Bloquear ' + u.email + '? No va a poder entrar a ORDEVA hasta que la desbloquees.')) return;
     if(a === 'temp' && !confirm('¿Poner una contraseña temporal a ' + u.email + '? La que tiene deja de servir.')) return;
     if(a === 'sesiones' && !confirm('¿Cerrar la sesión de ' + u.email + ' en todos sus equipos? La contraseña no cambia: en cada equipo le pide entrar otra vez (con internet). Úsalo si perdió o le robaron un celular.')) return;
+    // ¿Es la cuenta del administrador mismo o su cuenta de cliente (correo+cliente@…)?
+    const miCuenta = e => { const base = x => String(x || '').toLowerCase().replace(/\+[^@]*@/, '@'); return !!(sx.yo && sx.yo.email && base(e) === base(sx.yo.email)); };
     if(a === 'poner'){
       // Escribir la contraseña que el administrador quiera (dos veces, con 👁), y si la app le pide cambiarla al entrar.
       res.innerHTML = '<div class="card" style="margin-top:12px"><b>✏️ Contraseña nueva para ' + esc(u.email) + '</b>' +
         '<label class="soft" style="display:block;margin-top:8px">Contraseña (mínimo 8)<div class="row" style="margin:4px 0 0"><input id="upC1" type="password" autocomplete="new-password" maxlength="72" style="flex:1"><button class="b" type="button" data-ojo="upC1">👁</button></div></label>' +
         '<label class="soft" style="display:block;margin-top:8px">Otra vez<div class="row" style="margin:4px 0 0"><input id="upC2" type="password" autocomplete="new-password" maxlength="72" style="flex:1"><button class="b" type="button" data-ojo="upC2">👁</button></div></label>' +
-        '<label style="display:flex;gap:8px;align-items:center;margin-top:10px"><input id="upPedir" type="checkbox" checked> Pedirle que ponga una propia al entrar (recomendado)</label>' +
+        // 1.72.4: con la casilla marcada, el PRIMER equipo que entra obliga a cambiarla y la que se puso aquí deja de servir en
+        // los demás («funciona una vez y después no»). En la cuenta de cliente del propio administrador (+cliente) va sin marcar.
+        '<label style="display:flex;gap:8px;align-items:flex-start;margin-top:10px"><input id="upPedir" type="checkbox"' + (miCuenta(u.email) ? '' : ' checked') + ' style="margin-top:3px"> <span>Pedirle que ponga una propia al entrar <span class="soft">(si se marca, al cambiarla esta deja de servir en sus otros equipos)</span></span></label>' +
         '<p class="soft" style="margin:8px 0 0">La que tiene deja de servir en todos sus equipos apenas entre con internet.</p>' +
         '<div class="row"><button class="b p" type="button" id="upGo">Guardar contraseña</button></div><div id="upErr" class="bad-t"></div></div>';
       res.querySelectorAll('[data-ojo]').forEach(o => o.onclick = () => { const i = $(o.dataset.ojo); i.type = i.type === 'password' ? 'text' : 'password'; o.textContent = i.type === 'password' ? '👁' : '🙈'; });
@@ -2294,8 +2314,13 @@
   };
   $('erEstado').onchange = erCargar; $('erTipo').onchange = erPintar; $('erBuscar').oninput = erPintar; $('erRef').onclick = erCargar;
   document.addEventListener('click', e => { const it = e.target.closest('[data-error]'); if(it && !e.target.closest('button,a')) erAbrir(it.dataset.error); });
-  function erAbrir(h){
-    const e = (ad.errores || []).find(x => x.huella === h); if(!e) return;
+  // 1.72.4: desde un error, abrir la cuenta de quien lo tuvo; desde la cuenta, abrir el error (si ya está en la lista).
+  document.addEventListener('click', e => { const b = e.target.closest('[data-ver-cuenta]'); if(!b) return; if($('dlgEr').open) $('dlgEr').close(); usAbrir(b.dataset.verCuenta); });
+  async function erAbrir(h){
+    let e = (ad.errores || []).find(x => x.huella === h);
+    // 1.72.4: abierto desde la cuenta de un usuario (puede que la lista de errores no esté cargada, o que ya esté resuelto).
+    if(!e){ const j = await intentar(() => sxApi('errores', { estado: 'todos' })); if(j){ e = (j.errores || []).find(x => x.huella === h); if(e) ad.errores = (ad.errores || []).concat([e]); } }
+    if(!e) return;
     ad.error = e;
     $('erTit').textContent = erEtiqueta(e) + ' · ' + e.veces + ' ' + (e.veces === 1 ? 'vez' : 'veces');
     const xp = erExplicar(e);
@@ -2303,7 +2328,8 @@
     $('erInfo').innerHTML = '<p><b>' + esc(e.mensaje) + '</b></p><div class="card" style="margin:8px 0;padding:10px 12px"><b>🧠 Qué significa:</b> ' + esc(xp.que) + (xp.donde ? '<br><b>📍 Dónde:</b> <code>' + esc(xp.donde) + '</code>' : '') + '</div><dl class="kv">' + (erCodigo(e) ? kv('Código', erCodigo(e)) : '') + kv('Primera vez', fCoHora(e.primero)) + kv('Última vez', fCoHora(e.ultimo)) + kv('Equipos', e.equipos) + kv('Negocios', e.negocios) +
       kv('Página', e.pagina || '—') + kv('Versión', e.version ? 'v' + e.version : '—') + '</dl>' +
       '<h3 style="margin:14px 0 6px">Dónde pasó</h3><div class="list">' + (casos.length ? casos.map(c => '<div class="item"><div class="av">' + (c.plataforma === 'apk' ? '📲' : /android|iphone|ipad/.test(c.plataforma || '') ? '📱' : /mac/.test(c.plataforma || '') ? '🍎' : '💻') + '</div><div class="t"><b>' +
-        esc(c.negocio || 'Sin nombre de negocio') + '</b><small>' + esc([c.usuario || '', PLAT[c.plataforma] || c.plataforma || '', c.version ? 'v' + c.version : '', c.veces + (c.veces === 1 ? ' vez' : ' veces'), hace(c.ultimo)].filter(Boolean).join(' · ')) +
+        esc(c.negocio || 'Sin nombre de negocio') + '</b><small>' + esc([c.usuario || '', PLAT[c.plataforma] || c.plataforma || '', c.modelo || '', c.version ? 'v' + c.version : '', c.veces + (c.veces === 1 ? ' vez' : ' veces'), (c.primero ? 'desde ' + fCoHora(c.primero) : ''), 'última ' + hace(c.ultimo)].filter(Boolean).join(' · ')) +
+        (c.usuario_id ? ' <button class="b" type="button" data-ver-cuenta="' + esc(c.usuario_id) + '" style="padding:2px 8px;font-size:12px">👤 Ver la cuenta</button>' : '') +
         (c.detalle ? '<br><code style="white-space:pre-wrap;word-break:break-word;font-size:12px">' + esc(JSON.stringify(c.detalle, null, 1).slice(0, 1200)) + '</code>' : '') + '</small></div>' + (c.resuelto ? '<span class="pill ok">✅</span>' : '') + '</div>').join('') : '<div class="empty">Sin detalle.</div>') + '</div>';
     $('erResolver').hidden = !!e.resuelto; $('erReabrir').hidden = !e.resuelto;
     $('erEnsenar').hidden = !(e.tipo === 'pago' && frSugerir(e));
@@ -2645,12 +2671,20 @@
     try{
       const c = await sxCliente(); const r = await c.auth.signInWithPassword({ email: correo, password: clave });
       if(r && r.error) throw r.error;
-      $('lkClave').value = ''; await adminListo();
+      const listo = await adminListo();
+      // 1.72.4: se le pasa al administrador de contraseñas del equipo (Chrome / Android / Windows): «¿Guardar contraseña?».
+      // Solo si de verdad entró como administrador. En iPhone / Mac el llavero la toma del formulario.
+      if(listo){
+        try{ localStorage.setItem('vento-admin-correo', correo); }catch(x){}
+        try{ if(window.PasswordCredential && navigator.credentials && navigator.credentials.store) await navigator.credentials.store(new PasswordCredential({ id: correo, password: clave, name: 'ORDEVA Admin' })); }catch(x){}
+      }
+      $('lkClave').value = '';
     }catch(e){ lkMsg(esc(sxMsgError(e)), true); }
     finally{ $('lkGo').disabled = false; }
   };
-  $('lkClave').onkeydown = e => { if(e.key === 'Enter') $('lkGo').click(); };
-  $('lkCorreo').onkeydown = e => { if(e.key === 'Enter') $('lkClave').focus(); };
+  // El botón es de «enviar»: Enter en la contraseña entra (una sola vez); Enter en el correo pasa a la contraseña.
+  $('lkForm').addEventListener('submit', e => e.preventDefault());
+  $('lkCorreo').onkeydown = e => { if(e.key === 'Enter'){ e.preventDefault(); $('lkClave').focus(); } };
   $('lkNGo').onclick = async () => {
     const correo = $('lkNCorreo').value.trim().toLowerCase(), clave = $('lkNClave').value;
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)){ lkMsg('Escribe el correo del administrador.', true); return; }
@@ -2730,7 +2764,16 @@
     }
     try{ if(await sxSesion()){ lkMsg('<span class="spin"></span> Entrando…'); if(await adminListo()) return; } }catch(e){}
     if(!$('lkMsg').textContent) lkMsg('');
-    setTimeout(() => $('lkCorreo').focus(), 100);
+    try{ const g = localStorage.getItem('vento-admin-correo'); if(g && !$('lkCorreo').value) $('lkCorreo').value = g; }catch(e){}
+    setTimeout(() => ($('lkCorreo').value ? $('lkClave') : $('lkCorreo')).focus(), 100);
+    // 1.72.4: la contraseña guardada en este equipo (Chrome / Android): se pone sola y entra. Si el equipo pide la huella
+    // o la cara para llenar contraseñas, la pide aquí.
+    try{
+      if(window.PasswordCredential && navigator.credentials && navigator.credentials.get){
+        const cr = await navigator.credentials.get({ password: true, mediation: 'optional' });
+        if(cr && cr.type === 'password' && cr.password && $('lock') && !$('lock').hidden){ $('lkCorreo').value = cr.id; $('lkClave').value = cr.password; $('lkGo').click(); }
+      }
+    }catch(e){}
   })();
 
   // ---------------- Respaldo ----------------

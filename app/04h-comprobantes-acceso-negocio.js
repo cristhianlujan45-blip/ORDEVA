@@ -1017,6 +1017,12 @@ const authEsCorreo = t => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(t || '').trim
 // 1.72.1: «el usuario y la contraseña están correctos y no me deja entrar» (Windows): el correo tenía un ESPACIO
 // («cristhian+cliente @gmail.com»), así que no se tomaba como correo y salía «Usuario o contraseña incorrectos».
 // Un correo nunca lleva espacios: se quitan (también los invisibles que dejan algunos teclados al pegar) y va en minúsculas.
+// 🔐 1.72.4: al entrar bien, la contraseña se le pasa al administrador de contraseñas del equipo (Chrome / Android / Windows):
+// «¿Guardar contraseña?», y la próxima vez la pone solo (en el celular, con la huella o la cara). En iPhone / Mac el
+// llavero la toma del formulario. Nunca se guarda en ORDEVA ni se manda a ningún lado.
+function authGuardarEnEquipo(user, pass){
+  try{ if(user && pass && window.PasswordCredential && navigator.credentials && navigator.credentials.store) navigator.credentials.store(new PasswordCredential({ id: user, password: pass, name: 'ORDEVA' })).catch(() => {}); }catch(e){}
+}
 const authLimpiarUsuario = t => { let v = String(t || '').replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/＠/g, '@').trim().toLowerCase(); if(v.includes('@')) v = v.replace(/\s+/g, ''); return v; };
 const authNubeCuentas = () => { const n = window.ventoNube; return n && n.configurada && n.configurada() && n.crearCuenta ? n : null; };
 const authYaExiste = e => /already registered|already exists/i.test(String((e && e.message) || e));
@@ -1379,6 +1385,7 @@ function showAuth(firstRun){
           localStorage.setItem(CURRENT_SEDE_KEY, sede.id);
         }
         await enterApp(user, setup);
+        authGuardarEnEquipo(user, pass);
         if(enNube === 'ok') nb.crearNegocio(biz || (data && data.businessName) || 'Mi negocio').catch(x => { if(!authSinRed(x)) showToast('⚠️ Tu cuenta de ORDEVA: ' + nb.msgError(x), 6000); });
         else if(enNube === 'confirmar') showToast('📧 Te mandamos un correo a ' + user + ' para confirmar la cuenta. Al confirmarla, tus datos quedan guardados en tu cuenta.', 9000);
       }else{
@@ -1400,6 +1407,7 @@ function showAuth(firstRun){
         }
         if(entro){
           authLoginClear(user);
+          authGuardarEnEquipo(user, pass);
           document.getElementById('authPass').value = '';
           await enterApp(user, null);
           if(nb){ if(nb.conectado(user)) authRevisarClave(user, pass); else authConectarNube(user, pass, true); }
@@ -1409,7 +1417,7 @@ function showAuth(firstRun){
         // se busca la cuenta en la nube.
         if(nb){
           ocupado('⏳ Buscando tu cuenta…');
-          try{ await authEntrarDesdeNube(user, pass); authLoginClear(user); document.getElementById('authPass').value = ''; return; }
+          try{ await authEntrarDesdeNube(user, pass); authLoginClear(user); authGuardarEnEquipo(user, pass); document.getElementById('authPass').value = ''; return; }
           catch(x){ if(!authClaveMala(x)){ err.textContent = nb.msgError(x); return; } }
         }
         authLoginFail(user);
