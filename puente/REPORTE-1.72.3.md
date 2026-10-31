@@ -61,7 +61,10 @@ Aplica a hotel, hostal y apartamentos. No aplica al motel (que va por horas) ni 
   - **`pruebas/hotel.test.js`** (15 revisiones): el menú, los primeros pasos, la llegada y las noches, el aviso, poner
     las noches, cambiar la llegada, cobrar (la venta guarda las noches), las palabras de los botones y que no salga en
     un bar.
-- **La lista completa de CI:** ver el mensaje de la publicación.
+- **La lista completa de CI:** 65 de 66 pasaron. `codigoproducto` (intermitente conocida) marcó falla con sus 22 revisiones bien y pasó 2 de 2 al repetirla.
+- **Arreglos de pruebas que fallaban en GitHub:**
+  - `cajapro` (1.71.0): tocaba COBRAR dentro del medio segundo en que la caja ignora toques después de cobrar; ahora espera como una persona.
+  - `qrprivado` (1.72.1): el canal queda a nombre del negocio cuando suben los datos; en GitHub con carga tardó más de 12 s y ahora espera hasta 30 s. La revisión sigue igual de estricta.
 
 ## Lo que queda (no se hizo en esta versión)
 - **Reservas por fechas y calendario de ocupación** del hotel: el catálogo ya lo muestra como «Próximamente».
