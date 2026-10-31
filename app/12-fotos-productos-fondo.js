@@ -2841,7 +2841,9 @@ function ctMovimientos(r){
   try{ (window.libretaConta ? window.libretaConta(r.ini, r.fin) : []).forEach(m => mov.push(m)); }catch(e){}
   // Una factura escaneada que ya se pagó con la libreta: se sigue contando una sola vez (aquí, como compra).
   (data.contab || []).forEach(g => {
-    const t = new Date(g.fecha + 'T12:00').getTime();
+    // 1.68.1: un gasto con fecha (sin hora) cuenta desde el comienzo de ese día. Antes contaba a las 12:00 y el de
+    // HOY no aparecía en las mañanas (en «Hoy», el mes o Estadísticas).
+    const t = new Date(g.fecha + 'T00:00').getTime();
     if(t >= r.ini && t < r.fin) mov.push({ tipo: g.tipo, cat: g.cat, monto: Number(g.monto) || 0, metodo: g.metodo, fecha: t, desc: g.nota || ctCatNombre(g.tipo, g.cat).replace(/^\S+\s/, ''), id: g.id, adj: !!g.adj });
   });
   mov.sort((a, b) => b.fecha - a.fecha);

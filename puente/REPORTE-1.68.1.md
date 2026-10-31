@@ -48,14 +48,30 @@ código de antes:
    - Si el canal en vivo se cae (cambio de wifi a datos), se vuelve a abrir solo.
    - No se vuelve a subir lo que la nube ya tiene (evita subidas de eco que hacían esperar a los demás).
 
+8. **Toques durante la llegada de datos de un negocio grande** (encontrado con la traza de diagnóstico, con el equipo de
+   pruebas cargado).
+   - Mientras se ponían los datos del otro equipo, el guardado podía escribir la copia vieja encima.
+   - La mezcla tenía un tope de 5 vueltas: con toques seguidos, la última vuelta iba sin protección.
+   - Ahora no se escribe la copia vieja durante esa carga, y la mezcla se repite (protegida) hasta que no quede nada sin
+     juntar.
+   - Una bajada vieja tampoco pisa una subida más nueva.
+9. **Gastos de hoy en las mañanas** (`lib/vento-finanzas.js`, `app/12`). Un gasto con solo fecha contaba a las 12:00:
+   antes del mediodía no aparecía en «gastos operativos» ni en la alerta de gastos. Ahora cuenta desde las 00:00 de ese
+   día. Lo destapó la prueba `finanzas` al correr en la mañana.
+
 ## Sin cambios en
 - La base de datos y el servidor: no hay migraciones.
 - Las suscripciones y los permisos.
 - El formato de los datos y los registros históricos.
 
 ## Pruebas
-- `sincmesas`: **14 ✅** (nueva, en CI). Un «+» llega al otro celular en ≈1 s.
-- El resultado de la lista completa de CI y de las de sincronización está en el mensaje de la versión.
+- `sincmesas`: **14 ✅** (nueva, en CI). Un «+» llega al otro celular en ≈1 s cuando la prueba corre sola (4–5 s con
+  4 pruebas a la vez).
+  - Además se corrió 11 veces con 3 o 4 copias a la vez (el equipo muy cargado). Las 3 primeras, antes del arreglo 8,
+    todavía perdieron 1 a 5 toques en el negocio grande.
+  - Después del arreglo 8 (8 corridas): ningún toque perdido ni contado dos veces.
+- Lista completa de CI + sincroniza, cuentas, mesarepetida, mesapersonas: **59 de 60 ✅**. Faltaba `finanzas` por el
+  punto 9; ya corregido: 17 ✅, y las 8 pruebas que usan gastos y contabilidad ✅.
 
 ## Pendiente (ya conocido: P7 de la auditoría)
 Cada cambio todavía viaja con el negocio completo. Con negocios muy grandes y internet lento eso pesa. La solución de
