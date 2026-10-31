@@ -1496,9 +1496,12 @@ function computeClosureStats(fromISO, toISO){
     return (!from || d > from) && d <= to;
   });
   const totalSold = tickets.reduce((s,h)=> s + h.total, 0);
-  let totalEfectivo = 0, totalTransferencia = 0, totalDebe = 0;
+  let totalEfectivo = 0, totalTransferencia = 0, totalDebe = 0, totalRecibido = 0, totalVueltas = 0;
   tickets.forEach(h=>{
     (h.payments||[]).forEach(p=>{
+      // 1.69.0: lo que entregó el cliente en efectivo y las vueltas que se le dieron (no cambian lo que debe haber en caja:
+      // el pago en efectivo ya es lo cobrado, sin las vueltas).
+      if(p.method === 'efectivo' && Number(p.recibido) > 0){ totalRecibido += Number(p.recibido); totalVueltas += Math.max(0, Number(p.vueltas) || 0); }
       if(p.method === 'efectivo') totalEfectivo += p.amount;
       else if(p.method === 'transferencia') totalTransferencia += p.amount;
       else if(p.method === 'debe') totalDebe += p.amount;
@@ -1511,7 +1514,7 @@ function computeClosureStats(fromISO, toISO){
     hourlyMap[hourKey] = (hourlyMap[hourKey]||0) + h.total;
   });
   const hourly = Object.keys(hourlyMap).sort().map(h=>({ hour: h, total: hourlyMap[h] }));
-  return { tickets, totalSold, totalEfectivo, totalTransferencia, totalDebe, hourly };
+  return { tickets, totalSold, totalEfectivo, totalTransferencia, totalDebe, totalRecibido, totalVueltas, hourly };
 }
 
 // 1.55.0: lo que se le muestra antes de cerrar la caja (ventas desde el último cierre, mesas abiertas y qué pasa).
@@ -1554,7 +1557,7 @@ async function closeCashRegister(opts){
   // 🧮 Arqueo: contar el efectivo de la caja (base + ventas en efectivo + entradas − salidas). Cancelar = no se cierra.
   let caja = null;
   if(window.ventoTurno && (stats.tickets.length || window.ventoTurno.turno())){
-    caja = auto ? window.ventoTurno.sinContar(stats.totalEfectivo) : await window.ventoTurno.arqueo(stats.totalEfectivo);
+    caja = auto ? window.ventoTurno.sinContar(stats.totalEfectivo) : await window.ventoTurno.arqueo(stats.totalEfectivo, { recibido: stats.totalRecibido, vueltas: stats.totalVueltas });
     if(!caja){ saveData(); renderMesas(); return; }
   }
   if(stats.tickets.length === 0 && !caja){
@@ -1573,6 +1576,7 @@ async function closeCashRegister(opts){
     totalEfectivo: stats.totalEfectivo,
     totalTransferencia: stats.totalTransferencia,
     totalDebe: stats.totalDebe,
+    totalRecibido: stats.totalRecibido, totalVueltas: stats.totalVueltas,
     hourly: stats.hourly,
     caja
   };
@@ -1693,6 +1697,7 @@ function openClosureReport(closure){
       <span class="label">Transferencia</span>
       <span class="amount paid">${fmt(closure.totalTransferencia)}</span>
     </div>
+    ${closure.totalVueltas > 0 ? `<div class="total-row sub"><span class="label">💵 Recibido en efectivo · vueltas entregadas</span><span class="amount">${fmt(closure.totalRecibido)} · ${fmt(closure.totalVueltas)}</span></div>` : ''}
     ${closure.totalDebe > 0 ? `<div class="total-row sub"><span class="label">Quedó debiendo</span><span class="amount hist-debt-flag">${fmt(closure.totalDebe)}</span></div>` : ''}
     <div class="hist-detail-title">Ventas por hora</div>
     ${hourlyHtml}

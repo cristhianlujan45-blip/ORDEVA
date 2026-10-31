@@ -2811,6 +2811,16 @@ function ctRango(){
   const opt = { day: 'numeric', month: 'short', year: 'numeric' };
   return { ini: ini.getTime(), fin: f.getTime(), titulo: titulo + ' · ' + new Date(ini).toLocaleDateString('es-CO', opt) + ' al ' + new Date(f.getTime() - 1).toLocaleDateString('es-CO', opt) };
 }
+// 1.69.0: el período anterior equivalente, para comparar. «Este mes» se compara con el mismo tramo del mes pasado
+// (del 1 al mismo día), así a mitad de mes la comparación es justa.
+function ctRangoAnterior(r){
+  const ini = new Date(r.ini), fin = new Date(r.fin), dia = 864e5;
+  if(ctPeriodo === 'mes'){ const a = new Date(ini.getFullYear(), ini.getMonth() - 1, 1); const dias = Math.round((fin - ini) / dia); const b = new Date(a.getTime() + dias * dia); const finMes = new Date(ini.getFullYear(), ini.getMonth(), 1); return { ini: a.getTime(), fin: Math.min(b.getTime(), finMes.getTime()), titulo: 'el mismo tramo del mes pasado' }; }
+  if(ctPeriodo === 'mesant'){ return { ini: new Date(ini.getFullYear(), ini.getMonth() - 1, 1).getTime(), fin: ini.getTime(), titulo: 'el mes anterior' }; }
+  if(ctPeriodo === 'anio'){ const a = new Date(ini.getFullYear() - 1, 0, 1); return { ini: a.getTime(), fin: a.getTime() + (fin - ini), titulo: 'el mismo tramo del año pasado' }; }
+  const largo = fin - ini;
+  return { ini: ini.getTime() - largo, fin: ini.getTime(), titulo: ctPeriodo === 'hoy' ? 'ayer' : ctPeriodo === 'semana' ? 'los 7 días anteriores' : 'los días anteriores (mismo largo)' };
+}
 // Todos los movimientos del periodo en un solo formato: { tipo: venta|ingreso|gasto, monto, fecha, ... }
 function ctMovimientos(r){
   const mov = [];
@@ -2880,6 +2890,27 @@ function renderConta(){
   x.mov.forEach(m => { if(m.tipo === 'gasto') porCat[m.cat || 'otros'] = (porCat[m.cat || 'otros'] || 0) + m.monto; else porMedio[m.metodo || 'otro'] = (porMedio[m.metodo || 'otro'] || 0) + m.monto; });
   document.getElementById('ctMedios').innerHTML = barras(porMedio, 'v', q => CT_METODOS[q] || q);
   document.getElementById('ctCats').innerHTML = barras(porCat, 'g', q => ctCatNombre('gasto', q));
+  // 🗂️ 1.69.0: gastos por tipo y 📊 comparación con el período anterior.
+  try{
+    const F = window.ventoFinanzas;
+    const tiposEl = document.getElementById('ctTipos');
+    if(tiposEl && F && F.gastosPorTipo){
+      const pt = F.gastosPorTipo(x.mov.filter(m => m.tipo === 'gasto')), o = {};
+      F.TIPOS_GASTO.forEach(t => { if(pt[t[0]]) o[t[0]] = pt[t[0]]; });
+      tiposEl.innerHTML = Object.keys(o).length ? barras(o, 'g', q => (F.TIPOS_GASTO.find(t => t[0] === q) || [q, q])[1]) + '<div class="empty-note" style="margin-top:6px">Directos = mercancía e insumos (ya están en el costo de lo vendido). El resultado estimado resta los demás.</div>' : '<div class="empty-note">Sin gastos en este periodo.</div>';
+    }
+    const compEl = document.getElementById('ctComp');
+    if(compEl && F && F.variacion){
+      const ra = ctRangoAnterior(r), xa = ctMovimientos(ra);
+      const sumA = f => xa.mov.filter(f).reduce((a, m) => a + m.monto, 0);
+      const ventasA = sumA(m => m.tipo === 'venta'), gastosA = sumA(m => m.tipo === 'gasto'), resA = ventasA + sumA(m => m.tipo === 'ingreso') - gastosA;
+      const fila = (t, ahora, antes, malSiSube) => { const v = F.variacion(ahora, antes), sube = v != null && v > 0, flecha = v == null ? '' : v === 0 ? ' =' : (sube ? ' ▲ ' : ' ▼ ') + Math.abs(Math.round(v)) + ' %';
+        const bien = v == null || v === 0 ? '' : (sube !== !!malSiSube ? ' style="color:#15803d"' : ' style="color:#dc2626"');
+        return '<div class="vt-l"><span>' + t + '</span><b>' + ctFmt(ahora) + '<small' + bien + '>' + flecha + '</small></b></div><div class="empty-note" style="margin:-4px 0 6px">Antes: ' + ctFmt(antes) + '</div>'; };
+      compEl.innerHTML = '<div class="empty-note" style="margin-bottom:6px">Comparado con ' + ra.titulo + '.</div>' + fila('💰 Cobrado', ventas, ventasA) + fila('💸 Gastos', gastos, gastosA, true) + fila('✅ Te quedó (caja)', resultado, resA) +
+        fila('🧾 Vendido', x.vendido, xa.vendido);
+    }
+  }catch(e){ console.error('conta comparar', e); }
   // Gráfica: por día (hasta ~2 meses) o por mes
   const porMes = (r.fin - r.ini) / 864e5 > 62, grupos = {}, llaves = [];
   const clave = t => { const d = new Date(t); return porMes ? d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') : ctDia(d); };
