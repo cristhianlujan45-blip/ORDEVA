@@ -320,7 +320,8 @@ window.ventoAplicarDatosNube = async (obj, respaldarLocal) => {
   }finally{ window.__nubeAplicando = false; }
   // 1.68.1: lo que se tocó MIENTRAS se ponían los datos del otro equipo se guardó, pero no se avisaba a la nube (y se
   // quedaba solo en este celular hasta el siguiente cambio). Ahora se sube enseguida.
-  if(window.__nubeCambioEnAplicar){ window.__nubeCambioEnAplicar = false; setTimeout(() => { try{ window.ventoNube && window.ventoNube.cambio(); }catch(e){} }, 0); }
+  // (al instante, no después: así la nube sabe que hay algo por subir antes de dar estos datos por «al día»)
+  if(window.__nubeCambioEnAplicar){ window.__nubeCambioEnAplicar = false; try{ window.ventoNube && window.ventoNube.cambio(); }catch(e){} }
   // 1.68.1: la cuenta (o la persona) abierta en pantalla se vuelve a pintar con los datos nuevos. Antes seguía
   // mostrando la cantidad de antes y su «+» sumaba sobre una copia vieja.
   try{
@@ -356,7 +357,12 @@ function saveData(){
 function guardadoAhora(){
   const g = guardadoPend; if(!g) return Promise.resolve();
   guardadoPend = null; clearTimeout(g.t);
-  const r = guardarYa(g.key, g.obj); g.listo(r); return r;
+  // 1.68.1: mientras se ponen los datos de otro equipo no se escribe nada: antes se podía guardar la copia VIEJA encima de
+  // lo que acababa de llegar y el toque se perdía. Lo tocado se junta al terminar (vento-nube: aplicarProtegido).
+  if(window.__nubeAplicando && g.key === STORAGE_KEY){ window.__nubeCambioEnAplicar = true; g.listo(true); return Promise.resolve(true); }
+  // Si los datos ya se reemplazaron (llegaron de otro equipo), se guardan los de ahora, no la copia vieja.
+  const obj = (g.key === STORAGE_KEY && typeof data !== 'undefined' && data && g.obj !== data) ? data : g.obj;
+  const r = guardarYa(g.key, obj); g.listo(r); return r;
 }
 window.ventoGuardarYa = guardadoAhora;
 document.addEventListener('visibilitychange', () => { if(document.hidden) guardadoAhora(); });

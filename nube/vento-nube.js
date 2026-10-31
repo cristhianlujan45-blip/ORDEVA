@@ -226,6 +226,8 @@
   // toque durante la subida quedaba marcado como subido). enNube = el texto de lo que la nube ya tiene de este equipo:
   // si no cambió nada, no se sube otra vez (evita subidas de eco que hacían esperar a los demás).
   var cambiosN = 0, enNubeTxt = '', enNubeDe = '', fallos = 0, remotoPendiente = false;
+  // Diagnóstico (solo si una prueba pone window.__nubeTraza = []): qué hizo la sincronización y con qué datos.
+  function traza(ev, obj, x){ try{ var T0 = window.__nubeTraza; if(!T0) return; T0.push({ ev: ev, t: Date.now(), q: obj && window.__nubeTrazaQ ? window.__nubeTrazaQ(obj) : null, v: st.version, n: cambiosN, x: x }); }catch(e){} }
   function reintentar(ms){ clearTimeout(tSubir); tSubir = setTimeout(subir, ms); }
   // Conflicto (otro equipo subió primero): se reintenta enseguida, con un poco de azar para no chocar otra vez.
   var pronto = function(){ return 150 + Math.floor(Math.random() * 450); };
@@ -264,7 +266,7 @@
   function enSede(){ return !st.sede || st.sede === sedeActual(); }
   function cambio(){                     // la app acaba de guardar
     if(!st.negocio || !configurada() || !enSede()) return;
-    cambiosN++;
+    cambiosN++; traza('cambio', datosApp());
     st.sucio = true; guardarSt(); pintarEstado();
     clearTimeout(tSubir); tSubir = setTimeout(subir, SUBIR_MS);
   }
@@ -273,11 +275,11 @@
   function subirFoto(version){
     var d = datosApp(); if(!d) return Promise.resolve(null);
     var txt = JSON.stringify(d), n0 = cambiosN;
-    if(txt === enNubeTxt && enNubeDe === negId() && version === (st.version || 0)){ if(cambiosN === n0){ st.sucio = false; guardarSt(); } return Promise.resolve('igual'); }
-    var foto = JSON.parse(txt);
+    if(txt === enNubeTxt && enNubeDe === negId() && version === (st.version || 0)){ traza('igual', d); if(cambiosN === n0){ st.sucio = false; guardarSt(); } return Promise.resolve('igual'); }
+    var foto = JSON.parse(txt); traza('subir', foto, version);
     return rpc('guardar_datos', { p_negocio: st.negocio.id, p_datos: foto, p_version: version })
       .then(function(v){
-        st.version = v; if(cambiosN === n0) st.sucio = false; st.ultimo = Date.now(); ultimoError = ''; fallos = 0; enNubeTxt = txt; enNubeDe = negId(); guardarSt(); avisarOtros(v);
+        traza('subido', foto, v); st.version = v; if(cambiosN === n0) st.sucio = false; st.ultimo = Date.now(); ultimoError = ''; fallos = 0; enNubeTxt = txt; enNubeDe = negId(); guardarSt(); avisarOtros(v);
         return basePut(foto);
       });
   }
@@ -307,6 +309,7 @@
       var nube = x[0], b = x[1], local = datosApp();
       sinBase = !b;
       var mezcla; try{ mezcla = fusionar(b, local, nube.datos); }finally{ sinBase = false; }
+      traza('mezcla', mezcla, { b: b && window.__nubeTrazaQ ? window.__nubeTrazaQ(b) : null, l: window.__nubeTrazaQ ? window.__nubeTrazaQ(local) : null, r: window.__nubeTrazaQ ? window.__nubeTrazaQ(nube.datos) : null, vr: nube.version });
       st.version = nube.version; guardarSt();
       return aplicarProtegido(mezcla).then(function(){
         // 1.68.1: este equipo ya tiene lo de la nube: esa es la base nueva. Antes, si la subida volvía a chocar (varios
@@ -331,25 +334,35 @@
     return leerNube().then(function(n){
       return guardarPendiente().then(function(){
         if(!reemplazar && st.sucio) return subir();     // hay cambios de este equipo: se suben y, si chocan, se mezclan
+        // 1.68.1: mientras bajaba, este equipo subió algo más nuevo: lo bajado ya es viejo y no se pone encima.
+        if(!reemplazar && (subiendo || n.version <= (st.version || 0))){ traza('bajada-vieja', n.datos, n.version); remotoPendiente = true; return; }
+        traza('bajar', n.datos, { vr: n.version, local: window.__nubeTrazaQ ? window.__nubeTrazaQ(datosApp()) : null });
         st.version = n.version; st.sucio = false; st.ultimo = Date.now(); ultimoError = ''; guardarSt();
+        var n0 = cambiosN;
         return (reemplazar ? aplicar(n.datos, respaldarLocal === true) : aplicarProtegido(n.datos, respaldarLocal === true)).then(function(){
-          var d = datosApp(); enNubeTxt = st.sucio ? '' : (d ? JSON.stringify(d) : ''); enNubeDe = negId();
+          // Solo se da por «igual a la nube» si nada se tocó mientras se ponían los datos (si no, eso hay que subirlo).
+          var d = datosApp(); enNubeTxt = (st.sucio || cambiosN !== n0) ? '' : (d ? JSON.stringify(d) : ''); enNubeDe = negId();
           return basePut(n.datos);
         });
       });
     });
   }
+  // Pone los datos de la nube SIN perder lo que se toque mientras tanto. Lo que se toca mientras se ponen cae en la copia
+  // de antes (d0): se junta con lo que llegó y se vuelve a poner, otra vez protegido. 1.68.1: sin tope de vueltas (antes,
+  // con un negocio grande y toques seguidos, la última vuelta se ponía sin protección y ese toque se perdía); cada vuelta
+  // solo ocurre si de verdad se tocó algo, así que termina cuando se deja de tocar. (Después de leer lo guardado, la
+  // carga de los datos no hace pausas: en la copia nueva no alcanza a caer ningún toque.)
   function aplicarProtegido(remoto, respaldar){
     var d0 = datosApp(), foto = null;
     try{ foto = d0 ? JSON.stringify(d0) : null; }catch(e){}
     return aplicar(remoto, respaldar).then(function(){
-      var tocado = false;
-      try{ tocado = !!(d0 && foto !== null && d0 !== datosApp() && JSON.stringify(d0) !== foto); }catch(e){}
-      if(!tocado) return;
-      var mezcla = fusionar(JSON.parse(foto), d0, remoto);
-      st.sucio = true; guardarSt();
-      cambiosN++;
-      return aplicar(mezcla).then(function(){ reintentar(SUBIR_MS); });
+      var viejo = false;
+      try{ viejo = !!(d0 && foto !== null && d0 !== datosApp() && JSON.stringify(d0) !== foto); }catch(e){}
+      if(!viejo) return;
+      var m = fusionar(JSON.parse(foto), d0, remoto);
+      traza('tocado', m);
+      cambiosN++; st.sucio = true; guardarSt();
+      return aplicarProtegido(m, false).then(function(){ reintentar(SUBIR_MS); });
     });
   }
   function revisarNube(){
