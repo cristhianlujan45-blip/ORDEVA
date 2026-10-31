@@ -74,6 +74,14 @@
     window.saveData = function(){ const r = orig.apply(this, arguments); if(!window.__nubeAplicando){ clearTimeout(tCmp); tCmp = setTimeout(comparar, 300); } else antes = null; return r; };
     try{ saveData = window.saveData; }catch(e){}
   }
+  // 1.70.1: con la sincronización de menos de 1 s, los datos de otro equipo pueden llegar en los 0,3 s entre un cambio
+  // de este celular y su comparación: entonces ese cambio (ej. «Precio cambiado» por el dueño) no quedaba anotado.
+  // Antes de poner los datos que llegan, se anota YA lo pendiente de este celular.
+  { const apl = window.ventoAplicarDatosNube;
+    if(typeof apl === 'function' && !apl.__actividad){
+      const w = function(){ if(tCmp){ clearTimeout(tCmp); tCmp = null; try{ comparar(); }catch(e){} } return apl.apply(this, arguments); };
+      w.__actividad = true; window.ventoAplicarDatosNube = w;
+    } }
   setTimeout(() => { antes = foto(); }, 1500);
   setInterval(() => { if(!antes) antes = foto(); }, 5000);
   // ---------- Envío al servidor ----------

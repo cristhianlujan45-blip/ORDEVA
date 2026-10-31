@@ -1,4 +1,9 @@
-# ORDEVA 1.70.1 · Entrar en otro dispositivo ya no reinicia ni borra las cuentas
+# ORDEVA 1.70.1 · Entrar en otro dispositivo ya no reinicia ni borra las cuentas · el texto se ve en todos los diseños
+
+Tres arreglos:
+1. Entrar en otro dispositivo ya no reinicia las cuentas abiertas.
+2. Lo que se escribe se ve en todos los diseños.
+3. La actividad del dueño no se pierde cuando llegan datos de otro equipo.
 
 **Reporte del dueño:** «cuando inicio sesión en otro dispositivo se me reiniciaron todas las cuentas y me borró las
 cuentas».
@@ -40,6 +45,25 @@ Se reprodujo contra el servidor de pruebas (PostgreSQL real): con la 1.70.0 fall
   - Con la 1.70.1: 21 bien.
 - **Pruebas de servidor y entrada** (todas las que usan el servidor de pruebas) y la caja (`cajapro`): ver el mensaje de
   la publicación.
+
+## 2. «Cuando voy a poner el nombre o escribir un texto, no se ve el texto»
+- **Qué pasaba:** varios campos tenían el fondo **blanco fijo** (`#fff`) pero la letra del diseño (`var(--ink)`). En los
+  diseños oscuros la letra es clara, así que quedaba letra clara sobre blanco.
+- **Dónde:**
+  - Renombrar mesa y la ficha del producto (15 campos);
+  - las listas al agregar, el buscador de productos y sus sugerencias;
+  - elegir persona, cerrar la cuenta y el nombre de la pantalla de preparación.
+- **Arreglo:** el fondo ahora es el del diseño (`var(--surface-2)`). El recibo para imprimir sigue blanco a propósito.
+- **Prueba nueva `contraste`** (en CI):
+  - revisa el contraste de TODOS los campos (298) en los 16 diseños, también los de las ventanas de la caja;
+  - con la 1.70.0 fallaban todos los diseños oscuros; con la 1.70.1 pasan los 16.
+
+## 3. «📜 Actividad del equipo» no perdía cambios del dueño
+- **Qué pasaba:** con la sincronización de menos de 1 s, los datos de otro equipo podían llegar en los 0,3 s entre un
+  cambio de este celular y su anotación. Ese cambio (ej. «Precio cambiado») no quedaba en la actividad.
+- **Arreglo:** antes de poner los datos que llegan se anota lo pendiente (`app/30-actividad-equipo-huella.js`).
+- **Prueba:** `equipoactividad` falló 3 de 5 veces con la 1.70.0 más el arreglo de la entrada; con este arreglo pasó
+  4 de 4.
 
 ## Si a alguien ya le pasó
 - **En la nube:** quedan respaldos automáticos, uno por hora, los últimos 48. Los restaura el soporte de ORDEVA (no están
