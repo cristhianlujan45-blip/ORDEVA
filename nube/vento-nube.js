@@ -246,7 +246,38 @@
     return true;
   }
   function aviso(t){ try{ window.showToast && window.showToast(t, 5000); }catch(e){} }
-  function pintarEstado(){ try{ var el = document.getElementById('nubeEstadoAj'); if(el) el.textContent = textoEstado(); }catch(e){} }
+  function pintarEstado(){ try{ var el = document.getElementById('nubeEstadoAj'); if(el) el.textContent = textoEstado(); }catch(e){} pintarPunto(); }
+  // 1.69.0: 🟢 indicador de sincronización a la vista (arriba, junto a «Salir»): ✓ al día · ⏳ subiendo · ⚠️ sin internet.
+  // Así el mesero sabe si su pedido ya llegó a los otros equipos sin ir a Ajustes. Tocarlo dice el detalle.
+  function estadoSync(){
+    if(!configurada() || !st.negocio || !enSede()) return { k: 'off' };
+    var sinRed = typeof navigator !== 'undefined' && navigator.onLine === false;
+    if(sinRed || (ultimoError && !subiendo)) return { k: 'mal', sucio: !!st.sucio, error: sinRed ? 'sin internet' : ultimoError };
+    if(st.sucio || subiendo) return { k: 'sube' };
+    return { k: 'ok', ultimo: st.ultimo || 0 };
+  }
+  function pintarPunto(){
+    try{
+      var fila = document.getElementById('topActionsRow'); if(!fila) return;
+      var b = document.getElementById('nubePunto');
+      var e = estadoSync();
+      if(e.k === 'off'){ if(b) b.hidden = true; return; }
+      if(!b){
+        b = document.createElement('button'); b.type = 'button'; b.id = 'nubePunto'; b.className = 'top-pill nube-punto'; b.setAttribute('data-novocab', '');
+        b.addEventListener('click', function(){ var x = estadoSync(); aviso(x.k === 'ok' ? '✓ Todo al día con tus otros equipos' + (x.ultimo ? ' (' + new Date(x.ultimo).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' }) + ')' : '') + '.'
+          : x.k === 'sube' ? '⏳ Enviando tus cambios a los otros equipos…' : '⚠️ ' + (x.error === 'sin internet' ? 'Sin internet' : 'No se pudo sincronizar (' + x.error + ')') + (x.sucio ? '. Lo que hagas queda guardado aquí y se envía solo al volver.' : '.')); if(x.k === 'mal' && st.sucio) subir(); });
+        fila.insertBefore(b, fila.firstChild);
+        if(!document.getElementById('nubePuntoCss')){ var c = document.createElement('style'); c.id = 'nubePuntoCss';
+          c.textContent = '.nube-punto{min-width:34px;font-weight:800}.nube-punto[data-k="ok"]{color:#15803d}.nube-punto[data-k="sube"]{color:#b45309}.nube-punto[data-k="mal"]{color:#dc2626}.nube-punto[hidden]{display:none}';
+          document.head.appendChild(c); }
+      }
+      b.hidden = false; b.dataset.k = e.k;
+      b.textContent = e.k === 'ok' ? '✓' : e.k === 'sube' ? '⏳' : '⚠️';
+      var t = e.k === 'ok' ? 'Al día con tus otros equipos' : e.k === 'sube' ? 'Enviando cambios…' : 'Sin sincronizar: ' + e.error;
+      b.title = t; b.setAttribute('aria-label', t);
+    }catch(x){}
+  }
+  try{ window.addEventListener('online', pintarPunto); window.addEventListener('offline', pintarPunto); }catch(e){}
   function textoEstado(){
     if(!configurada()) return 'Sin configurar: todo se guarda solo en este celular.';
     if(!st.negocio) return st.email ? 'Conectado como ' + st.email + ' · elige o crea un negocio.' : 'Configurada · nadie ha entrado en este celular.';
@@ -272,22 +303,40 @@
   }
   // Sube una FOTO exacta de los datos (no el objeto vivo): lo que se toca mientras viaja ya no queda en la «base» como si
   // la nube lo tuviera (eso hacía que una suma se perdiera o se contara dos veces en la siguiente mezcla).
+  // 1.69.0: lo que el servidor NO deja cambiar a un empleado sin permiso (precios, nombres, costos y recetas de productos;
+  // permisos del equipo; funciones del negocio). Si el empleado lo cambió, el servidor lo deja como estaba (D2), pero su
+  // celular seguía mostrando lo que él puso: ahora, después de subir, ese celular vuelve a bajar lo que quedó.
+  function protegidoDe(d){
+    if(!d) return '';
+    return canon({ p: (d.products || []).map(function(p){ return p ? [p.id, p.name, p.price, p.cost, p.receta || null] : null; }),
+      e: d.permisosEquipo || null, m: d.modulos || null, r: d.recetasBloquear || null });
+  }
+  var esEquipo = function(){ var r = st.negocio && st.negocio.rol; return !!r && r !== 'dueno' && r !== 'admin'; };
+  function revisarRevertido(foto){
+    return leerNube().then(function(n){
+      if(!n || protegidoDe(n.datos) === protegidoDe(foto)) return;
+      traza('revertido', n.datos, n.version);
+      st.version = n.version; guardarSt(); enNubeTxt = '';
+      return aplicarProtegido(n.datos).then(function(){ aviso('🔒 Algunos cambios (precios, productos o permisos) solo los puede hacer el dueño: quedaron como estaban.'); return basePut(n.datos); });
+    }).catch(function(){});
+  }
   function subirFoto(version){
     var d = datosApp(); if(!d) return Promise.resolve(null);
     var txt = JSON.stringify(d), n0 = cambiosN;
     if(txt === enNubeTxt && enNubeDe === negId() && version === (st.version || 0)){ traza('igual', d); if(cambiosN === n0){ st.sucio = false; guardarSt(); } return Promise.resolve('igual'); }
     var foto = JSON.parse(txt); traza('subir', foto, version);
+    var tocoProtegido = esEquipo() && (!baseMem || protegidoDe(foto) !== protegidoDe(baseMem));
     return rpc('guardar_datos', { p_negocio: st.negocio.id, p_datos: foto, p_version: version })
       .then(function(v){
         traza('subido', foto, v); st.version = v; if(cambiosN === n0) st.sucio = false; st.ultimo = Date.now(); ultimoError = ''; fallos = 0; enNubeTxt = txt; enNubeDe = negId(); guardarSt(); avisarOtros(v);
-        return basePut(foto);
+        return basePut(foto).then(function(){ if(tocoProtegido) return revisarRevertido(foto); });
       });
   }
   function subir(){
     if(!st.negocio || !enSede()) return Promise.resolve();
     if(subiendo){ otraVez = true; return Promise.resolve(); }
     if(!datosApp()) return Promise.resolve();
-    subiendo = true; subiendoDesde = Date.now();
+    subiendo = true; subiendoDesde = Date.now(); pintarPunto();
     return subirFoto(st.version || 0)
       .catch(function(e){
         if(/conflicto/.test(String(e && e.message))) return mezclarConNube();
@@ -418,7 +467,7 @@
       document.addEventListener('visibilitychange', function(){ if(!document.hidden) revisarNube(); });
       window.addEventListener('online', function(){ if(st.sucio) subir(); else revisarNube(); archivosPendientes(); });
     }
-    abrirCanal();
+    abrirCanal(); pintarPunto();
     setTimeout(function(){ if(st.sucio) subir(); else revisarNube(); archivosPendientes(); }, 1500);
   }
 
@@ -846,7 +895,7 @@
 
   // ---------- API para la app ----------
   window.ventoNube = {
-    configurada: configurada, abrir: abrir, cambio: cambio, subir: subir, bajar: bajar, estado: textoEstado,
+    configurada: configurada, abrir: abrir, cambio: cambio, subir: subir, bajar: bajar, estado: textoEstado, estadoSync: estadoSync,
     correo: function(){ return st.negocio ? st.email : null; },
     rolActivo: function(){ return st.negocio ? st.negocio.rol : null; },
     sede: function(){ return st.negocio ? (st.sede || 'default') : null; },      // espacio de este equipo donde está ese negocio

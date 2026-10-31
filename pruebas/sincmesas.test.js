@@ -5,6 +5,8 @@
 //  2. Los dos celulares tocando «+» a la vez en la misma cuenta: no se pierde ningún toque ni se cuenta dos veces.
 //  3. Con un negocio grande (miles de ventas), los toques que caen mientras llegan datos del otro equipo no se pierden.
 //  4. Cuánto tarda un «+» en verse en el otro celular.
+//  5. Indicador ✓ / ⏳ / ⚠️ arriba; sin internet el toque queda y se envía solo al volver.
+//  6. Un mesero que cambia un precio sin permiso: el servidor no lo deja y SU celular vuelve a mostrar el precio real.
 'use strict';
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const fs = require('fs');
@@ -112,6 +114,40 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){
     if(!ok3){ await volcar(CEL.p, 'cel1'); await volcar(PC.p, 'cel2'); }
     chk('3. La cuenta abierta en cada celular muestra ×41', await esperar(CEL.p, () => /41/.test((document.querySelector('#itemsContainer .li-qty-val') || {}).textContent || ''), null, 8000) &&
       await esperar(PC.p, () => /41/.test((document.querySelector('#itemsContainer .li-qty-val') || {}).textContent || ''), null, 8000), [await enPantalla(CEL.p), await enPantalla(PC.p)]);
+    // ===== 5. Indicador de sincronización =====
+    let ind = await CEL.p.evaluate(() => { const b = document.getElementById('nubePunto'); return b ? { vis: !b.hidden, k: b.dataset.k, t: b.textContent } : null; });
+    chk('5. Arriba se ve el indicador ✓ «al día»', ind && ind.vis && ind.k === 'ok' && ind.t === '✓', ind);
+    await CEL.ctx.setOffline(true);
+    await CEL.p.evaluate(() => { window.dispatchEvent(new Event('offline')); });
+    await mas(CEL.p); await pausa(600);
+    ind = await CEL.p.evaluate(() => { const b = document.getElementById('nubePunto'); return { k: b.dataset.k, t: b.textContent }; });
+    chk('5. Sin internet: ⚠️ (el toque queda guardado en el celular)', ind.k === 'mal' && (await qty(CEL.p)) === 42, ind);
+    await CEL.ctx.setOffline(false);
+    await CEL.p.evaluate(() => { window.dispatchEvent(new Event('online')); });
+    chk('5. Al volver el internet se envía solo: los dos en 42 y ✓ otra vez', await igualesEn(42, 30000) && await esperar(CEL.p, () => (document.getElementById('nubePunto') || {}).dataset.k === 'ok', null, 15000), [await qty(CEL.p), await qty(PC.p)]);
+
+    // ===== 6. Mesero que cambia un precio sin permiso =====
+    await CEL.p.evaluate(() => window.ventoNube.abrir({}));
+    await CEL.p.waitForSelector('#nubeOv.show #nubeRolInv');
+    await CEL.p.selectOption('#nubeRolInv', 'mesero'); await CEL.p.click('#nubeInvitar');
+    await CEL.p.waitForSelector('#nubeInvRes .nube-cod');
+    const cod = (await CEL.p.textContent('#nubeInvRes .nube-cod')).trim();
+    await CEL.p.click('#nubeOv [data-n="cerrar"]');
+    const ME = await equipo('mesero');
+    await ME.p.click('#authNube'); await ME.p.waitForSelector('#nubeOv.show #nubeEmail');
+    await ME.p.fill('#nubeEmail', 'mesero@mesas.co'); await ME.p.fill('#nubePass', 'clave123'); await ME.p.fill('#nubeNombre', 'Pedro');
+    await ME.p.click('#nubeCrear'); await ME.p.waitForSelector('#nubeCodigo', { state: 'visible' });
+    await ME.p.fill('#nubeCodigo', cod); await ME.p.click('#nubeUnirme');
+    chk('6. El mesero entra a la cuenta', await esperar(ME.p, () => { const x = window.ventoNube.negocio(); return !!x && x.rol === 'mesero' && document.getElementById('authOverlay').hidden; }, null, 20000));
+    await esperar(ME.p, () => (data.products || []).some(p => p.id === 'p-ag'), null, 15000);
+    await ME.p.evaluate(() => { document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')); const p = data.products.find(x => x.id === 'p-ag'); p.price = 100; saveData(); });
+    chk('6. El precio que el mesero cambió sin permiso vuelve solo a $3.500 en SU celular', await esperar(ME.p, () => (data.products.find(x => x.id === 'p-ag') || {}).price === 3500, null, 20000), await ME.p.evaluate(() => (data.products.find(x => x.id === 'p-ag') || {}).price));
+    await pausa(1500);
+    chk('6. … y en el celular del dueño sigue en $3.500', (await CEL.p.evaluate(() => data.products.find(x => x.id === 'p-ag').price)) === 3500);
+    await ME.p.evaluate(() => { document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')); openTableModal(1); });
+    await pausa(400); await mas(ME.p);
+    chk('6. El «+» del mesero sí llega (43 en el celular del dueño)', await esperar(CEL.p, () => data.tables[1].items.filter(i => i.productId === 'p-ag').reduce((s, i) => s + i.qty, 0) === 43, null, 20000), await qty(CEL.p));
+
     const est = await Promise.all([CEL.p, PC.p].map(p => p.evaluate(() => window.ventoNube.estado ? window.ventoNube.estado() : null)));
     chk('3. Los dos quedan «al día» (nada por subir)', await esperar(CEL.p, () => !/por subir/.test(document.getElementById('nubeEstadoAj') ? document.getElementById('nubeEstadoAj').textContent : '') , null, 5000), est);
   }
