@@ -112,6 +112,12 @@
     });
   }
   var clonar = function(o){ return JSON.parse(JSON.stringify(o == null ? null : o)); };
+  // 1.68.1: la base también vive en memoria. Leerla de IndexedDB con un negocio grande podía tardar más del tope (5 s)
+  // y la mezcla se hacía SIN base: los productos de una mesa que estaban en los dos celulares se sumaban dos veces.
+  var baseMem = null, baseMemDe = '';
+  var negId = function(){ return (st.negocio && st.negocio.id) || ''; };
+  function baseGet(){ return baseMem && baseMemDe === negId() ? Promise.resolve(baseMem) : base('get'); }
+  function basePut(v){ baseMem = v; baseMemDe = negId(); return base('put', v); }
   // Comparación por contenido: la base de datos (jsonb) cambia el orden de los campos y la app agrega
   // campos vacíos (ej. personId: null) al cargar; sin esto un mismo producto parecía otro y se duplicaba.
   function canon(x){
@@ -143,9 +149,11 @@
     if(base && Array.isArray(y.history) && Array.isArray(base.history)){ var vistos = {}; base.history.forEach(function(h){ vistos[canon(h)] = 1; }); y.history = y.history.filter(function(h){ return !vistos[canon(h)]; }); }
     return y;
   }
+  var sinBase = false;   // la mezcla no tiene base (equipo recién instalado o copia perdida): no se puede saber qué sumó cada uno
   function fusionarItem(b, l, r){
     var out = fusionar(b || {}, l, r);
-    out.qty = r.qty + (l.qty - (b ? b.qty : 0));   // las dos ventas suman (como el stock)
+    // Las dos ventas suman (como el stock). Sin base, sumar contaría dos veces lo que ya estaba: se deja la mayor.
+    out.qty = sinBase && !b ? Math.max(r.qty, l.qty) : r.qty + (l.qty - (b ? b.qty : 0));
     return out;
   }
   // Renglones repetidos del mismo producto (de antes de 1.64.0) se juntan en uno: misma cantidad total y mismas anotaciones.
@@ -214,6 +222,15 @@
   function datosApp(){ try{ return typeof window.ventoDatosActuales === 'function' ? window.ventoDatosActuales() : null; }catch(e){ return null; } }
   function aplicar(obj, respaldar){ return typeof window.ventoAplicarDatosNube === 'function' ? Promise.resolve(window.ventoAplicarDatosNube(obj, respaldar)) : Promise.resolve(); }
   var subiendo = false, bajando = false, otraVez = false, tSubir = null, tPoll = null, ultimoError = '';
+  // 1.68.1: cambiosN cuenta los guardados de la app: «sucio» solo se apaga si no hubo cambios mientras se subía (antes un
+  // toque durante la subida quedaba marcado como subido). enNube = el texto de lo que la nube ya tiene de este equipo:
+  // si no cambió nada, no se sube otra vez (evita subidas de eco que hacían esperar a los demás).
+  var cambiosN = 0, enNubeTxt = '', enNubeDe = '', fallos = 0, remotoPendiente = false;
+  function reintentar(ms){ clearTimeout(tSubir); tSubir = setTimeout(subir, ms); }
+  // Conflicto (otro equipo subió primero): se reintenta enseguida, con un poco de azar para no chocar otra vez.
+  var pronto = function(){ return 150 + Math.floor(Math.random() * 450); };
+  // Sin internet o servidor lento: 2 s, 4 s, 8 s… hasta 20 s (antes siempre 20 s).
+  var luego = function(){ fallos++; return Math.min(T.reintento, 1000 * Math.pow(2, Math.min(fallos, 5))); };
   var subiendoDesde = 0, bajandoDesde = 0, trabadaAvisada = false;
   // 1.65.10: si subir o bajar lleva más de un minuto sin terminar, se suelta y se vuelve a intentar (y queda anotado
   // en los errores del equipo para el administrador, una vez por sesión).
@@ -247,39 +264,61 @@
   function enSede(){ return !st.sede || st.sede === sedeActual(); }
   function cambio(){                     // la app acaba de guardar
     if(!st.negocio || !configurada() || !enSede()) return;
+    cambiosN++;
     st.sucio = true; guardarSt(); pintarEstado();
     clearTimeout(tSubir); tSubir = setTimeout(subir, SUBIR_MS);
+  }
+  // Sube una FOTO exacta de los datos (no el objeto vivo): lo que se toca mientras viaja ya no queda en la «base» como si
+  // la nube lo tuviera (eso hacía que una suma se perdiera o se contara dos veces en la siguiente mezcla).
+  function subirFoto(version){
+    var d = datosApp(); if(!d) return Promise.resolve(null);
+    var txt = JSON.stringify(d), n0 = cambiosN;
+    if(txt === enNubeTxt && enNubeDe === negId() && version === (st.version || 0)){ if(cambiosN === n0){ st.sucio = false; guardarSt(); } return Promise.resolve('igual'); }
+    var foto = JSON.parse(txt);
+    return rpc('guardar_datos', { p_negocio: st.negocio.id, p_datos: foto, p_version: version })
+      .then(function(v){
+        st.version = v; if(cambiosN === n0) st.sucio = false; st.ultimo = Date.now(); ultimoError = ''; fallos = 0; enNubeTxt = txt; enNubeDe = negId(); guardarSt(); avisarOtros(v);
+        return basePut(foto);
+      });
   }
   function subir(){
     if(!st.negocio || !enSede()) return Promise.resolve();
     if(subiendo){ otraVez = true; return Promise.resolve(); }
-    var d = datosApp(); if(!d) return Promise.resolve();
+    if(!datosApp()) return Promise.resolve();
     subiendo = true; subiendoDesde = Date.now();
-    return rpc('guardar_datos', { p_negocio: st.negocio.id, p_datos: d, p_version: st.version || 0 })
-      .then(function(v){ st.version = v; st.sucio = false; st.ultimo = Date.now(); ultimoError = ''; guardarSt(); avisarOtros(v); return base('put', clonar(d)); })
+    return subirFoto(st.version || 0)
       .catch(function(e){
         if(/conflicto/.test(String(e && e.message))) return mezclarConNube();
-        ultimoError = msgError(e); clearTimeout(tSubir); tSubir = setTimeout(subir, T.reintento);
+        ultimoError = msgError(e); reintentar(luego());
       })
-      .then(function(){ subiendo = false; pintarEstado(); if(otraVez){ otraVez = false; return subir(); } });
+      .then(function(){
+        subiendo = false; pintarEstado();
+        if(otraVez){ otraVez = false; return subir(); }
+        // Mientras se subía llegó el aviso de otro equipo: se revisa YA (antes había que esperar a la siguiente vuelta).
+        if(remotoPendiente){ remotoPendiente = false; revisarNube(); }
+      });
   }
   function leerNube(){
     return conTiempo(cliente().then(function(c){ return c.from('datos_negocio').select('datos,version').eq('negocio_id', st.negocio.id).single(); }), T.rpc, 'leer')
       .then(function(r){ if(r.error) throw r.error; return r.data; });
   }
   function mezclarConNube(){
-    return Promise.all([leerNube(), base('get')]).then(function(x){
+    return Promise.all([leerNube(), baseGet()]).then(function(x){
       var nube = x[0], b = x[1], local = datosApp();
-      var mezcla = fusionar(b, local, nube.datos);
+      sinBase = !b;
+      var mezcla; try{ mezcla = fusionar(b, local, nube.datos); }finally{ sinBase = false; }
       st.version = nube.version; guardarSt();
       return aplicarProtegido(mezcla).then(function(){
-        return rpc('guardar_datos', { p_negocio: st.negocio.id, p_datos: datosApp() || mezcla, p_version: nube.version });
-      }).then(function(v){
-        st.version = v; st.sucio = false; st.ultimo = Date.now(); guardarSt(); avisarOtros(v);
-        // (sin aviso: los datos de los celulares se juntan solos, en silencio — el dueño pidió quitar esos avisos)
-        return base('put', clonar(mezcla));
+        // 1.68.1: este equipo ya tiene lo de la nube: esa es la base nueva. Antes, si la subida volvía a chocar (varios
+        // celulares a la vez), la siguiente mezcla usaba la base vieja y sumaba otra vez lo que ya se había juntado.
+        baseMem = nube.datos; baseMemDe = negId(); enNubeTxt = '';
+        return subirFoto(nube.version);
       });
-    }).catch(function(e){ ultimoError = msgError(e); clearTimeout(tSubir); tSubir = setTimeout(subir, 10000); });
+      // (sin aviso: los datos de los celulares se juntan solos, en silencio — el dueño pidió quitar esos avisos)
+    }).catch(function(e){
+      if(/conflicto/.test(String(e && e.message))){ st.sucio = true; guardarSt(); reintentar(pronto()); return; }
+      ultimoError = msgError(e); reintentar(luego());
+    });
   }
   // 1.59.2: bajar los datos de la nube NUNCA pisa lo que este equipo tocó y todavía no subió. Antes, si se agregaba
   // algo (una venta, un producto) justo mientras llegaban los datos de otro equipo, se perdía: la bajada lo pisaba.
@@ -291,9 +330,12 @@
   function bajar(respaldarLocal, reemplazar){
     return leerNube().then(function(n){
       return guardarPendiente().then(function(){
-        if(!reemplazar && st.sucio) return mezclarConNube();
+        if(!reemplazar && st.sucio) return subir();     // hay cambios de este equipo: se suben y, si chocan, se mezclan
         st.version = n.version; st.sucio = false; st.ultimo = Date.now(); ultimoError = ''; guardarSt();
-        return (reemplazar ? aplicar(n.datos, respaldarLocal === true) : aplicarProtegido(n.datos, respaldarLocal === true)).then(function(){ return base('put', clonar(n.datos)); });
+        return (reemplazar ? aplicar(n.datos, respaldarLocal === true) : aplicarProtegido(n.datos, respaldarLocal === true)).then(function(){
+          var d = datosApp(); enNubeTxt = st.sucio ? '' : (d ? JSON.stringify(d) : ''); enNubeDe = negId();
+          return basePut(n.datos);
+        });
       });
     });
   }
@@ -306,17 +348,25 @@
       if(!tocado) return;
       var mezcla = fusionar(JSON.parse(foto), d0, remoto);
       st.sucio = true; guardarSt();
-      return aplicar(mezcla).then(function(){ clearTimeout(tSubir); tSubir = setTimeout(subir, SUBIR_MS); });
+      cambiosN++;
+      return aplicar(mezcla).then(function(){ reintentar(SUBIR_MS); });
     });
   }
   function revisarNube(){
     destrabar();
-    if(!st.negocio || !configurada() || document.hidden || subiendo || !enSede()) return;
+    if(subiendo || bajando){ remotoPendiente = true; return; }
+    if(!st.negocio || !configurada() || document.hidden || !enSede()) return;
     conTiempo(cliente().then(function(c){ return c.from('datos_negocio').select('version').eq('negocio_id', st.negocio.id).maybeSingle(); }), T.rpc, 'revisar')
       .then(function(r){
         if(r.error) throw r.error;
         if(!r.data){ ultimoError = 'ya no eres miembro de este negocio'; pintarEstado(); return; }
-        if(r.data.version > (st.version || 0)){ if(st.sucio) return subir(); return bajar().then(function(){ avisoBajada(); }); }
+        if(r.data.version > (st.version || 0)){
+          if(st.sucio) return subir();
+          if(bajando) return;
+          bajando = true; bajandoDesde = Date.now();
+          return bajar().then(function(){ avisoBajada(); }).then(function(){ bajando = false; }, function(e){ bajando = false; throw e; })
+            .then(function(){ if(remotoPendiente){ remotoPendiente = false; revisarNube(); } });
+        }
       }).catch(function(e){ ultimoError = msgError(e); pintarEstado(); });
   }
   // «Datos al día con tus otros equipos»: ya no se avisa (el dueño lo pidió); los datos se actualizan solos, en silencio.
@@ -338,7 +388,8 @@
           if(v && !st.sucio && !subiendo && !bajando && enSede()){ bajando = true; bajandoDesde = Date.now(); bajar().then(function(){ avisoBajada(); }, function(){ revisarNube(true); }).then(function(){ bajando = false; }); return; }
           revisarNube(true); })
         .on('broadcast', { event: 'archivo' }, function(m){ var k = m && m.payload && m.payload.k; if(k) archivoCambiado(k); })
-        .subscribe();
+        // 1.68.1: si el canal en vivo se cae (cambio de wifi a datos), se vuelve a abrir en la siguiente revisión.
+        .subscribe(function(estado){ if(estado === 'CHANNEL_ERROR' || estado === 'TIMED_OUT' || estado === 'CLOSED'){ if(canalDe === id) canalDe = ''; } });
     }).catch(function(){});
   }
   function avisarOtros(v){ try{ if(canal) canal.send({ type: 'broadcast', event: 'version', payload: { v: v } }); }catch(e){} }
@@ -348,7 +399,7 @@
   function arrancar(){
     clearInterval(tPoll);
     if(!st.negocio || !configurada()) return;
-    tPoll = setInterval(function(){ revisarNube(); archivosPendientes(); }, POLL_MS);
+    tPoll = setInterval(function(){ revisarNube(); archivosPendientes(); if(!canalDe) abrirCanal(); }, POLL_MS);
     if(!oyendo){             // una sola vez (antes se sumaban escuchas en cada arranque)
       oyendo = true;
       document.addEventListener('visibilitychange', function(){ if(!document.hidden) revisarNube(); });
@@ -589,7 +640,7 @@
   function crearNegocio(nombre){
     var d = datosApp() || {};
     return rpc('crear_negocio', { p_nombre: nombre || d.businessName || 'Mi negocio', p_datos: d, p_nombre_usuario: st.nombre || null })
-      .then(function(id){ st.negocio = { id: id, nombre: nombre || d.businessName || 'Mi negocio', rol: 'dueno' }; st.sede = sedeActual(); st.version = 1; st.sucio = false; st.ultimo = Date.now(); guardarSt(); return base('put', clonar(d)); })
+      .then(function(id){ st.negocio = { id: id, nombre: nombre || d.businessName || 'Mi negocio', rol: 'dueno' }; st.sede = sedeActual(); st.version = 1; st.sucio = false; st.ultimo = Date.now(); guardarSt(); return basePut(clonar(d)); })
       .then(function(){ arrancar(); });
   }
   function elegir(n){
@@ -644,7 +695,7 @@
     return leerNube().then(function(nube){
       var mezcla = local ? fusionar(null, local, nube.datos) : nube.datos;
       return aplicarProtegido(mezcla, true).then(function(){ return rpc('guardar_datos', { p_negocio: n.id, p_datos: datosApp() || mezcla, p_version: nube.version }); })
-        .then(function(v){ st.version = v; st.sucio = false; st.ultimo = Date.now(); guardarSt(); return base('put', clonar(mezcla)); });
+        .then(function(v){ st.version = v; st.sucio = false; st.ultimo = Date.now(); guardarSt(); return basePut(clonar(mezcla)); });
     }).then(function(){ arrancar(); });
   }
   function conectado(email){ return !!(st.negocio && st.email === String(email || '').trim().toLowerCase()); }

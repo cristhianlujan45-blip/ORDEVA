@@ -318,6 +318,19 @@ window.ventoAplicarDatosNube = async (obj, respaldarLocal) => {
     await storageSet(STORAGE_KEY, JSON.stringify(obj));
     if(typeof authUser !== 'undefined' && authUser) await loadData();
   }finally{ window.__nubeAplicando = false; }
+  // 1.68.1: lo que se tocó MIENTRAS se ponían los datos del otro equipo se guardó, pero no se avisaba a la nube (y se
+  // quedaba solo en este celular hasta el siguiente cambio). Ahora se sube enseguida.
+  if(window.__nubeCambioEnAplicar){ window.__nubeCambioEnAplicar = false; setTimeout(() => { try{ window.ventoNube && window.ventoNube.cambio(); }catch(e){} }, 0); }
+  // 1.68.1: la cuenta (o la persona) abierta en pantalla se vuelve a pintar con los datos nuevos. Antes seguía
+  // mostrando la cantidad de antes y su «+» sumaba sobre una copia vieja.
+  try{
+    if(typeof currentTable !== 'undefined' && currentTable != null && typeof overlay !== 'undefined' && overlay.classList.contains('show')){
+      if(data.tables[currentTable]){ renderModalItems(); try{ renderPeople(); }catch(e){} }
+      else { overlay.classList.remove('show'); currentTable = null; }
+    }
+    if(typeof personOverlay !== 'undefined' && personOverlay.classList.contains('show') && typeof currentPersonId !== 'undefined' && currentPersonId != null) renderPersonModalItems();
+  }catch(e){}
+  try{ typeof renderMesas === 'function' && renderMesas(); }catch(e){}
   try{ window.dispatchEvent(new Event('vento-datos-remotos')); }catch(e){}
   // Llegaron datos de otro equipo: si traen fotos nuevas de productos, se bajan también.
   setTimeout(() => { try{ window.fotosDeLaNube && window.fotosDeLaNube(); }catch(e){} }, 600);
@@ -354,7 +367,7 @@ async function guardarYa(key, obj){
     const json = JSON.stringify(obj);
     const result = await storageSet(key, json);
     if(!result) showToast('No se pudo guardar. Intenta de nuevo.');
-    else { autoBackupTick(json); if(!window.__nubeAplicando) try{ window.ventoNube && window.ventoNube.cambio(); }catch(e){} }
+    else { autoBackupTick(json); if(!window.__nubeAplicando){ try{ window.ventoNube && window.ventoNube.cambio(); }catch(e){} } else window.__nubeCambioEnAplicar = true; }
   }catch(e){
     const cod = window.mesoraLogError ? window.mesoraLogError('guardar', 'No se pudo guardar: ' + (e && (e.name + ' ' + e.message) || e), 'saveData') : '';
     const lleno = e && (e.name === 'QuotaExceededError' || /quota/i.test(e.message || ''));
@@ -582,12 +595,24 @@ function qtyStepperHtml(idx, qty){
   </span>`;
 }
 
-function attachQtyStepperHandlers(container, t, rerender){
+// 1.68.1: cuando llegan los datos de otro celular, `data` se reemplaza por uno nuevo. La cuenta que estaba abierta en
+// pantalla seguía apuntando a la mesa VIEJA: el «+» sumaba en una copia que ya no existía y el toque se perdía («le doy
+// sumar y no suma en el otro celular»). Ahora cada toque busca la mesa y el renglón ACTUALES.
+function stepperActual(t, idx){
+  const cur = (typeof currentTable !== 'undefined' && currentTable != null && data.tables[currentTable]) || t;
+  let it = t && t.items ? t.items[idx] : null;
+  if(cur !== t && it){
+    const viejo = it;
+    it = (cur.items || []).find(x => x.productId === viejo.productId && (x.personId || null) === (viejo.personId || null) && x.price === viejo.price) || null;
+  }
+  return { t: cur, it };
+}
+function attachQtyStepperHandlers(container, t0, rerender){
   container.querySelectorAll('.li-qty-plus').forEach(btn=>{
     btn.addEventListener('click', (e)=>{
       e.stopPropagation();
       const idx = parseInt(btn.dataset.idx, 10);
-      const it = t.items[idx];
+      const { t, it } = stepperActual(t0, idx);
       if(!it) return;
       it.qty += 1;
       recordItemHistory(it, 1);
@@ -601,12 +626,12 @@ function attachQtyStepperHandlers(container, t, rerender){
     btn.addEventListener('click', (e)=>{
       e.stopPropagation();
       const idx = parseInt(btn.dataset.idx, 10);
-      const it = t.items[idx];
+      const { t, it } = stepperActual(t0, idx);
       if(!it) return;
       if(it.qty <= 1){
         noteManualChange(tableIdOf(t), it.name, -it.qty);
         try{ invOnSale(it, -it.qty); }catch(e){}
-        t.items.splice(idx, 1);
+        t.items.splice(t.items.indexOf(it), 1);
         sonidoPos('remove');
       } else {
         it.qty -= 1;
