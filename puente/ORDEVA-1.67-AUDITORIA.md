@@ -101,7 +101,7 @@ relacionales que se llenan solas + RLS) sirve, y la transición a registros rela
 | Reconocimiento (IA + Tesseract) | ✅ | |
 | Pantalla de revisión antes de guardar | ✅ | |
 | Conservar la imagen | ✅ | |
-| Bordes, esquinas, perspectiva y enderezado | ❌ | No hay corrección de perspectiva (no existe en `lib/vento-ocr.js` ni en `app/04e`) |
+| Bordes, esquinas, perspectiva y enderezado | ✅ | Corrección: SÍ existía (`app/04d` «Foto de la factura lista para leer»: recorte, perspectiva y luz pareja antes de leer; `app/04e` «✂️ Ajustar esquinas»). La auditoría de la 1.67 lo marcó mal |
 
 ### Gastos y caja
 
@@ -152,7 +152,7 @@ relacionales que se llenan solas + RLS) sirve, y la transición a registros rela
 | P4 | Lo recibido y las vueltas no quedaban en la venta | `app/04f`, `app/04a` | Media (trazabilidad) | ✅ Corregido en 1.67.0 |
 | P5 | Fórmula del margen repetida en 7 sitios | `app/04d`, `04e`, `04f`, `23` | Baja | ✅ Unificadas con el motor en la 1.67.2 |
 | P6 | Sin costo promedio ponderado: el último costo pisa al anterior | `app/04e` | Media | ✅ 1.67.6: Ajustes → «Costo de lo que compras» (último costo o promedio ponderado) |
-| P7 | Sincronización del documento completo en cada cambio | `nube/vento-nube.js` | Media (rendimiento con negocios grandes) | Pendiente (fase 10) |
+| P7 | Sincronización del documento completo en cada cambio | `nube/vento-nube.js` | Media (rendimiento con negocios grandes) | ✅ 1.69.0: solo viaja lo que cambió |
 | P8 | `javaavisos`: la revisión del servicio de fondo y `Cruce.java` no compilan en la prueba | `pruebas/javaavisos.test.js` | Baja (solo la prueba) | Viene de antes (M1). Pendiente |
 | P10 | La utilidad del Inicio restaba dos veces las compras de mercancía (factura + costo de lo vendido) | `lib/ordeva2.js` | **Alta** (utilidad más baja de la real) | ✅ Corregido en la 1.67.2 |
 | P9 | `equiposprobar` falló una vez en GitHub sin el resultado final; aquí pasa siempre | | Baja | Ahora el registro de pruebas muestra la causa si se repite |
@@ -182,11 +182,11 @@ Las vueltas nunca suman como venta ni como gasto (comprobado en la prueba `vuelt
 | 3. Diseño | Terminar ORDEVA 2.0 en Compras/Facturas, Clientes/Libreta, Laya y Ajustes | ✅ 1.67.4 |
 | 4. Cobro y vueltas | Campo siempre visible, billetes, pago exacto, mixto, sin pago incompleto, guardar recibido y vueltas, cuentas | ✅ Hecho (1.67.0) |
 | 5. Inventario y compras | Costo promedio ponderado (configurable), variación entre compras, comparación de proveedores, lotes y vencimientos | ✅ 1.67.6 (ver `puente/REPORTE-1.67.6.md`) |
-| 6. Facturas y OCR | Detección de bordes y corrección de perspectiva antes del reconocimiento | Pendiente |
-| 7. Caja y gastos | Tipos de gasto (directo / operativo / administrativo / financiero), comparación de períodos, vueltas en el arqueo | Pendiente |
-| 8. Laya | Preguntas financieras con el motor (margen por categoría, gastos que subieron) | Pendiente |
-| 9. Suscripciones | Conciliación y recuperación de pagos aprobados (revisar `vento-suscripciones`) | Pendiente |
-| 10. Rendimiento | Sincronización incremental; paginación del historial | Pendiente |
+| 6. Facturas y OCR | Detección de bordes y corrección de perspectiva antes del reconocimiento | ✅ Ya existía (ver arriba) |
+| 7. Caja y gastos | Tipos de gasto (directo / operativo / administrativo / financiero), comparación de períodos, vueltas en el arqueo | ✅ 1.69.0 |
+| 8. Laya | Preguntas financieras con el motor (margen por categoría, gastos que subieron) | ✅ 1.69.0 |
+| 9. Suscripciones | Conciliación y recuperación de pagos aprobados (revisar `vento-suscripciones`) | ✅ 1.69.0 (`srv_sub_conciliar`, cada 10 min) |
+| 10. Rendimiento | Sincronización incremental; paginación del historial | ✅ 1.69.0: sincronización por partes (`guardar_cambios`); el historial ya se mostraba por páginas |
 | 11–12. Pruebas integrales y publicación | | Por versión |
 | Caja Inteligente 2.0 | Voz + teclado + táctil sobre la misma caja: intérprete propio en español de Colombia, confirmación obligatoria al cobrar, F1–F9, orden escrita sin internet | ✅ 1.68.0 (ver `puente/CAJA-INTELIGENTE-2.0.md`) |
 
