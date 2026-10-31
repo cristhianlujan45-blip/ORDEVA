@@ -4,6 +4,7 @@
 //  3. Desde el panel de YouTube del celular: «⏭ Que siga» → suena en el COMPUTADOR; el celular muestra lo que suena allá.
 //  4. ⏭ y 🗑 desde el celular mandan la orden al computador; la cola del celular es la del computador.
 //  5. Canción por QR: llega a los dos, suena solo en el computador (una vez), y el celular no pide «activar música».
+//  5b. (1.72.0) Canción por QR que llega SOLO al celular: se le manda al computador y suena allá (antes se perdía).
 //  6. «🎶 Que suene en este equipo» en el celular: el computador se calla y ahora suena en el celular.
 'use strict';
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
@@ -100,6 +101,16 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     await PC.evaluate(() => window.__yt.main.terminar());
     chk('5. La canción del QR suena en el computador', await esperar(PC, () => window.__yt.cargados.includes('nichecali01')), await PC.evaluate(() => [window.__yt.cargados, window.vitoMusica.cola().map(x => x.song + ':' + x.status + ':' + x.vid)]));
     chk('5. … solo una vez, y el celular no suena ni pide «Activar música automática»', await PC.evaluate(() => window.__yt.cargados.filter(v => v === 'nichecali01').length === 1) && await CEL.evaluate(() => !window.__yt.cargados.length && !window.__toasts.some(t => /Activar música automática/.test(t))));
+
+    // ===== 5b. 1.72.0: la canción del QR llega SOLO al celular (el computador no recibe los pedidos del QR) =====
+    const msg2 = JSON.stringify({ t: 'cancion', v: 2, id: 'c-qr-88', mesa: 4, s: 'Joe Arroyo Rebelion', at: Date.now() });
+    await PC.route('**/vento-ia/yt/buscar**', rt => rt.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ items: [video('rebelionjoe', 'Rebelión')] }) }));
+    await CEL.evaluate(m => window.vitoMod.procesar(m), msg2);
+    chk('5b. Canción del QR que llegó solo al celular → el celular la manda al equipo de la música y entra a SU cola', await esperar(PC, () => window.vitoMusica.cola().some(x => x.reqId === 'c-qr-88' && x.mesa === 4)), await PC.evaluate(() => window.vitoMusica.cola().map(x => x.song + ':' + x.reqId)));
+    chk('5b. … y el celular la sigue viendo en la cola (una sola vez, la del equipo de la música)', await esperar(CEL, () => window.vitoMusica.cola().filter(x => x.reqId === 'c-qr-88' && !x.done).length === 1, null, 15000), await CEL.evaluate(() => window.vitoMusica.cola().map(x => x.song + ':' + x.reqId + ':' + x.id)));
+    await PC.evaluate(() => window.__yt.main.terminar());
+    chk('5b. … y suena en el computador (a continuación, una sola vez)', await esperar(PC, () => window.__yt.cargados.includes('rebelionjoe'), null, 20000), await PC.evaluate(() => [window.__yt.cargados, window.vitoMusica.cola().map(x => x.song + ':' + x.status + ':' + x.vid)]));
+    chk('5b. … y el celular no suena', await CEL.evaluate(() => !window.__yt.cargados.includes('rebelionjoe')));
 
     // ===== 6. Cambiar al celular =====
     await CEL.evaluate(() => window.vitoPanel.cerrar());

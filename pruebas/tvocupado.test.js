@@ -38,7 +38,7 @@ const mock = require('./ntfymock.js')();
   await p.click('#onbSaltar').catch(() => {});
   const topic = await p.evaluate(() => { document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')); document.getElementById('avBarra')?.remove(); for(let i = 1; i <= 4; i++) data.tables[i] = data.tables[i] || { items: [], people: [] }; saveData(); document.querySelector('nav button[data-view="musica"]')?.click(); return vitoMod.qCfg().topic; });
   await p.waitForTimeout(500);
-  await p.click('#tvTransmitir'); await p.waitForTimeout(1000);
+  await p.click('#mfCard [data-mf="tv"]'); await p.waitForTimeout(1000);   // 1.72.0: «📺 En el TV» de la tarjeta de Música (abre «Transmitir al TV»)
   await p.evaluate(() => [...document.querySelectorAll('#tvApkLista > button')].find(x => /webOS/.test(x.innerText)).click());
   await p.waitForTimeout(9000);
   chk('TV con YouTube abierto y OTRO celular conectado: ORDEVA se conecta igual', await p.evaluate(() => !!lng.sid && lngOn()) && tv.binds >= 1, await p.evaluate(() => lng.error));

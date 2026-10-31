@@ -427,7 +427,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-10-31 · v1.71.0';
+const MESORA_VERSION = '2026-10-31 · v1.72.0';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'ORDEVA · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 /* 🔄 La app Android se actualiza SOLA (Actualizador): revisa cada 3 h, baja la versión nueva y la instala cuando no se
@@ -2478,7 +2478,7 @@ function tvDisposPintar(){
   const act = document.getElementById('tvdAct'); if(act) act.textContent = tvWifiBuscando ? '⏳ buscando en el wifi…' : app ? '' : '';
   let h = filas.map(f => f.extra
     ? '<div class="tvv-dev ' + f.cls + '"><span class="tvv-ic">' + f.ic + '</span><div style="flex:1;min-width:0"><b>' + tvEsc(f.nombre) + '</b><small>' + tvEsc(f.sub) + '</small></div><span style="display:flex;gap:4px"><button type="button" class="btn-ghost" data-acc="mp:' + tvEsc(f.extra.app) + '" style="padding:6px 10px">' + f.go + '</button><button type="button" class="btn-ghost" data-acc="mn:' + tvEsc(f.extra.app) + '" style="padding:6px 10px">⏭</button></span></div>' +
-      (f.extra.remoto && !(lngOn() && lngTVEnLinea() !== false) ? '<button type="button" class="tvv-dev" data-acc="codigo"><span class="tvv-ic">🔗</span><div><b>Mandarle las canciones de las mesas a ' + tvEsc(f.extra.donde || 'ese TV') + '</b><small>Vincúlalo una vez con su código: en ese TV, YouTube → Configuración → «Vincular con código de TV». No se corta lo que suena.</small></div><span class="tvv-go">›</span></button>' : '')
+      (f.extra.remoto && !(lngOn() && lngTVEnLinea() !== false) ? '<button type="button" class="tvv-dev tvv-aqui" data-acc="aqui"><span class="tvv-ic">➕</span><div><b>Poner aquí las canciones de las mesas</b><small>Entran en la cola de ' + tvEsc(f.extra.donde || 'ese TV') + ', a continuación de lo que suena (no se corta). Sin límite de canciones.</small></div><span class="tvv-go">Conectar ›</span></button>' : '')
     : '<button type="button" class="tvv-dev ' + f.cls + '" data-acc="' + tvEsc(f.accion) + '"><span class="tvv-ic">' + f.ic + '</span><div><b>' + tvEsc(f.nombre) + '</b><small>' + tvEsc(f.sub) + '</small></div><span class="tvv-go">' + f.go + ' ›</span></button>').join('');
   if(app) h += '<button type="button" class="tvv-dev" data-acc="buscar"><span class="tvv-ic">🔄</span><div><b>Buscar TV en el wifi</b><small>' + (tvWifiBuscando ? 'Buscando…' : 'LG, Samsung, Chromecast, Android TV, TV Box, Fire TV') + '</small></div></button>';
   else if(!filas.length) h = '';
@@ -2523,6 +2523,14 @@ function mediosLeer(){
 function tvDisposToque(acc){
   const A = window.VentoAndroid;
   if(acc === 'mperm'){ showToast('En la pantalla que se abre, prende «ORDEVA». Solo mira los reproductores de música, no tus mensajes.', 9000); try{ A.mediosPermiso(); }catch(e){} return; }
+  // 1.72.0: «➕ Poner aquí las canciones» en lo que ya suena en un TV: con un toque. Si en el wifi hay un TV con YouTube
+  // abierto (o uno solo), ORDEVA se une a esa sesión (las canciones entran en su cola, a continuación); si no, el código.
+  if(acc === 'aqui'){
+    const tvs = Object.values(tvWifi), tv = tvs.find(x => x.youtube) || (tvs.length === 1 ? tvs[0] : null);
+    if(tv){ showToast('🔗 Conectando con «' + tv.nombre + '»…', 4000); tvConectarAparato(tv).then(ok => { if(ok) showToast('✅ Listo: las canciones de las mesas entran en la cola de «' + tv.nombre + '», a continuación de lo que suena.', 7000); else tvDisposToque('codigo'); }); return; }
+    if(lngPuenteApp() && !tvWifiBuscando && !tvs.length){ tvWifiBuscar(true); showToast('🔎 Buscando el TV en el wifi… toca otra vez en unos segundos.', 5000); return; }
+    acc = 'codigo';
+  }
   if(acc === 'codigo'){ tvSinLista('Escribe los 12 números que muestra ese TV en YouTube → Configuración → «Vincular con código de TV». Lo que suena no se corta.'); setTimeout(() => { const c = document.getElementById('lngCode'); if(c) c.focus(); }, 500); return; }
   if(/^m[pn]:/.test(acc) || /^m:/.test(acc)){
     const pkg = acc.replace(/^m[pn]?:/, ''), m = ((window.__medios || {}).lista || []).find(x => x.app === pkg);

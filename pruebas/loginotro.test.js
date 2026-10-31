@@ -9,6 +9,9 @@
 //  5. Copia vieja (una cuenta ya cobrada y otra nueva) → la cobrada no revive y la nueva aparece.
 //  6. Lo hecho SIN internet antes de cerrar sesión (una venta, un producto más) llega a la nube al volver a entrar.
 //  7. Igual, sin copia de referencia en el equipo: manda la nube, la venta no se pierde y queda un punto de restauración.
+//  8. (1.72.0) Equipo que ya tuvo la cuenta pero sus datos se reiniciaron (quedó su copia de referencia): ve lo de la
+//     nube y NO le borra nada a nadie (antes la mezcla lo tomaba como «este equipo borró todo»).
+//  9. (1.72.0) Con la sesión abierta el equipo pierde sus datos: no se sube ese vacío; se vuelven a bajar de la nube.
 'use strict';
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const o = console[k].bind(console); console[k] = (...a) => { if(typeof a[0] === 'string' && a[0].startsWith('{"t":"')) return; o(...a); }; }
@@ -132,6 +135,25 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const o = 
     chk('7. Sin copia de referencia: manda la nube (las cuentas no se suman ni reviven)', (await nube()) === ESP6 && (await mesas(A.p)) === ESP6 && (await mesas(B.p)) === ESP6, { nube: await nube(), A: await mesas(A.p), B: await mesas(B.p) });
     chk('7. … y la venta hecha sin internet tampoco se pierde', (await nubeHist()).includes('venta-sin-red-2') && (await historia(A.p)).includes('venta-sin-red-2'), await nubeHist());
     chk('7. B guardó un punto de restauración local antes de poner los datos de la nube', await B.p.evaluate(() => new Promise(ok => { try{ autoBackupPoints().then(l => ok((l || []).some(x => /antes de la nube/.test(x.day || '')))).catch(() => ok(false)); }catch(e){ ok(false); } })) === true);
+
+    // ===== Caso 8: un equipo que ya tuvo la cuenta, pero sus datos se reiniciaron (se limpió el almacenamiento, se
+    // reinstaló…) y quedó su copia de referencia: al entrar debe ver lo de la nube y NO borrarle nada a nadie. =====
+    await B.p.evaluate(() => window.ventoSalir()); await pausa(3000);
+    await B.p.waitForSelector('#authUser', { timeout: 15000 }).catch(() => {});
+    await B.p.evaluate(() => storageSet(STORAGE_KEY, JSON.stringify({ businessName: 'Bar Prueba', products: [{ id: 'p-propio', name: 'Producto de este equipo', price: 1000 }], tables: {}, history: [], categories: [], closures: [] })));
+    await pausa(500);
+    await entrar(B.p, 'dueno@reinicio.co'); await dentro(B.p); await cerrarTodo(B.p); await pausa(6000);
+    chk('8. Equipo con los datos reiniciados entra → ve las cuentas de la nube', (await mesas(B.p)) === ESP6, await mesas(B.p));
+    chk('8. … y NO le borra nada a la nube ni a A', (await nube()) === ESP6 && (await mesas(A.p)) === ESP6, { nube: await nube(), A: await mesas(A.p) });
+    chk('8. … y las ventas siguen en la nube', (await nubeHist()).includes('venta-sin-red') && (await nubeHist()).includes('venta-sin-red-2'), await nubeHist());
+
+    // ===== Caso 9: con la sesión abierta, el equipo pierde sus datos (el celular los borró por falta de espacio…) =====
+    await A.p.evaluate(() => { const v = (id, t) => ({ id, date: new Date().toISOString(), total: t, items: [], payments: [{ method: 'efectivo', amount: t }] }); data.history.unshift(v('venta-a1', 1000), v('venta-a2', 2000)); saveData(); });
+    await esperar(B.p, () => !!data && (data.history || []).some(h => h.id === 'venta-a2'), null, 15000); await pausa(2500);
+    await B.p.evaluate(() => { data.history = []; data.tables = {}; saveData(); });
+    await pausa(7000);
+    chk('9. Con la sesión abierta y los datos borrados en el equipo: NO se borra nada en la nube ni en A', (await nube()) === ESP6 && (await mesas(A.p)) === ESP6 && (await nubeHist()).includes('venta-a2'), { nube: await nube(), A: await mesas(A.p), hist: (await nubeHist()).length });
+    chk('9. … y el equipo recupera sus datos de la nube solo', (await mesas(B.p)) === ESP6 && await B.p.evaluate(() => (data.history || []).some(h => h.id === 'venta-a2')), await mesas(B.p));
   }catch(e){ mal++; console.log('❌ Excepción: ' + (e && e.stack || e)); }
   chk('Sin errores de página', !errs.length, errs);
   await b.close(); await sb.cerrar().catch(() => {});

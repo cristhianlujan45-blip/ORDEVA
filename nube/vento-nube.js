@@ -416,7 +416,18 @@
     var d = datosApp(); if(!d) return Promise.resolve(null);
     var txt = JSON.stringify(d), n0 = cambiosN;
     if(txt === enNubeTxt && enNubeDe === negId() && version === (st.version || 0)){ traza('igual', d); if(cambiosN === n0){ st.sucio = false; guardarSt(); } return Promise.resolve('igual'); }
-    var foto = JSON.parse(txt); traza('subir', foto, version);
+    var foto = JSON.parse(txt);
+    // 1.72.0: red de seguridad. Si lo que se va a subir perdió más de la mitad de las ventas de la copia de referencia
+    // (el celular borró sus datos por falta de espacio, se limpió el almacenamiento con la sesión abierta…), NO se sube:
+    // borraría las ventas y las cuentas de todos. Se vuelven a bajar los datos de la nube (con punto de restauración).
+    if(baseMem && baseMemDe === negId() && vaciado(baseMem, foto)){
+      traza('vaciado', foto, version); st.sucio = false; guardarSt();
+      try{ window.ventoError && window.ventoError('nube', 'Los datos de este equipo se habían borrado: no se subieron y se bajaron de la nube', { ventasCopia: (baseMem.history || []).length, ventasAqui: (foto.history || []).length }, 'nube-vaciado'); }catch(e){}
+      aviso('⚠️ Los datos de este equipo se habían borrado. No se tocó la nube: se volvieron a bajar tus datos.');
+      setTimeout(function(){ if(subiendo || bajando) return; bajando = true; bajandoDesde = Date.now(); bajar(true, true).then(finBajar, finBajar); }, 0);
+      return Promise.resolve('vaciado');
+    }
+    traza('subir', foto, version);
     var tocoProtegido = esEquipo() && (!baseMem || protegidoDe(foto) !== protegidoDe(baseMem));
     // 1.69.0: si la base es la versión de la nube que se va a reemplazar, solo viajan las partes que cambiaron.
     var cambios = null;
@@ -466,7 +477,7 @@
     return Promise.all([leerNube(), baseGet()]).then(function(x){
       var nube = x[0], b = x[1], local = datosApp();
       sinBase = !b;
-      var mezcla; try{ mezcla = fusionar(b, local, nube.datos); }finally{ sinBase = false; }
+      var mezcla; try{ mezcla = (b && local && vaciado(b, local)) ? registrosNuevos(local, nube.datos) : fusionar(b, local, nube.datos); }finally{ sinBase = false; }
       traza('mezcla', mezcla, { b: b && window.__nubeTrazaQ ? window.__nubeTrazaQ(b) : null, l: window.__nubeTrazaQ ? window.__nubeTrazaQ(local) : null, r: window.__nubeTrazaQ ? window.__nubeTrazaQ(nube.datos) : null, vr: nube.version });
       st.version = nube.version; guardarSt();
       return aplicarProtegido(mezcla).then(function(){
@@ -876,10 +887,16 @@
     var local = datosApp();
     return Promise.all([leerTodo(), base('get')]).then(function(x){
       var nube = x[0], b = x[1], mezcla;
+      // 1.72.0: «abro mi cuenta en otro dispositivo (Samsung) y no carga los datos ni las cuentas». Si los datos de este
+      // equipo se reiniciaron (se limpió el almacenamiento, se reinstaló…) pero quedó su copia de referencia, la mezcla de
+      // 3 vías lo tomaba como «este equipo borró todo» y BORRABA las cuentas y las ventas de la nube y de los demás.
+      // Ahora, si los datos de aquí parecen reiniciados frente a la copia, manda la nube (y solo se agregan los registros
+      // de aquí que la nube no tiene).
+      var reiniciado = !!(local && b && pareceReiniciado(b, local));
       if(!local) mezcla = nube.datos;
-      else if(b) mezcla = fusionar(b, local, nube.datos);
+      else if(b && !reiniciado) mezcla = fusionar(b, local, nube.datos);
       else mezcla = registrosNuevos(local, nube.datos);
-      traza('vincular', mezcla, { conBase: !!b, vr: nube.version });
+      traza('vincular', mezcla, { conBase: !!b, reiniciado: reiniciado, vr: nube.version });
       st.version = nube.version; st.sucio = false; guardarSt();
       return aplicarProtegido(mezcla, true).then(function(){
         baseMem = nube.datos; baseMemDe = negId(); baseVer = nube.version; enNubeTxt = '';
@@ -889,6 +906,26 @@
         if(d && !igual(d, nube.datos)){ cambiosN++; st.sucio = true; guardarSt(); }   // lo propio de este equipo se sube (por partes)
       });
     }).then(function(){ arrancar(); });
+  }
+  // ¿Los datos de este equipo se reiniciaron frente a su copia de referencia? (faltan muchas ventas o productos que la copia
+  // tenía, o tenía cuentas abiertas y aquí no queda ninguna sin que se haya registrado una venta nueva).
+  function pareceReiniciado(b, l){
+    var ids = function(x){ var o = {}, n = 0; (Array.isArray(x) ? x : []).forEach(function(y){ if(y && y.id != null && !o[y.id]){ o[y.id] = 1; n++; } }); return { o: o, n: n }; };
+    var falta = function(A, B){ if(!A.n) return 0; var k = 0; Object.keys(A.o).forEach(function(v){ if(!B.o[v]) k++; }); return k / A.n; };
+    var Hb = ids(b.history), Hl = ids(l.history), Pb = ids(b.products), Pl = ids(l.products);
+    if(falta(Hb, Hl) > 0.3 || falta(Pb, Pl) > 0.5) return true;
+    var abiertas = function(d){ var t = (d && d.tables) || {}; return Object.keys(t).filter(function(k){ return t[k] && (t[k].items || []).length; }).length; };
+    var nuevas = Object.keys(Hl.o).some(function(v){ return !Hb.o[v]; });
+    return abiertas(b) > 0 && abiertas(l) === 0 && !nuevas;
+  }
+  // Red de seguridad al subir: faltan más de la mitad de las ventas que la copia tenía (con al menos 3). En el uso normal
+  // las ventas se borran de a una; perder la mitad de golpe es que se borraron los datos del equipo.
+  function vaciado(b, l){
+    var hb = (b && Array.isArray(b.history)) ? b.history : [], hl = (l && Array.isArray(l.history)) ? l.history : [];
+    var ids = {}, n = 0; hb.forEach(function(x){ if(x && x.id != null && !ids[x.id]){ ids[x.id] = 1; n++; } });
+    if(n < 3) return false;
+    var hay = 0; hl.forEach(function(x){ if(x && ids[x.id]){ hay++; ids[x.id] = 0; } });
+    return (n - hay) / n > 0.5;
   }
   // Sin copia de referencia: los datos de la nube + los registros de este equipo que la nube no tiene (por id).
   var REGISTROS = ['history', 'closures', 'purchases', 'contab'];

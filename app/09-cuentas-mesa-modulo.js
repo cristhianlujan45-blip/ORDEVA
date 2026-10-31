@@ -1044,7 +1044,14 @@ function agregarCancion(mesa,song,reqId){
   const MAX=mzMax();
   if(mesa!==0&&MAX&&rec.length>=MAX)return{msg:'🎵 '+tableLabel(mesa)+' ya pidió '+MAX+' canciones; podrá pedir otra en '+Math.ceil((rec[0].ts+VENT-now)/6e4)+' min.',limite:true,min:Math.ceil((rec[0].ts+VENT-now)/6e4)};
   const it={id:now+'-'+Math.random().toString(36).slice(2,6),reqId:reqId||null,mesa,mesaNombre:tableLabel(mesa),song:song.slice(0,120),pedido:pedidoOriginal,title:lim.title.slice(0,80),artist:lim.artist.slice(0,60),ts:now,done:false,status:'pending'};
+  // 1.72.0: «la gente pone música por el QR y no sale en la lista». Si OTRO equipo pone la música, antes este equipo
+  // dejaba la canción en su cola sin mandarla («la pone el equipo de la música»), y si ese equipo no recibía los pedidos
+  // del QR (cada equipo decide si los recibe), la canción se perdía. Ahora se le manda; si ese equipo no responde,
+  // este equipo toma la música para que no quede en silencio.
+  if(mqOtro()&&Date.now()-mqDesde>15e3&&Date.now()-mqVisto>9e4){const era=mqNombre();try{mqElegir(true);}catch(e){}
+    try{showToast('🎶 «'+era+'» no respondía: ahora la música suena en este equipo.',8000);}catch(e){}}
   l.push(it);SS('vito_cola',l);mzRespaldo();
+  if(mqOtro()){it.enviada=now;SS('vito_cola',l);mqPub({t:'cmd',a:'cancion',id:it.id,mesa,s:it.song,p:pedidoOriginal,rid:reqId||it.id});}
   // Busca el video y la agrega sola a la lista/reproductor apenas llega el pedido,
   // sin esperar a que alguien toque "Cargar en mi lista" (antes solo pasaba con
   // ese botón, así que las canciones nuevas se quedaban esperando en silencio).
@@ -1862,7 +1869,7 @@ function mqEscuchar(){
 function mqPublicarEstado(forzar){
   if(!mqSoy())return;
   const a=mzActual(),F=mzF();let pausa=false;try{pausa=!!(a&&a.fuente==='app'&&yPl&&yPl.getPlayerState&&yPl.getPlayerState()===2);}catch(e){}
-  const it=x=>({i:x.id,v:x.vid||'',s:String(x.title||x.song||'').slice(0,80),a:String(x.artist||'').slice(0,50),g:String(x.song||'').slice(0,100),m:x.mesa,mn:String(x.mesaNombre||tableLabel(x.mesa)).slice(0,30),d:x.dur||null,ts:x.ts||0,pr:x.primero||0,fo:x.fondo?1:0});
+  const it=x=>({i:x.id,v:x.vid||'',s:String(x.title||x.song||'').slice(0,80),a:String(x.artist||'').slice(0,50),g:String(x.song||'').slice(0,100),m:x.mesa,mn:String(x.mesaNombre||tableLabel(x.mesa)).slice(0,30),d:x.dur||null,ts:x.ts||0,pr:x.primero||0,fo:x.fondo?1:0,r:x.reqId?String(x.reqId).slice(0,40):undefined});
   const est={t:'estado',ahora:a?Object.assign(it(a),{f:a.fuente||'',p:pausa?1:0}):null,q:ordenJusto(cola()).slice(0,40).map(it),fondo:F&&F.on?String(F.nombre||'').slice(0,60):''};
   const h=JSON.stringify(est);
   if(!forzar&&h===mqHash&&Date.now()-mqHashT<60e3)return;                // sin cambios: un «sigo aquí» por minuto
@@ -1876,11 +1883,14 @@ function mqAplicar(m){
   mqVisto=Date.now();
   const prev=mzActual(),l=[];
   if(prev&&(!m.ahora||m.ahora.i!==prev.id)){prev.status='played';prev.endedAt=Date.now();try{mzAlHistorial(prev);}catch(e){}}
-  const de=x=>({id:String(x.i),vid:x.v||null,title:x.s,artist:x.a,song:x.g||x.s,mesa:x.m,mesaNombre:x.mn,dur:x.d,ts:x.ts||Date.now(),primero:x.pr||0,fondo:!!x.fo});
+  const de=x=>({id:String(x.i),vid:x.v||null,title:x.s,artist:x.a,song:x.g||x.s,mesa:x.m,mesaNombre:x.mn,dur:x.d,ts:x.ts||Date.now(),primero:x.pr||0,fondo:!!x.fo,reqId:x.r||null});
   if(m.ahora)l.push(Object.assign(de(m.ahora),{status:'playing',done:true,fuente:'remoto',pausa:!!m.ahora.p,playedSeconds:m.ahora.p?m.ahora.e||0:m.ahora.e||0,progresoAt:m.ahora.p?null:Date.now(),startedAt:Date.now()-(m.ahora.e||0)*1000}));
   (m.q||[]).forEach(x=>l.push(Object.assign(de(x),{status:'approved',ok:true,done:false})));
   const ids=new Set(l.map(x=>x.id));
-  cola().filter(x=>!x.done&&!ids.has(x.id)&&Date.now()-(x.ts||0)<20000).forEach(x=>l.push(x));   // lo que se acaba de mandar y todavía no vuelve
+  // lo que se acaba de mandar y todavía no vuelve (1.72.0: las canciones del QR mandadas al equipo de la música, hasta 2 min
+  // o hasta que aparezcan allá con el mismo pedido)
+  const reqs=new Set(l.map(x=>x.reqId).filter(Boolean));
+  cola().filter(x=>!x.done&&!ids.has(x.id)&&!(x.reqId&&reqs.has(x.reqId))&&Date.now()-(x.ts||0)<(x.enviada?120000:20000)).forEach(x=>l.push(x));
   SS('vito_cola',l);
   try{renderMusica();}catch(e){}try{ypSigueK='';ypPintar();if(ypAbierto&&!ypVer&&ypTab==='cola')ypCuerpo(true);}catch(e){}
 }
@@ -1893,6 +1903,10 @@ function mqComando(m){
     if(m.a==='add'&&m.v&&/^[\w-]{6,20}$/.test(m.v.vid||'')){
       if(ypAgregar({vid:m.v.vid,title:String(m.v.title||'').slice(0,80),artist:String(m.v.artist||'').slice(0,60),dur:+m.v.dur||null},!!m.pr,true,m.id&&/^[\w-]{4,40}$/.test(m.id)?m.id:null))
         showToast('🎵 «'+String(m.v.title||'').slice(0,60)+'» (desde '+quien+')'+(m.pr?' suena después de la actual.':' a la cola.'));
+    }
+    else if(m.a==='cancion'&&m.s){   // 1.72.0: canción del QR que recibió otro equipo: entra a la cola de aquí (sin repetir)
+      const r=agregarCancion(parseInt(m.mesa,10)||0,String(m.s).slice(0,120),String(m.rid||m.id||'').slice(0,40)||null);
+      if(r&&r.nuevo!==false){try{renderMusica();}catch(e){}try{if(notifMusica())showToast(r.msg);}catch(e){}}
     }
     else if(m.a==='sig')mzSaltar();
     else if(m.a==='pausa')ypPausa();
