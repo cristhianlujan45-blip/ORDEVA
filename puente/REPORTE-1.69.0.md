@@ -141,7 +141,11 @@ Con 4000 ventas, un «+» viaja como ≈3 KB en vez de ≈758 KB.
   - `porpartes` 20 ✅ y `subconciliar` 11 ✅ (nuevas);
   - las demás pruebas de servidor (23 archivos) pasaron;
   - `revisar-migraciones`: «no borra datos» y RLS en todas las tablas.
-- La lista completa de CI está en el mensaje de la publicación.
+- **Lista completa de CI + sincronización + voz** (69 pruebas, en este equipo): 68 ✅. `qrprivado` falló una vez con el
+  equipo cargado: no vio el canal en los 12 s que espera.
+  - Repetida sola: 9 ✅.
+  - Con 3 copias a la vez: 2 pasaron y la otra se cayó al arrancar, por la carga.
+  - Ya había sido intermitente con carga antes de esta versión.
 
 ## Lo que no se probó
 - Celulares y computadores reales (punto 4).
