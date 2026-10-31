@@ -50,19 +50,28 @@ const fotoSet = (id, url) => {
 };
 const fotoDel = (id, soloAqui) => { delete fotosVer[id]; fotosVerGuardar(); const n = !soloAqui && nubeArch(); if(n) n.borrar('foto/' + id); return fotoTx('readwrite', st => st.delete(id)); };
 // Baja de la nube las fotos que este equipo no tiene (o que cambiaron en otro equipo).
-let fotosBajando = false;
+// 1.69.1: si la foto todavía no está en la nube (el otro celular la tomó sin internet y la sube al volver), se vuelve a
+// preguntar sola unas veces (2 s, 4 s, 8 s… hasta ~4 min), sin depender de que llegue el aviso en vivo ni otro cambio.
+let fotosBajando = false, fotosReintento = null;
+const fotosIntentos = {};
 async function fotosDeLaNube(){
   const n = nubeArch(); if(!n || fotosBajando) return 0;
-  fotosBajando = true; let hechas = 0;
+  fotosBajando = true; let hechas = 0, esperar = 0;
   try{
     const falta = fotosProds().filter(p => p.foto && (!fotosCache[p.id] || fotosVer[p.id] !== p.foto)).slice(0, 60);
     for(const p of falta){
       const url = await n.bajar('foto/' + p.id);
       if(url && /^data:image\//.test(url)){ fotosCache[p.id] = url; fotosVer[p.id] = p.foto; await fotoSetLocal(p.id, url).catch(() => {}); hechas++; }
-      else if(fotosCache[p.id]){ fotosVer[p.id] = p.foto; hechas = hechas || 0; }   // la nube no la tiene: se queda la de aquí (no se vuelve a preguntar)
+      else if(fotosCache[p.id] && url){ fotosVer[p.id] = p.foto; }   // la nube tiene otra cosa: se queda la de aquí (no se vuelve a preguntar)
+      else {
+        const k = p.id + ':' + p.foto, i = fotosIntentos[k] = (fotosIntentos[k] || 0) + 1;
+        if(i <= 7) esperar = esperar ? Math.min(esperar, 1000 * Math.pow(2, i)) : 1000 * Math.pow(2, i);
+        else if(fotosCache[p.id]) fotosVer[p.id] = p.foto;          // nunca llegó: se queda la de aquí
+      }
     }
     if(hechas){ fotosVerGuardar(); try{ renderProductos(); }catch(e){} try{ window.ventoFacil && window.ventoFacil.activo() && window.ventoFacil.pintar(); }catch(e){} }
   }finally{ fotosBajando = false; }
+  if(esperar && !fotosReintento) fotosReintento = setTimeout(() => { fotosReintento = null; fotosDeLaNube(); }, esperar);
   return hechas;
 }
 window.fotosDeLaNube = fotosDeLaNube;

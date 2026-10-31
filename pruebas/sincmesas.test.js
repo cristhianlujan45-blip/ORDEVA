@@ -46,7 +46,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){
       await enrutar(ctx, sb, { enVivo: !process.env.VENTO_SIN_VIVO });   // con el canal en vivo, como en Supabase de verdad (VENTO_SIN_VIVO=1: sin canal)
       await ctx.addInitScript(() => { try{ localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento-hola', '0'); }catch(e){} });
       const p = await ctx.newPage();
-      p.on('pageerror', e => errs.push(nombre + ': ' + e.message));
+      p.on('pageerror', e => errs.push(nombre + ': ' + e.message + ' @ ' + String(e.stack || '').split('\n').slice(1, 3).join(' ').trim()));
       await p.goto(BASE + '/index.html');
       await p.waitForSelector('#authOverlay:not([hidden])', { timeout: 15000 });
       await p.waitForFunction(() => window.ventoNube && window.ventoNube.crearCuenta, null, { timeout: 15000 });
@@ -179,7 +179,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){
     await ME.p.click('#nubeCrear'); await ME.p.waitForSelector('#nubeCodigo', { state: 'visible' });
     await ME.p.fill('#nubeCodigo', cod); await ME.p.click('#nubeUnirme');
     chk('6. El mesero entra a la cuenta', await esperar(ME.p, () => { const x = window.ventoNube.negocio(); return !!x && x.rol === 'mesero' && document.getElementById('authOverlay').hidden; }, null, 20000));
-    await esperar(ME.p, () => (data.products || []).some(p => p.id === 'p-ag'), null, 15000);
+    await esperar(ME.p, () => !!data && (data.products || []).some(p => p.id === 'p-ag'), null, 15000);   // (data es null hasta que llegan los datos)
     await ME.p.evaluate(() => { document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')); const p = data.products.find(x => x.id === 'p-ag'); p.price = 100; saveData(); });
     chk('6. El precio que el mesero cambió sin permiso vuelve solo a $3.500 en SU celular', await esperar(ME.p, () => (data.products.find(x => x.id === 'p-ag') || {}).price === 3500, null, 20000), await ME.p.evaluate(() => (data.products.find(x => x.id === 'p-ag') || {}).price));
     await pausa(1500);
