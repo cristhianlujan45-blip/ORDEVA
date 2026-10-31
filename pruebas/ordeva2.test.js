@@ -97,14 +97,14 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     await p.click('#o2LadoOn + .switch-slider'); await p.waitForTimeout(250);
     v = await p.evaluate(() => ({ lado: document.body.classList.contains('o2-lado'), pos: getComputedStyle(document.querySelector('.tabbar')).position, guardado: localStorage.getItem('vento_o2_lado') }));
     vis = await visibles(p);
-    chk('7. Apagada: vuelve la barra de siempre (sin lateral; con la Vista sencilla, 4 botones)', !v.lado && v.pos !== 'fixed' && v.guardado === '0' && vis.length === 4, { v, vis });
+    chk('7. Apagada: vuelve la barra de siempre (sin lateral; con la Vista sencilla, 5 botones con «Caja POS»)', !v.lado && v.pos !== 'fixed' && v.guardado === '0' && vis.length === 5 && vis.includes('posNav'), { v, vis });
     await ctx.close();
 
     // ===== 1. Celular =====
     ({ ctx, p } = await abrir(390, 844));
     v = await p.evaluate(() => ({ lado: document.body.classList.contains('o2-lado'), pos: getComputedStyle(document.querySelector('.tabbar')).position, abajo: Math.round(document.querySelector('.tabbar').getBoundingClientRect().bottom), marca: getComputedStyle(document.getElementById('o2Marca')).display }));
     vis = await visibles(p);
-    chk('1. Celular: la barra de abajo de siempre (4 con la Vista sencilla), sin la lateral', v.pos === 'fixed' && v.abajo === 844 && v.marca === 'none' && vis.length === 4 && vis.includes('navMoreBtn'), { v, vis });
+    chk('1. Celular: la barra de abajo de siempre (5 con la Vista sencilla, con «Caja POS»), sin la lateral', v.pos === 'fixed' && v.abajo === 844 && v.marca === 'none' && vis.length === 5 && vis.includes('posNav') && vis.includes('navMoreBtn'), { v, vis });
     await p.click('.nav-more'); await p.waitForTimeout(250); await p.click('.more-tile[data-go="inicio"]'); await p.waitForTimeout(300);
     v = await p.evaluate(() => { const m = document.querySelector('.o2-movil'); return { vis: !!m && getComputedStyle(m).display !== 'none', tiles: [...document.querySelectorAll('.o2-tile span')].map(x => x.textContent), header: getComputedStyle(document.querySelector('.wrap > header')).backgroundColor }; });
     chk('9. Celular: Inicio con la tarjeta oscura del negocio y accesos (Cuentas, Productos, Caja, Reportes, Ajustes…)', v.vis && v.tiles.length >= 4 && v.tiles.includes('Productos') && v.tiles.includes('Ajustes') && /rgb\(11, 12, 14\)/.test(v.header), v);

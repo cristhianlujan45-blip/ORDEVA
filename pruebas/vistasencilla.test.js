@@ -1,6 +1,6 @@
 // 🧭 Vista sencilla (Ajustes → Apariencia, ORDEVA 1.63.0): el diseño de siempre sigue igual al apagarla.
 //  1. Desde 1.65.6 viene PRENDIDA de fábrica; se apaga en Ajustes y la barra de abajo y los menús quedan como siempre.
-//  2. Se prende en Ajustes → Apariencia: abajo solo Cuentas · Productos · Caja · Más; «Más» por grupos con su nombre.
+//  2. Se prende en Ajustes → Apariencia: abajo Cuentas · Caja POS · Productos · Cuadre · Más; «Más» por grupos con su nombre.
 //  3. 💵 Caja: lo vendido desde el último cierre (efectivo, transferencias, fiado) y lo que falta en las cuentas abiertas,
 //     con las mismas cifras del cierre de caja; «Cerrar caja del día» pregunta como siempre.
 //  4. La cuenta: «⋯ Opciones» con cada acción con nombre (hace lo mismo que el icono de antes) y abajo «Falta por pagar»
@@ -39,12 +39,12 @@ const FOTOS = process.env.VENTO_FOTOS || '';
       // 1. Apagada de fábrica
       let v = await p.evaluate(() => ({ on: window.ventoVistaSencilla.on(), clase: document.body.classList.contains('vs-on') }));
       chk(nom + ' · 1. De fábrica la vista sencilla está PRENDIDA', v.on && v.clase, v);
-      chk(nom + ' · 1. Prendida de fábrica: abajo solo 4, con «Caja»', (await visibles()).length === 4 && (await visibles()).includes('Caja'), await visibles());
+      chk(nom + ' · 1. Prendida de fábrica: abajo Cuentas · Caja POS · Productos · Cuadre · Más (1.72.2: la Caja POS con su entrada)', (await visibles()).join('|') === 'Cuentas|Caja POS|Productos|Cuadre|Más', await visibles());
       await p.evaluate(() => window.ventoVistaSencilla.poner(false)); await p.waitForTimeout(250);
       v = await p.evaluate(() => ({ on: window.ventoVistaSencilla.on(), clase: document.body.classList.contains('vs-on'), guardada: localStorage.getItem('vento_vista_sencilla') }));
       chk(nom + ' · 1. Se puede apagar (y queda guardado que la apagó)', !v.on && !v.clase && v.guardada === '0', v);
       const antes = await visibles();
-      chk(nom + ' · 1. Apagada: la barra de siempre (sin «Caja»)', !antes.includes('Caja') && antes.length >= 3, antes);
+      chk(nom + ' · 1. Apagada: la barra de siempre (sin «Cuadre»)', !antes.includes('Cuadre') && antes.length >= 3, antes);
 
       // 2. Se prende en Ajustes → Apariencia
       await p.evaluate(() => { const b = document.querySelector('nav button[data-view="ajustes"]'); b.click(); document.querySelector('.ajustes-cat[data-cat="apariencia"]').click(); });
@@ -55,7 +55,7 @@ const FOTOS = process.env.VENTO_FOTOS || '';
       await p.waitForTimeout(250);
       await p.evaluate(() => document.querySelector('nav button[data-view="mesas"]').click()); await p.waitForTimeout(300);
       const despues = await visibles();
-      chk(nom + ' · 2. Prendida: abajo solo 4 (Mesas/Cuentas · Productos · Caja · Más)', despues.length === 4 && despues[1] === 'Productos' && despues[2] === 'Caja' && despues[3] === 'Más', despues);
+      chk(nom + ' · 2. Prendida: abajo Cuentas · Caja POS · Productos · Cuadre · Más', despues.join('|') === 'Cuentas|Caja POS|Productos|Cuadre|Más', despues);
       v = await p.evaluate(() => ({ guardada: localStorage.getItem('vento_vista_sencilla'), general: getComputedStyle(document.getElementById('generalBillBtn')).display, masop: !!document.getElementById('vsMasOp') && document.getElementById('vsMasOp').offsetParent !== null, cierre: getComputedStyle(document.getElementById('closeDayTop')).display }));
       chk(nom + ' · 2. Cuentas: «Cuenta general» y lo poco usado quedan en «⋯ Más opciones»; «Cerrar caja» pasa a la Caja', v.guardada === '1' && v.general === 'none' && v.masop && v.cierre === 'none', v);
       await p.click('#vsMasOp'); await p.waitForTimeout(150);
