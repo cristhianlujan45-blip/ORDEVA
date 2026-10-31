@@ -22,7 +22,9 @@
   var K_CFG = 'vento_nube_cfg', K_ST = 'vento_nube_estado';
   // 1.50.0: sube a los 0,3 s del último cambio (antes 1 s) y revisa cada 3 s (antes 5 s): «cuando agrego cervezas en una
   // mesa, que se sincronice todo muy rápido».
-  var POLL_MS = 3000, SUBIR_MS = 300;
+  // 1.69.1: «que no se demore ni un segundo». Sube a los 25 ms del toque (antes 300 ms; los toques seguidos igual se juntan
+  // porque mientras sube, lo nuevo se sube al terminar). Si el canal en vivo no está conectado, revisa cada 1 s (antes 3 s).
+  var POLL_MS = 3000, SUBIR_MS = 25, POLL_SIN_CANAL_MS = 1000, canalVivo = false;
   // 1.65.10: ningún paso de la sincronización puede quedarse esperando para siempre. Si una llamada al servidor no
   // contestaba (cambio de wifi a datos, celular dormido) o la copia local (IndexedDB) no respondía (Android con poca
   // memoria), «subiendo» quedaba prendido y ese equipo dejaba de subir y de revisar la nube hasta cerrar la app: lo de
@@ -308,6 +310,10 @@
   function datosApp(){ try{ return typeof window.ventoDatosActuales === 'function' ? window.ventoDatosActuales() : null; }catch(e){ return null; } }
   function aplicar(obj, respaldar){ return typeof window.ventoAplicarDatosNube === 'function' ? Promise.resolve(window.ventoAplicarDatosNube(obj, respaldar)) : Promise.resolve(); }
   var subiendo = false, bajando = false, otraVez = false, tSubir = null, tPoll = null, ultimoError = '';
+  // 1.69.1: subir y bajar nunca al mismo tiempo (los dos ponen datos en la app). Si toca subir mientras se baja, se sube
+  // apenas termine la bajada (antes, con la espera de 300 ms, casi nunca se cruzaban; ahora se sube a los 25 ms).
+  var subirTrasBajar = false;
+  function finBajar(){ bajando = false; if(subirTrasBajar){ subirTrasBajar = false; reintentar(0); } }
   // 1.68.1: cambiosN cuenta los guardados de la app: «sucio» solo se apaga si no hubo cambios mientras se subía (antes un
   // toque durante la subida quedaba marcado como subido). enNube = el texto de lo que la nube ya tiene de este equipo:
   // si no cambió nada, no se sube otra vez (evita subidas de eco que hacían esperar a los demás).
@@ -435,6 +441,7 @@
   function subir(){
     if(!st.negocio || !enSede()) return Promise.resolve();
     if(subiendo){ otraVez = true; return Promise.resolve(); }
+    if(bajando){ subirTrasBajar = true; return Promise.resolve(); }
     if(!datosApp()) return Promise.resolve();
     subiendo = true; subiendoDesde = Date.now(); pintarPunto();
     return subirFoto(st.version || 0)
@@ -490,7 +497,8 @@
         traza('bajar', n.datos, { vr: n.version, local: window.__nubeTrazaQ ? window.__nubeTrazaQ(datosApp()) : null });
         st.version = n.version; st.sucio = false; st.ultimo = Date.now(); ultimoError = ''; guardarSt();
         var n0 = cambiosN;
-        return (reemplazar ? aplicar(n.datos, respaldarLocal === true) : aplicarProtegido(n.datos, respaldarLocal === true)).then(function(){
+        traza('aplicando', null, n.version);
+        return (reemplazar ? aplicar(n.datos, respaldarLocal === true) : aplicarProtegido(n.datos, respaldarLocal === true)).then(function(){ traza('aplicado', null, n.version);
           // Solo se da por «igual a la nube» si nada se tocó mientras se ponían los datos (si no, eso hay que subirlo).
           var d = datosApp(); enNubeTxt = (st.sucio || cambiosN !== n0) ? '' : (d ? JSON.stringify(d) : ''); enNubeDe = negId();
           return basePut(n.datos, n.version);
@@ -528,7 +536,7 @@
           if(st.sucio) return subir();
           if(bajando) return;
           bajando = true; bajandoDesde = Date.now();
-          return bajar().then(function(){ avisoBajada(); }).then(function(){ bajando = false; }, function(e){ bajando = false; throw e; })
+          return bajar().then(function(){ avisoBajada(); }).then(function(){ finBajar(); }, function(e){ finBajar(); throw e; })
             .then(function(){ if(remotoPendiente){ remotoPendiente = false; revisarNube(); } });
         }
       }).catch(function(e){ ultimoError = msgError(e); pintarEstado(); });
@@ -548,12 +556,12 @@
       canalDe = id;
       canal = c.channel('vento-datos-' + id, { config: { broadcast: { self: false } } })
         // Otro equipo guardó: si aquí no hay nada por subir, se baja de una (sin preguntar antes la versión: un viaje menos).
-        .on('broadcast', { event: 'version' }, function(m){ var v = m && m.payload && m.payload.v; if(v && v <= (st.version || 0)) return;
-          if(v && !st.sucio && !subiendo && !bajando && enSede()){ bajando = true; bajandoDesde = Date.now(); bajar().then(function(){ avisoBajada(); }, function(){ revisarNube(true); }).then(function(){ bajando = false; }); return; }
+        .on('broadcast', { event: 'version' }, function(m){ var v = m && m.payload && m.payload.v; traza('aviso', null, v); if(v && v <= (st.version || 0)) return;
+          if(v && !st.sucio && !subiendo && !bajando && enSede()){ bajando = true; bajandoDesde = Date.now(); bajar().then(function(){ avisoBajada(); }, function(){ revisarNube(true); }).then(function(){ finBajar(); }); return; }
           revisarNube(true); })
         .on('broadcast', { event: 'archivo' }, function(m){ var k = m && m.payload && m.payload.k; if(k) archivoCambiado(k); })
         // 1.68.1: si el canal en vivo se cae (cambio de wifi a datos), se vuelve a abrir en la siguiente revisión.
-        .subscribe(function(estado){ if(estado === 'CHANNEL_ERROR' || estado === 'TIMED_OUT' || estado === 'CLOSED'){ if(canalDe === id) canalDe = ''; } });
+        .subscribe(function(estado){ if(estado === 'SUBSCRIBED') canalVivo = true; if(estado === 'CHANNEL_ERROR' || estado === 'TIMED_OUT' || estado === 'CLOSED'){ canalVivo = false; if(canalDe === id) canalDe = ''; } });
     }).catch(function(){});
   }
   function avisarOtros(v){ try{ if(canal) canal.send({ type: 'broadcast', event: 'version', payload: { v: v } }); }catch(e){} }
@@ -563,7 +571,8 @@
   function arrancar(){
     clearInterval(tPoll);
     if(!st.negocio || !configurada()) return;
-    tPoll = setInterval(function(){ revisarNube(); archivosPendientes(); if(!canalDe) abrirCanal(); }, POLL_MS);
+    var vuelta = 0;
+    tPoll = setInterval(function(){ vuelta++; if(canalVivo && vuelta % Math.round(POLL_MS / POLL_SIN_CANAL_MS)) return; revisarNube(); archivosPendientes(); if(!canalDe) abrirCanal(); }, POLL_SIN_CANAL_MS);
     if(!oyendo){             // una sola vez (antes se sumaban escuchas en cada arranque)
       oyendo = true;
       document.addEventListener('visibilitychange', function(){ if(!document.hidden) revisarNube(); });

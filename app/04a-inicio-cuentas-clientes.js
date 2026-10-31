@@ -227,9 +227,10 @@ function defaultData(){
 
 let currentCategoryFilter = null; // null = Todas
 
-async function loadData(){
+async function loadData(txtNube){
   try{
-    const res = await storageGet(STORAGE_KEY);
+    // 1.69.1: con los datos que llegan de otro equipo ya en texto, no se vuelven a leer del almacenamiento (más rápido).
+    const res = typeof txtNube === 'string' ? { value: txtNube } : await storageGet(STORAGE_KEY);
     data = res ? JSON.parse(res.value) : defaultData();
   }catch(e){
     data = defaultData();
@@ -309,15 +310,18 @@ window.ventoAplicarDatosNube = async (obj, respaldarLocal) => {
   // 1.59.2: lo último que se tocó (se guarda un instante después) se guarda YA, antes de poner los datos de la nube.
   // Si no, ese guardado pendiente caía después y pisaba lo que acababa de llegar (celular nuevo con los datos de muestra).
   try{ await guardadoAhora(); }catch(e){}
+  let escrito = null;
   window.__nubeAplicando = true;
   try{
     if(respaldarLocal && typeof data !== 'undefined' && data){
       // Antes de cambiar este celular a los datos de la nube, se deja un punto de restauración local.
       await autoBackupAgregar({ day: new Date().toISOString().slice(0, 10) + ' (antes de la nube)', at: Date.now(), data: JSON.stringify(data) }, 8, false);
     }
-    await storageSet(STORAGE_KEY, JSON.stringify(obj));
-    if(typeof authUser !== 'undefined' && authUser) await loadData();
+    const txt = JSON.stringify(obj);
+    escrito = storageSet(STORAGE_KEY, txt);                       // se guarda mientras se pinta (no se espera para mostrarlo)
+    if(typeof authUser !== 'undefined' && authUser) await loadData(txt);
   }finally{ window.__nubeAplicando = false; }
+  try{ await escrito; }catch(e){}
   // 1.68.1: lo que se tocó MIENTRAS se ponían los datos del otro equipo se guardó, pero no se avisaba a la nube (y se
   // quedaba solo en este celular hasta el siguiente cambio). Ahora se sube enseguida.
   // (al instante, no después: así la nube sabe que hay algo por subir antes de dar estos datos por «al día»)
@@ -349,6 +353,11 @@ function saveData(){
   if(guardadoPend) guardadoAhora();                       // otra sede u otros datos: lo pendiente se guarda ya, con su llave
   let listo; const p = new Promise(r => { listo = r; });
   const g = guardadoPend = { key, obj, p, listo };
+  // 1.69.1: se avisa a la nube YA (sube en ~25 ms lo que hay en memoria), sin esperar a que termine de guardarse aquí.
+  if(key === STORAGE_KEY){
+    if(window.__nubeAplicando) window.__nubeCambioEnAplicar = true;   // se avisa apenas terminen de ponerse los datos del otro equipo
+    else { try{ window.ventoNube && window.ventoNube.cambio(); }catch(e){} }
+  }
   const ir = () => { if(guardadoPend === g) guardadoAhora(); };
   try{ requestAnimationFrame(() => setTimeout(ir, 0)); }catch(e){}
   g.t = setTimeout(ir, 120);                              // sin cuadros (app en el fondo): igual se guarda enseguida
@@ -373,7 +382,7 @@ async function guardarYa(key, obj){
     const json = JSON.stringify(obj);
     const result = await storageSet(key, json);
     if(!result) showToast('No se pudo guardar. Intenta de nuevo.');
-    else { autoBackupTick(json); if(!window.__nubeAplicando){ try{ window.ventoNube && window.ventoNube.cambio(); }catch(e){} } else window.__nubeCambioEnAplicar = true; }
+    else { autoBackupTick(json); if(window.__nubeAplicando) window.__nubeCambioEnAplicar = true; }   // el aviso a la nube ya salió en saveData
   }catch(e){
     const cod = window.mesoraLogError ? window.mesoraLogError('guardar', 'No se pudo guardar: ' + (e && (e.name + ' ' + e.message) || e), 'saveData') : '';
     const lleno = e && (e.name === 'QuotaExceededError' || /quota/i.test(e.message || ''));
@@ -579,7 +588,9 @@ function sinSonidoPos(fn){ return window.ventoSonidos ? window.ventoSonidos.call
 
 function recordItemHistory(item, qty){
   if(!item.history) item.history = [];
-  item.history.push({ qty, at: Date.now() });
+  // 1.69.1: «k» hace único cada toque. Si dos celulares tocaban «+» en el mismo milisegundo, sus anotaciones eran idénticas
+  // y al juntar los datos parecían una sola: se contaba un toque en vez de dos.
+  item.history.push({ qty, at: Date.now(), k: Math.random().toString(36).slice(2, 8) });
   try{ invOnSale(item, qty); }catch(e){}
   if(qty) sonidoPos(qty > 0 ? 'add' : 'remove');   // todo +/− de una cuenta pasa por aquí (toques, favoritos, escáner, voz)
   if(item.history.length > 30) item.history = item.history.slice(-30);

@@ -7,6 +7,7 @@
 //  4. Cuánto tarda un «+» en verse en el otro celular.
 //  5. Indicador ✓ / ⏳ / ⚠️ arriba; sin internet el toque queda y se envía solo al volver.
 //  6. Un mesero que cambia un precio sin permiso: el servidor no lo deja y SU celular vuelve a mostrar el precio real.
+//  8. Cuánto tarda un «+» en verse en el otro celular (meta: menos de 1 segundo).
 //  7. Solo viaja lo que cambió (un «+» no sube ni baja el negocio entero).
 'use strict';
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
@@ -42,7 +43,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){
     async function equipo(nombre){
       const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
       await ctx.route('**/*', rt => { const u = new URL(rt.request().url()); return (u.hostname === 'localhost' || u.hostname === '127.0.0.1') ? rt.continue() : rt.abort(); });
-      await enrutar(ctx, sb);
+      await enrutar(ctx, sb, { enVivo: !process.env.VENTO_SIN_VIVO });   // con el canal en vivo, como en Supabase de verdad (VENTO_SIN_VIVO=1: sin canal)
       await ctx.addInitScript(() => { try{ localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento-hola', '0'); }catch(e){} });
       const p = await ctx.newPage();
       p.on('pageerror', e => errs.push(nombre + ': ' + e.message));
@@ -96,8 +97,11 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){
     chk('1. … y el celular 1 también llega a 5', await igualesEn(5), [await qty(CEL.p), await qty(PC.p)]);
 
     // ===== 2. Los dos tocando «+» a la vez =====
+    await trazar(CEL.p); await trazar(PC.p);
     for(let i = 0; i < 8; i++){ await Promise.all([mas(CEL.p), mas(PC.p)]); await pausa(120); }
-    chk('2. 8 toques en cada celular al mismo tiempo → los dos quedan en 21 (5 + 16), sin perder ni duplicar', await igualesEn(21, 30000), [await qty(CEL.p), await qty(PC.p)]);
+    const ok2 = await igualesEn(21, 30000);
+    chk('2. 8 toques en cada celular al mismo tiempo → los dos quedan en 21 (5 + 16), sin perder ni duplicar', ok2, [await qty(CEL.p), await qty(PC.p)]);
+    if(!ok2){ await volcar(CEL.p, 'p2cel1'); await volcar(PC.p, 'p2cel2'); }
     chk('2. Un solo renglón de Águila en la mesa (no repetidos)', await PC.p.evaluate(() => data.tables[1].items.filter(i => i.productId === 'p-ag').length) === 1);
 
     // ===== 3. Negocio grande: toques mientras llegan datos del otro =====
@@ -122,17 +126,45 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){
 
     chk('3. La cuenta abierta en cada celular muestra ×41', await esperar(CEL.p, () => /41/.test((document.querySelector('#itemsContainer .li-qty-val') || {}).textContent || ''), null, 8000) &&
       await esperar(PC.p, () => /41/.test((document.querySelector('#itemsContainer .li-qty-val') || {}).textContent || ''), null, 8000), [await enPantalla(CEL.p), await enPantalla(PC.p)]);
+    // ===== 8. Cuánto tarda (medido dentro de los dos celulares, con el mismo reloj) =====
+    await abrirMesa(CEL.p); await abrirMesa(PC.p); await pausa(1500);
+    await PC.p.evaluate(() => { window.__vistos = []; let ult = null; const q = () => ((data.tables[1] || {}).items || []).filter(i => i.productId === 'p-ag').reduce((s, i) => s + i.qty, 0);
+      ult = q(); clearInterval(window.__mira); window.__mira = setInterval(() => { const x = q(); if(x !== ult){ ult = x; window.__vistos.push(Date.now()); } }, 5); });
+    const tiempos = [];
+    for(let i = 0; i < 6; i++){
+      const n0 = await PC.p.evaluate(() => window.__vistos.length);
+      const t0 = await CEL.p.evaluate(() => { const t = Date.now(); document.querySelector('#itemsContainer .li-qty-plus').click(); return t; });
+      for(let k = 0; k < 60; k++){ const n = await PC.p.evaluate(() => window.__vistos.length); if(n > n0) break; await pausa(50); }
+      const t1 = await PC.p.evaluate(n0 => window.__vistos[n0], n0);
+      if(t1) tiempos.push(t1 - t0);
+      await pausa(1200);
+    }
+    if(process.env.VENTO_TRAZA){
+      await trazar(PC.p); await trazar(CEL.p);
+      const t0 = await CEL.p.evaluate(() => { const t = Date.now(); document.querySelector('#itemsContainer .li-qty-plus').click(); return t; });
+      await pausa(3000);
+      for(const [n, P] of [['cel1', CEL.p], ['cel2', PC.p]]){ const tr = await P.evaluate(() => window.__nubeTraza || []); console.log('   ' + n + ': ' + tr.map(x => x.ev + '@' + (x.t - t0)).join('  ')); }
+      await PC.p.evaluate(() => { window.__nubeTraza = null; }); await CEL.p.evaluate(() => { window.__nubeTraza = null; });
+    }
+    tiempos.sort((a, b) => a - b);
+    const mediana = tiempos[Math.floor(tiempos.length / 2)];
+    console.log('   ⏱️ tiempos de un «+» al otro celular (ms): ' + tiempos.join(', '));
+    chk('8. Un «+» se ve en el otro celular en menos de 1 segundo (mediana ' + mediana + ' ms)', tiempos.length === 6 && mediana < 1000, tiempos);
+    await PC.p.evaluate(() => clearInterval(window.__mira));
+    await igualesEn(await qty(CEL.p), 20000);
+
     // ===== 5. Indicador de sincronización =====
     let ind = await CEL.p.evaluate(() => { const b = document.getElementById('nubePunto'); return b ? { vis: !b.hidden, k: b.dataset.k, t: b.textContent } : null; });
     chk('5. Arriba se ve el indicador ✓ «al día»', ind && ind.vis && ind.k === 'ok' && ind.t === '✓', ind);
+    const antes5 = await qty(CEL.p);
     await CEL.ctx.setOffline(true);
     await CEL.p.evaluate(() => { window.dispatchEvent(new Event('offline')); });
     await mas(CEL.p); await pausa(600);
     ind = await CEL.p.evaluate(() => { const b = document.getElementById('nubePunto'); return { k: b.dataset.k, t: b.textContent }; });
-    chk('5. Sin internet: ⚠️ (el toque queda guardado en el celular)', ind.k === 'mal' && (await qty(CEL.p)) === 42, ind);
+    chk('5. Sin internet: ⚠️ (el toque queda guardado en el celular)', ind.k === 'mal' && (await qty(CEL.p)) === antes5 + 1, ind);
     await CEL.ctx.setOffline(false);
     await CEL.p.evaluate(() => { window.dispatchEvent(new Event('online')); });
-    chk('5. Al volver el internet se envía solo: los dos en 42 y ✓ otra vez', await igualesEn(42, 30000) && await esperar(CEL.p, () => (document.getElementById('nubePunto') || {}).dataset.k === 'ok', null, 15000), [await qty(CEL.p), await qty(PC.p)]);
+    chk('5. Al volver el internet se envía solo: los dos con el toque y ✓ otra vez', await igualesEn(antes5 + 1, 30000) && await esperar(CEL.p, () => (document.getElementById('nubePunto') || {}).dataset.k === 'ok', null, 15000), [await qty(CEL.p), await qty(PC.p)]);
 
     // ===== 6. Mesero que cambia un precio sin permiso =====
     await CEL.p.evaluate(() => window.ventoNube.abrir({}));
@@ -153,8 +185,8 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){
     await pausa(1500);
     chk('6. … y en el celular del dueño sigue en $3.500', (await CEL.p.evaluate(() => data.products.find(x => x.id === 'p-ag').price)) === 3500);
     await ME.p.evaluate(() => { document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')); openTableModal(1); });
-    await pausa(400); await mas(ME.p);
-    chk('6. El «+» del mesero sí llega (43 en el celular del dueño)', await esperar(CEL.p, () => data.tables[1].items.filter(i => i.productId === 'p-ag').reduce((s, i) => s + i.qty, 0) === 43, null, 20000), await qty(CEL.p));
+    await pausa(400); await CEL.p.evaluate(n => { window.__m6 = n + 1; }, await qty(CEL.p)); await mas(ME.p);
+    chk('6. El «+» del mesero sí llega (uno más en el celular del dueño)', await esperar(CEL.p, () => data.tables[1].items.filter(i => i.productId === 'p-ag').reduce((s, i) => s + i.qty, 0) === window.__m6, null, 20000), await qty(CEL.p));
 
     const est = await Promise.all([CEL.p, PC.p].map(p => p.evaluate(() => window.ventoNube.estado ? window.ventoNube.estado() : null)));
     chk('3. Los dos quedan «al día» (nada por subir)', await esperar(CEL.p, () => !/por subir/.test(document.getElementById('nubeEstadoAj') ? document.getElementById('nubeEstadoAj').textContent : '') , null, 5000), est);

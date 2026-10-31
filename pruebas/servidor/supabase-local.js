@@ -614,7 +614,7 @@ async function iniciar(opts = {}) {
 
 // Para pruebas de NAVEGADOR (Playwright): manda https://<algo>.supabase.co/* a este servidor y sirve supabase-js
 // desde pruebas/node_modules para la URL del CDN. Uso:  await enrutar(ctx, sb)
-async function enrutar(ctx, sb) {
+async function enrutar(ctx, sb, opts) {
   const sdk = fs.readFileSync(require.resolve('@supabase/supabase-js/dist/umd/supabase.js'));
   await ctx.route(/^https:\/\/cdn\.jsdelivr\.net\/npm\/@supabase\/supabase-js@2(?:\.\d+\.\d+)?\//, (r) => r.fulfill({ status: 200, contentType: 'application/javascript; charset=utf-8', body: sdk }));
   // La clave pública de nube/config.js (la del proyecto real) se cambia por la de este servidor: la app no se toca.
@@ -630,7 +630,51 @@ async function enrutar(ctx, sb) {
     const out = {}; resp.headers.forEach((v, k) => { if (!/^(content-encoding|content-length|transfer-encoding|connection)$/i.test(k)) out[k] = v; });
     await r.fulfill({ status: resp.status, headers: out, body: Buffer.from(await resp.arrayBuffer()) });
   });
-  if (ctx.routeWebSocket) await ctx.routeWebSocket(/supabase\.co\/realtime/, (ws) => ws.close());
+  if (!ctx.routeWebSocket) return;
+  // Canal en vivo (Realtime «broadcast») — solo si la prueba lo pide (opts.enVivo). Imita lo que usa la app: unirse a un
+  // canal, latido y reenviar los mensajes «broadcast» a los demás equipos del mismo canal (sin eco al que lo mandó). Sin
+  // opts.enVivo se cierra como antes (las pruebas viejas siguen probando el camino sin canal en vivo).
+  if (!(opts && opts.enVivo)) { await ctx.routeWebSocket(/supabase\.co\/realtime/, (ws) => ws.close()); return; }
+  const hub = sb._enVivo || (sb._enVivo = new Map());       // tema → Set de { ws, join, v2 }
+  await ctx.routeWebSocket(/supabase\.co\/realtime/, (ws) => {
+    const mios = new Set();
+    const enviar = (c, msg) => { try { c.ws.send(c.v2 ? JSON.stringify([msg.join_ref ?? null, msg.ref ?? null, msg.topic, msg.event, msg.payload]) : JSON.stringify(msg)); } catch (e) {} };
+    ws.onMessage((raw) => {
+      if (process.env.VENTO_RT_LOG) console.log('RT<', typeof raw === 'string' ? raw.slice(0, 220) : '[binario ' + raw.length + ']');
+      // supabase-js (Realtime v2) manda los «broadcast» en binario: [3, largo joinRef, largo ref, largo tema, largo evento,
+      // largo metadatos, codificación] + joinRef + ref + tema + evento + metadatos + datos. Se reenvía como lo hace Supabase:
+      // [4, largo tema, largo evento, largo metadatos, codificación] + tema + evento + metadatos + datos.
+      if (typeof raw !== 'string') {
+        const b = Buffer.from(raw); if (b[0] !== 3) return;
+        const lj = b[1], lr = b[2], lt = b[3], le = b[4], lm = b[5], cod = b[6]; let o = 7;
+        o += lj + lr; const tema = b.slice(o, o + lt).toString(); o += lt;
+        const ev = b.slice(o, o + le); o += le; const meta = b.slice(o, o + lm); o += lm; const datos = b.slice(o);
+        const salida = Buffer.concat([Buffer.from([4, lt, le, lm, cod]), Buffer.from(tema), ev, meta, datos]);
+        (hub.get(tema) || new Set()).forEach((c) => { if (c.ws === ws && !c.self) return; try { c.ws.send(c.v2 ? salida : JSON.stringify({ topic: tema, event: 'broadcast', payload: { type: 'broadcast', event: ev.toString(), payload: cod === 1 ? JSON.parse(datos.toString() || 'null') : null }, ref: null })); } catch (e) {} });
+        return;
+      }
+      let m; try { m = JSON.parse(raw); } catch (e) { return; }
+      const v2 = Array.isArray(m);
+      if (v2) m = { join_ref: m[0], ref: m[1], topic: m[2], event: m[3], payload: m[4] };
+      const ok = (resp) => enviar({ ws, v2 }, { join_ref: m.join_ref, ref: m.ref, topic: m.topic, event: 'phx_reply', payload: { status: 'ok', response: resp || {} } });
+      if (m.event === 'heartbeat') return ok();
+      if (m.event === 'phx_join') {
+        const c = { ws, join: m.join_ref || m.ref, v2, self: !!(m.payload && m.payload.config && m.payload.config.broadcast && m.payload.config.broadcast.self) };
+        if (!hub.has(m.topic)) hub.set(m.topic, new Set());
+        hub.get(m.topic).add(c); mios.add([m.topic, c]);
+        return ok({ postgres_changes: [] });
+      }
+      if (m.event === 'phx_leave') { const L = hub.get(m.topic); if (L) [...L].forEach((c) => { if (c.ws === ws) L.delete(c); }); return ok(); }
+      if (m.event === 'broadcast') {
+        const L = hub.get(m.topic) || new Set();
+        L.forEach((c) => { if (c.ws === ws && !c.self) return; enviar(c, { join_ref: c.join, ref: null, topic: m.topic, event: 'broadcast', payload: m.payload }); });
+        if (m.ref) ok();
+        return;
+      }
+      if (m.ref) ok();
+    });
+    ws.onClose(() => { mios.forEach(([t, c]) => { const L = hub.get(t); if (L) L.delete(c); }); });
+  });
 }
 
 module.exports = { iniciar, enrutar, firmarJwt, leerJwt };
