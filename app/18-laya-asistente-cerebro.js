@@ -299,11 +299,61 @@
   }
 
   // ---------- Entender la frase ----------
+  // ---------- 🧮 1.69.0: preguntas de plata con el motor financiero (las mismas cifras de Estadísticas y Contabilidad) ----------
+  // Solo dueño o administrador (el equipo no ve costos ni ganancias). Nunca inventa: si no hay datos, lo dice.
+  function finanzas(t){
+    const F = window.ventoFinanzas; if(!F) return null;
+    const pideMargen = /\b(margen\w*|rentab\w*|me deja (mas|menos)|deja mas|deja menos|gano mas|gano menos|mas rentable|menos rentable)\b/.test(t);
+    const pideGastoSube = /\bgastos?\b/.test(t) && /\b(subi\w*|aument\w*|crec\w*|se dispar\w*|mas que (el|la) (mes|semana)|cual(es)? gasto)\b/.test(t);
+    const pideGanancia = /\b(cuanto (gane|gano|ganamos|me quedo|me quedó|quedo|ha quedado|me dejo)|utilidad|resultado (del|de este|neto)|ganancia (del|de este|neta)|estado de resultados)\b/.test(t);
+    if(!pideMargen && !pideGastoSube && !pideGanancia) return null;
+    try{ if(window.ventoRoles && !window.ventoRoles.esJefe()) return { text: '🔒 Los costos, márgenes y ganancias solo los ve el dueño o el administrador.' }; }catch(e){}
+    const d = data, ahora = Date.now(), d0 = new Date(); d0.setHours(0, 0, 0, 0);
+    const r0 = rango(t) || (() => { const a = new Date(d0); a.setDate(1); return { desde: a.getTime(), hasta: ahora + 1, nom: 'en lo que va del mes' }; })();
+    if(r0.ultima) return null;
+    const R = { ini: r0.desde, fin: r0.hasta };
+    if(pideMargen){
+      const x = F.rentabilidad(d.history, d.products, d.categories, R);
+      const conM = l => l.filter(y => y.margen != null && y.ventas > 0);
+      const porProducto = /\bproducto/.test(t) && !/\bcategor/.test(t);
+      const L = conM(porProducto ? x.productos : x.categorias).sort((a, b) => a.margen - b.margen);
+      if(!L.length) return { text: 'No tengo ventas con costo ' + r0.nom + ' para calcular el margen. Ponle el costo a los productos (Productos → tocar el producto → Costo).' };
+      const pocos = /\b(menos|peor|bajo|baja|flaco)\b/.test(t), muchos = /\b(mas|mejor|alto|alta)\b/.test(t) && !pocos;
+      const orden = muchos ? L.slice().reverse() : L;
+      const linea = y => y.nombre + ': margen ' + Math.round(y.margen) + ' % · ganancia ' + plata(y.utilidad) + ' de ' + plata(y.ventas) + ' vendidos';
+      return { text: '🧮 ' + (porProducto ? 'Productos' : 'Categorías') + ' ' + (muchos ? 'que más te dejan' : pocos ? 'que menos te dejan' : 'por margen') + ' ' + r0.nom + ':\n' + bul(orden.slice(0, 8).map(linea)) +
+        (x.ventasSinCosto ? '\n(Hay ' + plata(x.ventasSinCosto) + ' vendidos sin costo: no entran en el margen.)' : '') };
+    }
+    const gastosEn = (ini, fin) => { const o = {}; (d.contab || []).forEach(g => { if(g.tipo !== 'gasto') return; const tt = new Date(g.fecha + 'T00:00').getTime(); if(tt >= ini && tt < fin) o[g.cat || 'otros'] = (o[g.cat || 'otros'] || 0) + (Number(g.monto) || 0); }); return o; };
+    const nomCat = c => { try{ return typeof ctCatNombre === 'function' ? ctCatNombre('gasto', c).replace(/^\S+\s/, '') : c; }catch(e){ return c; } };
+    if(pideGastoSube){
+      // Este período contra el anterior del mismo largo (este mes: el mismo tramo del mes pasado).
+      const ini = R.ini, fin = Math.min(R.fin, ahora + 1), largo = fin - ini;
+      let pIni = ini - largo, pFin = ini;
+      if(/mes/.test(r0.nom) && !/pasado/.test(r0.nom)){ const a = new Date(ini); a.setMonth(a.getMonth() - 1); pIni = a.getTime(); pFin = pIni + largo; }
+      const A = gastosEn(ini, fin), B = gastosEn(pIni, pFin);
+      const cats = Object.keys(Object.assign({}, A, B)).map(c => ({ c, a: A[c] || 0, b: B[c] || 0 })).filter(x => x.a > x.b).sort((x, y) => (y.a - y.b) - (x.a - x.b));
+      if(!Object.keys(A).length && !Object.keys(B).length) return { text: 'No hay gastos registrados en Contabilidad ' + r0.nom + ' ni en el período anterior.' };
+      if(!cats.length) return { text: '✅ Ningún gasto subió ' + r0.nom + ' frente al período anterior.' };
+      return { text: '📈 Gastos que subieron ' + r0.nom + ' (frente al período anterior):\n' + bul(cats.slice(0, 8).map(x => nomCat(x.c) + ': ' + plata(x.a) + ' (antes ' + plata(x.b) + (x.b ? ', +' + Math.round((x.a - x.b) / x.b * 100) + ' %' : ', es nuevo') + ')')) };
+    }
+    // ¿Cuánto gané?: vendido − costo de lo vendido − gastos operativos (las compras de mercancía no se restan dos veces).
+    let vendido = 0, costo = 0, sinCosto = 0;
+    (d.history || []).forEach(h => { const tt = new Date(h.date).getTime(); if(!(tt >= R.ini && tt < R.fin)) return; (h.items || []).forEach(it => { const q = Number(it.qty) || 0, v = q * (Number(it.price) || 0); if(/domicilio|propina/i.test(it.name || '')) return; vendido += v; if(it.cost != null && it.cost !== '') costo += q * (Number(it.cost) || 0); else sinCosto += v; }); });
+    const G = []; Object.entries(gastosEn(R.ini, R.fin)).forEach(([cat, monto]) => G.push({ tipo: 'gasto', cat, monto }));
+    const res = F.resultado(vendido, costo, G);
+    if(!vendido && !G.length) return { text: 'No hay ventas ni gastos ' + r0.nom + ' para calcular la ganancia.' };
+    return { text: '🧮 Resultado ' + r0.nom + ' (estimado):\n' + bul(['Vendido: ' + plata(vendido), 'Costo de lo vendido: ' + plata(costo), 'Utilidad bruta: ' + plata(res.utilidadBruta) + (res.margenBruto != null ? ' (margen ' + Math.round(res.margenBruto) + ' %)' : ''),
+      'Gastos operativos: ' + plata(res.gastosOperativos), (res.resultadoNeto >= 0 ? '✅ Te quedaron: ' : '⚠️ Pérdida: ') + plata(Math.abs(res.resultadoNeto))]) +
+      (sinCosto ? '\n(Hay ' + plata(sinCosto) + ' vendidos sin costo: la ganancia real es menor.)' : '') + (res.comprasInventario ? '\n(Las compras de mercancía, ' + plata(res.comprasInventario) + ', ya están en el costo de lo vendido.)' : '') };
+  }
   function responder(raw){
     if(!listo()) return null;
     let t = normUnidad(N(raw).replace(/^((oye|hola|ok|okey|ey|hey),? )?(laya|vento|bento|ordeva|hordeva|or deva)\b[ ,]*/, '').trim());
     if(!t) return { text: '¡Aquí estoy! Pregúntame por facturas, IVA, costos, proveedores, inventario, pedidos, ' + UP().toLowerCase() + ', ' + prepNombre().toLowerCase() + ' o música.' };
     const r = rango(t), pn = N(prepNombre());
+    // 1.69.0: las preguntas de plata van primero (antes «¿cuánto gané?» daba la ganancia sin restar los gastos, y al equipo).
+    const rf = finanzas(t); if(rf){ registrar('consulta', 'Finanzas: ' + t.slice(0, 60)); return rf; }
     const ru = responderUnidades(t, raw); if(ru) return ru;
     // Centro de control, auditoría, estimaciones, tiempos
     if(/\b(centro de control|como va todo|como vamos|que esta pasando|estado general|resumen general|panorama)\b/.test(t)) return { text: centro() };
@@ -512,5 +562,5 @@
   st.textContent = '.jm-card{border:1px solid var(--line);border-radius:14px;padding:12px;margin:10px 0;background:var(--surface)}.jm-card>b{display:block;margin-bottom:6px}.laya-inf{white-space:pre-wrap;font:inherit;font-size:14px;line-height:1.5;border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--surface);margin:10px 0}.jm-tabla div{display:grid;grid-template-columns:1.2fr 1.5fr 1fr .8fr;gap:6px;font-size:12.5px;padding:4px 0;border-top:1px solid var(--line)}.jm-act div{grid-template-columns:5.5em 1fr 4.5em;overflow-wrap:anywhere}.jm-act{max-height:50vh;overflow:auto}';
   document.head.appendChild(st);
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', crearPanel); else crearPanel();
-  window.Laya = { responder, ejecutar, registrar, centro, auditoria, prediccion, tiempos, buscarFuera, informe: (k, r) => INFORMES[k] ? INFORMES[k](r) : '', duplicados, cambiosPrecio, proveedores, resumenCompras, avisos: () => recientes.slice(), revisar };
+  window.Laya = { responder, finanzas, ejecutar, registrar, centro, auditoria, prediccion, tiempos, buscarFuera, informe: (k, r) => INFORMES[k] ? INFORMES[k](r) : '', duplicados, cambiosPrecio, proveedores, resumenCompras, avisos: () => recientes.slice(), revisar };
 })();

@@ -187,6 +187,9 @@
     }
     // Cuentas: «ORDEVA, súmame 3500 más 4000 y multiplícame 5000 por 2»
     if(window.ventoCalcular && !/\b(mesa|cuenta de|pedido)\b/.test(t)){ const c = window.ventoCalcular(raw.replace(/^\s*((oye|hola|ok|okey|ey|hey)[\s,]+)?(laya|vento|bento|ordeva|hordeva|or deva)\b[\s,]*/i, ''), true); if(c) return { text: c.texto }; }
+    // 1.69.0: las preguntas de plata (márgenes, gastos que subieron, ganancia con gastos) las responde el motor financiero
+    // de Laya (solo dueño o administrador).
+    { let rf = null; try{ rf = window.Laya && window.Laya.finanzas ? window.Laya.finanzas(t) : null; }catch(e){} if(rf){ reg('consulta', 'Finanzas'); return rf; } }
     const pe = periodo(t);
     if(/\b(ganancia|ganancias|utilidad|cuanto gane|cuanto he ganado|cuanto ganamos|me gane|rentabilidad|margen de hoy)\b/.test(t)){
       const v = ventas(pe.ini, pe.fin); reg('consulta', 'Ganancia ' + pe.txt);
