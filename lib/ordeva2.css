@@ -263,12 +263,13 @@ body.o2 .pz-caja-top{ background: var(--surface); }
   body.o2 .pz-lmini{ display: none; }
 }
 @media (min-width: 900px){
-  body.o2 .pz-tienda{ grid-template-columns: minmax(0, 1fr) 380px; gap: 20px; }
+  /* 1.70.0: la caja en dos columnas, productos 60 % y venta 40 % */
+  body.o2 .pz-tienda{ grid-template-columns: minmax(0, 3fr) minmax(340px, 2fr); gap: 20px; }
   body.o2 .pz-tienda .pz-grid{ grid-template-columns: repeat(auto-fill, minmax(156px, 1fr)); }
   body.o2 .pz-tienda .pz-pie{ flex-direction: column; align-items: stretch; gap: 12px; border-top: 1px solid var(--line); padding-top: 12px; margin-top: 4px; }
   body.o2 .pz-tienda .pz-total{ display: flex; align-items: baseline; justify-content: space-between; }
   body.o2 .pz-tienda .pz-total span{ font-size: 13px; letter-spacing: .04em; }
-  body.o2 .pz-tienda .pz-total b{ font-size: 30px; }
+  body.o2 .pz-tienda .pz-total b{ font-size: clamp(34px, 3.2vw, 46px); }
   body.o2 .pz-tienda .pz-cobrar{ width: 100%; min-height: 56px; }
 }
 /* La «+» no va en la fila compacta del modo mixto ni en el modo fácil (ahí la tarjeta entera ya dice «toque») */

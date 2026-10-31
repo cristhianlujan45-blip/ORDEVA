@@ -77,7 +77,7 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
  s0=(await S(p)).length;
  await p.click('#posPanel .pz-cobrar'); await p.waitForTimeout(250);
  r=await p.evaluate(()=>[...document.querySelectorAll('.pz-pago .pz-met')].map(b=>b.textContent.trim()).join('|'));
- chk('COBRAR abre «¿Cómo pagó?»: Efectivo, Nequi, DaviPlata, Tarjeta (y fiado)', r==='💵Efectivo|💜Nequi|🔴DaviPlata|💳Tarjeta' && await visible(p,'.pz-pago .pz-fiado'), r);
+ chk('COBRAR abre «¿Cómo pagó?»: Efectivo, Nequi, DaviPlata, Transferencia, Tarjeta (y fiado)', r==='💵Efectivo|💜Nequi|🔴DaviPlata|🏦Transferencia|💳Tarjeta' && await visible(p,'.pz-pago .pz-fiado'), r);
  await p.click('.pz-pago .pz-met[data-m="efectivo"]'); await p.waitForTimeout(400);
  r=await p.evaluate(()=>{ const h=data.history[0]; return {n:data.history.length, tot:h.total, mesa:h.table, met:h.payments[0].method, items:h.items.map(i=>i.name+'×'+i.qty+'@'+i.price).join(','), debe:h.debt}; });
  chk('Venta registrada en el historial con los ítems y el total', r.n===2 && r.tot===13500 && r.mesa===null && r.met==='efectivo' && r.debe===0 && r.items==='Águila×2@4000,Empanada×1@2500,Gaseosa×1@3000', JSON.stringify(r));
