@@ -436,6 +436,7 @@
       <div class="sx-head">
         <div class="sx-who"><div class="av">👑</div><div class="t"><b id="sxQuien"></b><small>✓ Administrador de ORDEVA</small></div></div>
         <button class="b" id="sxRefrescar" type="button" title="Actualizar">🔄</button>
+        <button class="b" id="sxConciliar" type="button" title="Revisar que cada pago aprobado tenga su tiempo en el plan (también se hace solo cada 10 minutos)">🧮 Conciliar pagos</button>
         <button class="b" id="sxSalir" type="button" title="Salir de la cuenta de ORDEVA Nube">Salir</button>
       </div>
       <div class="grid" id="sxKpis"></div>
@@ -1556,6 +1557,7 @@
     }catch(e){ sxFallo(e); }
   }
   $('sxRefrescar').onclick = () => { sxAviso(''); sxCargar(); };
+  { const bc = $('sxConciliar'); if(bc) bc.onclick = async () => { bc.disabled = true; try{ const r = await sxApi('conciliar', {}); sxAviso(r.arreglados ? '🧮 ' + r.arreglados + ' plan' + (r.arreglados === 1 ? '' : 'es') + ' recuperado' + (r.arreglados === 1 ? '' : 's') + ': tenían pagos aprobados sin su tiempo.' : '✅ Todo cuadra: cada pago aprobado tiene su tiempo.'); sxCargar(); }catch(e){ sxAviso('No se pudo conciliar: ' + (e && e.message || e), true); } finally{ bc.disabled = false; } }; }
   // Revisa si llegaron pagos nuevos cada minuto (solo con la pestaña a la vista y sin ventanas abiertas).
   setInterval(() => {
     if(!sx.yo || sx.cargando || $('sxPanel').hidden || !$('lock').hidden || document.visibilityState !== 'visible' || document.querySelector('dialog[open]') || !document.querySelector('#tabs button.on[data-t="subs"]')) return;

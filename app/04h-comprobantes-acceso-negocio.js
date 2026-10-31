@@ -1687,6 +1687,12 @@ function wireAccountUI(){
     // 📦 1.67.6: método de valoración del costo (último o promedio ponderado)
     const cmSel = document.getElementById('costoMetodoSel');
     if(cmSel){ cmSel.value = data.costoMetodo === 'promedio' ? 'promedio' : 'ultimo'; cmSel.onchange = () => { data.costoMetodo = cmSel.value === 'promedio' ? 'promedio' : 'ultimo'; saveData(); showToast(data.costoMetodo === 'promedio' ? '📦 El costo será el promedio ponderado desde la próxima compra.' : '📦 El costo será el de la última compra.'); }; }
+    // 🧾 1.69.0: retenciones sobre compras (estimado para el contador)
+    [['retFuenteIn', 'retefuente', 20], ['retIvaIn', 'reteiva', 100], ['retIcaIn', 'reteica', 30]].forEach(([id, k, max]) => {
+      const el = document.getElementById(id); if(!el) return;
+      const r0 = data.retenciones || {}; el.value = r0[k] ? r0[k] : '';
+      el.addEventListener('blur', () => { const v = parseFloat(el.value); const r = data.retenciones || (data.retenciones = {}); if(isFinite(v) && v > 0) r[k] = Math.min(max, v); else delete r[k]; el.value = r[k] || ''; saveData(); });
+    });
     ivaRateInput.addEventListener('blur', () => {
       const v = parseFloat(ivaRateInput.value);
       data.ivaRate = (isFinite(v) && v >= 0) ? v : 19;

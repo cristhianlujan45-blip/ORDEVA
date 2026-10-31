@@ -6,6 +6,7 @@
 <script src="lib/vento-errores.js?v=1.68.1"></script><!-- errores de este equipo → ORDEVA Admin (🐞 Errores) -->
 <script src="lib/vento-colormix.js?v=1.68.1" defer></script><!-- iPhone con iOS 15/16.0: colores mezclados (no hace nada en los demás) -->
 <script src="lib/vento-finanzas.js?v=1.68.1"></script><!-- 🧮 Motor financiero: margen, recargo y precios sugeridos (las mismas fórmulas en toda la app) -->
+<script src="lib/vento-xlsx.js?v=1.68.1" defer></script><!-- 📊 Excel de verdad (.xlsx) sin librerías -->
 <script src="app/01-menus-saltan-arriba.js?v=1.68.1"></script>
 <script>
 // Un QR de mesa o link de domicilio que cae en la app del negocio abre la carta del cliente.
@@ -3388,10 +3389,11 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
       <div class="settings-group"><h2>📊 Frente al período anterior</h2><div id="ctComp"></div></div>
       <div class="settings-group"><h2>🧾 Gastos por categoría</h2><div id="ctCats"></div></div>
       <div class="settings-group"><h2>🗂️ Gastos por tipo</h2><div id="ctTipos"></div></div>
+      <div class="settings-group"><h2>🧾 IVA del período (estimado)</h2><div id="ctIva"></div></div>
     </div>
     <div class="settings-group">
       <h2>📋 Movimientos</h2>
-      <div class="mz-actions" style="margin-bottom:8px"><button class="btn-ghost" id="ctCsv" type="button">⬇️ Descargar para Excel</button></div>
+      <div class="mz-actions" style="margin-bottom:8px"><button class="btn-ghost" id="ctCsv" type="button">⬇️ Descargar para Excel</button><button class="btn-ghost" id="ctXlsx" type="button">📊 Excel completo (ventas, productos, gastos e IVA)</button></div>
       <div id="ctLista"></div>
     </div>
   </section>
@@ -3932,6 +3934,14 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
       <div class="settings-row" style="flex-direction:column;align-items:stretch">
         <div class="settings-row-text"><strong>Tarifa de IVA</strong><span>19% es la tarifa general en Colombia; cámbiala si tu caso es distinto.</span></div>
         <input type="number" id="ivaRateInput" class="mz-in" style="width:100%" min="0" max="100" step="0.5" placeholder="19">
+      </div>
+      <div class="settings-row" style="flex-direction:column;align-items:stretch">
+        <div class="settings-row-text"><strong>Retenciones sobre tus compras (opcional)</strong><span>Solo si eres agente retenedor. Salen como estimado en Contabilidad → IVA, para tu contador. Déjalas en 0 si no aplican.</span></div>
+        <div class="mz-actions" style="flex-wrap:wrap">
+          <label style="flex:1;min-width:110px;font-size:13px">ReteFuente %<input type="number" id="retFuenteIn" class="mz-in" min="0" max="20" step="0.1" placeholder="0"></label>
+          <label style="flex:1;min-width:110px;font-size:13px">ReteIVA % (del IVA)<input type="number" id="retIvaIn" class="mz-in" min="0" max="100" step="1" placeholder="0"></label>
+          <label style="flex:1;min-width:110px;font-size:13px">ReteICA (por mil)<input type="number" id="retIcaIn" class="mz-in" min="0" max="30" step="0.1" placeholder="0"></label>
+        </div>
       </div>
       <div class="settings-row" style="flex-direction:column;align-items:stretch">
         <div class="settings-row-text"><strong>Prefijo y próximo consecutivo</strong><span>Ej: FV-14 será el siguiente número de factura. Sube el consecutivo si ya venías numerando en otro lado.</span></div>
@@ -4677,6 +4687,8 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
       <input type="number" id="editProdCost" min="0" step="100" placeholder="Ej. 1200">
       <label for="editProdIva" data-novocab>IVA de este producto (%) — vacío = el del negocio</label>
       <input type="number" id="editProdIva" min="0" max="50" step="1" placeholder="19">
+      <label for="editProdIvaTipo" data-novocab>Tipo de IVA</label>
+      <select id="editProdIvaTipo" class="mz-in"><option value="">Gravado (lleva IVA)</option><option value="exento">Exento (0 %, se puede descontar el IVA de compras)</option><option value="excluido">Excluido (no lleva IVA)</option></select>
       <div id="editProdMarginLine" class="margin-breakdown"></div>
       <div id="editProdSugeridos" class="pr-sug" hidden></div>
       <div id="editProdHistory"></div>

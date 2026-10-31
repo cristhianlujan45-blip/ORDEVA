@@ -289,6 +289,12 @@ async function admin(req: Request, env: Env, accion: string, b: Record<string, u
       return { ok: true, ...(await db.rpc<Record<string, unknown>>("srv_sub_rechazar", { p_payment: pagoDe(b), p_admin: a, p_motivo: String(b.motivo || "") })) };
     case "suscripciones":
       return { ok: true, suscripciones: await db.rpc("srv_admin_suscripciones") };
+    // 1.69.0: que ningún pago aprobado pierda su tiempo (también corre sola cada 10 min con pg_cron).
+    case "conciliar": {
+      const r = await db.rpc<Record<string, unknown>>("srv_sub_conciliar", { p_negocio: b.negocio ? negocioDe(b) : null });
+      log("info", "sub_conciliar", { admin: a, arreglados: r && r.arreglados });
+      return { ok: true, ...r };
+    }
     case "negocios":
       return { ok: true, negocios: await db.rpc("srv_admin_negocios") };
     case "negocio":

@@ -699,6 +699,7 @@ document.getElementById('qpAddBtn').addEventListener('click', async () => {
    - Responsable de IVA:    utilidad = precio/(1+iva) − costo/(1+iva)
    - No responsable:        el IVA de la compra es parte del costo → utilidad = precio − costo */
 function ivaDeProducto(p){
+  if(p && (p.ivaTipo === 'exento' || p.ivaTipo === 'excluido')) return 0;   // 1.69.0
   if(p && p.iva != null && p.iva !== '') return Math.max(0, Math.min(50, Number(p.iva) || 0));
   return (typeof data !== 'undefined' && data && data.ivaResponsable) ? (Number(data.ivaRate) || 19) : 0;
 }
@@ -969,6 +970,7 @@ function openEditProductModal(productId){
   document.getElementById('editProdCostWrap').open = p.cost != null;
   const ivaEl = document.getElementById('editProdIva');
   if(ivaEl){ ivaEl.value = (p.iva == null || p.iva === '') ? '' : p.iva; ivaEl.placeholder = String(ivaDeProducto({})); }
+  { const it = document.getElementById('editProdIvaTipo'); if(it) it.value = p.ivaTipo === 'exento' || p.ivaTipo === 'excluido' ? p.ivaTipo : ''; }
   document.getElementById('editProdSize').value = p.size || '';
   document.getElementById('editProdSpecs').value = Array.isArray(p.specifications) ? p.specifications.join(', ') : (p.specifications || '');
   pintarCamposProducto(p);
@@ -1163,6 +1165,7 @@ function saveEditedProduct(){
   p.cost = invNum(document.getElementById('editProdCost').value);
   const ivaTxt = (document.getElementById('editProdIva').value || '').trim();
   if(ivaTxt === '') delete p.iva; else p.iva = Math.max(0, Math.min(50, Number(ivaTxt) || 0));
+  { const it = document.getElementById('editProdIvaTipo'); const v = it ? it.value : ''; if(v === 'exento' || v === 'excluido') p.ivaTipo = v; else delete p.ivaTipo; }
   if(typeof prodFotoModalGuardar === 'function') prodFotoModalGuardar(p);
   const nMesas = sincronizarProductoEnMesas(p, nombreAntes);
   registrarRenombre(nombreAntes, p.name);

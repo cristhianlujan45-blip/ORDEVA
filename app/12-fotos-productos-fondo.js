@@ -2910,6 +2910,19 @@ function renderConta(){
       compEl.innerHTML = '<div class="empty-note" style="margin-bottom:6px">Comparado con ' + ra.titulo + '.</div>' + fila('💰 Cobrado', ventas, ventasA) + fila('💸 Gastos', gastos, gastosA, true) + fila('✅ Te quedó (caja)', resultado, resA) +
         fila('🧾 Vendido', x.vendido, xa.vendido);
     }
+    // 🧾 IVA del período (estimado)
+    const ivaEl = document.getElementById('ctIva');
+    if(ivaEl && F && F.informeIva){
+      const I = F.informeIva(data, { ini: r.ini, fin: r.fin }), V = I.ventas, C = I.compras;
+      const l = (t, v, sub) => '<div class="vt-l"><span>' + t + '</span><b>' + v + '</b></div>' + (sub ? '<div class="empty-note" style="margin:-4px 0 6px">' + sub + '</div>' : '');
+      ivaEl.innerHTML = (V.porTarifa.length ? V.porTarifa.map(t => l('Ventas al ' + t.tarifa + ' %', ctFmt(t.iva), 'Ventas ' + ctFmt(t.ventas) + ' · base ' + ctFmt(t.base))).join('') : '') +
+        (V.exentas ? l('Ventas exentas (0 %)', ctFmt(V.exentas)) : '') + (V.excluidas ? l('Ventas excluidas (sin IVA)', ctFmt(V.excluidas)) : '') +
+        (V.sinIva ? l('Ventas sin IVA', ctFmt(V.sinIva), data.ivaResponsable ? 'Productos con tarifa 0 %.' : 'El negocio no está marcado como responsable de IVA (Ajustes → Negocio).') : '') +
+        l('IVA generado', ctFmt(V.generado)) + l('IVA descontable (compras)', ctFmt(C.descontable), C.facturas + (C.facturas === 1 ? ' factura' : ' facturas') + ' por ' + ctFmt(C.total)) +
+        l(I.saldo >= 0 ? '💰 IVA por pagar' : '✅ IVA a favor', ctFmt(Math.abs(I.saldo))) +
+        (I.conRetenciones ? l('Retenciones sobre compras', ctFmt(I.retenciones.retefuente + I.retenciones.reteiva + I.retenciones.reteica), 'ReteFuente ' + ctFmt(I.retenciones.retefuente) + ' · ReteIVA ' + ctFmt(I.retenciones.reteiva) + ' · ReteICA ' + ctFmt(I.retenciones.reteica)) : '') +
+        '<div class="empty-note" style="margin-top:6px">Estimado con lo registrado en ORDEVA (los precios ya traen el IVA). No reemplaza la declaración: revísalo con tu contador. Cada producto puede ser gravado, exento o excluido (Productos → tocar el producto → Costo y margen).</div>';
+    }
   }catch(e){ console.error('conta comparar', e); }
   // Gráfica: por día (hasta ~2 meses) o por mes
   const porMes = (r.fin - r.ini) / 864e5 > 62, grupos = {}, llaves = [];
@@ -2990,6 +3003,38 @@ function iniConta(){
     document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
     showToast('⬇️ Descargado: ábrelo con Excel o Google Sheets.');
   };
+  // 📊 1.69.0: Excel completo (.xlsx de verdad, con varias hojas y números que se pueden sumar) para el contador.
+  { const bx = document.getElementById('ctXlsx'); if(bx) bx.onclick = () => { try{ ctExcel(); }catch(e){ console.error(e); showToast('No se pudo armar el Excel.'); } }; }
+}
+function ctExcel(){
+  const X = window.ventoXlsx, F = window.ventoFinanzas; if(!X || !F){ showToast('Recarga ORDEVA para descargar el Excel.'); return; }
+  const r = ctRango(), R = { ini: r.ini, fin: r.fin }, x = ctMovimientos(r), d = data;
+  const dia = t => ctDia(t), num = n => Math.round(Number(n) || 0);
+  const ventasH = (d.history || []).filter(h => { const t = new Date(h.date).getTime(); return t >= r.ini && t < r.fin; });
+  const suma = f => x.mov.filter(f).reduce((a, m) => a + m.monto, 0);
+  const iva = F.informeIva(d, R), rent = F.rentabilidad(d.history, d.products, d.categories, R);
+  const gastosMov = x.mov.filter(m => m.tipo === 'gasto'), res = F.resultado(x.vendido, x.costo, gastosMov), pt = F.gastosPorTipo(gastosMov);
+  const hojas = [
+    { nombre: 'Resumen', filas: [['Concepto', 'Valor'], ['Negocio', d.businessName || ''], ['Período', r.titulo], ['Cobrado (entradas)', num(suma(m => m.tipo === 'venta'))], ['Otros ingresos', num(suma(m => m.tipo === 'ingreso'))],
+      ['Gastos (salidas)', num(suma(m => m.tipo === 'gasto'))], ['Vendido', num(x.vendido)], ['Costo de lo vendido', num(x.costo)], ['Utilidad bruta', num(res.utilidadBruta)], ['Gastos operativos', num(res.gastosOperativos)],
+      ['Resultado estimado', num(res.resultadoNeto)], ['Gastos directos', pt.directo], ['Gastos operativos (tipo)', pt.operativo], ['Gastos administrativos', pt.administrativo], ['Gastos financieros', pt.financiero],
+      ['IVA generado (ventas)', iva.ventas.generado], ['IVA descontable (compras)', iva.compras.descontable], [iva.saldo >= 0 ? 'IVA por pagar (estimado)' : 'IVA a favor (estimado)', Math.abs(iva.saldo)]] },
+    { nombre: 'Ventas', filas: [['Fecha', 'Hora', 'Cuenta', 'Total', 'Pagado', 'Debe', 'Medios de pago', 'Descuento', 'Observación']].concat(ventasH.slice().reverse().map(h => {
+      const pag = (h.payments || []).reduce((a, p) => a + (p.method === 'debe' ? 0 : num(p.amount)), 0);
+      return [dia(h.date), new Date(h.date).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }), h.tableName || (h.table != null ? 'Mesa ' + h.table : 'Caja'), num(h.total), pag, num(h.debt),
+        [...new Set((h.payments || []).map(p => p.note || p.method))].join(', '), h.descuento ? num(h.descuento.valor) : '', h.observacion || ''];
+    })) },
+    { nombre: 'Productos vendidos', filas: [['Producto', 'Categoría', 'Unidades', 'Ventas', 'Costo', 'Ganancia', 'Margen %']].concat(rent.productos.sort((a, b) => b.ventas - a.ventas).map(p => [p.nombre, p.cat, Math.round(p.q * 100) / 100, num(p.ventas), p.conCosto ? num(p.costo) : '', p.utilidad != null ? num(p.utilidad) : '', p.margen != null ? p.margen : ''])) },
+    { nombre: 'Gastos', filas: [['Fecha', 'Categoría', 'Tipo', 'Detalle', 'Medio de pago', 'Valor']].concat(gastosMov.slice().reverse().map(m => [dia(m.fecha), ctCatNombre('gasto', m.cat).replace(/^\S+\s/, ''), (F.TIPOS_GASTO.find(t => t[0] === F.tipoGasto(m.cat)) || ['', ''])[1].replace(/^\S+\s/, '').replace(/ \(.*\)$/, ''), m.desc || '', (CT_METODOS[m.metodo] || '').replace(/^\S+\s/, ''), num(m.monto)])) },
+    { nombre: 'IVA', filas: [['Concepto', 'Ventas', 'Base', 'IVA']].concat(iva.ventas.porTarifa.map(t => ['Gravadas al ' + t.tarifa + ' %', t.ventas, t.base, t.iva]),
+      [['Exentas (0 %)', iva.ventas.exentas, iva.ventas.exentas, 0], ['Excluidas', iva.ventas.excluidas, '', ''], ['Sin IVA (no responsable / sin tarifa)', iva.ventas.sinIva, '', ''],
+       ['Compras con factura (' + iva.compras.facturas + ')', iva.compras.total, iva.compras.base, iva.compras.descontable], [iva.saldo >= 0 ? 'IVA por pagar (estimado)' : 'IVA a favor (estimado)', '', '', Math.abs(iva.saldo)]],
+      iva.conRetenciones ? [['ReteFuente (compras)', '', '', iva.retenciones.retefuente], ['ReteIVA (compras)', '', '', iva.retenciones.reteiva], ['ReteICA (compras)', '', '', iva.retenciones.reteica]] : [],
+      [['Estimado con los datos registrados en ORDEVA. No reemplaza la declaración: revísalo con tu contador.']]) }
+  ];
+  X.descargar('ORDEVA-' + String(d.businessName || 'negocio').replace(/[^\w]+/g, '-') + '-' + dia(r.ini) + '-a-' + dia(r.fin - 1), hojas);
+  showToast('📊 Excel descargado: ventas, productos, gastos e IVA del período.');
+  return hojas;
 }
 
 /* ---------- Ajustes → App de meseros ---------- */
