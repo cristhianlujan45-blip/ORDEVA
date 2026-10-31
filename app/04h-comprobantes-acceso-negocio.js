@@ -1014,6 +1014,10 @@ window.bloquearApp = bloquearApp;
 // celular), así no se puede crear otra cuenta con el mismo correo y en otro celular se ven los mismos datos.
 // Los usuarios sin correo (ej. «mesero1») siguen siendo de este celular, como siempre.
 const authEsCorreo = t => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(t || '').trim());
+// 1.72.1: «el usuario y la contraseña están correctos y no me deja entrar» (Windows): el correo tenía un ESPACIO
+// («cristhian+cliente @gmail.com»), así que no se tomaba como correo y salía «Usuario o contraseña incorrectos».
+// Un correo nunca lleva espacios: se quitan (también los invisibles que dejan algunos teclados al pegar) y va en minúsculas.
+const authLimpiarUsuario = t => { let v = String(t || '').replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/＠/g, '@').trim().toLowerCase(); if(v.includes('@')) v = v.replace(/\s+/g, ''); return v; };
 const authNubeCuentas = () => { const n = window.ventoNube; return n && n.configurada && n.configurada() && n.crearCuenta ? n : null; };
 const authYaExiste = e => /already registered|already exists/i.test(String((e && e.message) || e));
 const authClaveMala = e => /invalid login credentials/i.test(String((e && e.message) || e));
@@ -1214,7 +1218,8 @@ function showAuth(firstRun){
     if(authPinPuede(u)) b.title = 'Entra con su PIN';
     chips.appendChild(b);
   });
-  g('authForgot').onclick = () => { af.hidden = true; rf.hidden = false; g('recUser').value = g('authUser').value; };
+  ['authUser', 'recUser'].forEach(id => { const el = g(id); if(el) el.addEventListener('blur', () => { const v = authLimpiarUsuario(el.value); if(v.includes('@') && v !== el.value) el.value = v; }); });
+  g('authForgot').onclick = () => { af.hidden = true; rf.hidden = false; g('recUser').value = authLimpiarUsuario(g('authUser').value); };
   g('recBack').onclick = () => { rf.hidden = true; af.hidden = false; };
   // Se ve desde el inicio (crear cuenta o iniciar sesión): si el celular quedó
   // sin ningún usuario guardado (datos borrados, celular nuevo, etc.), el
@@ -1230,7 +1235,7 @@ function showAuth(firstRun){
   };
   g('recMailBtn').onclick = async () => {
     const b = g('recMailBtn'), t = g('recMailTxt'); b.disabled = true; b.textContent = '⏳ Enviando…'; t.textContent = '';
-    try{ const r = await authCorreoEnviar(g('recUser').value);
+    try{ const r = await authCorreoEnviar(authLimpiarUsuario(g('recUser').value));
       t.textContent = r.ok ? (r.codigo ? '✅ Te mandamos un código temporal a ' + r.mascara + ' (revisa también «Spam»). Escríbelo abajo con tu contraseña nueva. Vence en 15 minutos.'
         : '✅ Te mandé un correo a ' + r.mascara + ' (revisa también «Spam»). Toca el enlace desde ESTE celular: ORDEVA se abre y te pide la contraseña nueva. Si en el correo viene un código de números, escríbelo abajo.') : '⚠️ ' + r.error;
       if(r.ok) g('recCode').focus(); }
@@ -1247,7 +1252,7 @@ function showAuth(firstRun){
       g('otpDestTxt').textContent = cel ? 'Tu número de celular' : 'Tu correo';
       d.type = cel ? 'tel' : 'email'; d.inputMode = cel ? 'tel' : 'email'; d.autocomplete = cel ? 'tel' : 'email';
       d.placeholder = cel ? '300 123 4567' : 'tucorreo@gmail.com';
-      d.value = cel ? '' : (authEsCorreo(g('authUser').value.trim()) ? g('authUser').value.trim().toLowerCase() : '');
+      d.value = cel ? '' : (authEsCorreo(authLimpiarUsuario(g('authUser').value)) ? authLimpiarUsuario(g('authUser').value) : '');
       g('otpPaso2').hidden = true; g('otpErr').textContent = ''; g('otpCode').value = '';
       g('otpHint').textContent = cel ? 'Te llega un mensaje de texto con un código de 6 números. Sirve si ya uniste tu celular a la cuenta (Ajustes → Negocio → 📱 Celular de la cuenta).'
         : 'Sin contraseña: te mandamos un código de 6 números al correo de tu cuenta y entras con él.';
@@ -1309,18 +1314,18 @@ function showAuth(firstRun){
   rf.onsubmit = async (e) => {
     e.preventDefault(); g('recErr').textContent = '';
     let pend = null; try{ pend = JSON.parse(sessionStorage.getItem('cm-rec-mail') || 'null'); }catch(x){}
-    const esMail = /^\s*\d[\d\s]{5,9}\s*$/.test(g('recCode').value) && pend && pend.user === g('recUser').value.trim().toLowerCase() && Date.now() - pend.at < 60 * 6e4;
+    const esMail = /^\s*\d[\d\s]{5,9}\s*$/.test(g('recCode').value) && pend && pend.user === authLimpiarUsuario(g('recUser').value) && Date.now() - pend.at < 60 * 6e4;
     const bOk = g('recOk'), tOk = bOk.textContent; bOk.disabled = true; bOk.textContent = '⏳ Comprobando…';
     let m;
     try{
       m = esMail && pend.nube ? await authRecoverNube(pend.user, g('recCode').value, g('recNew').value, g('recNew2').value)
-        : esMail ? await authRecoverCorreo(g('recUser').value, g('recCode').value, g('recNew').value, g('recNew2').value)
-        : await authRecover(g('recUser').value, g('recCode').value, g('recNew').value, g('recNew2').value);
+        : esMail ? await authRecoverCorreo(authLimpiarUsuario(g('recUser').value), g('recCode').value, g('recNew').value, g('recNew2').value)
+        : await authRecover(authLimpiarUsuario(g('recUser').value), g('recCode').value, g('recNew').value, g('recNew2').value);
     }catch(x){ m = '⚠️ ' + ((x && x.message) || x); }
     finally{ bOk.disabled = false; bOk.textContent = tOk; }
     if(typeof m === 'string'){ g('recErr').textContent = m; return; }
     if(m.entro){ ['recCode','recNew','recNew2'].forEach(i => g(i).value = ''); rf.hidden = true; af.hidden = false; showToast('✅ Contraseña cambiada. Ya entraste con tu cuenta.', 5000); return; }
-    g('authUser').value = g('recUser').value.trim().toLowerCase();
+    g('authUser').value = authLimpiarUsuario(g('recUser').value);
     ['recCode','recNew','recNew2'].forEach(i => g(i).value = '');
     rf.hidden = true; af.hidden = false;
     g('authErr').textContent = m.correo ? '✅ Contraseña cambiada con el código del correo. Ya puedes entrar.' : '✅ Contraseña cambiada. Ya puedes entrar. Ese código ya no sirve más' + (m.quedan ? ' (te quedan ' + m.quedan + ').' : ': crea códigos nuevos en Ajustes → Negocio.');
@@ -1330,7 +1335,8 @@ function showAuth(firstRun){
     e.preventDefault();
     if(enviando) return;
     const err = document.getElementById('authErr'); err.textContent = '';
-    const user = document.getElementById('authUser').value.trim().toLowerCase();
+    const user = authLimpiarUsuario(document.getElementById('authUser').value);
+    if(document.getElementById('authUser').value !== user && user.includes('@')) document.getElementById('authUser').value = user;   // se ve corregido
     const pass = document.getElementById('authPass').value;
     const nb = authEsCorreo(user) ? authNubeCuentas() : null;
     const btn = g('authBtn'), txt = btn.textContent;

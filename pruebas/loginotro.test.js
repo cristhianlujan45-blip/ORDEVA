@@ -11,6 +11,7 @@
 //  7. Igual, sin copia de referencia en el equipo: manda la nube, la venta no se pierde y queda un punto de restauración.
 //  8. (1.72.0) Equipo que ya tuvo la cuenta pero sus datos se reiniciaron (quedó su copia de referencia): ve lo de la
 //     nube y NO le borra nada a nadie (antes la mezcla lo tomaba como «este equipo borró todo»).
+// 10. (1.72.1) El correo escrito con un espacio y mayúsculas entra igual.
 //  9. (1.72.0) Con la sesión abierta el equipo pierde sus datos: no se sube ese vacío; se vuelven a bajar de la nube.
 'use strict';
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
@@ -154,6 +155,13 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const o = 
     await pausa(7000);
     chk('9. Con la sesión abierta y los datos borrados en el equipo: NO se borra nada en la nube ni en A', (await nube()) === ESP6 && (await mesas(A.p)) === ESP6 && (await nubeHist()).includes('venta-a2'), { nube: await nube(), A: await mesas(A.p), hist: (await nubeHist()).length });
     chk('9. … y el equipo recupera sus datos de la nube solo', (await mesas(B.p)) === ESP6 && await B.p.evaluate(() => (data.history || []).some(h => h.id === 'venta-a2')), await mesas(B.p));
+
+    // ===== Caso 10 (1.72.1): el correo con un espacio y mayúsculas («Dueno @reinicio.co»), como en la foto de Windows =====
+    const D = await equipo('D');
+    await entrar(D.p, 'Dueno @Reinicio.co ');
+    chk('10. Correo con un espacio y mayúsculas → entra igual (antes: «Usuario o contraseña incorrectos»)', await dentro(D.p), await D.p.evaluate(() => (document.getElementById('authErr') || {}).textContent));
+    await cerrarTodo(D.p); await pausa(4000);
+    chk('10. … y ve las cuentas del negocio', (await mesas(D.p)) === ESP6, await mesas(D.p));
   }catch(e){ mal++; console.log('❌ Excepción: ' + (e && e.stack || e)); }
   chk('Sin errores de página', !errs.length, errs);
   await b.close(); await sb.cerrar().catch(() => {});
