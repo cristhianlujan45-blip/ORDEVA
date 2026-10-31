@@ -864,12 +864,49 @@
   function vincular(n, reemplazar){
     st.negocio = { id: n.id, nombre: n.nombre, rol: n.rol }; st.sede = sedeActual(); st.version = 0; guardarSt();
     if(reemplazar) return bajar(true, true).then(function(){ arrancar(); });
+    // 1.70.1: «entré en otro celular y se me reiniciaron las cuentas». Al volver a entrar en un equipo que ya tenía la
+    // cuenta, su copia (vieja) se juntaba con la nube SIN copia de referencia: las cantidades se sumaban (3 + 4 = 7
+    // Águilas), las cuentas ya cobradas volvían a aparecer, y esa mezcla se subía y pisaba a todos los equipos.
+    // Ahora:
+    //  • con la copia de referencia de este equipo (lo último que sincronizó con ese negocio, guardada aunque se haya
+    //    cerrado la sesión): mezcla de 3 vías de verdad → solo se conserva lo que este equipo cambió y la nube no tiene;
+    //  • sin ella: manda la nube; de este equipo solo se agregan las ventas, cierres, compras y gastos que la nube no
+    //    tiene (nunca se pierde una venta hecha sin internet).
+    // Antes de poner los datos queda un punto de restauración local («antes de la nube»), como siempre.
     var local = datosApp();
-    return leerNube().then(function(nube){
-      var mezcla = local ? fusionar(null, local, nube.datos) : nube.datos;
-      return aplicarProtegido(mezcla, true).then(function(){ return rpc('guardar_datos', { p_negocio: n.id, p_datos: datosApp() || mezcla, p_version: nube.version }); })
-        .then(function(v){ st.version = v; st.sucio = false; st.ultimo = Date.now(); guardarSt(); return basePut(clonar(mezcla), v); });
+    return Promise.all([leerTodo(), base('get')]).then(function(x){
+      var nube = x[0], b = x[1], mezcla;
+      if(!local) mezcla = nube.datos;
+      else if(b) mezcla = fusionar(b, local, nube.datos);
+      else mezcla = registrosNuevos(local, nube.datos);
+      traza('vincular', mezcla, { conBase: !!b, vr: nube.version });
+      st.version = nube.version; st.sucio = false; guardarSt();
+      return aplicarProtegido(mezcla, true).then(function(){
+        baseMem = nube.datos; baseMemDe = negId(); baseVer = nube.version; enNubeTxt = '';
+        return basePut(nube.datos, nube.version);
+      }).then(function(){
+        var d = datosApp();
+        if(d && !igual(d, nube.datos)){ cambiosN++; st.sucio = true; guardarSt(); }   // lo propio de este equipo se sube (por partes)
+      });
     }).then(function(){ arrancar(); });
+  }
+  // Sin copia de referencia: los datos de la nube + los registros de este equipo que la nube no tiene (por id).
+  var REGISTROS = ['history', 'closures', 'purchases', 'contab'];
+  function registrosNuevos(local, nube){
+    var out = clonar(nube);
+    REGISTROS.forEach(function(k){
+      var L = Array.isArray(local[k]) ? local[k] : [], R = Array.isArray(out[k]) ? out[k] : [];
+      var ids = {}; R.forEach(function(x){ if(x && x.id != null) ids[x.id] = 1; });
+      var nuevos = L.filter(function(x){ return x && x.id != null && !ids[x.id]; });
+      if(!nuevos.length) return;
+      var junto = R.concat(clonar(nuevos));
+      if(k === 'history' || k === 'closures'){   // lo más reciente primero, como en la app
+        var t = function(x){ var v = new Date(x.date || x.at || 0).getTime(); return isFinite(v) ? v : 0; };
+        junto.sort(function(a, b2){ return t(b2) - t(a); });
+      }
+      out[k] = junto;
+    });
+    return out;
   }
   function conectado(email){ return !!(st.negocio && st.email === String(email || '').trim().toLowerCase()); }
   function unirse(codigo, nombre){
