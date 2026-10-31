@@ -114,10 +114,96 @@
   var clonar = function(o){ return JSON.parse(JSON.stringify(o == null ? null : o)); };
   // 1.68.1: la base también vive en memoria. Leerla de IndexedDB con un negocio grande podía tardar más del tope (5 s)
   // y la mezcla se hacía SIN base: los productos de una mesa que estaban en los dos celulares se sumaban dos veces.
-  var baseMem = null, baseMemDe = '';
+  var baseMem = null, baseMemDe = '', baseVer = -1;   // baseVer: la versión de la nube a la que corresponde baseMem
   var negId = function(){ return (st.negocio && st.negocio.id) || ''; };
   function baseGet(){ return baseMem && baseMemDe === negId() ? Promise.resolve(baseMem) : base('get'); }
-  function basePut(v){ baseMem = v; baseMemDe = negId(); return base('put', v); }
+  function basePut(v, ver){ baseMem = v; baseMemDe = negId(); baseVer = ver == null ? -1 : ver; return base('put', v); }
+
+  /* ---------- 1.69.0: sincronizar SOLO lo que cambió ----------
+     En vez del negocio completo, se mandan las partes que cambiaron frente a la base (lo último que la nube tiene de este
+     equipo) y los otros equipos bajan solo esas partes (tabla datos_cambios). El formato es el mismo del servidor
+     (supabase/migrations/20261123000000_datos_por_partes.sql):
+       {"v": valor} reemplaza · {"x": true} quita · {"o": {clave: …}} objeto por claves (ej. tables) ·
+       {"l": {pre, set, del}} lista con «id» (ej. history): lo nuevo al comienzo, lo cambiado por id, lo quitado por id.
+     Si el servidor todavía no tiene guardar_cambios, si no hay base, o si falta alguna versión, se usa el camino de
+     siempre (todo el negocio). */
+  var partesNo = false, parchesSeguidos = 0;
+  var esObj = function(o){ return !!o && typeof o === 'object' && !Array.isArray(o); };
+  // Igual por contenido: rápido si el texto es igual; si no, sin importar el orden de los campos ni los vacíos.
+  function mismo(a, b){ if(a === b) return true; var ja = JSON.stringify(a), jb = JSON.stringify(b); return ja === jb || canon(a) === canon(b); }
+  function listaConId(a){
+    if(!Array.isArray(a)) return false;
+    var vistos = {};
+    for(var i = 0; i < a.length; i++){ var e = a[i]; if(!esObj(e) || e.id == null) return false; var k = String(e.id); if(vistos[k]) return false; vistos[k] = 1; }
+    return true;
+  }
+  function parteLista(b, l){
+    var enB = {}, enL = {};
+    b.forEach(function(e){ enB[String(e.id)] = e; }); l.forEach(function(e){ enL[String(e.id)] = 1; });
+    var n = 0; while(n < l.length && !enB[String(l[n].id)]) n++;           // lo nuevo va al comienzo (como el historial)
+    var queda = b.filter(function(e){ return enL[String(e.id)]; });
+    if(l.length - n !== queda.length) return null;                        // hay nuevos en medio: lista completa
+    var set = [];
+    for(var i = 0; i < queda.length; i++){
+      var e = l[n + i]; if(String(e.id) !== String(queda[i].id)) return null; // cambió el orden: lista completa
+      if(!mismo(e, queda[i])) set.push(e);
+    }
+    return { pre: l.slice(0, n), set: set, del: b.filter(function(e){ return !enL[String(e.id)]; }).map(function(e){ return e.id; }) };
+  }
+  function parte(bv, lv){
+    if(listaConId(bv) && listaConId(lv)){ var p = parteLista(bv, lv); if(p) return { l: p }; }
+    else if(esObj(bv) && esObj(lv)){
+      var o = {}, k;
+      for(k in lv) if(Object.prototype.hasOwnProperty.call(lv, k) && (!(k in bv) || !mismo(bv[k], lv[k]))) o[k] = { v: lv[k] };
+      for(k in bv) if(Object.prototype.hasOwnProperty.call(bv, k) && !(k in lv)) o[k] = { x: true };
+      return { o: o };
+    }
+    return { v: lv };
+  }
+  // Las partes que cambiaron de b a l (null si no se puede).
+  function cambiosDe(b, l){
+    if(!esObj(b) || !esObj(l)) return null;
+    var c = {}, k;
+    for(k in l) if(Object.prototype.hasOwnProperty.call(l, k) && (!(k in b) || !mismo(b[k], l[k]))) c[k] = parte(b[k], l[k]);
+    for(k in b) if(Object.prototype.hasOwnProperty.call(b, k) && !(k in l)) c[k] = { x: true };
+    return c;
+  }
+  // Pone los cambios sobre un documento (lo mismo que datos_aplicar_cambios del servidor). No toca «doc».
+  function aplicarCambios(doc, c){
+    var d = Object.assign({}, doc || {});
+    Object.keys(c || {}).forEach(function(k){
+      var x = c[k];
+      if(x.x) delete d[k];
+      else if('v' in x) d[k] = x.v;
+      else if(x.o){ var o = esObj(d[k]) ? Object.assign({}, d[k]) : {}; Object.keys(x.o).forEach(function(s2){ if(x.o[s2].x) delete o[s2]; else o[s2] = x.o[s2].v; }); d[k] = o; }
+      else if(x.l){
+        var b = Array.isArray(d[k]) ? d[k] : [], pone = {}, borra = {};
+        (x.l.set || []).forEach(function(e){ pone[String(e.id)] = e; }); (x.l.del || []).forEach(function(i){ borra[String(i)] = 1; });
+        d[k] = (x.l.pre || []).concat(b.filter(function(e){ return !(e && borra[String(e.id)]); }).map(function(e){ return e && pone[String(e.id)] || e; }));
+      }
+    });
+    return d;
+  }
+  var noExiste = function(e){ var m = String((e && (e.message || e.code)) || ''); return /guardar_cambios|PGRST202|does not exist|no existe|404/i.test(m) && !/conflicto/.test(m); };
+  // Bajar solo lo que cambió desde la base. Si falta algo, null (y se baja todo como siempre).
+  function leerCambios(){
+    if(partesNo || !baseMem || baseMemDe !== negId() || baseVer < 1 || parchesSeguidos >= 40) return Promise.resolve(null);
+    var desde = baseVer, id = negId();
+    return conTiempo(cliente().then(function(c){
+      return Promise.all([
+        c.from('datos_negocio').select('version').eq('negocio_id', id).maybeSingle(),
+        c.from('datos_cambios').select('version,cambios').eq('negocio_id', id).gt('version', desde).order('version', { ascending: true }).limit(80)
+      ]);
+    }), T.rpc, 'cambios').then(function(r){
+      if(r[0].error || r[1].error || !r[0].data) return null;
+      var hasta = r[0].data.version, L = r[1].data || [];
+      if(hasta <= desde || L.length !== hasta - desde) return null;
+      for(var i = 0; i < L.length; i++) if(L[i].version !== desde + 1 + i || !esObj(L[i].cambios)) return null;
+      var doc = baseMem; L.forEach(function(x){ doc = aplicarCambios(doc, x.cambios); });
+      parchesSeguidos++; traza('bajar-partes', doc, { desde: desde, hasta: hasta });
+      return { datos: doc, version: hasta, partes: true };
+    }).catch(function(){ return null; });
+  }
   // Comparación por contenido: la base de datos (jsonb) cambia el orden de los campos y la app agrega
   // campos vacíos (ej. personId: null) al cargar; sin esto un mismo producto parecía otro y se duplicaba.
   function canon(x){
@@ -317,7 +403,7 @@
       if(!n || protegidoDe(n.datos) === protegidoDe(foto)) return;
       traza('revertido', n.datos, n.version);
       st.version = n.version; guardarSt(); enNubeTxt = '';
-      return aplicarProtegido(n.datos).then(function(){ aviso('🔒 Algunos cambios (precios, productos o permisos) solo los puede hacer el dueño: quedaron como estaban.'); return basePut(n.datos); });
+      return aplicarProtegido(n.datos).then(function(){ aviso('🔒 Algunos cambios (precios, productos o permisos) solo los puede hacer el dueño: quedaron como estaban.'); return basePut(n.datos, n.version); });
     }).catch(function(){});
   }
   function subirFoto(version){
@@ -326,10 +412,24 @@
     if(txt === enNubeTxt && enNubeDe === negId() && version === (st.version || 0)){ traza('igual', d); if(cambiosN === n0){ st.sucio = false; guardarSt(); } return Promise.resolve('igual'); }
     var foto = JSON.parse(txt); traza('subir', foto, version);
     var tocoProtegido = esEquipo() && (!baseMem || protegidoDe(foto) !== protegidoDe(baseMem));
-    return rpc('guardar_datos', { p_negocio: st.negocio.id, p_datos: foto, p_version: version })
+    // 1.69.0: si la base es la versión de la nube que se va a reemplazar, solo viajan las partes que cambiaron.
+    var cambios = null;
+    if(!partesNo && baseMem && baseMemDe === negId() && baseVer === version){
+      try{ cambios = cambiosDe(baseMem, foto); }catch(e){ cambios = null; }
+      if(cambios && !Object.keys(cambios).length){ enNubeTxt = txt; enNubeDe = negId(); if(cambiosN === n0){ st.sucio = false; guardarSt(); } traza('igual', foto); return Promise.resolve('igual'); }
+      if(cambios && JSON.stringify(cambios).length > txt.length * 0.6) cambios = null;   // casi todo cambió: va completo
+    }
+    var envio = cambios
+      ? rpc('guardar_cambios', { p_negocio: st.negocio.id, p_cambios: cambios, p_version: version }).catch(function(e){
+          if(noExiste(e)){ partesNo = true; return rpc('guardar_datos', { p_negocio: st.negocio.id, p_datos: foto, p_version: version }); }
+          throw e;
+        })
+      : rpc('guardar_datos', { p_negocio: st.negocio.id, p_datos: foto, p_version: version });
+    if(cambios) traza('subir-partes', foto, Object.keys(cambios));
+    return envio
       .then(function(v){
         traza('subido', foto, v); st.version = v; if(cambiosN === n0) st.sucio = false; st.ultimo = Date.now(); ultimoError = ''; fallos = 0; enNubeTxt = txt; enNubeDe = negId(); guardarSt(); avisarOtros(v);
-        return basePut(foto).then(function(){ if(tocoProtegido) return revisarRevertido(foto); });
+        return basePut(foto, v).then(function(){ if(tocoProtegido) return revisarRevertido(foto); });
       });
   }
   function subir(){
@@ -349,7 +449,9 @@
         if(remotoPendiente){ remotoPendiente = false; revisarNube(); }
       });
   }
-  function leerNube(){
+  function leerNube(){ return leerCambios().then(function(x){ return x || leerTodo(); }); }
+  function leerTodo(){
+    parchesSeguidos = 0;
     return conTiempo(cliente().then(function(c){ return c.from('datos_negocio').select('datos,version').eq('negocio_id', st.negocio.id).single(); }), T.rpc, 'leer')
       .then(function(r){ if(r.error) throw r.error; return r.data; });
   }
@@ -363,7 +465,7 @@
       return aplicarProtegido(mezcla).then(function(){
         // 1.68.1: este equipo ya tiene lo de la nube: esa es la base nueva. Antes, si la subida volvía a chocar (varios
         // celulares a la vez), la siguiente mezcla usaba la base vieja y sumaba otra vez lo que ya se había juntado.
-        baseMem = nube.datos; baseMemDe = negId(); enNubeTxt = '';
+        baseMem = nube.datos; baseMemDe = negId(); baseVer = nube.version; enNubeTxt = '';
         return subirFoto(nube.version);
       });
       // (sin aviso: los datos de los celulares se juntan solos, en silencio — el dueño pidió quitar esos avisos)
@@ -391,7 +493,7 @@
         return (reemplazar ? aplicar(n.datos, respaldarLocal === true) : aplicarProtegido(n.datos, respaldarLocal === true)).then(function(){
           // Solo se da por «igual a la nube» si nada se tocó mientras se ponían los datos (si no, eso hay que subirlo).
           var d = datosApp(); enNubeTxt = (st.sucio || cambiosN !== n0) ? '' : (d ? JSON.stringify(d) : ''); enNubeDe = negId();
-          return basePut(n.datos);
+          return basePut(n.datos, n.version);
         });
       });
     });
@@ -702,7 +804,7 @@
   function crearNegocio(nombre){
     var d = datosApp() || {};
     return rpc('crear_negocio', { p_nombre: nombre || d.businessName || 'Mi negocio', p_datos: d, p_nombre_usuario: st.nombre || null })
-      .then(function(id){ st.negocio = { id: id, nombre: nombre || d.businessName || 'Mi negocio', rol: 'dueno' }; st.sede = sedeActual(); st.version = 1; st.sucio = false; st.ultimo = Date.now(); guardarSt(); return basePut(clonar(d)); })
+      .then(function(id){ st.negocio = { id: id, nombre: nombre || d.businessName || 'Mi negocio', rol: 'dueno' }; st.sede = sedeActual(); st.version = 1; st.sucio = false; st.ultimo = Date.now(); guardarSt(); return basePut(clonar(d), 1); })
       .then(function(){ arrancar(); });
   }
   function elegir(n){
@@ -757,7 +859,7 @@
     return leerNube().then(function(nube){
       var mezcla = local ? fusionar(null, local, nube.datos) : nube.datos;
       return aplicarProtegido(mezcla, true).then(function(){ return rpc('guardar_datos', { p_negocio: n.id, p_datos: datosApp() || mezcla, p_version: nube.version }); })
-        .then(function(v){ st.version = v; st.sucio = false; st.ultimo = Date.now(); guardarSt(); return basePut(clonar(mezcla)); });
+        .then(function(v){ st.version = v; st.sucio = false; st.ultimo = Date.now(); guardarSt(); return basePut(clonar(mezcla), v); });
     }).then(function(){ arrancar(); });
   }
   function conectado(email){ return !!(st.negocio && st.email === String(email || '').trim().toLowerCase()); }

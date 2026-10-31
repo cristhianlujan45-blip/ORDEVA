@@ -7,6 +7,7 @@
 //  4. Cuánto tarda un «+» en verse en el otro celular.
 //  5. Indicador ✓ / ⏳ / ⚠️ arriba; sin internet el toque queda y se envía solo al volver.
 //  6. Un mesero que cambia un precio sin permiso: el servidor no lo deja y SU celular vuelve a mostrar el precio real.
+//  7. Solo viaja lo que cambió (un «+» no sube ni baja el negocio entero).
 'use strict';
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const fs = require('fs');
@@ -112,6 +113,13 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){
     const ok3 = await igualesEn(41, 40000);
     chk('3. Negocio con 4000 ventas: 10 toques en cada celular mientras llegan los datos del otro → 41 en los dos', ok3, [await qty(CEL.p), await qty(PC.p)]);
     if(!ok3){ await volcar(CEL.p, 'cel1'); await volcar(PC.p, 'cel2'); }
+    // ===== 7. Solo viaja lo que cambió =====
+    const NEGID = await CEL.p.evaluate(() => window.ventoNube.negocio().id);
+    const tam = (await sb.sql("select octet_length(datos::text) d, (select count(*)::int from datos_cambios where negocio_id = $1) n, (select max(octet_length(cambios::text)) from datos_cambios where negocio_id = $1 and version > (select version - 10 from datos_negocio where negocio_id = $1)) c from datos_negocio where negocio_id = $1", [NEGID]))[0];
+    chk('7. Con 4000 ventas, cada «+» viaja como un cambio pequeño (' + Math.round(tam.c / 1024) + ' KB) y no el negocio entero (' + Math.round(tam.d / 1024) + ' KB)', tam.n > 10 && tam.c < tam.d / 20, tam);
+    const tr = await Promise.all([CEL.p, PC.p].map(p => p.evaluate(() => (window.__nubeTraza || []).map(x => x.ev))));
+    chk('7. Los celulares suben por partes y bajan por partes', tr.some(t => t.includes('subir-partes')) && tr.some(t => t.includes('bajar-partes')), tr.map(t => [...new Set(t)]));
+
     chk('3. La cuenta abierta en cada celular muestra ×41', await esperar(CEL.p, () => /41/.test((document.querySelector('#itemsContainer .li-qty-val') || {}).textContent || ''), null, 8000) &&
       await esperar(PC.p, () => /41/.test((document.querySelector('#itemsContainer .li-qty-val') || {}).textContent || ''), null, 8000), [await enPantalla(CEL.p), await enPantalla(PC.p)]);
     // ===== 5. Indicador de sincronización =====

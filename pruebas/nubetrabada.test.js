@@ -54,10 +54,10 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){
     async function crear(p, biz, email, pass){ await p.fill('#authBiz', biz); await p.fill('#authUser', email); await p.fill('#authPass', pass); await p.click('#authBtn'); }
     const agregar = (p, nom) => p.evaluate(n => { data.products.push({ id: 'p-' + n.replace(/\W/g, ''), name: n, price: 4000, categoryId: null }); saveData(); }, nom);
     const tiene = (p, nom, ms) => { const vis = () => p.evaluate(() => document.dispatchEvent(new Event('visibilitychange'))).catch(() => {}); vis(); return esperar(p, n => data.products.some(x => x.name === n), nom, ms || 15000); };
-    // Cuelga (sin contestar nunca) las próximas «n» llamadas a guardar_datos de ese celular.
+    // Cuelga (sin contestar nunca) las próximas «n» llamadas a guardar_datos o guardar_cambios (1.69.0: subir por partes) de ese celular.
     async function colgarGuardado(c, n){
       let quedan = n; c.colgadas = c.colgadas || 0;
-      await c.p.route(/\/rest\/v1\/rpc\/guardar_datos/, rt => { if(quedan > 0){ quedan--; c.colgadas++; return; } return rt.fallback(); });
+      await c.p.route(/\/rest\/v1\/rpc\/guardar_(datos|cambios)/, rt => { if(quedan > 0){ quedan--; c.colgadas++; return; } return rt.fallback(); });
     }
 
     // Preparar: A crea la cuenta, B entra a la misma
