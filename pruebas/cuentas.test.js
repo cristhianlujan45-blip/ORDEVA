@@ -93,7 +93,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){
     chk('2. Mismo correo y su contraseña: entra a la cuenta que ya existe (no crea otra)', await dentro(B.p));
     await cerrarTodo(B.p);
     chk('2. B quedó en el MISMO negocio de la nube', await esperar(B.p, n => (window.ventoNube.negocio() || {}).id === n, NEG, 10000));
-    chk('2. B ve los datos de A («Club Ana», nombre «Bar Ana»)', await esperar(B.p, () => data.products.some(p => p.name === 'Club Ana') && data.businessName === 'Bar Ana', null, 10000), await B.p.evaluate(() => data.businessName));
+    chk('2. B ve los datos de A («Club Ana», nombre «Bar Ana»)', await esperar(B.p, () => !!data && data.products.some(p => p.name === 'Club Ana') && data.businessName === 'Bar Ana', null, 10000), await B.p.evaluate(() => data.businessName));
     chk('2. No se creó ningún negocio «Bar Copia»', Number((await uno("select count(*) n from negocios where nombre = 'Bar Copia'")).n) === 0);
 
     // ===== 3. Celular C: «¿Ya tienes cuenta?» → entra con el correo =====
@@ -110,18 +110,18 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){
     chk('3. C no ve el tutorial de bienvenida del negocio nuevo (ya tiene datos)', !(await C.p.evaluate(() => !!document.querySelector('#onbSaltar') && document.querySelector('#onbSaltar').offsetParent)));
     await salirApp(C.p);
     await entrar(C.p, 'ana@bar.co', 'clave123');
-    chk('3. Al volver a entrar en C (usuario ya guardado) sigue igual', await dentro(C.p) && await esperar(C.p, () => data.products.some(p => p.name === 'Club Ana'), null, 8000));
+    chk('3. Al volver a entrar en C (usuario ya guardado) sigue igual', await dentro(C.p) && await esperar(C.p, () => !!data && data.products.some(p => p.name === 'Club Ana'), null, 8000));
     await cerrarTodo(C.p);
 
     // ===== 4. Lo que cambia un celular le llega al otro =====
     await agregar(B.p, 'Poker de B');
     chk('4. El cambio de B sube a la nube', await esperarNube(NEG, d => nombres(d).includes('Poker de B')));
     await A.p.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
-    chk('4. A recibe lo que agregó B', await esperar(A.p, () => data.products.some(p => p.name === 'Poker de B'), null, 12000));
+    chk('4. A recibe lo que agregó B', await esperar(A.p, () => !!data && data.products.some(p => p.name === 'Poker de B'), null, 12000));
     await agregar(A.p, 'Aguardiente de A');
     await esperarNube(NEG, d => nombres(d).includes('Aguardiente de A'));
     await C.p.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
-    chk('4. C recibe lo que agregó A', await esperar(C.p, () => data.products.some(p => p.name === 'Aguardiente de A') && data.products.some(p => p.name === 'Poker de B'), null, 12000));
+    chk('4. C recibe lo que agregó A', await esperar(C.p, () => !!data && data.products.some(p => p.name === 'Aguardiente de A') && data.products.some(p => p.name === 'Poker de B'), null, 12000));
 
     // ===== 4b. Cambiar la contraseña en un celular la cambia en todos =====
     const cambio = await A.p.evaluate(async () => {
@@ -134,7 +134,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){
     chk('4b. En la nube quedó la contraseña nueva', Number((await uno("select count(*) n from auth.users where email = 'ana@bar.co' and encrypted_password = extensions.crypt('nueva999', encrypted_password)")).n) === 1);
     await salirApp(C.p);
     await entrar(C.p, 'ana@bar.co', 'nueva999');
-    chk('4b. En C (que tenía guardada la anterior) entra con la contraseña nueva', await dentro(C.p) && await esperar(C.p, () => data.products.some(p => p.name === 'Club Ana'), null, 8000));
+    chk('4b. En C (que tenía guardada la anterior) entra con la contraseña nueva', await dentro(C.p) && await esperar(C.p, () => !!data && data.products.some(p => p.name === 'Club Ana'), null, 8000));
     await cerrarTodo(C.p);
     await salirApp(C.p);
     await entrar(C.p, 'ana@bar.co', 'clave123');
@@ -178,7 +178,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){
     chk('6. El negocio de Ana no se mezcló con el otro', !nombres(ana.datos).includes('Solo de Otro') && ana.datos.businessName === 'Bar Ana', nombres(ana.datos));
     await salirApp(A.p);
     await entrar(A.p, 'ana@bar.co', 'nueva999');
-    chk('6. Ana vuelve a entrar en A y ve sus datos (y no los del otro)', await dentro(A.p) && await esperar(A.p, () => data.products.some(p => p.name === 'Poker de B') && !data.products.some(p => p.name === 'Solo de Otro'), null, 10000));
+    chk('6. Ana vuelve a entrar en A y ve sus datos (y no los del otro)', await dentro(A.p) && await esperar(A.p, () => !!data && data.products.some(p => p.name === 'Poker de B') && !data.products.some(p => p.name === 'Solo de Otro'), null, 10000));
     await cerrarTodo(A.p);
     chk('6. … y A vuelve a sincronizar con el negocio de Ana', await esperar(A.p, n => (window.ventoNube.negocio() || {}).id === n, NEG, 12000));
     await agregar(A.p, 'Ana otra vez');
