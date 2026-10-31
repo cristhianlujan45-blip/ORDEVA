@@ -50,6 +50,8 @@ jobs:
         run: |
           npm install --prefix pruebas --no-save --no-audit --no-fund playwright@1.63.0 pg@8 @supabase/supabase-js@2.117.2 acorn@8.14.0 acorn-walk@8.3.4 html2canvas@1.4.1 >/dev/null
           npx --prefix pruebas playwright install --with-deps chromium webkit >/dev/null
+          # ivaexcel abre el .xlsx con openpyxl; si no se puede instalar, la prueba lo lee con lo que trae Python.
+          python3 -m pip install --quiet --break-system-packages openpyxl==3.1.5 || echo 'openpyxl no se pudo instalar: ivaexcel usa zipfile'
       - name: Pruebas
         env:
           VENTO_PG_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres

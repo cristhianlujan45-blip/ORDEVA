@@ -71,15 +71,52 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     const ruta = path.join(os.tmpdir(), 'ordeva-prueba-' + process.pid + '.xlsx');
     await dl.saveAs(ruta);
     chk('3. Se descarga un archivo .xlsx', /\.xlsx$/.test(dl.suggestedFilename()) && fs.statSync(ruta).size > 1000, dl.suggestedFilename());
-    const py = spawnSync('python3', ['-c', `
-import sys, json, openpyxl
-wb = openpyxl.load_workbook(sys.argv[1])
-out = {'hojas': wb.sheetnames}
-def filas(n): return [[c for c in r] for r in wb[n].iter_rows(values_only=True)]
+    // Con openpyxl (una librería de hojas de cálculo) si está; si no (algunas máquinas de GitHub), con lo que trae Python:
+    // el ZIP se revisa con sus CRC (testzip) y las hojas se leen del XML.
+    const py = spawnSync('python3', ['-I', '-c', `
+import sys, json, re, zipfile
+import xml.etree.ElementTree as ET
+try:
+    import openpyxl
+    wb = openpyxl.load_workbook(sys.argv[1])
+    nombres = wb.sheetnames
+    def filas(n): return [[c for c in r] for r in wb[n].iter_rows(values_only=True)]
+    lector = 'openpyxl'
+except ImportError:
+    z = zipfile.ZipFile(sys.argv[1])
+    if z.testzip() is not None: raise SystemExit('ZIP dañado')
+    N = '{http://schemas.openxmlformats.org/spreadsheetml/2006/main}'
+    R = '{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id'
+    libro = ET.fromstring(z.read('xl/workbook.xml'))
+    rels = {r.get('Id'): r.get('Target') for r in ET.fromstring(z.read('xl/_rels/workbook.xml.rels'))}
+    hojas = {h.get('name'): 'xl/' + rels[h.get(R)] for h in libro.iter(N + 'sheet')}
+    nombres = list(hojas)
+    def col(ref):
+        n = 0
+        for ch in re.match('[A-Z]+', ref).group(0): n = n * 26 + ord(ch) - 64
+        return n - 1
+    def valor(c):
+        if c.get('t') == 'inlineStr': return ''.join(t.text or '' for t in c.iter(N + 't'))
+        v = c.find(N + 'v')
+        if v is None: return None
+        x = float(v.text)
+        return int(x) if x.is_integer() else x
+    def filas(n):
+        out = []
+        for fila in ET.fromstring(z.read(hojas[n])).iter(N + 'row'):
+            r = []
+            for c in fila.iter(N + 'c'):
+                i = col(c.get('r'))
+                while len(r) < i: r.append(None)
+                r.append(valor(c))
+            out.append(r)
+        return out
+    lector = 'zipfile'
+out = {'hojas': nombres, 'lector': lector}
 out['resumen'] = filas('Resumen'); out['ventas'] = filas('Ventas'); out['productos'] = filas('Productos vendidos'); out['gastos'] = filas('Gastos'); out['iva'] = filas('IVA')
 print(json.dumps(out, default=str))`, ruta], { encoding: 'utf8' });
     let X = null; try{ X = JSON.parse(py.stdout); }catch(e){}
-    chk('3. Es un Excel de verdad: una librería de hojas de cálculo lo abre, con 5 hojas', X && JSON.stringify(X.hojas) === JSON.stringify(['Resumen', 'Ventas', 'Productos vendidos', 'Gastos', 'IVA']), py.stderr || X);
+    chk('3. Es un Excel de verdad: se abre (' + (X && X.lector) + ') con 5 hojas', X && JSON.stringify(X.hojas) === JSON.stringify(['Resumen', 'Ventas', 'Productos vendidos', 'Gastos', 'IVA']), py.stderr || X);
     if(X){
       const val = (f, c) => (f.find(r => r[0] === c) || [])[1];
       chk('3. Resumen: vendido 43300, salidas 61900 (gasto + factura de compra), gastos operativos 50000 e IVA por pagar 2400 (como números)', val(X.resumen, 'Vendido') === 43300 && val(X.resumen, 'Gastos (salidas)') === 61900 && val(X.resumen, 'Gastos operativos') === 50000 && val(X.resumen, 'IVA por pagar (estimado)') === 2400, X.resumen);

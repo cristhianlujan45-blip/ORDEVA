@@ -60,5 +60,12 @@ que no se demore ni un segundo».
   por la actualización automática, porque la versión era la misma. No se reprodujo en 20 corridas con diagnóstico, que
   anotaba por qué se recarga. Queda anotado.
 
+- **GitHub: la corrida de la 1.69.0 salió en rojo** solo por `ivaexcel`.
+  - La máquina de GitHub no tenía `openpyxl`, la librería con que la prueba abre el Excel. El Excel estaba bien.
+  - Ahora el flujo instala `openpyxl`. Si no puede, la prueba lee el .xlsx con lo que trae Python (ZIP con sus CRC y el
+    XML de cada hoja).
+  - Se probó por los dos caminos: 18/18 cada uno.
+- **Lista completa de CI más las de sincronización** (67 pruebas), después de estos arreglos: todas pasaron.
+
 ## Lo que no se probó
 - Celulares reales con datos móviles. El tiempo real depende de la red: con 4G normal se espera menos de 1 s.
