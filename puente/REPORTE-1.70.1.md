@@ -62,8 +62,12 @@ Se reprodujo contra el servidor de pruebas (PostgreSQL real): con la 1.70.0 fall
 - **Qué pasaba:** con la sincronización de menos de 1 s, los datos de otro equipo podían llegar en los 0,3 s entre un
   cambio de este celular y su anotación. Ese cambio (ej. «Precio cambiado») no quedaba en la actividad.
 - **Arreglo:** antes de poner los datos que llegan se anota lo pendiente (`app/30-actividad-equipo-huella.js`).
-- **Prueba:** `equipoactividad` falló 3 de 5 veces con la 1.70.0 más el arreglo de la entrada; con este arreglo pasó
-  4 de 4.
+- **Prueba:** `equipoactividad`:
+  - con la 1.70.0, 0 fallas en 3 corridas;
+  - con el arreglo de la entrada y sin este, 3 fallas en 6 corridas;
+  - con este arreglo, 4 de 4 bien.
+  - No es seguro que la diferencia venga del arreglo de la entrada: esta prueba no vuelve a entrar en ningún equipo y
+    las muestras son pequeñas.
 
 ## Si a alguien ya le pasó
 - **En la nube:** quedan respaldos automáticos, uno por hora, los últimos 48. Los restaura el soporte de ORDEVA (no están
