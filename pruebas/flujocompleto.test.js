@@ -166,7 +166,10 @@ const b64u = s => Buffer.from(s).toString('base64url');
       await p.click('#addItemBtn');
       const enMesa = await p.evaluate(() => (data.tables[1].items || []).reduce((s, i) => s + (i.qty || 0), 0));
       await p.evaluate(() => { const b = [document.getElementById('vsCobrarBtn'), document.getElementById('chargeBtn')].find(x => x && x.offsetParent); b.click(); });   // 1.72.5: un solo «Cobrar»
-      if(await p.waitForSelector('button[data-v="0"]', { timeout: 600 }).then(() => true, () => false)) await p.click('button[data-v="0"]');   // propina (si está activada)
+      // Lo que salga primero: la propina (si está activada) o la ventana de cobro. Con la máquina cargada la propina puede
+      // tardar más de medio segundo (antes la prueba la daba por no activada y se quedaba esperando el cobro).
+      const primero = await p.waitForSelector('button[data-v="0"], .pz-pago-ov.show button[data-m="efectivo"]', { timeout: 15000 }).then(e => e.getAttribute('data-v'), () => null);
+      if(primero === '0') await p.click('button[data-v="0"]');   // sin propina
       await p.click('button[data-m="efectivo"]');
       const cobro = await esperar(p, h => data.history.length > h, h0, 6000);
       return Object.assign({ enMesa, pedida, cobro }, await p.evaluate(() => ({ h: data.history.length, total: (data.history[0] || {}).total, debe: (data.history[0] || {}).debt, libre: !(data.tables[1].items || []).length })));
