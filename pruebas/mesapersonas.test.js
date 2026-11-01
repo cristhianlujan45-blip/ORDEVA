@@ -73,6 +73,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     // ===== Mesa 5: «¿Quién paga?» con el nombre de una persona =====
     await p.evaluate(() => document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')));
     await preparar(5);
+    await p.evaluate(() => { const c = document.querySelector('#overlay .pay-card[data-scope="table"]'); if(c && c.classList.contains('cs-plegado')) document.getElementById('csAbono').click(); }); await p.waitForTimeout(150);   // 1.72.5: abonos plegados
     await p.fill('#paymentNote', 'luis'); await pagarMesa(6000);
     chk('10. En el pago de la mesa, «¿Quién paga? luis» → el pago queda a nombre de Luis (no de la cuenta general)', /Luis[\s\S]*✅ Pagó \$\s?6\.000/.test(await txt('#mesaQuienPago')) && await p.evaluate(() => data.tables[5].payments[0].personId === 'pl'), await txt('#mesaQuienPago'));
 

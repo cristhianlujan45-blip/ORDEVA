@@ -45,3 +45,18 @@ Para cobrar una mesa (o habitación, silla…) había **tres caminos** que se pi
   - `hotel`: el aviso de cobro;
   - `flujocompleto`.
 - **Pasan:** `modos` y `sonidos`, sin cambios.
+- **También ajustadas:** `comprobantepantallazo`, `vueltas`, `mesapersonas` y `divtest` abren el plegable antes de usar el
+  cuadro de abonos. `flujocompleto` espera lo que salga primero, la propina o el cobro (con la máquina cargada la propina
+  tardaba más de 0,6 s), y toca el «Efectivo» de la ventana de cobro.
+- **Arreglo de paso:** al abrir otra cuenta, el plegado y el monto del botón se ponen al día de una; antes tardaban hasta
+  0,3 s.
+
+## Resultado
+- **La lista completa de CI (71):** 69 de 71 en la primera vuelta. Las 2 que fallaron (`flujocompleto` y
+  `comprobantepantallazo`) eran de las pruebas mismas.
+- **Al repetir:** después de ajustarlas pasan, junto con todas las que tocan el cobro y los abonos: `cobrosimple` 21,
+  `flujocompleto` 87 (también con la máquina cargada), `mesacomoda` 16, `vistasencilla` 45, `hotel` 15, `mesapersonas` 22,
+  `comprobantepantallazo` 39, `vueltas` 25 y `divtest` 6.
+
+## Lo que no se probó
+- En un celular o una tableta de verdad (se probó con las medidas de pantalla en Chromium).

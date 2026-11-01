@@ -170,7 +170,7 @@ const b64u = s => Buffer.from(s).toString('base64url');
       // tardar más de medio segundo (antes la prueba la daba por no activada y se quedaba esperando el cobro).
       const primero = await p.waitForSelector('button[data-v="0"], .pz-pago-ov.show button[data-m="efectivo"]', { timeout: 15000 }).then(e => e.getAttribute('data-v'), () => null);
       if(primero === '0') await p.click('button[data-v="0"]');   // sin propina
-      await p.click('button[data-m="efectivo"]');
+      await p.click('.pz-pago-ov.show button[data-m="efectivo"]');   // el de la ventana de cobro (el cuadro de abonos plegado también tiene uno)
       const cobro = await esperar(p, h => data.history.length > h, h0, 6000);
       return Object.assign({ enMesa, pedida, cobro }, await p.evaluate(() => ({ h: data.history.length, total: (data.history[0] || {}).total, debe: (data.history[0] || {}).debt, libre: !(data.tables[1].items || []).length })));
     }
