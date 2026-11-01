@@ -33,6 +33,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     });
     chk('Abre la mesa y agrega 3 Poker', r.qty === 3, r);
     chk('Nada se sale de la pantalla del iPhone', r.ancho <= r.vw + 2, r);
+    await p.evaluate(() => { const c = document.querySelector('#overlay .pay-card[data-scope="table"]'); if(c && c.classList.contains('cs-plegado')) document.getElementById('csAbono').click(); }); await p.waitForTimeout(150);   // 1.72.5: abonos plegados
     await p.fill('#paymentAmount', '11400').catch(() => {});
     await p.click('#addPaymentBtn').catch(() => {});
     await p.waitForTimeout(500);

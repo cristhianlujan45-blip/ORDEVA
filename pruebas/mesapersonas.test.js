@@ -22,7 +22,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
         people: [{ id: 'pa', name: 'Ana' }, { id: 'pl', name: 'Luis' }], payments: [] };
       saveData(); renderMesas(); openTableModal(m);
     }, mesa);
-    const pagarMesa = async v => { await p.fill('#paymentAmount', String(v)); await p.click('#addPaymentBtn'); await p.waitForTimeout(150); };
+    const pagarMesa = async v => { await p.evaluate(() => { const c = document.querySelector('#overlay .pay-card[data-scope="table"]'); if(c && c.classList.contains('cs-plegado')) document.getElementById('csAbono').click(); }); await p.waitForTimeout(150); await p.fill('#paymentAmount', String(v)); await p.click('#addPaymentBtn'); await p.waitForTimeout(150); };
     const pagarPersona = async (id, v) => { await p.evaluate(id => openPersonModal(id), id); await p.fill('#personPaymentAmount', String(v)); await p.click('#personAddPaymentBtn'); await p.waitForTimeout(150); await p.evaluate(() => closePersonModal()); };
     const txt = sel => p.evaluate(s => (document.querySelector(s) || {}).textContent || '', sel);
     await p.evaluate(async () => { try{ await enterApp('test', null); }catch(x){} localStorage.setItem('cm-tutorial-seen', '1'); });

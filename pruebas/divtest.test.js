@@ -7,6 +7,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
  await p.evaluate(async()=>{ try{await enterApp('test',null);}catch(x){} localStorage.setItem('cm-tutorial-seen','1'); document.querySelectorAll('.overlay.show').forEach(o=>o.classList.remove('show'));
    data.products=[{id:'pk',name:'Poker',price:3000,stock:50}]; data.tables[3]={items:[{productId:'pk',name:'Poker',price:3000,qty:10,personId:null,history:[]}],people:[],payments:[]}; saveData(); renderMesas(); openTableModal(3); });
  await p.waitForTimeout(600);
+ await p.evaluate(()=>{ const c=document.querySelector('#overlay .pay-card[data-scope="table"]'); if(c && c.classList.contains('cs-plegado')) document.getElementById('csAbono').click(); }); await p.waitForTimeout(150);   // 1.72.5: abonos plegados
  await p.evaluate(()=>document.getElementById('paymentNote').scrollIntoView({block:'start'}));
  const sel='.pay-card[data-scope=table]';
  chk('Se ve el divisor con el número de personas (÷ 2)', /÷\s*2/.test(await p.textContent(sel+' .pay-div-n')));

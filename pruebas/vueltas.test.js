@@ -94,6 +94,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     // ===== 7. Cuenta (mesa) =====
     await p.evaluate(() => { data.tables[3] = { items: [{ productId: 'a', name: 'Almuerzo', price: 37500, qty: 1 }], payments: [], people: [] }; saveData(); openTableModal(3); });
     await p.waitForTimeout(400);
+    await p.evaluate(() => { const c = document.querySelector('#overlay .pay-card[data-scope="table"]'); if(c && c.classList.contains('cs-plegado')) document.getElementById('csAbono').click(); }); await p.waitForTimeout(150);   // 1.72.5: abonos plegados
     await p.fill('#paymentAmount', '50000');
     v = await p.evaluate(() => document.querySelector('.pay-vu[data-vu="table"]').textContent);
     chk('7. Cuenta: al escribir $50.000 en efectivo ya dice «Cambio que debe devolver $12.500»', /Cambio que debe devolver: \$\s?12\.500/.test(v), v);
@@ -103,6 +104,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     await p.evaluate(() => { data.tables[4] = { items: [{ productId: 'a', name: 'Almuerzo', price: 37500, qty: 1 }], payments: [], people: [] }; saveData(); document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')); openTableModal(4); });
     await p.waitForTimeout(400);
     await p.evaluate(() => { const s = document.getElementById('paymentMethod'); s.value = 'transferencia'; s.dispatchEvent(new Event('change', { bubbles: true })); });
+    await p.evaluate(() => { const c = document.querySelector('#overlay .pay-card[data-scope="table"]'); if(c && c.classList.contains('cs-plegado')) document.getElementById('csAbono').click(); }); await p.waitForTimeout(150);   // 1.72.5: abonos plegados
     await p.fill('#paymentAmount', '50000'); await p.click('#addPaymentBtn'); await p.waitForTimeout(300);
     const preg = await p.evaluate(() => { const o = document.getElementById('confirmOverlay'); return o && o.classList.contains('show') ? document.getElementById('confirmMessage').textContent : null; });
     await p.click('#confirmCancelBtn'); await p.waitForTimeout(300);

@@ -79,6 +79,7 @@ const RECIBOS = {
     await p.evaluate(() => { window.__lt.length = 0; window.__clic = true; });
     // El clic en 📎 abre el selector de archivos del sistema: aquí se toma el archivo directo.
     await p.evaluate(() => { const i = document.getElementById('rcptInput'); i.click = () => {}; });
+    if(await p.evaluate(() => !!document.getElementById('csAbono') && !document.getElementById('payRcptBtn').offsetParent)) await p.click('#csAbono');   // 1.72.5: el comprobante está en «➕ Abono o dividir la cuenta»
     await p.click('#payRcptBtn');
     await archivoEn('#rcptInput', 'davi');
     await p.waitForFunction(() => { const o = document.getElementById('compOv'); return o && o.classList.contains('show'); }, null, { timeout: 30000 }).catch(() => {});
@@ -93,6 +94,7 @@ const RECIBOS = {
 
     // ===== 4. Comprobante repetido: «NO LO ACEPTES», el pantallazo sigue adjunto hasta que se quite =====
     await p.evaluate(() => { document.getElementById('compOv').classList.remove('show'); data.tables[1].items.push({ productId: 'p2', name: 'Picada', price: 30000, qty: 1 }); });
+    if(await p.evaluate(() => !!document.getElementById('csAbono') && !document.getElementById('payRcptBtn').offsetParent)) await p.click('#csAbono');   // 1.72.5: el comprobante está en «➕ Abono o dividir la cuenta»
     await p.click('#payRcptBtn');
     await archivoEn('#rcptInput', 'davi');
     await p.waitForFunction(() => { const o = document.getElementById('compOv'); return o && o.classList.contains('show') && /NO LO ACEPTES/.test(o.innerText); }, null, { timeout: 30000 }).catch(() => {});
