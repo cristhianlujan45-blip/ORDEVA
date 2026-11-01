@@ -36,7 +36,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     if(r.top < 0 || r.bottom > innerHeight + 1 || r.left < 0 || r.right > innerWidth + 1) return s + ': fuera (' + Math.round(r.top) + '..' + Math.round(r.bottom) + ')';
     const x = r.left + r.width / 2, y = r.top + Math.min(r.height / 2, 12), t = document.elementFromPoint(x, y);
     return t && (t === e || e.contains(t) || t.contains(e)) ? '' : s + ': tapado por ' + (t ? (t.id || t.className || t.tagName) : '¿?'); }).filter(Boolean), sels);
-  const MESA = ['#modalTitle', '#addProductSearch', '#itemsContainer .line-item-wrap:last-of-type .line-item', '#mesaTotal', '#paymentsContainer', '#modalConsumo', '#modalTotal', '#paymentAmount', '#addPaymentBtn', '#vsCobrarBtn', '#printReceiptBtn', '#closeModalBtn', '#chargeBtn'];
+  const MESA = ['#modalTitle', '#addProductSearch', '#itemsContainer .line-item-wrap:last-of-type .line-item', '#mesaTotal', '#paymentsContainer', '#modalConsumo', '#modalTotal', '#csAbono', '#vsCobrarBtn', '#printReceiptBtn', '#closeModalBtn'];   // 1.72.5: un solo «Cobrar»; abonos plegados
   try{
     for(const [w, h, n] of [[1366, 768, 'computador 1366×768'], [820, 1180, 'tableta vertical 820×1180'], [1180, 820, 'tableta horizontal 1180×820']]){
       const { ctx, p } = await abrir(w, h, n !== 'computador 1366×768');
@@ -45,12 +45,13 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
         return { cabe: r.top >= 0 && r.bottom <= innerHeight, ancho: Math.round(r.width), vw: innerWidth, lado: b.left >= a.right - 2 && Math.abs(a.top - b.top) < 4, scroll: m.scrollHeight - m.clientHeight }; });
       chk('1. ' + n + ': la cuenta cabe en la pantalla, en dos columnas (lo pedido | pagos y cobro)', v.cabe && v.lado && v.ancho > v.vw * 0.6 && v.scroll <= 2, v);
       const no = await seVen(p, MESA);
-      chk('1. ' + n + ': se ve TODO sin desplazar (pedido, total, pagos, saldo, registrar pago, Cobrar, recibo, Cerrar, Cobrar todo)', !no.length, no);
+      chk('1. ' + n + ': se ve TODO sin desplazar (pedido, total, pagos, saldo, abono, Cobrar, recibo, Cerrar)', !no.length, no);
       if(n === 'computador 1366×768'){
         // 2. Funciona igual
         const q0 = await p.evaluate(() => data.tables[1].items[0].qty);
         await p.click('#itemsContainer .li-qty-plus[data-idx="0"]'); await p.waitForTimeout(150);
         chk('2. «+» de Águila suma (6 → 7) con la ventana en dos columnas', (await p.evaluate(() => data.tables[1].items[0].qty)) === q0 + 1);
+        await p.click('#csAbono'); await p.waitForTimeout(200);   // «➕ Abono o dividir la cuenta»
         await p.fill('#paymentAmount', '20000'); await p.click('#addPaymentBtn'); await p.waitForTimeout(400);
         const pg = await p.evaluate(() => ({ n: data.tables[1].payments.length, saldo: tableBalance(1), txt: document.getElementById('modalTotal').textContent }));
         chk('2. Registrar un abono de $20.000 lo guarda y el saldo baja ($102.200 − $30.000 = $72.200)', pg.n === 2 && pg.saldo === 72200 && /72\.200/.test(pg.txt), pg);
@@ -78,8 +79,8 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     no = await seVen(p, ['#modalTitle', '#vsCobrarBtn']);
     chk('4. Celular: al bajar, el título (con Opciones) sigue arriba y «Cobrar» sigue abajo', !no.length, no);
     await p.evaluate(() => { const m = document.querySelector('#overlay .mesa-modal'); m.scrollTop = m.scrollHeight; }); await p.waitForTimeout(250);
-    no = await seVen(p, ['#modalTitle', '#chargeBtn', '#closeModalBtn']);
-    chk('4. Celular: al final, Cerrar y Cobrar todo, con el título arriba', !no.length, no);
+    no = await seVen(p, ['#modalTitle', '#vsCobrarBtn', '#closeModalBtn']);
+    chk('4. Celular: al final, Cerrar y Cobrar, con el título arriba', !no.length, no);
     await ctx.close();
     chk('Sin errores de página', !errs.length, errs);
   }catch(e){ mal++; console.log('❌ Excepción: ' + (e && e.stack || e)); }

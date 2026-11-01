@@ -103,9 +103,10 @@ const FOTOS = process.env.VENTO_FOTOS || '';
       await p.evaluate(() => [...document.querySelectorAll('#vsOpcOv .vs-acc')].find(x => /Cambiar el nombre/.test(x.textContent)).click()); await p.waitForTimeout(250);
       chk(nom + ' · 4. «Cambiar el nombre» hace lo mismo que el icono de antes', await p.evaluate(() => window.__ren === 1));
       await p.evaluate(() => document.querySelectorAll('.overlay.show').forEach(o => { if(o.id !== 'overlay'){ const c = o.querySelector('#confirmCancel, .btn-close, .btn-ghost'); o.classList.remove('show'); } }));
-      await p.click('#vsCobrarBtn'); await p.waitForTimeout(400);
-      v = await p.evaluate(() => ({ monto: document.getElementById('paymentAmount').value, pagos: data.tables[1].payments.length }));
-      chk(nom + ' · 4. «Cobrar» pone lo que falta ($10.000) en el pago, sin registrarlo solo', Number(v.monto) === 10000 && v.pagos === 1, v);
+      await p.click('#vsCobrarBtn'); await p.waitForTimeout(500);
+      v = await p.evaluate(() => ({ ventana: !!document.querySelector('.pz-pago-ov.show'), total: ((document.querySelector('.pz-pago-ov.show .pz-pago') || {}).innerText || '').match(/\$\s?[\d.]+/), pagos: data.tables[1].payments.length }));
+      chk(nom + ' · 4. «Cobrar» abre el cobro con lo que falta ($10.000), sin registrar nada solo (1.72.5: un solo cobro)', v.ventana && /10\.000/.test(String(v.total)) && v.pagos === 1, v);
+      await p.evaluate(() => { const c = document.querySelector('.pz-pago-ov.show .pz-cancel'); if(c) c.click(); }); await p.waitForTimeout(300);
       await p.evaluate(() => { try{ closeModal(); }catch(e){} document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')); });
 
       // 5. Un empleado no ve la Caja

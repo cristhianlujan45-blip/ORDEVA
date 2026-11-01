@@ -4,7 +4,7 @@
 //     cuenta tiene 1». La tarjeta de la habitación dice el día y las noches.
 //  3. «Poner 2 noches» deja 2 en la tarifa (y el total sube); el aviso desaparece.
 //  4. «Cambiar llegada» a hoy → 1 noche.
-//  5. Cobrar todo y liberar: el botón dice «habitación» (no «mesa»); la venta guarda la llegada y las noches; la
+//  5. Cobrar (1.72.5: «💰 Cobrar $…», la ventana de la Caja POS): la venta guarda la llegada y las noches; la
 //     habitación queda libre y sin llegada para el siguiente huésped.
 //  6. En un bar no aparece nada de esto.
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
@@ -65,16 +65,16 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     chk('4. Con más noches en la cuenta que las que lleva: solo una nota, sin aviso', /más de las que lleva/.test(v.t) && !/Lleva/.test(v.t), v.t);
     // ===== 5 =====
     v = await p.evaluate(() => document.getElementById('chargeBtn').textContent);
-    chk('5. El botón dice «Cobrar todo y liberar habitación»', /liberar habitación/.test(v), v);
-    await p.click('#chargeBtn'); await p.waitForTimeout(400);
+    chk('5. El botón dice cuánto se cobra («💰 Cobrar $396.000»)', /Cobrar \$\s?396\.000/.test(v), v);
+    await p.evaluate(() => { const b = [document.getElementById('vsCobrarBtn'), document.getElementById('chargeBtn')].find(x => x && x.offsetParent); b.click(); }); await p.waitForTimeout(500);
     v = await p.evaluate(() => [...document.querySelectorAll('button[data-m]')].filter(b => b.offsetParent).map(b => b.textContent));
     await p.evaluate(() => { const b = [...document.querySelectorAll('button[data-m="efectivo"]')].find(x => x.offsetParent); b && b.click(); }); await p.waitForTimeout(700);
-    v = await p.evaluate(() => { const h = data.history[0] || {}; return { total: h.total, noches: h.noches, entrada: h.entrada, libre: !(data.tables[1].items || []).length, sinEntrada: !('entrada' in data.tables[1]), toast: (document.getElementById('toast') || {}).innerText || '' }; });
+    v = await p.evaluate(() => { const h = data.history[0] || {}; return { total: h.total, noches: h.noches, entrada: h.entrada, libre: !(data.tables[1].items || []).length, sinEntrada: !('entrada' in data.tables[1]), toast: [...document.querySelectorAll('.pz-dmsg')].map(x => x.innerText).join(' ') || (document.getElementById('toast') || {}).innerText || '' }; });
     chk('5. Cobrado: la venta guarda la llegada y las noches; la habitación queda libre y sin llegada', v.total === 396000 && v.noches === 1 && !!v.entrada && v.libre && v.sinEntrada, v);
-    chk('5. El aviso dice «habitación liberada» (no «mesa»)', /habitación liberada/i.test(v.toast) && !/mesa/i.test(v.toast), v.toast);
+    chk('5. El aviso dice «Cobrado … · Habitación 1» (no «mesa»), con «Deshacer»', /Cobrado/.test(v.toast) && /Habitación 1/.test(v.toast) && !/mesa/i.test(v.toast), v.toast);
     // Confirmar con la cuenta ya pagada: el botón de la ventana también usa la palabra del negocio
     await p.evaluate(() => { const pr = data.products[0]; data.tables[2] = { items: [{ productId: pr.id, name: pr.name, price: pr.price, size: '', qty: 1, personId: null, history: [{ qty: 1, at: Date.now(), k: 'c' }] }], payments: [{ note: 'abono', amount: pr.price, method: 'efectivo', at: Date.now() }], people: [] }; saveData(); openTableModal(2); });
-    await p.waitForTimeout(500); await p.click('#chargeBtn'); await p.waitForTimeout(400);
+    await p.waitForTimeout(500); await p.evaluate(() => { const b = [document.getElementById('vsCobrarBtn'), document.getElementById('chargeBtn')].find(x => x && x.offsetParent); b.click(); }); await p.waitForTimeout(400);
     v = await p.evaluate(() => document.getElementById('confirmOkBtn').textContent);
     chk('5. «¿Cerrar esta cuenta?» → «Sí, liberar habitación»', /liberar habitación/.test(v), v);
     await p.click('#confirmOkBtn'); await p.waitForTimeout(400);

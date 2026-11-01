@@ -658,6 +658,20 @@ document.getElementById('chargeBtn').addEventListener('click', async ()=>{
     }
   }
   const saldo = tableBalance(currentTable);
+  // 1.72.5: un solo cobro, el MISMO de la Caja POS (¿con cuánto paga? con el vuelto en grande, Nequi, DaviPlata, tarjeta,
+  // mixto, fiado con el nombre, teclado). Cobra el saldo, libera la mesa y deja «Deshacer» (ventoPOS.cobrarMesa).
+  if(saldo > 0 && window.ventoPOS && typeof window.ventoPOS.cobrarMesa === 'function'){
+    const mesa = currentTable;
+    const loyaltyPhone0 = data.loyaltyOn ? document.getElementById('loyaltyPhone').value : '';
+    const loyaltyName0 = data.loyaltyOn ? document.getElementById('loyaltyName').value : '';
+    const entry = await window.ventoPOS.cobrarMesa(mesa, { desdeCuenta: true });
+    if(!entry) return;                                   // canceló el cobro: la mesa sigue igual
+    if(loyaltyPhone0) registrarVisitaCliente(loyaltyPhone0, loyaltyName0, entry.total);
+    saveData(); renderLoyaltyClientsList();
+    if(currentTable === mesa){ overlay.classList.remove('show'); currentTable = null; }
+    renderMesas();
+    return;
+  }
   if(saldo > 0){
     // Un solo paso: cómo pagaron todo el saldo. Se registra ese pago y la mesa se libera sin deuda.
     const metodo = await askPagoCierre(saldo, tableLabel(currentTable));

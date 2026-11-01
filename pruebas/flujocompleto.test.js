@@ -165,7 +165,7 @@ const b64u = s => Buffer.from(s).toString('base64url');
       const pedida = +(await p.inputValue('#addQty'));
       await p.click('#addItemBtn');
       const enMesa = await p.evaluate(() => (data.tables[1].items || []).reduce((s, i) => s + (i.qty || 0), 0));
-      await p.click('#chargeBtn');
+      await p.evaluate(() => { const b = [document.getElementById('vsCobrarBtn'), document.getElementById('chargeBtn')].find(x => x && x.offsetParent); b.click(); });   // 1.72.5: un solo «Cobrar»
       if(await p.waitForSelector('button[data-v="0"]', { timeout: 600 }).then(() => true, () => false)) await p.click('button[data-v="0"]');   // propina (si está activada)
       await p.click('button[data-m="efectivo"]');
       const cobro = await esperar(p, h => data.history.length > h, h0, 6000);
