@@ -80,6 +80,10 @@
     huella, y que solo el servidor puede llamar las funciones);
   - `adminreal` 50/50, `errores` 37/37, `admin` 169/169 y las 52 migraciones se aplican.
 
+## Resultado final
+- La lista completa de CI: **70 de 70** pasaron, después del arreglo de la sincronización.
+- Las **25 pruebas del servidor** pasan. La migración nueva no borra datos y se aplica sobre una base vacía.
+
 ## 5. Sincronización: un dato podía no llegar nunca a la nube (`nube/vento-nube.js`)
 Lo encontró la prueba `qrprivado`. Fallaba de vez en cuando en GitHub (1.72.1) y aquí, con la máquina cargada.
 - **Qué pasaba:**
