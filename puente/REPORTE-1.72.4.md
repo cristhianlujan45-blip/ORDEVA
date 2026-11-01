@@ -80,6 +80,39 @@
     huella, y que solo el servidor puede llamar las funciones);
   - `adminreal` 50/50, `errores` 37/37, `admin` 169/169 y las 52 migraciones se aplican.
 
+## 5. Sincronización: un dato podía no llegar nunca a la nube (`nube/vento-nube.js`)
+Lo encontró la prueba `qrprivado`. Fallaba de vez en cuando en GitHub (1.72.1) y aquí, con la máquina cargada.
+- **Qué pasaba:**
+  - Al crear el negocio en la nube, ORDEVA mandaba los datos del equipo.
+  - Cuando el servidor respondía, guardaba como «copia de referencia» los datos **de ese momento**, no los que había
+    mandado.
+  - Si algo cambió en ese par de segundos (por ejemplo el canal de pedidos del QR, que se anota al abrir), la referencia
+    creía que ya estaba en la nube. La subida por partes solo manda lo distinto a la referencia, así que ese dato **no se
+    subía nunca**.
+- **Consecuencias:**
+  - el canal de pedidos del QR no quedaba protegido en el servidor (con la clave pública se podían leer los pedidos);
+  - un ajuste hecho en esos segundos podía no llegar a los otros equipos.
+- **Arreglo:** la referencia es la foto que de verdad se mandó. Si algo cambió mientras tanto, queda pendiente y se sube.
+- **Comprobado con carga:**
+  - antes del arreglo, 2 de 4 copias de `qrprivado` fallaban;
+  - después, las que corrieron pasaron 9 de 9 (otras 2 no arrancaron porque chocaron al armar la base de pruebas, que es
+    del montaje y no de la app).
+- **Diagnóstico nuevo:** si `qrprivado` vuelve a fallar, ahora muestra el rastreo de la sincronización.
+
+## 6. Pruebas ajustadas
+- **`escanear`:** prueba con una cámara falsa que muestra un código de barras EAN-13 **de verdad** y el lector real (ZXing).
+  Ahora prueba el modo escáner dentro de la caja:
+  - abre en 310 ms y lee el código de verdad;
+  - cinco toques abren una sola cámara;
+  - funciona con el permiso lento y con la cámara ocupada;
+  - sin permiso lo explica, y al tocar 📷 otra vez abre;
+  - al cerrar se apaga.
+
+  Pasa 13 de 13. Mientras la cámara abre, más toques en 📷 no hacen nada (pedirla otra vez la deja ocupada en muchos
+  celulares).
+- **`clavevarios`:** la espera de la prueba leía la pantalla de entrada mientras la página se recargaba. Era de la prueba,
+  no de la app.
+
 ## Lo que no se probó
 - **Cámara:** con un celular de verdad y su cámara. Las pruebas usan la cámara falsa de Chromium y un lector simulado.
 - **Guardar la contraseña con huella:** en un Android, iPhone o Windows de verdad. Depende del administrador de contraseñas

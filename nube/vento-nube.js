@@ -822,9 +822,17 @@
   }
   function misNegocios(){ return rpc('mis_negocios'); }
   function crearNegocio(nombre){
-    var d = datosApp() || {};
+    // 1.72.4: una FOTO de los datos al mandarlos (antes eran los datos vivos de la app). La copia de referencia se tomaba al
+    // responder el servidor: lo que cambió mientras tanto (p. ej. el canal de pedidos del QR, que se anota al abrir) quedaba
+    // en la referencia como si ya estuviera en la nube, la subida por partes no lo mandaba nunca y el canal no quedaba
+    // protegido en el servidor. Ahora la referencia es lo que de verdad se mandó y lo que cambió después se sube.
+    var d = clonar(datosApp() || {}), n0 = cambiosN;
     return rpc('crear_negocio', { p_nombre: nombre || d.businessName || 'Mi negocio', p_datos: d, p_nombre_usuario: st.nombre || null })
-      .then(function(id){ st.negocio = { id: id, nombre: nombre || d.businessName || 'Mi negocio', rol: 'dueno' }; st.sede = sedeActual(); st.version = 1; st.sucio = false; st.ultimo = Date.now(); guardarSt(); return basePut(clonar(d), 1); })
+      .then(function(id){
+        var cambio = cambiosN !== n0 || !igual(datosApp() || {}, d);
+        st.negocio = { id: id, nombre: nombre || d.businessName || 'Mi negocio', rol: 'dueno' }; st.sede = sedeActual(); st.version = 1; st.sucio = cambio; st.ultimo = Date.now(); guardarSt();
+        return basePut(d, 1).then(function(){ if(cambio) reintentar(50); });
+      })
       .then(function(){ arrancar(); });
   }
   function elegir(n){

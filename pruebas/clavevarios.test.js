@@ -23,15 +23,16 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const o = 
     await ctx.route('**/*', rt => { const u = new URL(rt.request().url()); return (u.hostname === 'localhost' || u.hostname === '127.0.0.1') ? rt.continue() : rt.abort(); });
     await enrutar(ctx, sb, { enVivo: true });
     await ctx.addInitScript(() => { try{ localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento-hola', '0'); }catch(e){} });
-    const p = await ctx.newPage(); p.on('pageerror', e => errs.push(nombre + ': ' + e.message));
+    const p = await ctx.newPage(); p.on('pageerror', e => errs.push(nombre + ': ' + e.message + ' @ ' + String(e.stack || '').split('\n').slice(1, 3).join(' | ').replace(/https?:\/\/[^/]+\//g, '')));
     p.on('dialog', d => d.accept(p.__clave || ''));
     await p.goto(BASE + '/index.html');
     await p.waitForFunction(() => window.ventoNube && window.ventoNube.crearCuenta, null, { timeout: 15000 });
     return { ctx, p };
   }
-  const adentro = p => p.evaluate(() => document.getElementById('authOverlay').hidden && !!authUser);
-  const dentro = p => esperar(p, () => document.getElementById('authOverlay').hidden && !!authUser, null, 20000);
-  const fuera = (p, ms) => esperar(p, () => !document.getElementById('authOverlay').hidden && !!document.getElementById('authUser'), null, ms || 20000);
+  // Con resguardo: mientras la página se recarga, la pantalla de entrada todavía no existe.
+  const adentro = p => p.evaluate(() => { const o = document.getElementById('authOverlay'); return !!o && o.hidden && typeof authUser !== 'undefined' && !!authUser; });
+  const dentro = p => esperar(p, () => { const o = document.getElementById('authOverlay'); return !!o && o.hidden && typeof authUser !== 'undefined' && !!authUser; }, null, 20000);
+  const fuera = (p, ms) => esperar(p, () => { const o = document.getElementById('authOverlay'); return !!o && !o.hidden && !!document.getElementById('authUser'); }, null, ms || 20000);
   const cerrarTodo = p => p.evaluate(() => document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')));
   const entrar = async (p, clave) => {
     await p.waitForSelector('#authUser', { timeout: 15000 }).catch(() => {});

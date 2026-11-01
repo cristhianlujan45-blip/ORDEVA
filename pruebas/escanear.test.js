@@ -1,5 +1,7 @@
 // 📷 Auditoría del lector de códigos (ORDEVA 1.65.7), con una cámara de prueba que muestra un código de barras EAN-13 de
 // verdad (lo dibuja esta prueba) y el MISMO lector de ORDEVA (el del equipo o ZXing):
+//  (1.72.4: en la Caja POS la cámara queda DENTRO de la caja —modo escáner, lib/vento-escaner-caja.js—; la venta rápida
+//   sigue con la ventana de la cámara.)
 //  1. Un toque en «📷» de la caja: la cámara abre de una y el código leído se suma a la venta.
 //  2. Tocar el botón 5 veces seguidas: abre UNA sola cámara y funciona (antes cada toque cerraba la apertura en curso y
 //     muchos celulares terminaban en «No se pudo abrir la cámara»).
@@ -63,20 +65,23 @@ function videoY4m(bits){
       saveData(); window.ventoPOS.vaciar(); window.ventoPOS.abrirCaja(); }, code);
     await p.waitForSelector('#pzCajaOv [data-scan]', { timeout: 8000 });
     const esperar = (fn, arg, ms) => p.waitForFunction(fn, arg, { timeout: ms || 10000, polling: 100 }).then(() => true, () => false);
-    const estado = () => p.evaluate(() => ({ abierta: document.getElementById('scanOverlay').classList.contains('show'), video: document.getElementById('scanVideo').videoWidth,
-      txt: document.getElementById('scanStatus').textContent, reintentar: !document.getElementById('scanRetryBtn').hidden, pedidas: window.__cam.pedidas, vivas: window.__cam.vivas(),
-      venta: window.ventoPOS.carrito().map(l => l.name + '×' + (l.qty || l.cantidad || 1)) }));
-    const cerrar = () => p.evaluate(() => closeScanOverlay());
+    // La cámara de la caja (modo escáner): el panel #ecPanel con su video y su aviso.
+    const VID = () => p.evaluate(() => { const v = document.getElementById('ecVideo'); return v ? v.videoWidth : 0; });
+    const estado = () => p.evaluate(() => { const v = document.getElementById('ecVideo'), t = document.getElementById('ecEstado');
+      return { abierta: !!document.getElementById('ecPanel'), video: v ? v.videoWidth : 0, txt: t ? t.textContent : '', pedidas: window.__cam.pedidas, vivas: window.__cam.vivas(),
+        venta: window.ventoPOS.carrito().map(l => l.name + '×' + (l.qty || l.cantidad || 1)) }; });
+    const cerrar = () => p.evaluate(() => window.ventoEscanerCaja.apagar(true));
+    const conVideo = "(() => { const v = document.getElementById('ecVideo'); return !!v && v.videoWidth > 0; })()";
 
     // La cámara se ve ENCIMA de la caja (antes se abría detrás y no se veía).
-    const visible = () => p.evaluate(() => { const v = document.getElementById('scanVideo').getBoundingClientRect(), el = document.elementFromPoint(v.left + v.width / 2, v.top + v.height / 2); return !!el && !!el.closest('#scanOverlay'); });
+    const visible = () => p.evaluate(() => { const v = document.getElementById('ecVideo').getBoundingClientRect(), el = document.elementFromPoint(v.left + v.width / 2, v.top + v.height / 2); return !!el && !!el.closest('#ecPanel'); });
 
     // ===== 1. Un toque =====
     const t0 = Date.now();
     await p.click('#pzCajaOv [data-scan]');
-    const abrio = await esperar(() => document.getElementById('scanVideo').videoWidth > 0, null, 8000), tAbrir = Date.now() - t0;
+    const abrio = await esperar(conVideo, null, 8000), tAbrir = Date.now() - t0;
     chk('1. Un toque en «📷»: la cámara abre de una (' + tAbrir + ' ms)', abrio && tAbrir < 4000, await estado());
-    chk('1. … y se VE encima de la caja (antes quedaba escondida detrás)', await visible());
+    chk('1. … y se VE dentro de la caja, arriba (no tapada)', await visible());
     chk('1. El código EAN-13 que se ve en la cámara se lee y la «Gaseosa del lector» se suma a la venta', await esperar(() => window.ventoPOS.carrito().some(l => /Gaseosa del lector/.test(l.name)), null, 12000), await estado());
     await cerrar();
     chk('1. Al cerrar, la cámara se apaga (no queda prendida)', await esperar(() => window.__cam.vivas() === 0, null, 3000), await estado());
@@ -84,7 +89,7 @@ function videoY4m(bits){
     // ===== 2. Cinco toques seguidos =====
     await p.evaluate(() => { window.ventoPOS.vaciar(); window.__cam.pedidas = 0; window.__cam.espera = 600; });   // un celular normal tarda un poco en abrir
     for(let i = 0; i < 5; i++){ await p.click('#pzCajaOv [data-scan]', { force: true }).catch(() => p.evaluate(() => document.querySelector('#pzCajaOv [data-scan]').click())); await p.waitForTimeout(80); }
-    await esperar(() => document.getElementById('scanVideo').videoWidth > 0, null, 8000);
+    await esperar(conVideo, null, 8000);
     await p.waitForTimeout(800);
     let e = await estado();
     chk('2. Cinco toques seguidos: abre UNA sola cámara, sin error', e.abierta && e.video > 0 && e.pedidas === 1 && e.vivas === 1 && !/No se pudo/.test(e.txt), e);
@@ -95,24 +100,24 @@ function videoY4m(bits){
     await p.evaluate(() => { window.ventoPOS.vaciar(); window.__cam.pedidas = 0; window.__cam.espera = 2500; });
     await p.evaluate(() => document.querySelector('#pzCajaOv [data-scan]').click());
     for(let i = 0; i < 3; i++){ await p.waitForTimeout(400); await p.evaluate(() => document.querySelector('#pzCajaOv [data-scan]').click()); }
-    chk('3. El celular tarda en dar el permiso y se toca varias veces: abre igual, una sola vez', await esperar(() => document.getElementById('scanVideo').videoWidth > 0 && window.__cam.vivas() === 1, null, 8000) &&
+    chk('3. El celular tarda en dar el permiso y se toca varias veces: abre igual, una sola vez', await esperar(conVideo + " && window.__cam.vivas() === 1", null, 8000) &&
       await p.evaluate(() => window.__cam.pedidas === 1 && window.__cam.vivas() === 1), await estado());
     await cerrar();
 
     // ===== 4. Cámara ocupada un momento =====
     await p.evaluate(() => { window.__cam.pedidas = 0; window.__cam.espera = 0; window.__cam.fallar = ['NotReadableError', 'NotReadableError']; });
     await p.evaluate(() => document.querySelector('#pzCajaOv [data-scan]').click());
-    chk('4. Cámara ocupada (NotReadableError dos veces): se reintenta sola y abre', await esperar(() => document.getElementById('scanVideo').videoWidth > 0, null, 8000), await estado());
+    chk('4. Cámara ocupada (NotReadableError dos veces): se reintenta sola y abre', await esperar(conVideo, null, 8000), await estado());
     await cerrar();
 
     // ===== 5. Sin permiso =====
     await p.evaluate(() => { window.__cam.fallar = ['NotAllowedError']; });
     await p.evaluate(() => document.querySelector('#pzCajaOv [data-scan]').click());
-    await esperar(() => !document.getElementById('scanRetryBtn').hidden, null, 6000);
+    await esperar(() => /permiso/i.test((document.getElementById('ecEstado') || {}).textContent || ''), null, 6000);
     e = await estado();
-    chk('5. Sin permiso: lo dice claro (cómo permitir la cámara) y sale «🔄 Reintentar»', e.reintentar && /permi/i.test(e.txt) && !/^No se pudo abrir la cámara\. Revisa/.test(e.txt), e);
-    await p.click('#scanRetryBtn');
-    chk('5. «Reintentar» (ya con permiso) abre la cámara', await esperar(() => document.getElementById('scanVideo').videoWidth > 0 && document.getElementById('scanRetryBtn').hidden, null, 8000), await estado());
+    chk('5. Sin permiso: lo dice claro (cómo permitir la cámara y volver a tocar 📷)', /permiso/i.test(e.txt) && /📷/.test(e.txt) && !e.video, e);
+    await p.evaluate(() => document.querySelector('#pzCajaOv [data-scan]').click());
+    chk('5. Tocar 📷 otra vez (ya con permiso) abre la cámara', await esperar(conVideo, null, 8000), await estado());
     await cerrar();
 
     // ===== 6. Un solo botón =====
@@ -121,7 +126,7 @@ function videoY4m(bits){
     chk('6. Un solo botón para escanear en la caja y en la venta rápida (el celular como lector está dentro de la cámara)', botones.caja >= 1 && !botones.celCaja && botones.ventaRapida === 1 && !botones.celVenta, botones);
     await p.evaluate(() => { window.ventoPOS.cerrarCaja(); document.getElementById('qsScanBtn').click(); });
     chk('6. «📷 Escanear» de la venta rápida abre la cámara y ofrece el celular como lector adentro', await esperar(() => document.getElementById('scanVideo').videoWidth > 0 && !!document.querySelector('#scanCelBox [data-lcel="ver"]'), null, 8000), await estado());
-    await cerrar();
+    await p.evaluate(() => closeScanOverlay());
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.stack || e)); }
   chk('Sin errores de página', !errs.length, errs);
   await b.close(); try{ fs.rmSync(dir, { recursive: true, force: true }); }catch(e){}

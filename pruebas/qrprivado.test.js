@@ -30,7 +30,9 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
       const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
       await ctx.route('**/*', rt => { const u = new URL(rt.request().url()); return (u.hostname === 'localhost' || u.hostname === '127.0.0.1') ? rt.continue() : rt.abort(); });
       await enrutar(ctx, sb);
-      await ctx.addInitScript(() => { try{ localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento-hola', '0'); }catch(e){} });
+      await ctx.addInitScript(() => { try{ localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento-hola', '0'); }catch(e){}
+        // Rastreo de la sincronización (solo se lee si algo falla): qué tenía cada foto de los canales del QR.
+        window.__nubeTraza = []; window.__nubeTrazaQ = o => ({ canales: o && o.qrCanales, prods: o && o.products ? o.products.length : null }); });
       const p = await ctx.newPage(); p.on('pageerror', e => errs.push(nombre + ': ' + e.message));
       await p.goto(url);
       return p;
@@ -55,7 +57,9 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     const info = await A.evaluate(() => { const M = window.vitoMod, c = M.qCfg(); return { topic: c.topic, link: M.linkMesa(c, 1) }; });
     let anot = null;
     for(let i = 0; i < 100 && !anot; i++){ anot = await uno('select negocio_id from canal_privado where canal = $1', [info.topic]); if(!anot) await A.waitForTimeout(300); }
-    chk('1. El canal de pedidos del negocio quedó anotado en el servidor a su nombre', anot && anot.negocio_id === NEG, anot);
+    chk('1. El canal de pedidos del negocio quedó anotado en el servidor a su nombre', anot && anot.negocio_id === NEG,
+      anot || { topic: info.topic, nube: await uno("select version, datos->'qrCanales' canales, datos->'qrFijo' fijo from datos_negocio where negocio_id = $1", [NEG]),
+        local: await A.evaluate(() => ({ canales: data.qrCanales, sync: window.ventoNube && window.ventoNube.estado ? window.ventoNube.estado() : null, traza: (window.__nubeTraza || []).map(x => [x.ev, x.v, x.n, JSON.stringify(x.q), JSON.stringify(x.x || '').slice(0, 80)].join(' ')) })), anotados: await uno('select count(*) n from canal_privado') });
     // Sin esperar los 7 días de gracia:
     await sb.sql("update canal_privado set cerrar_desde = now() - interval '1 minute'");
     await sb.sql("update servidor_config set valor = jsonb_build_object('t', now() - interval '1 minute') where clave = 'canal_privado_desde'");
