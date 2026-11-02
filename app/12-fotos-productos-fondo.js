@@ -1215,7 +1215,7 @@ function iniCast(){
       const pb = document.getElementById('apkPermisos'), pt = document.getElementById('apkPermisosTxt');
       if(pb && typeof A.permisos === 'function'){
         const pintarP = () => { try{ const e = JSON.parse(A.permisos() || '{}'); const f = (ok, n) => (ok ? '✅ ' : '⚠️ ') + n;
-          pt.textContent = [f(e.microfono, 'Micrófono'), f(e.camara, 'Cámara'), f(e.avisos, 'Avisos'), f(e.bateria, 'Sin ahorro de batería'), f(e.fondo, 'Trabajando de fondo')].join(' · ');
+          pt.textContent = [f(e.microfono, 'Micrófono'), f(e.camara, 'Cámara'), f(e.avisos, 'Avisos')].concat(e.sms === undefined ? [] : [f(e.sms, 'SMS del banco')]).concat([f(e.bateria, 'Sin ahorro de batería'), f(e.fondo, 'Trabajando de fondo')]).join(' · ');
           const todo = e.microfono && e.camara && e.avisos && e.bateria; pb.textContent = todo ? '🔐 Permisos del celular: todo listo' : '🔐 Dar los permisos que faltan'; pt.hidden = false; }catch(x){} };
         pb.hidden = false; pintarP();
         pb.onclick = () => { try{ A.pedirPermisos(); }catch(x){} setTimeout(pintarP, 4000); };

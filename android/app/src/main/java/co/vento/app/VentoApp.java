@@ -370,22 +370,6 @@ public class VentoApp extends Application {
         ui.post(() -> { if (ttsPago == null) crearVoz(); });
     }
 
-    /** 1.65.7: ¿el motor de voz de los pagos sigue vivo? Se le pide un silencio de 1 ms (no se oye): si no lo acepta, Android
-     *  lo cerró por su cuenta y se prepara uno nuevo YA, no cuando llegue el próximo pago (que esperaba segundos). */
-    static void revisarVozPagos() {
-        if (app == null) return;
-        ui.post(() -> {
-            if (ttsPago == null) { crearVoz(); return; }
-            if (!ttsPagoListo || pagosHablando > 0) return;
-            int r;
-            try { r = Build.VERSION.SDK_INT >= 21 ? ttsPago.playSilentUtterance(1, TextToSpeech.QUEUE_ADD, "vivo" + System.nanoTime()) : TextToSpeech.SUCCESS; }
-            catch (Throwable e) { r = TextToSpeech.ERROR; }
-            if (r == TextToSpeech.SUCCESS) return;
-            try { ttsPago.shutdown(); } catch (Throwable ignorado) { }
-            ttsPago = null; ttsPagoListo = false;
-            crearVoz();
-        });
-    }
 
     // ---------- Qué motor de voz usar (1.52.0) ----------
     // En Samsung el motor de fábrica («Samsung TTS») muchas veces NO trae la voz en español: el pago se mandaba a decir
@@ -1767,6 +1751,7 @@ public class VentoApp extends Application {
                 JSONObject o = new JSONObject();
                 o.put("microfono", tiene(Manifest.permission.RECORD_AUDIO));
                 o.put("camara", tiene(Manifest.permission.CAMERA));
+                o.put("sms", tiene(Manifest.permission.RECEIVE_SMS));   // 1.72.6: SMS del banco directo (SmsBanco)
                 o.put("avisos", Build.VERSION.SDK_INT < 33 || tiene(Manifest.permission.POST_NOTIFICATIONS));
                 boolean bat = true;
                 if (Build.VERSION.SDK_INT >= 23) {

@@ -9,6 +9,8 @@
     <!-- Comandos de voz y cámara (facturas, códigos de barras) -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- 1.72.6: los SMS del banco (DaviPlata 85888, Bold 890412…) directo, también con el celular bloqueado (SmsBanco). -->
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <!-- Trabajar de fondo: pedidos y música con la app cerrada, la pantalla apagada o al prender el celular -->
@@ -129,6 +131,11 @@
         <!-- Al prender el celular o actualizar la app, Vento vuelve a trabajar de fondo sola -->
         <!-- 🔄 Respuesta del instalador de Android a la actualización automática -->
         <receiver android:name=".Actualizador$Receptor" android:exported="false" />
+        <receiver android:name=".SmsBanco" android:exported="true" android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter android:priority="999">
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
         <!-- El APK de la actualización para el instalador de Android («¿Actualizar esta app?»): funciona en todos los
              celulares (Xiaomi y otros bloquean la instalación desde la app en segundo plano). -->
         <provider

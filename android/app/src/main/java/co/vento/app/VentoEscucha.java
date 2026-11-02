@@ -35,6 +35,7 @@ public class VentoEscucha extends NotificationListenerService {
     @Override
     public void onListenerConnected() {
         activa = this;
+        rastro("🔌 Android volvió a conectar la lectura de avisos");
         seguirViva();
         // Los pagos que llegaron mientras Vento no estaba escuchando (el celular la cerró, se reinició…) siguen en la barra
         // de notificaciones: se toman ahora (los que ya se habían visto no se repiten).
@@ -49,9 +50,20 @@ public class VentoEscucha extends NotificationListenerService {
     @Override
     public void onListenerDisconnected() {
         if (activa == this) activa = null;
+        rastro("🔌 Android CORTÓ la lectura de avisos");
         // Si Android la desconecta (ahorro de batería, actualización), se pide volver a conectarla: sin esto los pagos
         // dejaban de llegar hasta abrir Vento otra vez.
         try { requestRebind(new android.content.ComponentName(this, VentoEscucha.class)); } catch (Exception ignorado) { }
+    }
+
+    /** 1.72.6: cuándo Android corta o vuelve a conectar la lectura, y si el celular estaba bloqueado (para el diagnóstico). */
+    private void rastro(String que) {
+        try {
+            boolean bloq = false;
+            android.app.KeyguardManager k = (android.app.KeyguardManager) getSystemService(KEYGUARD_SERVICE);
+            if (k != null) bloq = k.isKeyguardLocked();
+            traza(getSharedPreferences("vento", MODE_PRIVATE), "Vento", "", que + (bloq ? " · celular bloqueado" : " · celular en uso"));
+        } catch (Throwable ignorado) { }
     }
 
     @Override public void onDestroy() { if (activa == this) activa = null; super.onDestroy(); }
@@ -247,11 +259,22 @@ public class VentoEscucha extends NotificationListenerService {
             // Los de antes: solo los de los últimos 10 min (los más viejos ya se dijeron o no son de ahora). Cada mensaje se
             // reconoce por su hora y su texto: el mismo nunca suena dos veces.
             if (i != nuevo && ahora - hora > 10 * 60_000L) continue;
+            // 1.72.6: ya lo tomó el lector directo de SMS (SmsBanco), apenas llegó: este aviso no vuelve a sonar.
+            if (SmsBanco.yaTomado(sp, (String) m[0])) continue;
             tiempos(hora, ahora);
             if (procesarSms(sp, remitente, (String) m[0], "M:" + hora + ":", callado)) alguno = true;
         }
-        if (nuevo < 0 && procesarSms(sp, remitente, principal, prefijo, callado)) alguno = true;
+        if (nuevo < 0 && !SmsBanco.yaTomado(sp, principal) && procesarSms(sp, remitente, principal, prefijo, callado)) alguno = true;
         return alguno;
+    }
+
+    /** 📩 1.72.6: un SMS del banco que llegó DIRECTO (SmsBanco), también con el celular bloqueado: las mismas reglas que el
+     *  aviso, y la página lo toma apenas despierte. true si se tomó como pago. */
+    static boolean smsDirecto(SharedPreferences sp, String remitente, String cuerpo, String prefijo) {
+        boolean r = false;
+        try { r = procesarSms(sp, remitente, cuerpo, prefijo, false); } catch (Exception ignorado) { }
+        if (r) { try { if (activa != null) activa.seguirViva(); else if (!VentoServicio.activo && VentoApp.app != null) VentoServicio.arrancar(VentoApp.app); } catch (Throwable ignorado) { } avisarPagina(); }
+        return r;
     }
 
     // Lo que se dijo desde un RESUMEN en los últimos 30 s: si después llega el aviso normal con el mismo texto, es el mismo
