@@ -519,7 +519,12 @@ function mesoraRevisarVersionNueva(){
    • Antes de recargar se guarda todo. Si después de recargar sigue la versión vieja (la página nueva todavía no llega a
      todos los servidores), no vuelve a intentarlo en 10 minutos: nunca se queda recargando en vueltas. */
 const MESORA_AUTO_KEY = 'vento-actualizando';
+// 1.72.6: la última vez que se tocó, deslizó o escribió en ORDEVA. La versión nueva NO recarga mientras se está usando
+// (antes podía recargar en medio de deslizar los pedidos): espera 2 minutos sin tocar nada, o a que ORDEVA quede de fondo.
+let mesoraUltimoUso = Date.now();
+['pointerdown', 'touchstart', 'wheel', 'scroll', 'keydown'].forEach(ev => window.addEventListener(ev, () => { mesoraUltimoUso = Date.now(); }, { passive: true, capture: true }));
 function mesoraOcupado(){
+  if(Date.now() - mesoraUltimoUso < 120000) return true;
   const a = document.activeElement;
   if(a && (/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) || a.isContentEditable) && a.offsetParent !== null) return true;
   return !!document.querySelector('.overlay.show, #pgVentana, #lcelOv, .vs-sheet.show');
@@ -553,7 +558,7 @@ function mesoraAvisoVersionNueva(nueva){
   let falta = 15;
   const t = setInterval(() => {
     if(document.hidden){ clearInterval(t); mesoraRecargarYa(nueva); return; }
-    if(mesoraOcupado()){ txt.textContent = 'Se actualiza sola cuando termines lo que estás haciendo.'; return; }
+    if(mesoraOcupado()){ falta = 15; txt.textContent = 'Se actualiza sola cuando dejes de usar ORDEVA un momento (o con «Actualizar ahora»).'; return; }
     txt.textContent = 'Se actualiza sola en ' + falta + ' s (no se pierde nada).';
     if(--falta < 0){ clearInterval(t); mesoraRecargarYa(nueva); }
   }, 1000);

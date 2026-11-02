@@ -56,7 +56,7 @@
       falta: '' },
     tienda:   { esp: ['Cuenta', 'Cuentas', '🛒', 'f'], n: 3, fun: 'd', mod: 'vb', prod: ['Producto', 'Productos'], icE: 'orden', icP: 'carrito', campos: [['marca','Marca','txt','Ej. Colgate'],['unidad','Se vende por','txt','unidad, libra, kilo, metro'],['venc','Se vence','txt','Ej. 12/2026']], inv: ['Inventario','unidades'], carta: 'Catálogo', icCarta: '🛒', gastos: ['mercancia', 'fletes', 'vencidos'], cat: 'Productos',
       vento: 'Venta rápida con lector de código de barras, inventario con alertas de lo que se acaba, fiados en la libreta, domicilios por WhatsApp y facturas de proveedor por foto.',
-      falta: 'Venta por peso con báscula conectada.' },
+      falta: '' },   // 1.72.6: la venta por peso con báscula ya existe (lib/vento-equipos.js)
     servicio: { esp: ['Silla', 'Sillas', '💺', 'f'], n: 4, fun: 'fp', mod: 'nv', prod: ['Servicio', 'Servicios'], icE: 'silla', icP: 'tijeras', campos: [['dura','Cuánto dura (minutos)','num','30'],['incluye','Qué incluye','txt','Ej. lavado, corte y peinado'],['quien','Quién lo hace','txt','Ej. cualquier barbero']], inv: ['Inventario','unidades'], carta: 'Servicios', icCarta: '💈', gastos: ['productos_srv', 'comisiones'], cat: 'Servicios',
       vento: 'Una cuenta por silla o puesto, lista de servicios con precio, clientes frecuentes con puntos, propinas y lo que gana cada empleado.',
       falta: 'Agenda de citas con recordatorio al cliente.' },

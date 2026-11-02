@@ -1630,8 +1630,27 @@ function pintarBadgesCat(){
 function abrirCarta(){pintarCat(true);$('carta').hidden=false;$('carta').scrollTop=0;document.body.style.overflow='hidden'}
 function cerrarCarta(){$('carta').hidden=true;document.body.style.overflow=''}
 $('catBtn').onclick=abrirCarta;$('catX').onclick=cerrarCarta;$('catBack').onclick=cerrarCarta;$('cq').oninput=()=>pintarCat(true);
+/* 1.72.6: al volver a la página (o con la carta en vivo) solo se vuelve a pintar si la carta o las fotos CAMBIARON, y sin
+   perder el punto donde iba el cliente. Antes se pintaba todo otra vez: la carta se devolvía arriba y las fotos se
+   cargaban de nuevo («cuando bajo vuelve a subir y se carga»). */
+let catPintada='';
+const firmaCat=()=>{try{return JSON.stringify(cat||null)+'|'+Object.keys(fotos||{}).length}catch(e){return String(Math.random())}};
+function conPosicion(fn){
+  const car=$('carta'),box=$('cat'),tb=box&&box.querySelector('.cat-tabs');
+  const st=car?car.scrollTop:0,wy=window.scrollY,tl=tb?tb.scrollLeft:0,alto=box?box.offsetHeight:0;
+  if(box&&alto)box.style.minHeight=alto+'px';           // mientras se dibujan las fotos, la página no se encoge
+  fn();
+  if(car&&car.scrollTop!==st)car.scrollTop=st;
+  if(Math.abs(window.scrollY-wy)>2)window.scrollTo(0,wy);
+  const tb2=box&&box.querySelector('.cat-tabs');if(tb2)tb2.scrollLeft=tl;
+  clearTimeout(conPosicion.t);conPosicion.t=setTimeout(()=>{if(box)box.style.minHeight=''},1500);
+}
+function repintarCat(){
+  const f=firmaCat();if(f===catPintada)return;            // nada cambió: no se toca
+  catPintada=f;conPosicion(()=>{pintarCat(!$('carta').hidden);pintarSug();});
+}
 async function cargarCat(){
-  pintarCat();if(!c){pintarCat(true);return}
+  if(!catPintada){pintarCat();if(!c){pintarCat(true);catPintada=firmaCat();return}}
   try{
     const ctrl=new AbortController(),tmo=setTimeout(()=>ctrl.abort(),6000);
     const r=await fetch('https://canal.vento.local/'+c+'k/json?poll=1&since=12h',{signal:ctrl.signal,cache:'no-store'});
@@ -1639,8 +1658,9 @@ async function cargarCat(){
     const ls=(await r.text()).trim().split('\n').filter(Boolean);
     for(let i=ls.length-1;i>=0;i--){const m=JSON.parse(ls[i]);if(m.event==='message'){cat=JSON.parse(m.message);jset('cat_'+c,cat);applyTh(cat.th);break}}
   }catch(e){}
-  await cargarFotos();
-  pintarCat(true);pintarSug();
+  if(!catPintada||Date.now()-(cargarCat.fotosT||0)>10*60000){cargarCat.fotosT=Date.now();await cargarFotos();}
+  if(!catPintada){pintarCat(true);pintarSug();catPintada=firmaCat();}
+  else repintarCat();
   catEnVivo();
 }
 /* La carta se actualiza sola mientras el cliente la tiene abierta: cuando el negocio cambia un
@@ -1649,7 +1669,7 @@ let catES=null;
 function catEnVivo(){
   if(!c||catES||!window.EventSource)return;
   try{catES=new EventSource('https://canal.vento.local/'+c+'k/sse?since='+Math.floor(Date.now()/1000));}catch(e){return}
-  catES.onmessage=ev=>{try{const m=JSON.parse(ev.data);if(m.event!=='message')return;cat=JSON.parse(m.message);jset('cat_'+c,cat);applyTh(cat.th);const abierta=!$('carta').hidden;pintarCat(abierta);pintarSug();}catch(e){}};
+  catES.onmessage=ev=>{try{const m=JSON.parse(ev.data);if(m.event!=='message')return;const nuevo=JSON.parse(m.message);if(JSON.stringify(nuevo)===JSON.stringify(cat))return;cat=nuevo;jset('cat_'+c,cat);applyTh(cat.th);repintarCat();}catch(e){}};
   catES.onerror=()=>{if(catES&&catES.readyState===2){catES=null;setTimeout(catEnVivo,5000);}};
 }
 document.addEventListener('visibilitychange',()=>{if(!document.hidden){cargarCat();}});

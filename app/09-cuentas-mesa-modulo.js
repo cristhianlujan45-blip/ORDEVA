@@ -2350,6 +2350,12 @@ async function publicarCatalogo(force){
   while(list.length && new Blob([JSON.stringify(m)]).size > 3800) list.pop();   // tope del canal de ORDEVA (~4 KB)
   const s = JSON.stringify(m);
   if(!force && s === catHash && Date.now() - catT < 3 * 36e5) return;           // se reenvía cada 3 h para que no caduque
+  // 1.72.6: lo que cambia solo (el orden de «lo más vendido», un agotado) sale como mucho una vez por minuto. Antes salía con
+  // cada venta y el celular del cliente volvía a pintar la carta una y otra vez. Un cambio de productos o precios (force) sale ya.
+  if(!force && catHash && Date.now() - catT < 60000){
+    clearTimeout(publicarCatalogo.luego); publicarCatalogo.luego = setTimeout(() => { try{ publicarCatalogo(); }catch(e){} }, 60000 - (Date.now() - catT) + 200);
+    return;
+  }
   try{
     const r = await fetch('https://canal.vento.local/' + c.topic + 'k', { method: 'POST', body: s });
     if(!r.ok) throw new Error('error ' + r.status);
