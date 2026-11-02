@@ -47,10 +47,10 @@ create table if not exists public.reservas_config (
   negocio_id uuid primary key references public.negocios(id) on delete cascade,
   publico text not null unique,
   activo boolean not null default false,
-  tipo text not null default 'mesa' check (tipo in ('habitacion', 'mesa')),
+  tipo text not null default 'mesa' check (tipo in ('habitacion', 'mesa', 'ninguno')),   -- ninguno: tiendas (solo domicilios por el agente)
   nombre text,
   recursos jsonb not null default '[]'::jsonb,        -- [{id, nombre, capacidad, precio, detalle}]
-  reglas jsonb not null default '{}'::jsonb,          -- {entrada, salida, duracion_min, abre, cierra, dias, confirmar, whatsapp, info}
+  reglas jsonb not null default '{}'::jsonb,          -- {entrada, salida, duracion_min, abre, cierra, dias, confirmar, info, domicilios, c (canal de pedidos), wa}
   actualizado_en timestamptz not null default now()
 );
 alter table public.reservas_config enable row level security;
@@ -94,7 +94,7 @@ begin
   if jsonb_typeof(coalesce(p_recursos, '[]'::jsonb)) <> 'array' or jsonb_array_length(coalesce(p_recursos, '[]'::jsonb)) > 300 then raise exception 'recursos_invalidos'; end if;
   insert into public.reservas_config(negocio_id, publico, activo, tipo, nombre, recursos, reglas)
   values (p_negocio, lower(substr(replace(gen_random_uuid()::text, '-', ''), 1, 12)), coalesce(p_activo, false),
-    case when p_tipo = 'habitacion' then 'habitacion' else 'mesa' end, left(p_nombre, 60), coalesce(p_recursos, '[]'::jsonb), coalesce(p_reglas, '{}'::jsonb))
+    case when p_tipo in ('habitacion', 'ninguno') then p_tipo else 'mesa' end, left(p_nombre, 60), coalesce(p_recursos, '[]'::jsonb), coalesce(p_reglas, '{}'::jsonb))
   on conflict (negocio_id) do update set activo = excluded.activo, tipo = excluded.tipo, nombre = excluded.nombre,
     recursos = excluded.recursos, reglas = excluded.reglas, actualizado_en = now()
   returning * into c;
