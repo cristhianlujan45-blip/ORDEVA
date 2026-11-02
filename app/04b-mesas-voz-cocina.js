@@ -1725,6 +1725,7 @@ function renderMesasList(){
   const grid = document.getElementById('tableGrid');
   grid.innerHTML = '';
   const ids = Object.keys(data.tables).map(Number).sort((a,b)=>a-b);
+  const MP = window.ventoMapa, mpCtx = MP ? MP.contexto() : null;   // 🗺️ 1.74.0: estado de cada mesa (lib/vento-mapa.js)
   ids.forEach(id=>{
     const t = data.tables[id];
     const total = tableTotal(id);
@@ -1761,9 +1762,11 @@ function renderMesasList(){
       ${!isOpen && window.ventoReservas ? window.ventoReservas.marca(id) : ''}
       ${window.vitoGrupos && window.vitoGrupos.de(id) ? '<div class="grp-tag">🔗 ' + invEsc(window.vitoGrupos.etiqueta(window.vitoGrupos.de(id))) + ' · ' + fmt(window.vitoGrupos.total(window.vitoGrupos.de(id))) + '</div>' : ''}
     `;
+    if(MP) try{ MP.tarjeta(card, id, mpCtx); }catch(x){}
     card.addEventListener('click', ()=> openTableModal(id));
     grid.appendChild(card);
   });
+  if(MP) try{ MP.lista(grid); }catch(x){}
 }
 
 /* ---------- Mapa del local: ubicar mesas libremente ---------- */
@@ -1823,6 +1826,7 @@ function renderFloorPlan(){
   const plan = document.getElementById('floorPlan');
   plan.innerHTML = '';
   const ids = Object.keys(data.tables).map(Number).sort((a,b)=>a-b);
+  const MP = window.ventoMapa, mpCtx = MP ? MP.contexto() : null;
   ids.forEach(id=>{
     const t = data.tables[id];
     const isOpen = t.items && t.items.length > 0;
@@ -1840,9 +1844,11 @@ function renderFloorPlan(){
         <div class="ft-status">${isOpen ? fmt(balance) : 'Vacía'}</div>
       </div>
     `;
+    if(MP) try{ MP.plano(el, id, mpCtx); }catch(x){}
     attachFloorDrag(el, id);
     plan.appendChild(el);
   });
+  if(MP) try{ MP.planoListo(plan); }catch(x){}
 }
 
 function attachFloorDrag(el, id){
