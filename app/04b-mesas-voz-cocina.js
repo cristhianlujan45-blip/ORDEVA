@@ -1758,6 +1758,7 @@ function renderMesasList(){
       <div class="status ${isOpen ? '' : 'empty'}">${isOpen ? fmt(balance) : 'Vacía'}</div>
       <div class="items-count">${subLine}</div>
       ${desde ? '<div class="tk-desde">⏱ Desde ' + desde + '</div>' : ''}
+      ${!isOpen && window.ventoReservas ? window.ventoReservas.marca(id) : ''}
       ${window.vitoGrupos && window.vitoGrupos.de(id) ? '<div class="grp-tag">🔗 ' + invEsc(window.vitoGrupos.etiqueta(window.vitoGrupos.de(id))) + ' · ' + fmt(window.vitoGrupos.total(window.vitoGrupos.de(id))) + '</div>' : ''}
     `;
     card.addEventListener('click', ()=> openTableModal(id));
