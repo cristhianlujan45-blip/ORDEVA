@@ -12,6 +12,7 @@
 //   9. Sin errores en la página.
 //  Tienda (1.75.0):
 //  10. Si salta el asistente queda en modo caja; el conteo dice «abiertas» y no «libres» ni «reservadas».
+//  11. Agencia de viajes: sus cuentas son clientes: «abiertas» y «Vacía» (no «libres» ni «Libre»).
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 (async () => {
@@ -136,6 +137,11 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     chk('10. Minimercado nuevo que salta el asistente: queda en modo caja (no como restaurante)', v.modo === 'tienda', v);
     chk('10. Tienda: el conteo dice «abiertas» (no «libres / ocupadas») y no muestra «reservadas»', v.res.length === 1 && /abiertas/.test(v.res[0]) && !v.res.some(x => /reservad|libre/.test(x)), v.res);
     await T.ctx.close();
+    // Agencia de viajes (1.77.0): las cuentas son clientes, no lugares
+    const A = await abrir('agencia_viajes', 'Viajes del Sol'); const ag = A.p;
+    v = await ag.evaluate(() => { renderMesas(); return { res: [...document.querySelectorAll('#mesasSummary [data-mpf]')].map(x => x.dataset.mpf + ':' + x.innerText.replace(/\s+/g, ' ').trim()), carta: (document.querySelector('#tableGrid .ticket .status') || {}).textContent }; });
+    chk('11. Agencia de viajes: el conteo dice «abiertas» (no «libres / ocupadas») y el cliente sin cuenta dice «Vacía»', v.res.length === 1 && /abiertas/.test(v.res[0]) && v.carta === 'Vacía', v);
+    await A.ctx.close();
     chk('9. Sin errores en la página', errs.length === 0, errs);
   }catch(e){ mal++; console.log('❌ Error: ' + (e.stack || e)); }
   await b.close();
