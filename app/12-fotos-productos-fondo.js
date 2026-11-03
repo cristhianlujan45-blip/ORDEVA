@@ -2782,7 +2782,9 @@ function iniLounge(){
    y otros ingresos (data.contab). Todo sale de los datos que ya tiene la app. */
 const CT_CATS = {
   gasto: [['proveedores', '📦 Proveedores / mercancía'], ['arriendo', '🏠 Arriendo'], ['servicios', '💡 Servicios (luz, agua, gas, internet)'], ['nomina', '👥 Nómina / sueldos'], ['impuestos', '🏛️ Impuestos'], ['mantenimiento', '🛠️ Mantenimiento'], ['transporte', '🚚 Transporte / domicilios'], ['publicidad', '📣 Publicidad'], ['seguridad_social', '🩺 Salud, pensión y ARL'], ['bancos', '🏦 Bancos (comisiones, intereses, cuotas)'], ['otros', '🗂️ Otros gastos']],
-  ingreso: [['otros_ingresos', '💰 Otros ingresos'], ['aporte', '🙋 Aporte del dueño'], ['prestamo', '🏦 Préstamo recibido']]
+  ingreso: [['otros_ingresos', '💰 Otros ingresos'], ['aporte', '🙋 Aporte del dueño'], ['prestamo', '🏦 Préstamo recibido']],
+  // 1.79.0: plata que cambia de lugar, sin ser gasto ni ingreso (retirar del banco, el dueño que saca para él).
+  traslado: [['banco_efectivo', '🏧 Retiro: de banco a efectivo'], ['retiro_dueno', '🙋 Retiro del dueño']]
 };
 // Además de las de siempre, cada tipo de negocio tiene sus propios gastos típicos.
 const CT_CATS_NEGOCIO = {
@@ -2909,7 +2911,7 @@ function renderConta(){
   document.getElementById('ctAviso').textContent = (x.sinCosto ? '⚠️ Algunos productos vendidos no tienen costo: la ganancia de lo vendido sale más alta de lo real (ponlo en Productos → tocar el producto → Costo). ' : '') + 'Entradas = dinero cobrado (los fiados cuentan el día que los pagan). «Te quedó (caja)» es la plata que entró menos la que salió; «Resultado estimado» es lo que el negocio ganó: ganancia de lo vendido menos gastos operativos (las compras de mercancía no se restan dos veces). Las compras a proveedores entran solas al escanear sus facturas; los demás gastos regístralos aquí abajo.';
   const barras = (obj, cls, nombre) => { const ks = Object.keys(obj).sort((a, b) => obj[b] - obj[a]); const max = Math.max(1, ...ks.map(q => obj[q])); return ks.length ? ks.map(q => '<div class="ct-barra ' + cls + '"><span>' + invEsc(nombre(q)) + '</span><i style="width:' + Math.max(2, obj[q] / max * 100) + '%"></i><b>' + ctFmt(obj[q]) + '</b></div>').join('') : '<div class="empty-note">Nada en este periodo.</div>'; };
   const porMedio = {}, porCat = {};
-  x.mov.forEach(m => { if(m.tipo === 'gasto') porCat[m.cat || 'otros'] = (porCat[m.cat || 'otros'] || 0) + m.monto; else porMedio[m.metodo || 'otro'] = (porMedio[m.metodo || 'otro'] || 0) + m.monto; });
+  x.mov.forEach(m => { if(m.tipo === 'gasto') porCat[m.cat || 'otros'] = (porCat[m.cat || 'otros'] || 0) + m.monto; else if(m.tipo !== 'traslado') porMedio[m.metodo || 'otro'] = (porMedio[m.metodo || 'otro'] || 0) + m.monto; });
   document.getElementById('ctMedios').innerHTML = barras(porMedio, 'v', q => CT_METODOS[q] || q);
   document.getElementById('ctCats').innerHTML = barras(porCat, 'g', q => ctCatNombre('gasto', q));
   // 🗂️ 1.69.0: gastos por tipo y 📊 comparación con el período anterior.
@@ -2949,7 +2951,7 @@ function renderConta(){
   // Gráfica: por día (hasta ~2 meses) o por mes
   const porMes = (r.fin - r.ini) / 864e5 > 62, grupos = {}, llaves = [];
   const clave = t => { const d = new Date(t); return porMes ? d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') : ctDia(d); };
-  x.mov.forEach(m => { const g = grupos[clave(m.fecha)] || (grupos[clave(m.fecha)] = { in: 0, out: 0 }); if(m.tipo === 'gasto') g.out += m.monto; else g.in += m.monto; });
+  x.mov.forEach(m => { const g = grupos[clave(m.fecha)] || (grupos[clave(m.fecha)] = { in: 0, out: 0 }); if(m.tipo === 'gasto') g.out += m.monto; else if(m.tipo !== 'traslado') g.in += m.monto; });
   if(porMes){ const d = new Date(r.ini); while(d.getTime() < r.fin){ llaves.push(clave(d)); d.setMonth(d.getMonth() + 1); } }
   else { for(let t = r.ini; t < r.fin; t += 864e5) llaves.push(clave(t)); }
   const mx = Math.max(1, ...llaves.map(q => Math.max((grupos[q] || {}).in || 0, (grupos[q] || {}).out || 0)));
@@ -2965,10 +2967,10 @@ function renderConta(){
   lista.innerHTML = filas.length ? '' : '<div class="empty-note">Sin movimientos en este periodo.</div>';
   filas.slice(0, 300).forEach(m => {
     const d = document.createElement('div'); d.className = 'ct-mov';
-    const ic = m.tipo === 'venta' ? '🧾' : m.tipo === 'ingreso' ? '💰' : (ctCatNombre('gasto', m.cat).split(' ')[0] || '💸');
+    const ic = m.tipo === 'venta' ? '🧾' : m.tipo === 'ingreso' ? '💰' : m.tipo === 'traslado' ? '🏧' : (ctCatNombre('gasto', m.cat).split(' ')[0] || '💸');
     const med = m.metodo && m.metodo !== 'otro' && CT_METODOS[m.metodo] ? ' · ' + CT_METODOS[m.metodo].replace(/^\S+\s/, '') : '';
-    const sub = new Date(m.fecha).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }) + ' · ' + (m.sub || (ctCatNombre(m.tipo, m.cat).replace(/^\S+\s/, '') + med + (m.auto ? ' · automático' : '')));
-    d.innerHTML = '<span class="ic">' + ic + '</span><span class="tx"><b></b><small></small></span><span class="vl ' + (m.tipo === 'gasto' ? 'out' : 'in') + '">' + (m.tipo === 'gasto' ? '−' : '+') + ctFmt(m.monto) + '</span>';
+    const sub = new Date(m.fecha).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }) + ' · ' + (m.sub || (ctCatNombre(m.tipo, m.cat).replace(/^\S+\s/, '') + (m.tipo === 'traslado' ? ' (no es gasto)' : '') + med + (m.auto ? ' · automático' : '')));
+    d.innerHTML = '<span class="ic">' + ic + '</span><span class="tx"><b></b><small></small></span><span class="vl ' + (m.tipo === 'gasto' ? 'out' : m.tipo === 'traslado' ? 'tr' : 'in') + '">' + (m.tipo === 'gasto' ? '−' : m.tipo === 'traslado' ? '⇄ ' : '+') + ctFmt(m.monto) + '</span>';
     d.querySelector('b').textContent = m.desc; d.querySelector('small').textContent = sub;
     if(m.adj){
       const ver = document.createElement('button'); ver.type = 'button'; ver.className = 'btn-ghost'; ver.textContent = '📎'; ver.title = 'Ver el recibo';
@@ -3016,9 +3018,9 @@ function iniConta(){
     if(!ctCsvData || !ctCsvData.filas.length){ showToast('No hay movimientos para descargar.'); return; }
     const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
     const filas = [['Fecha', 'Tipo', 'Categoría', 'Detalle', 'Medio de pago', 'Entrada', 'Salida']].concat(ctCsvData.filas.slice().reverse().map(m => [
-      new Date(m.fecha).toLocaleString('es-CO'), m.tipo === 'venta' ? 'Venta' : m.tipo === 'ingreso' ? 'Otro ingreso' : 'Gasto',
+      new Date(m.fecha).toLocaleString('es-CO'), m.tipo === 'venta' ? 'Venta' : m.tipo === 'ingreso' ? 'Otro ingreso' : m.tipo === 'traslado' ? 'Traslado (retiro)' : 'Gasto',
       m.tipo === 'venta' ? 'Ventas' : ctCatNombre(m.tipo, m.cat).replace(/^\S+\s/, ''), m.desc, (CT_METODOS[m.metodo] || '').replace(/^\S+\s/, ''),
-      m.tipo === 'gasto' ? '' : Math.round(m.monto), m.tipo === 'gasto' ? Math.round(m.monto) : '']));
+      m.tipo === 'gasto' || m.tipo === 'traslado' ? '' : Math.round(m.monto), m.tipo === 'gasto' ? Math.round(m.monto) : '']));
     const csv = '﻿' + filas.map(f => f.map(q).join(';')).join('\r\n');
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
     a.download = 'contabilidad-' + String(data.businessName || 'negocio').replace(/[^\w]+/g, '-') + '-' + ctDia(Date.now()) + '.csv';
