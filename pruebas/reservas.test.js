@@ -7,6 +7,9 @@
 //  5. Atender = ocupada: al anotar en la habitación 2 (sin reserva), queda ocupada en el servidor y el agente ya no la ofrece;
 //     al cobrar (cuenta vacía) se libera.
 //  6. «✅ Llegó» en una reserva de hoy: pasa a ocupada y abre la cuenta de esa habitación.
+//  7. 🔧 Fuera de servicio (1.75.0): bloqueada en el servidor hasta su próxima reserva; «Limpia» la desbloquea.
+//  8. 🔗 Booking y Airbnb (1.76.0): link de ORDEVA por habitación; el de afuera bloquea, el que choca avisa «Doble reserva»
+//     y lo cancelado allá se cancela aquí.
 'use strict';
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const fs = require('fs');
@@ -20,10 +23,14 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
   const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
   let ok = 0, mal = 0; const errs = [];
   const chk = (n, c, x) => { if(c){ ok++; console.log('✅ ' + n); } else { mal++; console.log('❌ ' + n + (x !== undefined ? ' → ' + (typeof x === 'string' ? x : JSON.stringify(x)).slice(0, 600) : '')); } };
-  const sb = await iniciar(); const b = await chromium.launch();
+  // 🔗 1.76.0: un «Booking» de mentira en este equipo sirve el calendario de cada habitación.
+  const http = require('http'); const ICS = {};
+  const booking = http.createServer((req, res) => { const k = (/\/ical\/(\w+)\.ics/.exec(req.url) || [])[1]; res.writeHead(ICS[k] ? 200 : 404, { 'Content-Type': 'text/calendar' }); res.end(ICS[k] || ''); });
+  await new Promise(r => booking.listen(0, '127.0.0.1', r)); const PB = booking.address().port;
+  const sb = await iniciar({ env: { VENTO_ICAL_HOSTS: '127.0.0.1' } }); const b = await chromium.launch();
   try{ await pruebas(); } catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.stack || e)); }
   chk('Sin errores de página', !errs.length, errs.join(' | '));
-  await b.close().catch(() => {}); await sb.cerrar().catch(() => {});
+  await b.close().catch(() => {}); await sb.cerrar().catch(() => {}); booking.close();
   console.log('RESULTADO', ok, 'bien', mal, 'mal'); process.exit(mal ? 1 : 0);
 
   async function pruebas(){
@@ -116,5 +123,34 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     for(let i = 0; i < 30; i++){ bl = await sb.sql("select estado from reservas where negocio_id = $1 and recurso = '1' and nota = 'bloqueo'", [NEG]); if(bl[0] && bl[0].estado === 'cancelada') break; await new Promise(r => setTimeout(r, 300)); }
     const disp3 = await fetch(sb.url + '/rest/v1/rpc/reservas_disponibles', { method: 'POST', headers: anon, body: JSON.stringify({ p_publico: PUB.publico, p_desde: new Date().toISOString(), p_hasta: new Date(Date.now() + 3 * 36e5).toISOString(), p_personas: 1 }) }).then(r => r.json());
     chk('7. «Limpia»: se quita el bloqueo y el agente la vuelve a ofrecer', bl[0] && bl[0].estado === 'cancelada' && Array.isArray(disp3) && disp3.some(x => x.id === '1'), [bl, disp3]);
+
+    // ===== 8. 🔗 Booking y Airbnb (1.76.0) =====
+    const ymd = n => { const x = new Date(); x.setHours(0, 0, 0, 0); x.setDate(x.getDate() + n); return x.getFullYear() + String(x.getMonth() + 1).padStart(2, '0') + String(x.getDate()).padStart(2, '0'); };
+    const cal = (uid, a, z) => ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Booking.com//EN', 'BEGIN:VEVENT', 'UID:' + uid, 'DTSTART;VALUE=DATE:' + ymd(a), 'DTEND;VALUE=DATE:' + ymd(z), 'SUMMARY:CLOSED - Not av', ' ailable', 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+    ICS['h5'] = cal('bk-555@booking.com', 3, 5);
+    ICS['h1'] = cal('ab-111@airbnb.com', 1, 2);   // choca con la reserva de Ana (mañana, 2 noches)
+    await p.evaluate(() => { document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')); window.ventoReservas.abrir('hoy'); });
+    chk('8. En 📅 Reservas está «🔗 Booking y Airbnb»', await esperar(p, () => !!document.getElementById('icBtn'), null, 6000));
+    await p.click('#icBtn');
+    await esperar(p, () => !!document.querySelector('#icOv [data-ic-nuevo="4"]'), null, 8000);
+    let v = await p.evaluate(() => { const b = document.querySelector('#icOv [data-ic="copiar"][data-id="4"]'); return b ? b.parentNode.querySelector('input').value : ''; });
+    chk('8. Cada habitación tiene su link de ORDEVA para pegar en Booking / Airbnb (…/vento-ical/cal/<código>/4.ics)', /\/functions\/v1\/vento-ical\/cal\/[0-9a-f]{12}\/4\.ics$/.test(v), v);
+    const ex = await fetch(sb.url + v.slice(v.indexOf('/functions/v1/'))).then(x => x.text());   // al Servidor de pruebas, nunca al de verdad
+    chk('8. Ese link responde como calendario', /BEGIN:VCALENDAR/.test(ex), ex.slice(0, 120));
+    // «➕» sin https no se guarda
+    await p.fill('#icOv [data-ic-nuevo="4"]', 'http://127.0.0.1:' + PB + '/ical/h5.ics'); await p.click('#icOv [data-ic="agregar"][data-id="4"]');
+    chk('8. Un link sin https no se guarda y lo dice', await esperar(p, () => /empieza con https/.test((document.getElementById('toast') || {}).textContent || ''), null, 4000) && await p.evaluate(() => !(data.icalLinks || {})['4']));
+    // (el «Booking» de mentira es http: los links se ponen directo para la prueba)
+    await p.evaluate(port => { data.icalLinks = data.icalLinks || {}; data.icalLinks['4'] = [{ fuente: 'Booking', url: 'http://127.0.0.1:' + port + '/ical/h5.ics' }]; data.icalLinks['1'] = [{ fuente: 'Airbnb', url: 'http://127.0.0.1:' + port + '/ical/h1.ics' }]; saveData(); return window.ventoIcal.sincronizar(true); }, PB);
+    let im = [];
+    for(let i = 0; i < 30; i++){ im = await sb.sql("select recurso, estado, cliente from reservas where negocio_id = $1 and nota like 'ical:%'", [NEG]); if(im.length) break; await new Promise(r => setTimeout(r, 300)); }
+    chk('8. La reserva de Booking queda en la habitación 4 («🔗 Booking», confirmada)', im.length === 1 && im[0].recurso === '4' && im[0].estado === 'confirmada' && im[0].cliente === '🔗 Booking', im);
+    chk('8. La de Airbnb que choca con Ana NO se guarda y la app avisa «⚠️ Doble reserva»', await esperar(p, () => /Doble reserva/.test((document.getElementById('toast') || {}).textContent || ''), null, 8000) && !im.some(x => x.recurso === '1'), await p.evaluate(() => (document.getElementById('toast') || {}).textContent));
+    v = await p.evaluate(() => document.getElementById('icOv').innerText.replace(/\s+/g, ' '));
+    chk('8. La pantalla dice cuántas reservas trajo y cuándo', /✅ 1 reservas/.test(v), v.slice(0, 500));
+    ICS['h5'] = cal('otra@booking.com', 10, 12);   // la de antes se canceló allá
+    await p.evaluate(() => window.ventoIcal.sincronizar(true));
+    im = await sb.sql("select ical.estado from reservas ical where negocio_id = $1 and nota = 'ical:Booking:bk-555@booking.com'", [NEG]);
+    chk('8. Allá la cancelan: al sincronizar, aquí se cancela', im[0] && im[0].estado === 'cancelada', im);
   }
 })();

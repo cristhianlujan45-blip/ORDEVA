@@ -31,6 +31,7 @@ const STUB = path.join(__dirname, 'stub.sql');
 const FUNCIONES = {
   'vento-pagos': path.join(RAIZ, 'supabase', 'functions', 'vento-pagos', 'app.ts'),
   'vento-suscripciones': path.join(RAIZ, 'supabase', 'functions', 'vento-suscripciones', 'app.ts'),
+  'vento-ical': path.join(RAIZ, 'supabase', 'functions', 'vento-ical', 'app.ts'),
 };
 const PG_URL = process.env.VENTO_PG_URL || 'postgres://postgres:postgres@127.0.0.1:5432/postgres';
 
