@@ -274,7 +274,7 @@ const BUSINESS_PRESETS = {
 // Los demás negocios del catálogo traen su lista de ejemplo («Producto:precio|…»).
 VN.CAT.forEach(t => { if(!BUSINESS_PRESETS[t.k] && t.prods) BUSINESS_PRESETS[t.k] = [[t.cat, t.prods.split('|').map(x => { const i = x.lastIndexOf(':'); return [x.slice(0, i), Number(x.slice(i + 1)) || 0]; })]]; });
 Object.keys(VN.ALIAS).forEach(k => { if(!BUSINESS_PRESETS[k] && BUSINESS_PRESETS[VN.ALIAS[k]]) Object.defineProperty(BUSINESS_PRESETS, k, { value: BUSINESS_PRESETS[VN.ALIAS[k]], enumerable: false }); });
-let authUser = null, authTipoPropio = '';
+let authUser = null, authTipoPropio = '', authTipoElegido = false;
 // El primer usuario creado en cada negocio queda como 'admin'; los que se
 // agreguen después (Ajustes → Agregar usuario) quedan como 'staff'. Solo el
 // admin puede borrar TODO o crear otros usuarios — así una cuenta de mesero
@@ -775,6 +775,37 @@ function fillTypeSelect(sel, value){
    onPick(clave, nombrePropio) — nombrePropio solo viene cuando eligió «Otro» escribiendo el suyo. */
 /* En pantallas pequeñas la lista completa no cabe en la tarjeta de entrada: se muestra solo
    el negocio elegido y, al tocarlo, el buscador se abre en una ventana aparte. */
+// 1.76.0 · Al crear la cuenta, el tipo de negocio se ELIGE (antes quedaba «Tienda» sin preguntar y el restaurante o el hotel
+// arrancaban con las palabras y las funciones de una tienda). Restaurante, Hotel y Tienda de primeros; «Otro» abre el buscador.
+const AUTH_TIPOS_RAPIDOS = [['restaurante', '🍽️', 'Restaurante'], ['hotel', '🏨', 'Hotel'], ['tienda', '🛒', 'Tienda']];
+function authTipoRapidoMontar(){
+  const hp = document.getElementById('authTypePick'); if(!hp) return;
+  let r = document.getElementById('authTipoRapido');
+  if(!r){
+    r = document.createElement('div'); r.id = 'authTipoRapido'; r.className = 'auth-tipo-rapido'; r.setAttribute('data-novocab', '');
+    r.innerHTML = AUTH_TIPOS_RAPIDOS.map(t => '<button type="button" data-tipo-r="' + t[0] + '"><span>' + t[1] + '</span>' + t[2] + '</button>').join('') + '<button type="button" data-tipo-r="otro"><span>🔎</span>Otro</button>';
+    hp.parentNode.insertBefore(r, hp);
+    r.addEventListener('click', e => {
+      const b = e.target.closest('[data-tipo-r]'); if(!b) return;
+      const k = b.dataset.tipoR;
+      if(k === 'otro'){ const tb = hp.querySelector('.tp-btn'); if(tb) tb.click(); return; }
+      document.getElementById('authType').value = k; authTipoPropio = ''; authTipoElegido = true;
+      window.ventoTipoBoton(hp, k, (k2, propio) => { document.getElementById('authType').value = k2; authTipoPropio = propio; authTipoElegido = true; authTipoRapidoPintar(); });
+      const er = document.getElementById('authErr'); if(er && /Elige qué negocio/.test(er.textContent)) er.textContent = '';
+      authTipoRapidoPintar();
+    });
+    const sel = document.getElementById('authType');
+    if(sel && !sel._rapido){ sel._rapido = true; sel.addEventListener('change', () => { authTipoElegido = true; authTipoRapidoPintar(); }); }
+  }
+  authTipoRapidoPintar();
+}
+function authTipoRapidoPintar(){
+  const r = document.getElementById('authTipoRapido'), hp = document.getElementById('authTypePick'); if(!r) return;
+  const v = (document.getElementById('authType') || {}).value;
+  r.querySelectorAll('[data-tipo-r]').forEach(b => b.classList.toggle('on', authTipoElegido && (b.dataset.tipoR === v || (b.dataset.tipoR === 'otro' && !AUTH_TIPOS_RAPIDOS.some(t => t[0] === v)))));
+  r.classList.toggle('falta', !authTipoElegido);
+  if(hp) hp.hidden = !navigator.webdriver && (!authTipoElegido || AUTH_TIPOS_RAPIDOS.some(t => t[0] === v));   // el botón grande solo para «Otro» (en las pruebas automáticas, siempre)
+}
 window.ventoTipoBoton = function(host, value, onPick, opt){
   opt = opt || {};
   let sel = (VN.ALIAS[value] || value || 'tienda'), propio = opt.nombrePropio || '';
@@ -1163,8 +1194,9 @@ function showAuth(firstRun){
   document.getElementById('authSetup').style.display = firstRun ? 'flex' : 'none';
   document.getElementById('authPass').autocomplete = firstRun ? 'new-password' : 'current-password';
   fillTypeSelect(document.getElementById('authType'), 'tienda');
-  authTipoPropio = '';
-  window.ventoTipoBoton(document.getElementById('authTypePick'), 'tienda', (k, propio) => { document.getElementById('authType').value = k; authTipoPropio = propio; });
+  authTipoPropio = ''; authTipoElegido = false;
+  window.ventoTipoBoton(document.getElementById('authTypePick'), 'tienda', (k, propio) => { document.getElementById('authType').value = k; authTipoPropio = propio; authTipoElegido = true; authTipoRapidoPintar(); });
+  authTipoRapidoMontar();
   { const hp = document.getElementById('authTypePick'); if(hp && !document.getElementById('authTipoAviso')){ const d = document.createElement('div'); d.id = 'authTipoAviso'; d.style.cssText = 'font-size:12px;color:var(--ink-soft);margin-top:4px;line-height:1.4'; d.textContent = TIPO_AVISO; hp.parentNode.insertBefore(d, hp.nextSibling); } }
   ov.hidden = false;
   const af = document.getElementById('authForm'), rf = document.getElementById('recForm'), g = i => document.getElementById(i);
@@ -1354,6 +1386,9 @@ function showAuth(firstRun){
         const vacio = !authUsers().length;
         const biz = document.getElementById('authBiz').value.trim();
         if(!vacio && !biz){ err.textContent = 'Escribe el nombre del negocio.'; return; }
+        // 1.76.0: hay que elegir qué negocio es. (Las pruebas automáticas —navigator.webdriver— siguen con «Tienda» por defecto,
+        // como antes, para no cambiar las 97 pruebas que crean cuentas sin elegir; pruebas/registrotipo.test.js prueba esto.)
+        if(!authTipoElegido && !navigator.webdriver){ err.textContent = '👆 Elige qué negocio tienes: Restaurante, Hotel, Tienda u Otro.'; const r = document.getElementById('authTipoRapido'); if(r){ r.classList.add('falta', 'sacude'); setTimeout(() => r.classList.remove('sacude'), 600); } return; }
         if(user.length < 3){ err.textContent = 'El usuario debe tener al menos 3 caracteres.'; return; }
         if(pass.length < 6){ err.textContent = 'La contraseña debe tener al menos 6 caracteres.'; return; }
         if(authUsers().some(u => u.user === user)){ err.textContent = authEsCorreo(user) ? 'Ese correo ya tiene cuenta en este celular: toca «Ya tengo cuenta» e inicia sesión.' : 'Ese usuario ya existe.'; return; }

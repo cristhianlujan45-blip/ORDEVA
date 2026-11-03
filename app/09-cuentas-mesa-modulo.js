@@ -810,9 +810,11 @@ function pedidoPublicar(p){
 function pedidoAplicar(p){
   if(p.aplicado)return;
   asegurarMesa(p.mesa);                                          // un pedido aceptado a mano de una mesa que no estaba (1.56.0)
-  const its=p.items.filter(i=>i.ok).map(i=>({productText:i.name,qty:i.qty}));
+  // 🧩 1.76.0: «Hamburguesa (Término medio · +Queso extra)» del QR entra con sus opciones y el precio del negocio.
+  const conOp=[];const its=p.items.filter(i=>i.ok).filter(i=>{const x=window.ventoOpciones&&window.ventoOpciones.partirNombre(i.name);if(x){conOp.push([x,i.qty]);return false;}return true;}).map(i=>({productText:i.name,qty:i.qty}));
+  conOp.forEach(([x,q])=>{try{window.ventoOpciones.agregar(p.mesa,x.product,x.opc,q,true);}catch(e){}});
   // Pedidos del QR: no suenan aquí (ya tienen su timbre y su aviso; si llegan muchos no se llena de «tún»).
-  if(its.length){const r=sinSonidoPos(()=>applyVoiceItems(p.mesa,its,'add'));p.agregados=r.added.map(a=>a.qty+' '+a.name);}
+  if(its.length||conOp.length){const r=its.length?sinSonidoPos(()=>applyVoiceItems(p.mesa,its,'add')):{added:[]};p.agregados=r.added.map(a=>a.qty+' '+a.name).concat(conOp.map(([x,q])=>q+' '+x.product.name+(x.opc.txt?' ('+x.opc.txt+')':'')));}
   p.aplicado=true;
   try{saveData();renderMesas();if(typeof refrescarTodoEnVivo==='function')refrescarTodoEnVivo();}catch(e){}
 }
@@ -836,9 +838,12 @@ function pedidoEntrante(o,origen){
   const verificado=origen!=='qr'||(!!o.vm&&cods.indexOf(String(o.vm))>=0);
   if(!mesa||(verificado?!asegurarMesa(mesa):(mesa<1||mesa>500)))return null;
   const items=(Array.isArray(o.items)?o.items:[]).slice(0,40).map(x=>{
-    const n=String(x.n||x.name||'').slice(0,60),q=Math.max(1,Math.min(99,Math.round(Number(x.q||x.qty)||1)));
-    const pr=n?pedidoProducto(n):null;
-    return{productId:pr?pr.id:null,name:pr?pr.name:n,qty:q,price:pr?Number(pr.price)||0:Math.max(0,Number(x.p)||0),ok:!!pr};
+    const n=String(x.n||x.name||'').slice(0,160),q=Math.max(1,Math.min(99,Math.round(Number(x.q||x.qty)||1)));
+    // 🧩 1.76.0: «Hamburguesa (Término medio · +Queso extra)»: el producto con lo elegido y el precio del negocio.
+    const xo=window.ventoOpciones&&window.ventoOpciones.partirNombre(n);
+    if(xo)return{productId:xo.product.id,name:xo.product.name+(xo.opc.txt?' ('+xo.opc.txt+')':''),qty:q,price:(Number(xo.product.price)||0)+(xo.opc.extra||0),ok:true};
+    const pr=n?pedidoProducto(n.slice(0,60)):null;
+    return{productId:pr?pr.id:null,name:pr?pr.name:n.slice(0,60),qty:q,price:pr?Number(pr.price)||0:Math.max(0,Number(x.p)||0),ok:!!pr};
   }).filter(x=>x.name);
   if(!items.length)return null;
   const p={id,mesa,mesaNombre:tableLabel(mesa),items,total:items.reduce((s,i)=>s+i.qty*i.price,0),nota:String(o.nota||'').slice(0,140),
@@ -875,7 +880,7 @@ function pedidoCambiar(id,estado){
 }
 // Pedidos que ya se sumaron a la cuenta por otro camino (app de meseros): también van a preparación.
 function pedidoRegistrarAplicado(mesa,added,origen){
-  const items=(added||[]).filter(a=>a.qty>0).map(a=>{const pr=pedidoProducto(a.name);return{productId:pr?pr.id:null,name:a.name,qty:a.qty,price:pr?Number(pr.price)||0:0,ok:true};});
+  const items=(added||[]).filter(a=>a.qty>0).map(a=>{const pr=pedidoProducto(a.name);const it={productId:pr?pr.id:null,name:a.name,qty:a.qty,price:pr?Number(pr.price)||0:0,ok:true};if(a.k)it.k=a.k;return it;});
   if(!items.length)return null;
   const p={id:'m'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),mesa:parseInt(mesa,10),mesaNombre:tableLabel(mesa),items,total:items.reduce((s,i)=>s+i.qty*i.price,0),
     at:Date.now(),recibidoEn:Date.now(),estado:'recibido',origen:origen||'mesero',negocio:qCfg().topic,aplicado:true,hist:[{e:'recibido',at:Date.now()}]};
@@ -2340,6 +2345,8 @@ async function publicarCatalogo(force){
   });
   const m = {
     y: bt, t: cartaTerm(), ic: cartaIcon(), ip: (tipoNegocio() || {}).icono || '', th: data.theme || '', n: (data.businessName || '').slice(0, 40), p: list,
+    // 🧩 1.76.0: opciones de cada producto (término, sin…, adiciones) para elegirlas desde el QR.
+    ...(window.ventoOpciones && window.ventoOpciones.paraCarta() ? { op: window.ventoOpciones.paraCarta() } : {}),
     // Personalización de pedido.html: mensaje, info extra y horario (para el
     // reloj + aviso de abierto/cerrado). Todo opcional, se manda tal cual.
     msg: (data.orderMessage || '').slice(0, 200),
@@ -2349,7 +2356,12 @@ async function publicarCatalogo(force){
     cl: mzMax(),                                                         // canciones por mesa cada 15 min (0 = sin límite)
     mo: (data.motivo || '')
   };
-  while(list.length && new Blob([JSON.stringify(m)]).size > 3800) list.pop();   // tope del canal de ORDEVA (~4 KB)
+  // 🧩 1.76.0: si no cabe, primero se quitan las opciones (de los últimos productos hacia arriba), nunca un plato por ellas.
+  const tam = () => new Blob([JSON.stringify(m)]).size;
+  if(m.op){ const orden = list.map(r => r[0]); let ks = Object.keys(m.op).sort((a, b) => orden.indexOf(b) - orden.indexOf(a));
+    while(ks.length && tam() > 3800){ delete m.op[ks.shift()]; } if(!Object.keys(m.op).length) delete m.op; }
+  while(list.length && tam() > 3800) list.pop();   // tope del canal de ORDEVA (~4 KB)
+  if(m.op){ const quedan = new Set(list.map(r => r[0])); Object.keys(m.op).forEach(k => { if(!quedan.has(k)) delete m.op[k]; }); }
   const s = JSON.stringify(m);
   if(!force && s === catHash && Date.now() - catT < 3 * 36e5) return;           // se reenvía cada 3 h para que no caduque
   // 1.72.6: lo que cambia solo (el orden de «lo más vendido», un agotado) sale como mucho una vez por minuto. Antes salía con

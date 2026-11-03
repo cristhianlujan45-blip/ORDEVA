@@ -1119,6 +1119,12 @@ function sincronizarProductoEnMesas(p, nombreAnterior){
     (t.items || []).forEach(it => {
       const es = it.productId ? it.productId === p.id : (viejo && String(it.name || '').trim().toLowerCase() === viejo);
       if(!es) return;
+      // 🧩 1.76.0: un plato con opciones elegidas (término, adiciones…) las conserva: precio nuevo + lo que suman.
+      if(it.opc){
+        const pr = (Number(p.price) || 0) + (Number(it.opc.extra) || 0), sz = [p.size || '', it.opc.txt || ''].filter(Boolean).join(' · ');
+        if(it.name !== p.name || it.price !== pr || (it.size || '') !== sz){ it.name = p.name; it.price = pr; it.size = sz; cambio = true; }
+        return;
+      }
       if(it.name !== p.name || it.price !== p.price || (it.size || '') !== (p.size || '')){
         it.name = p.name; it.price = p.price; it.size = p.size || ''; if(!it.productId) it.productId = p.id; cambio = true;
       }
