@@ -861,6 +861,8 @@ function pedidoEntrante(o,origen){
 }
 function pedidoCambiar(id,estado){
   const p=pedidosLista().find(x=>x.id===id);if(!p||!PEDIDO_EST[estado]||p.estado===estado)return p;
+  // 1.75.0: un «❌ ANULAR» a la cocina (lib/vento-comanda.js) nunca suma ni resta productos de la cuenta.
+  if(p.anula){p.estado=estado;p.hist.push({e:estado,at:Date.now()});pedidosGuardar();pedidoPublicar(p);return p;}
   if(estado==='cancelado'&&p.aplicado&&['recibido','preparacion','nuevo'].includes(p.estado)){
     const its=p.items.filter(i=>i.ok).map(i=>({productText:i.name,qty:i.qty}));
     if(its.length)try{sinSonidoPos(()=>applyVoiceItems(p.mesa,its,'subtract'));}catch(e){}
@@ -879,7 +881,7 @@ function pedidoRegistrarAplicado(mesa,added,origen){
     at:Date.now(),recibidoEn:Date.now(),estado:'recibido',origen:origen||'mesero',negocio:qCfg().topic,aplicado:true,hist:[{e:'recibido',at:Date.now()}]};
   pedidosLista().push(p);pedidosGuardar();return p;
 }
-window.vitoPedidos={lista:pedidosLista,entrante:pedidoEntrante,cambiar:pedidoCambiar,registrarAplicado:pedidoRegistrarAplicado,EST:PEDIDO_EST,auto:pedidosAuto};
+window.vitoPedidos={lista:pedidosLista,entrante:pedidoEntrante,cambiar:pedidoCambiar,registrarAplicado:pedidoRegistrarAplicado,guardar:pedidosGuardar,EST:PEDIDO_EST,auto:pedidosAuto};
 // Para las pruebas de seguridad de los canales (pruebas/canalseguro.test.js): lo que llega por cada canal.
 window.vitoCanalPrueba={procesar:procesar,procesarMesero:procesarMesero,procesarPrep:procesarPrep,vTopic:vTopic,qMesaCodigo:qMesaCodigo};
 // Compatibilidad con la campana y la pantalla vieja: aceptar = recibido; rechazar = cancelado.

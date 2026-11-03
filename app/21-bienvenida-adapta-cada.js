@@ -110,7 +110,18 @@
         '<div class="modal-actions"><button type="button" class="btn-close" id="onbAtras">← Atrás</button><button type="button" class="btn-close" id="onbSaltar">Ahora no</button><button type="button" class="btn-primary" id="onbSig">Siguiente →</button></div></div>';
       document.body.appendChild(ov);
       $b('onbAtras').onclick = () => { if(st.paso > 0){ guardarPaso(); st.paso--; paso(); } };
-      $b('onbSaltar').onclick = () => { ov.classList.remove('show'); try{ window.ventoPasos && window.ventoPasos.pintar(); }catch(e){} };
+      $b('onbSaltar').onclick = () => {
+        ov.classList.remove('show');
+        // 1.75.0: negocio nuevo que eligió su tipo y salta el asistente: igual queda con el modo de ese tipo (un minimercado,
+        // una droguería o una ferretería venden por caja; antes quedaban como restaurante, con «cuentas libres / ocupadas»).
+        // «tienda» a secas es lo que viene marcado al registrarse: quien no eligió nada sigue como antes.
+        if(primera && data.businessType && data.businessType !== 'tienda' && !['restaurante', 'tienda', 'mixto'].includes(data.modoOperacion)){
+          data.modoOperacion = modoDe(data.businessType || 'tienda');
+          try{ saveData(); }catch(e){}
+          try{ window.ventoPOS && window.ventoPOS.pintar(); }catch(e){} try{ aplicarVocabulario(); }catch(e){} try{ renderMesas(); }catch(e){}
+        }
+        try{ window.ventoPasos && window.ventoPasos.pintar(); }catch(e){}
+      };
       $b('onbSig').onclick = () => { if(!guardarPaso()) return; if(st.paso < 3){ st.paso++; paso(); } else { ov.classList.remove('show'); aplicar(); } };
     }
     paso(); ov.classList.add('show');

@@ -93,8 +93,9 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 
  // Cobrar la mesa → success
  a=await S();
- await p.click('#chargeBtn'); await p.waitForTimeout(300);
- await p.click('button[data-m="efectivo"]'); await p.waitForTimeout(400); d=await S();
+ // 1.72.5: el cobro puede estar en «💰 Cobrar» de la vista sencilla o en el botón de siempre (el que se vea)
+ await p.evaluate(()=>{ const b=[document.getElementById('vsCobrarBtn'),document.getElementById('chargeBtn')].find(x=>x&&x.offsetParent); b.click(); }); await p.waitForTimeout(400);
+ await p.evaluate(()=>{ const b=[...document.querySelectorAll('button[data-m="efectivo"]')].find(x=>x.offsetParent); b&&b.click(); }); await p.waitForTimeout(500); d=await S();
  r=await p.evaluate(()=>({items:(data.tables[1].items||[]).length, h:data.history.length, debt:data.history[0]&&data.history[0].debt}));
  chk('Cobrar la cuenta: mesa liberada y suena «success»', r.items===0 && r.debt===0 && JSON.stringify(nuevos(a,d))==='["success"]', JSON.stringify(r)+' '+JSON.stringify(nuevos(a,d)));
  // Venta rápida: agregar, + y cobrar

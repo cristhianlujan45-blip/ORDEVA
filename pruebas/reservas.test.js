@@ -101,5 +101,20 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     let est = [];
     for(let i = 0; i < 30; i++){ est = await sb.sql("select estado from reservas where negocio_id = $1 and cliente = 'Carlos Pérez'", [NEG]); if(est[0] && est[0].estado === 'ocupada') break; await new Promise(r => setTimeout(r, 300)); }
     chk('6. «✅ Llegó»: la reserva pasa a ocupada y se abre la cuenta de la habitación 3', est[0] && est[0].estado === 'ocupada' && await esperar(p, () => document.getElementById('overlay').classList.contains('show') && String(currentTable) === '3', null, 6000), est);
+
+    // ===== 7. 🔧 Fuera de servicio (1.75.0): bloqueada en el servidor hasta su reserva =====
+    await p.evaluate(() => { try{ closeModal(); }catch(e){} document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')); openTableModal(1); });
+    await esperar(p, () => { const b = document.getElementById('mpAseo'); return !!b && !b.hidden; }, null, 6000);
+    await p.click('#mpAseo [data-mapa="mant"]');
+    let bl = [];
+    for(let i = 0; i < 30; i++){ bl = await sb.sql("select r.estado, r.hasta = a.desde as hasta_reserva from reservas r, reservas a where r.negocio_id = $1 and r.recurso = '1' and r.nota = 'bloqueo' and a.negocio_id = $1 and a.cliente = 'Ana Ruiz'", [NEG]); if(bl.length) break; await new Promise(r => setTimeout(r, 300)); }
+    chk('7. «Fuera de servicio»: la habitación 1 queda bloqueada en el servidor hasta la reserva de Ana (no la pisa)', bl.length === 1 && bl[0].estado === 'confirmada' && bl[0].hasta_reserva === true, bl);
+    const disp2 = await fetch(sb.url + '/rest/v1/rpc/reservas_disponibles', { method: 'POST', headers: anon, body: JSON.stringify({ p_publico: PUB.publico, p_desde: new Date().toISOString(), p_hasta: new Date(Date.now() + 3 * 36e5).toISOString(), p_personas: 1 }) }).then(r => r.json());
+    chk('7. … y el agente ya no la ofrece', Array.isArray(disp2) && !disp2.some(x => x.id === '1'), disp2);
+    chk('7. La tarjeta no dice «Reservada» por el bloqueo y la barra no lo cuenta como reserva de hoy', await p.evaluate(() => { const c = document.querySelector('#tableGrid .ticket[data-id="1"]'); return !!c && c.dataset.est === 'mant' && !/Reservada hoy/.test(c.innerText) && !/2 hoy/.test((document.getElementById('rsBarra') || {}).textContent || ''); }), await p.evaluate(() => [(document.querySelector('#tableGrid .ticket[data-id="1"]') || {}).innerText, (document.getElementById('rsBarra') || {}).textContent]));
+    await p.click('#mpAseo [data-mapa="limpia"]');
+    for(let i = 0; i < 30; i++){ bl = await sb.sql("select estado from reservas where negocio_id = $1 and recurso = '1' and nota = 'bloqueo'", [NEG]); if(bl[0] && bl[0].estado === 'cancelada') break; await new Promise(r => setTimeout(r, 300)); }
+    const disp3 = await fetch(sb.url + '/rest/v1/rpc/reservas_disponibles', { method: 'POST', headers: anon, body: JSON.stringify({ p_publico: PUB.publico, p_desde: new Date().toISOString(), p_hasta: new Date(Date.now() + 3 * 36e5).toISOString(), p_personas: 1 }) }).then(r => r.json());
+    chk('7. «Limpia»: se quita el bloqueo y el agente la vuelve a ofrecer', bl[0] && bl[0].estado === 'cancelada' && Array.isArray(disp3) && disp3.some(x => x.id === '1'), [bl, disp3]);
   }
 })();

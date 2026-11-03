@@ -10,6 +10,8 @@
 //   7. Al cobrar, la habitación queda «🧹 Por limpiar», con «✅ Ya está limpia» en la tarjeta. Al tocarlo, queda libre.
 //   8. En una habitación vacía: «Estado de la habitación: Limpia / Por limpiar / Fuera de servicio».
 //   9. Sin errores en la página.
+//  Tienda (1.75.0):
+//  10. Si salta el asistente queda en modo caja; el conteo dice «abiertas» y no «libres» ni «reservadas».
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 (async () => {
@@ -128,6 +130,12 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     t = await tarjetas(q);
     chk('8. «Fuera de servicio»: la 202 queda en gris y lo dice', t[4].est === 'mant' && /Fuera de servicio/.test(t[4].txt), t[4]);
     await q.screenshot({ path: (process.env.CAPTURAS || '/tmp') + '/mapa-hotel.png' }).catch(() => {});
+    // ================= Tienda (1.75.0) =================
+    const T = await abrir('minimercado', 'Minimercado La 14'); const r = T.p;
+    v = await r.evaluate(() => { window.ventoMapa.resumen(); return { modo: data.modoOperacion, res: [...document.querySelectorAll('#mesasSummary [data-mpf]')].map(x => x.dataset.mpf + ':' + x.innerText.replace(/\s+/g, ' ').trim()) }; });
+    chk('10. Minimercado nuevo que salta el asistente: queda en modo caja (no como restaurante)', v.modo === 'tienda', v);
+    chk('10. Tienda: el conteo dice «abiertas» (no «libres / ocupadas») y no muestra «reservadas»', v.res.length === 1 && /abiertas/.test(v.res[0]) && !v.res.some(x => /reservad|libre/.test(x)), v.res);
+    await T.ctx.close();
     chk('9. Sin errores en la página', errs.length === 0, errs);
   }catch(e){ mal++; console.log('❌ Error: ' + (e.stack || e)); }
   await b.close();
