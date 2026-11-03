@@ -124,7 +124,7 @@ public class VentoEscucha extends NotificationListenerService {
         // La página (aunque la ventana esté cerrada, la mantiene viva VentoServicio) lo toma ya.
         VentoApp.ui.post(() -> {
             VentoApp.motor(null);
-            VentoApp.js("try{window.ventoAvisosNativos&&window.ventoAvisosNativos()}catch(e){}");
+            VentoApp.js("try{window.ventoAvisosNativos&&window.ventoAvisosNativos()}catch(e){}try{window.ventoReservasAvisosNativos&&window.ventoReservasAvisosNativos()}catch(e){}");
         });
     }
 
@@ -144,6 +144,9 @@ public class VentoEscucha extends NotificationListenerService {
         android.content.pm.ApplicationInfo info;
         try { info = pm.getApplicationInfo(pkg, 0); app = String.valueOf(pm.getApplicationLabel(info)); }
         catch (Exception e) { return false; }
+        // 🏨 1.77.0: aviso de una app de reservas (Booking.com Pulse, Airbnb…): va a su propia cola, nunca es un pago.
+        String fuenteReserva = ReservaAviso.fuente(pkg, app);
+        if (fuenteReserva != null) return leerReserva(sp, fuenteReserva, app, sbn, n);
         String smsDefecto = null;
         try { smsDefecto = android.provider.Telephony.Sms.getDefaultSmsPackage(this); } catch (Throwable ignorado) { }
         boolean sms = AvisoPago.esAppSms(pkg, smsDefecto);
@@ -655,6 +658,41 @@ public class VentoEscucha extends NotificationListenerService {
     static synchronized String tomarSalidas(SharedPreferences sp) {
         String s = sp.getString(PREF_SALIDAS, "[]");
         sp.edit().putString(PREF_SALIDAS, "[]").apply();
+        return s;
+    }
+
+    // ---------- 🏨 Avisos de las apps de reservas (1.77.0) ----------
+    static final String PREF_RESERVAS = "reservasAvisos";
+    private boolean leerReserva(SharedPreferences sp, String fuente, String app, StatusBarNotification sbn, Notification n) {
+        Bundle x = n.extras; if (x == null) return false;
+        String titulo = texto(x.getCharSequence(Notification.EXTRA_TITLE));
+        CharSequence grande = x.getCharSequence(Notification.EXTRA_BIG_TEXT);
+        StringBuilder t = new StringBuilder(texto(grande != null ? grande : x.getCharSequence(Notification.EXTRA_TEXT)));
+        for (String k : new String[]{Notification.EXTRA_SUB_TEXT, Notification.EXTRA_SUMMARY_TEXT}) { String v = texto(x.getCharSequence(k)); if (!v.isEmpty() && t.indexOf(v) < 0) t.append(' ').append(v); }
+        CharSequence[] lineas = x.getCharSequenceArray(Notification.EXTRA_TEXT_LINES);
+        if (lineas != null) for (CharSequence l : lineas) { String v = texto(l); if (!v.isEmpty() && t.indexOf(v) < 0) t.append('\n').append(v); }
+        String todo = (titulo + "\n" + t).trim();
+        if (todo.isEmpty() || !ReservaAviso.pareceReserva(todo)) return false;
+        long cuando = n.when != 0 ? n.when : sbn.getPostTime();
+        guardarReserva(sp, fuente, app, titulo, t.toString().trim(), "R:" + sbn.getKey() + ":" + cuando + ":" + todo.hashCode());
+        return true;
+    }
+    static synchronized void guardarReserva(SharedPreferences sp, String fuente, String app, String titulo, String txt, String id) {
+        try {
+            if (!marcarVisto(sp, id)) return;
+            JSONArray l = new JSONArray(sp.getString(PREF_RESERVAS, "[]")), out = new JSONArray();
+            long ahora = System.currentTimeMillis();
+            for (int i = 0; i < l.length(); i++) { JSONObject o = l.getJSONObject(i); if (ahora - o.optLong("t") < 3 * 24 * 3600_000L) out.put(o); }
+            out.put(new JSONObject().put("id", id).put("f", fuente).put("app", app).put("ti", titulo).put("tx", txt).put("t", ahora));
+            while (out.length() > 40) out.remove(0);
+            sp.edit().putString(PREF_RESERVAS, out.toString()).apply();
+            traza(sp, app, titulo, "🏨 aviso de reserva de " + fuente + ": va a 📅 Reservas");
+        } catch (Exception ignorado) { }
+    }
+    /** La página toma los avisos de reservas pendientes (y se borran de aquí). */
+    static synchronized String tomarReservas(SharedPreferences sp) {
+        String s = sp.getString(PREF_RESERVAS, "[]");
+        sp.edit().putString(PREF_RESERVAS, "[]").apply();
         return s;
     }
 

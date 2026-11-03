@@ -1375,6 +1375,10 @@ public class VentoApp extends Application {
         @JavascriptInterface
         public String pagosAvisosTomar() { return VentoEscucha.tomar(getSharedPreferences("vento", MODE_PRIVATE)); }
 
+        /** 🏨 1.77.0: avisos de las apps de reservas (Booking.com Pulse, Airbnb…) de este celular: [{id, f, app, ti, tx, t}]. */
+        @JavascriptInterface
+        public String reservasAvisosTomar() { return VentoEscucha.tomarReservas(getSharedPreferences("vento", MODE_PRIVATE)); }
+
         /** 💸 Plata que salió de las apps del banco de este celular (lo que el dueño envió o pagó): [{id, app, txt, t}]. */
         @JavascriptInterface
         public String pagosSalidasTomar() { return VentoEscucha.tomarSalidas(getSharedPreferences("vento", MODE_PRIVATE)); }
