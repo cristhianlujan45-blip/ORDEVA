@@ -742,7 +742,9 @@ const iconoProdEmoji = () => { const t = tipoNegocio(); return t ? t.icCarta : '
 function aplicarInventario(){
   const [tab, unidad] = invPalabra();
   const h = document.querySelector('#view-inventario .inv-head h2');
-  if(h) h.textContent = iconoProdEmoji() + ' ' + i18nPut(producto1()[1]) + ' e ' + i18nPut(tab).toLowerCase();
+  // 1.78.1: «Tarifas y consumos e disponibilidad» → «Tarifas y consumos» (si el nombre ya junta dos cosas, no se le pega otra),
+  // y «y» o «e» según cómo empieza la palabra («Productos e inventario», «Planes y cupos»).
+  if(h){ const pl = i18nPut(producto1()[1]), t = i18nPut(tab).toLowerCase(); h.textContent = iconoProdEmoji() + ' ' + pl + (/ y | e /.test(pl) ? '' : (/^h?[ií]/.test(t) ? ' e ' : ' y ') + t); }
   const at = document.getElementById('prodAddTitulo');
   if(at) at.textContent = 'Agregar ' + producto1()[0].toLowerCase();
   const ap = document.getElementById('prodAddPanel'), as = ap && ap.querySelector('summary small');
