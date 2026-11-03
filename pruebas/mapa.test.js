@@ -131,6 +131,6 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     chk('9. Sin errores en la página', errs.length === 0, errs);
   }catch(e){ mal++; console.log('❌ Error: ' + (e.stack || e)); }
   await b.close();
-  console.log('\n' + ok + ' ✅  ' + mal + ' ❌');
+  console.log('\nRESULTADO ' + ok + ' bien ' + mal + ' mal');
   process.exit(mal ? 1 : 0);
 })();
