@@ -31,6 +31,34 @@ cantidad, no solo el producto.»
   - Un empleado necesita la clave del dueño, y el cambio queda en la auditoría.
   - Está el botón «Volver a $3.500».
 
+## 1b. 📱 Celular como lector por QR: otra vez funciona, y la cámara no se apaga sola
+«Corrígeme lo de conectar el celular por código QR para escanear, ahora no funciona. La cámara tiene que quedar
+funcionando hasta que yo le dé finalizar, y que escanee como un lector de código de barras normal.»
+
+**Por qué no funcionaba:**
+- **No había cómo conectarlo desde la Caja POS.** Desde la 1.72.4, el 📷 de la Caja POS prende la cámara del mismo
+  equipo. La opción «📱 Usar el celular como lector» solo estaba en la ventana vieja de «Escanear», y desde la caja ya no
+  se llegaba ahí.
+- **Con la ventana del QR abierta, los códigos no entraban a la caja.** Esa ventana tapaba la caja, así que el celular
+  decía «El computador no está escaneando» y no mandaba nada.
+
+**Cómo quedó:**
+- **Desde la Caja POS:**
+  - el 📷 trae «📱 Celular» junto a «✕ Apagar cámara»;
+  - en un computador sin cámara, el 📷 abre de una vez el QR para conectar el celular.
+- **Mientras se muestra el QR:** la caja sigue recibiendo lo que lee el celular. La ventana se cierra sola cuando el
+  celular se conecta o manda el primer código.
+- **En el celular (`lector.html`):**
+  - la cámara queda prendida hasta tocar **«⏹ Finalizar»**, y «▶ Escanear otra vez» la vuelve a prender;
+  - mientras lee, la pantalla no se apaga;
+  - si el celular suelta la cámara (se bloqueó, entró una llamada, otra app la usó), se vuelve a abrir sola;
+  - el mismo código quieto frente a la cámara no se repite; para sumar otro, se retira y se vuelve a pasar, como con una
+    pistola lectora.
+- **Con la cámara de la propia caja (el celular es la caja):** la pantalla tampoco se apaga y la cámara se vuelve a abrir
+  sola. Solo se apaga con «✕ Apagar cámara».
+- **Prueba `lectorcel` (30 ✅, con cámaras de mentira que muestran códigos de verdad):** revisa la ventana del QR abierta
+  encima de la caja, que la cámara vuelva sola, «Finalizar» y «Escanear otra vez».
+
 ## 2. 💸 Todas las salidas quedan en Contabilidad
 «Cuando uno saca plata de los bancos del negocio… todas las salidas deben quedar registradas para la contabilidad.
 Como este que dice *Pasaste $10.000*: tiene que quedar bien contabilizado.»
