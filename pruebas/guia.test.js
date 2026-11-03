@@ -156,7 +156,9 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     chk('7. «¿Cuánto vendí hoy?» → pestaña Hoy y lo dice', (await p.evaluate(() => window.ventoFacil.estado().tab)) === 'hoy' && await dijo(/Hoy ha vendido/));
     await p.evaluate(() => window.ventoGuia.iniciar('vender')); await p.waitForTimeout(700);
     chk('7. «¿Cómo vendo?» señala las mesas con el nombre del negocio («Toque la cuenta»)', await p.isVisible('#gzTour') && (await p.textContent('#gzTour .gz-gt')) === 'Toque la cuenta');
-    await p.click('#facilApp .fz-mesa[data-mesa="1"]'); await p.waitForTimeout(900);
+    // La guía avanza sola cuando aparece la caja de productos: en GitHub (más lento) puede tardar más de 900 ms.
+    await p.click('#facilApp .fz-mesa[data-mesa="1"]');
+    await p.waitForFunction(() => { const g = document.querySelector('#gzTour .gz-gt'); return g && g.textContent === 'Toque los productos'; }, null, { timeout: 6000 }).catch(() => {});
     chk('7. Al tocar la mesa sigue solo: «Toque los productos»', (await p.evaluate(() => document.querySelector('#gzTour .gz-gt') && document.querySelector('#gzTour .gz-gt').textContent)) === 'Toque los productos');
     await p.click('#gzTour .gz-gsaltar'); await p.waitForTimeout(150);
     await p.click('#facilApp .fz-ayuda'); await p.waitForTimeout(200);
