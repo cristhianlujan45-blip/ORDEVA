@@ -2,6 +2,8 @@
 #  • En cada publicación de la rama principal que cambia la app: las pruebas CRÍTICAS (pedidos y QR seguros, pagos, caja,
 #    recetas, entrar y recuperar la cuenta…). Si una falla, queda en rojo en GitHub Actions para revisarla de inmediato.
 #  • A mano (Actions → «Pruebas de la app» → Run workflow, «todas»): la batería completa (más de una hora).
+#  • 1.81.2: TODAS cada noche (2:17 a. m. de Colombia), para que una prueba que no está en la lista rápida no se dañe sin que
+#    nadie lo note (en la auditoría de la 1.81 había 65 pruebas que solo corrían a mano).
 # (1.56.0, auditoría ORDEVA R5.)
 name: Pruebas de la app
 
@@ -12,6 +14,8 @@ on:
         description: "Correr TODAS las pruebas (más de una hora)"
         type: boolean
         default: false
+  schedule:
+    - cron: "17 7 * * *"
   push:
     branches: [claude/precio-margen-productos-tabla-mioclt]
     paths:
@@ -56,7 +60,7 @@ jobs:
         env:
           VENTO_PG_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres
           PLAYWRIGHT_PATH: ${{ github.workspace }}/pruebas/node_modules/playwright
-          TODAS: ${{ inputs.todas }}
+          TODAS: ${{ inputs.todas || github.event_name == 'schedule' }}
         run: |
           if [ "$TODAS" = "true" ]; then
             bash pruebas/correr.sh
