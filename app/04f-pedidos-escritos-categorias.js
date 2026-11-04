@@ -70,7 +70,7 @@ function qsRegistrarVenta(cart, opts){
     qty: it.qty,
     price: it.price,
     cost: (data.products.find(p=>p.id===it.productId)||{}).cost ?? null
-  }, it.unidad ? { unidad: it.unidad } : {}, it.productId ? { productId: it.productId } : {}, it.precioLista != null && it.precioLista !== it.price ? { precioLista: it.precioLista } : {}));      // ⚖️ por kilo/libra · 🏷️ precio antes del descuento
+  }, it.unidad ? { unidad: it.unidad } : {}, it.productId ? { productId: it.productId } : {}, it.precioLista != null && it.precioLista !== it.price ? { precioLista: it.precioLista } : {}, it.variante ? { variante: String(it.variante).slice(0, 30) } : {}));      // ⚖️ por kilo/libra · 🏷️ precio antes del descuento
   // El valor del domicilio se suma como una línea más (igual que la propina),
   // así el total del recibo y de las estadísticas ya lo incluyen sin tener
   // que tocar nada más en la app.

@@ -15,6 +15,8 @@
 // 13. 🔒 Cierre Z numerado con TODOS los medios (Nequi, tarjeta…) y el Excel de cierres del mes.
 // 14. 📅 Crédito con cuotas: al fiar se elige el plan; «📅 Créditos» muestra la vencida; el abono baja la deuda y entra
 //     a Contabilidad el día que se paga; el recordatorio por WhatsApp dice la cuota.
+// 15. 🎨 Variantes: al tocar el producto se elige la variante (o se escanea su código); cada una baja su stock.
+// 16. 🧾 Varias cajas: «Caja 2» con su propio turno, base y efectivo; la principal no se mezcla.
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 
@@ -221,6 +223,32 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     v = await p.evaluate(() => { const h = data.history[0]; const x = ctMovimientos({ ini: Date.now() - 6e4, fin: Date.now() + 6e4 }); return { debt: h.debt, c1: h.credito.cuotas[0].pagado, mov: x.mov.filter(m => /Abono de crédito/.test(m.desc)).map(m => m.monto), lista: document.querySelectorAll('.cm-ov .cm-cred').length, venc: !!document.querySelector('.cm-ov .cm-cred.venc') }; });
     chk('14. Abono de $5.000 por Nequi: debe $10.000, la cuota 1 queda pagada y el abono entra a Contabilidad hoy', v.debt === 10000 && v.c1 === 5000 && v.mov.join() === '5000' && v.lista === 1 && !v.venc, v);
     await p.evaluate(() => document.querySelectorAll('.cm-ov').forEach(o => o.remove()));
+
+    // ===== 15. Variantes =====
+    await p.evaluate(() => { data.products.push({ id: 'cam', name: 'Camiseta', price: 20000, stock: 10, variantes: [{ n: 'Roja M', stock: 2, cod: 'VAR1' }, { n: 'Azul L', stock: 5, precio: 22000 }] }); saveData(); window.ventoPOS.vaciar(); }); await pausa(300);
+    await p.click(R + ' .pz-grid [data-add="cam"]'); await pausa(250);
+    v = await p.evaluate(() => [...document.querySelectorAll('.cm-ov .cm-var')].map(b => b.innerText.replace(/\s+/g, ' ')));
+    chk('15. Tocar «Camiseta» pregunta la variante, con su precio y lo que queda', v.length === 2 && /Roja M/.test(v[0]) && /quedan 2/.test(v[0]) && /Azul L/.test(v[1]) && /22\.000/.test(v[1]), v);
+    await p.click('.cm-ov .cm-var[data-i="0"]'); await pausa(200);
+    await p.evaluate(() => window.ventoPOS.leerCodigo('VAR1')); await pausa(200);
+    await p.click(R + ' .pz-grid [data-add="cam"]'); await pausa(250); await p.click('.cm-ov .cm-var[data-i="1"]'); await pausa(200);
+    v = await lin();
+    chk('15. «Camiseta · Roja M» ×2 (una tocada y otra por su código) y «Azul L» a $22.000', /cam~0:20000×2/.test(v) && /cam~1:22000×1/.test(v), v);
+    const e15 = await p.evaluate(async () => { const en = await window.ventoPOS.cobrar({ pago: { method: 'efectivo', metodo: 'efectivo' } }); const pr = data.products.find(x => x.id === 'cam'); return { items: en.items.map(i => i.productId + ':' + i.variante + ':' + i.qty), st: pr.variantes.map(x => x.stock), base: pr.stock }; });
+    chk('15. Al cobrar: la venta dice la variante; Roja M queda en 0, Azul L en 4 y la Camiseta en 7', e15.items.join() === 'cam:Roja M:2,cam:Azul L:1' && e15.st.join() === '0,4' && e15.base === 7, e15);
+    await pausa(9500);
+
+    // ===== 16. Varias cajas =====
+    v = await p.evaluate(async () => {
+      const T = window.ventoTurno; T.ponerCajaNombre('Caja 2'); T.abrir(10000);
+      window.ventoPOS.agregar('l', 1); const en = await window.ventoPOS.cobrar({ pago: { method: 'efectivo', metodo: 'efectivo' } });
+      const r2 = T.resumen(), t2 = T.turno();
+      T.ponerCajaNombre(''); const r1 = T.resumen();
+      const sinCaja = data.history.filter(h => !h.caja).reduce((a, h) => a + h.payments.filter(p => p.method === 'efectivo').reduce((x, p) => x + p.amount, 0), 0);
+      return { caja: en.caja, base2: t2 && t2.base, esperado2: r2.esperado, ventas2: r2.ventas, guardada: !!(data.turnosCaja && data.turnosCaja['Caja 2']), ppal: r1.abierta, ventas1: r1.ventas, sinCaja, cajas: data.cajas };
+    });
+    chk('16. «Caja 2»: su turno con base $10.000 y la venta marcada; debe haber $14.000 (no cuenta lo de las otras cajas)', v.caja === 'Caja 2' && v.base2 === 10000 && v.ventas2 === 4000 && v.esperado2 === 14000 && v.guardada, v);
+    chk('16. La caja principal sigue aparte (sin abrir y sin el efectivo de la Caja 2)', v.ppal === false && v.ventas1 === v.sinCaja && (v.cajas || []).includes('Caja 2'), v);
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.stack || e)); }
   chk('Sin errores de página', !errs.length, errs);
   await b.close();

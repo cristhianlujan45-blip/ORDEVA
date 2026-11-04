@@ -66,7 +66,10 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     chk('1. Reserva nueva de la habitación 1 (mañana, 2 noches): queda en el servidor', filas.length === 1 && filas[0].cliente === 'Ana Ruiz' && filas[0].estado === 'confirmada', filas);
 
     // ===== 2. Se cruza =====
+    // Después de guardar, la ventana se vuelve a pintar con lo del servidor: se espera a que el formulario esté a la vista.
+    await p.waitForTimeout(800);
     await p.evaluate(() => { document.querySelector('.rs-nueva').open = true; });
+    await p.waitForSelector('#rsDesde', { state: 'visible', timeout: 10000 }).catch(() => {});
     await p.selectOption('#rsRec', '1'); await p.fill('#rsDesde', manana[0]); await p.fill('#rsHasta', manana[1]); await p.fill('#rsCli', 'Luis'); await p.click('[data-rs="guardar"]');
     chk('2. Otra en la misma habitación y fechas: NO se guarda y dice que ya está reservada', await esperar(p, () => /ya está reservada/.test((document.getElementById('rsMsg') || {}).textContent || ''), null, 8000) &&
       (await sb.sql("select count(*)::int n from reservas where negocio_id = $1", [NEG]))[0].n === 1, await p.evaluate(() => (document.getElementById('rsMsg') || {}).textContent));
@@ -81,7 +84,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
 
     // ===== 4. Entra una reserva por el agente =====
     await p.evaluate(() => { document.getElementById('rsOv').classList.remove('show'); document.querySelector('nav button[data-view="mesas"]').click(); });
-    const hoy = await p.evaluate(() => { const fin = new Date(); fin.setHours(23, 59, 0, 0); const d = new Date(Date.now() + Math.min(2 * 36e5, Math.max(6e4, (fin - Date.now()) / 2)));   // siempre HOY (en GitHub corre de noche) const h = new Date(); h.setDate(h.getDate() + 1); h.setHours(12, 0, 0, 0); return [d.toISOString(), h.toISOString()]; });
+    const hoy = await p.evaluate(() => { const fin = new Date(); fin.setHours(23, 59, 0, 0); const d = new Date(Date.now() + Math.min(2 * 36e5, Math.max(6e4, (fin - Date.now()) / 2)));   /* siempre HOY (en GitHub corre de noche) */ const h = new Date(); h.setDate(h.getDate() + 1); h.setHours(12, 0, 0, 0); return [d.toISOString(), h.toISOString()]; });
     const anon = { apikey: sb.anonKey, 'Content-Type': 'application/json', Authorization: 'Bearer ' + sb.anonKey };
     const pub = await fetch(sb.url + '/rest/v1/rpc/reserva_publica_crear', { method: 'POST', headers: anon, body: JSON.stringify({ p_publico: PUB.publico, p_recurso: '3', p_desde: hoy[0], p_hasta: hoy[1], p_cliente: 'Carlos Pérez', p_telefono: '3105550000', p_personas: 2, p_nota: 'Llega en bus' }) }).then(r => r.json());
     chk('4. El agente reserva la habitación 3 para hoy', pub && pub.ok, pub);
