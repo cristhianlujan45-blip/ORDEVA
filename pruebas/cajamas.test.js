@@ -8,6 +8,11 @@
 //  6. Corte X (no cierra la caja) y 🔁 cambio de turno (arqueo; la caja sigue con el que llega y su base es lo contado).
 //  7. IVA por tarifa en el recibo: 19 %, 5 % y exento por separado.
 //  8. 📺 Pantalla del cliente en otra ventana: lo que se registra, el total y «¡Gracias!».
+//  9. 1.81.0: 🔒 vender sin existencias pide confirmar (dueño) / la clave (equipo), si se prendió en Ajustes.
+// 10. 🎉 Promoción por horario (hora feliz): el precio baja sola en esa hora y se ve en la venta.
+// 11. 💳 Datáfono: con tarjeta espera el aviso del pago por ese valor y la venta se cobra sola.
+// 12. 🧾 Recibos de cualquier día desde la caja.
+// 13. 🔒 Cierre Z numerado con TODOS los medios (Nequi, tarjeta…) y el Excel de cierres del mes.
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 
@@ -144,6 +149,54 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     v = await pan.evaluate(() => ({ g: !document.getElementById('gracias').hidden, vu: document.getElementById('graVu').textContent }));
     chk('8. Al cobrar: «¡Gracias por su compra!» con el cambio ($7.000)', v.g && /7\.000/.test(v.vu), v);
     await pan.close();
+    await pausa(9500);
+
+    // ===== 9. Sin existencias =====
+    await p.evaluate(() => { data.cajaCfg = { claveAgotado: true }; data.products.push({ id: 'z', name: 'Atún', price: 6000, stock: 1 }); saveData(); window.ventoPOS.vaciar(); });
+    await p.evaluate(() => { window.ventoPOS.agregar('z', 1); }); await pausa(200);
+    await p.evaluate(() => { window.ventoPOS.agregar('z', 1); }); await pausa(300);
+    v = await p.evaluate(() => ({ conf: document.getElementById('confirmOverlay') && document.getElementById('confirmOverlay').classList.contains('show') && document.getElementById('confirmOverlay').innerText, l: window.ventoPOS.carrito().map(x => x.id + '×' + x.qty).join() }));
+    chk('9. El 2.º Atún (solo queda 1): pregunta «Sin existencias» y todavía no lo suma', /existencias/i.test(v.conf || '') && v.l === 'z×1', v);
+    await p.click('#confirmOkBtn'); await pausa(300);
+    v = await p.evaluate(() => window.ventoPOS.carrito().map(x => x.id + '×' + x.qty).join());
+    chk('9. Con «Sí, vender» se suma', v === 'z×2', v);
+    await p.evaluate(() => { data.cajaCfg = {}; saveData(); window.ventoPOS.vaciar(); });
+
+    // ===== 10. Hora feliz =====
+    await p.evaluate(() => { const h = new Date(), a = new Date(h.getTime() - 36e5), b = new Date(h.getTime() + 36e5), hm = d => String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+      data.categories = [{ id: 'cv', name: 'Cervezas' }]; data.products.find(x => x.id === 'c').categoryId = 'cv';
+      data.promosHora = [{ n: 'Hora feliz', desde: hm(a), hasta: hm(b) > hm(a) ? hm(b) : '23:59', pct: 20, dias: [], cats: ['cv'], on: true }]; saveData();
+      window.ventoPOS.agregar('c', 1); window.ventoPOS.agregar('l', 1); }); await pausa(300);
+    v = await p.evaluate(R => ({ l: window.ventoPOS.carrito().map(x => x.id + ':' + x.price).join(), chip: (document.querySelector(R + ' .cm-promo-v') || {}).textContent || '' }), R);
+    chk('10. Hora feliz −20 % en Cervezas: la cerveza baja ($3.500 → $2.800), la leche no; y se ve en la venta', v.l === 'c:2800,l:4000' && /Hora feliz/.test(v.chip) && /20 %/.test(v.chip), v);
+    await p.evaluate(() => { data.promosHora = []; saveData(); });
+
+    // ===== 11. Datáfono =====
+    await p.evaluate(() => { data.cajaCfg = { datafono: true }; saveData(); window.ventoPOS.vaciar(); window.ventoPOS.agregar('l', 2); window.__cob = window.ventoPOS.cobrar(); }); await pausa(500);
+    await p.click('.pz-pago-ov .pz-met[data-m="tarjeta"]'); await pausa(300);
+    v = await p.evaluate(() => ({ df: !!document.getElementById('pzDfOv'), txt: (document.getElementById('pzDfOv') || {}).innerText || '', n: data.history.length }));
+    chk('11. Con tarjeta: «Pase la tarjeta en el datáfono por $8.000» y espera (todavía no se cobra)', v.df && /8\.000/.test(v.txt) && /Esperando/.test(v.txt), v);
+    const n11 = v.n;
+    await p.evaluate(() => { window.pagoLlego && window.pagoLlego({ monto: 8000, metodo: 'BOLD', estado: 'ok' }); }); await pausa(1800);
+    v = await p.evaluate(n => { const h = data.history[0]; return { n: data.history.length, pago: h && h.payments.map(x => x.method + ':' + x.note + ':' + x.amount), df: !!document.getElementById('pzDfOv') }; }, n11);
+    chk('11. Llega el aviso de Bold por $8.000: la venta se cobra sola como «Tarjeta»', v.n === n11 + 1 && /Tarjeta/.test(v.pago.join()) && !v.df, v);
+    await p.evaluate(() => { data.cajaCfg = {}; saveData(); });
+    await pausa(9500);
+
+    // ===== 12. Recibos =====
+    await p.evaluate(() => { const h = data.history[data.history.length - 1]; h.date = new Date(Date.now() - 5 * 864e5).toISOString(); saveData(); window.ventoPOS.ponerMeta(window.ventoPOS.meta()); }); await pausa(200);
+    await btn('recibos');
+    v = await p.evaluate(() => document.querySelectorAll('.cm-ov .cm-it').length);
+    const nh = await p.evaluate(() => data.history.length);
+    chk('12. «🧾 Recibos» lista las ventas de todos los días (también la de hace 5 días)', v === nh, { v, nh });
+    await p.evaluate(() => document.querySelectorAll('.cm-ov').forEach(o => o.remove()));
+
+    // ===== 13. Cierre Z =====
+    await p.evaluate(() => { window.ventoPOS.agregar('a', 1); }); await p.evaluate(async () => { await window.ventoPOS.cobrar({ pago: { method: 'transferencia', metodo: 'nequi', nota: 'Nequi' } }); }); await pausa(300);
+    await p.evaluate(async () => { document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')); await closeCashRegister({ auto: true }); }); await pausa(600);
+    v = await p.evaluate(() => { const c = data.closures[0]; return { z: c.z, medios: c.medios, txt: buildClosureText(c), csv: window.ventoCajaMas.cierresCsv(0, Date.now() + 864e5).csv }; });
+    chk('13. Cierre Z N.º 0001 con cada medio aparte (Efectivo, Nequi, Tarjeta, Saldo a favor)', v.z === 1 && v.medios.nequi > 0 && v.medios.tarjeta === 8000 && v.medios.efectivo > 0 && v.medios.saldo === 4200 && /Cierre Z N\.º 0001/.test(v.txt) && /Nequi/.test(v.txt) && /Tarjeta/.test(v.txt), v);
+    chk('13. El Excel de cierres trae el número, las columnas de cada medio y el arqueo', /"Cierre Z"/.test(v.csv) && /"0001"/.test(v.csv) && /"Nequi"/.test(v.csv) && /"Tarjeta"/.test(v.csv) && /Efectivo contado/.test(v.csv), v.csv.slice(0, 400));
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.stack || e)); }
   chk('Sin errores de página', !errs.length, errs);
   await b.close();

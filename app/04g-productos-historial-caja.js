@@ -1503,7 +1503,8 @@ function computeClosureStats(fromISO, toISO){
     return (!from || d > from) && d <= to;
   });
   const totalSold = tickets.reduce((s,h)=> s + h.total, 0);
-  let totalEfectivo = 0, totalTransferencia = 0, totalDebe = 0, totalRecibido = 0, totalVueltas = 0;
+  let totalEfectivo = 0, totalTransferencia = 0, totalDebe = 0, totalRecibido = 0, totalVueltas = 0, descuentos = 0, devoluciones = 0;
+  const medios = {}, cajeros = {};
   tickets.forEach(h=>{
     (h.payments||[]).forEach(p=>{
       // 1.69.0: lo que entregó el cliente en efectivo y las vueltas que se le dieron (no cambian lo que debe haber en caja:
@@ -1512,7 +1513,11 @@ function computeClosureStats(fromISO, toISO){
       if(p.method === 'efectivo') totalEfectivo += p.amount;
       else if(p.method === 'transferencia') totalTransferencia += p.amount;
       else if(p.method === 'debe') totalDebe += p.amount;
+      const k = medioDePago(p); medios[k] = (medios[k] || 0) + (Number(p.amount) || 0);   // 1.81.0: TODOS los medios (Nequi, tarjeta…)
     });
+    const c = h.by || 'Sin usuario', x = cajeros[c] || (cajeros[c] = { n: 0, total: 0 }); x.n++; x.total += Number(h.total) || 0;
+    if(h.descuento) descuentos += Number(h.descuento.valor) || 0;
+    (h.devoluciones || []).forEach(d => { devoluciones += Number(d.total) || 0; });
   });
   const hourlyMap = {};
   tickets.forEach(h=>{
@@ -1521,8 +1526,22 @@ function computeClosureStats(fromISO, toISO){
     hourlyMap[hourKey] = (hourlyMap[hourKey]||0) + h.total;
   });
   const hourly = Object.keys(hourlyMap).sort().map(h=>({ hour: h, total: hourlyMap[h] }));
-  return { tickets, totalSold, totalEfectivo, totalTransferencia, totalDebe, totalRecibido, totalVueltas, hourly };
+  return { tickets, totalSold, totalEfectivo, totalTransferencia, totalDebe, totalRecibido, totalVueltas, hourly, medios, cajeros, descuentos, devoluciones };
 }
+// 🔒 1.81.0: cierre Z numerado y con todos los medios de pago. Nombre de cada medio para el informe.
+// La caja guarda Nequi, DaviPlata, tarjeta… como «transferencia» con el nombre en la nota: aquí se separan.
+function medioDePago(p){
+  const m = (p && p.method) || 'otro'; if(m !== 'transferencia') return m;
+  const n = String(p.note || '').toLowerCase();
+  return /nequi/.test(n) ? 'nequi' : /daviplata/.test(n) ? 'daviplata' : /tarjeta|dat[aá]fono|bold|redeban|cr[eé]dito|d[eé]bito/.test(n) ? 'tarjeta' : /bre-?b|llave/.test(n) ? 'breb' : /\bqr\b/.test(n) ? 'qr' : 'transferencia';
+}
+window.medioDePago = medioDePago;
+const CIERRE_MEDIOS = { efectivo: '💵 Efectivo', transferencia: '🏦 Transferencia', nequi: '📱 Nequi', daviplata: '📱 DaviPlata', tarjeta: '💳 Tarjeta', saldo: '💳 Saldo a favor', breb: '🔑 Bre-B', qr: '📲 QR', debe: '📝 Fiado (quedó debiendo)', otro: 'Otro' };
+function cierreMedios(closure){
+  if(closure.medios && Object.keys(closure.medios).length) return Object.keys(closure.medios).filter(k => closure.medios[k]).sort((a, b) => (a === 'debe') - (b === 'debe') || closure.medios[b] - closure.medios[a]).map(k => [CIERRE_MEDIOS[k] || k, closure.medios[k], k]);
+  return [['💵 Efectivo', closure.totalEfectivo, 'efectivo'], ['🏦 Transferencia', closure.totalTransferencia, 'transferencia']].concat(closure.totalDebe > 0 ? [['📝 Fiado (quedó debiendo)', closure.totalDebe, 'debe']] : []);
+}
+const cierreZ = c => c && c.z ? 'Cierre Z N.º ' + String(c.z).padStart(4, '0') : 'Cierre de caja';
 
 // 1.55.0: lo que se le muestra antes de cerrar la caja (ventas desde el último cierre, mesas abiertas y qué pasa).
 function cierreResumenTexto(s, openIds, last){
@@ -1585,7 +1604,11 @@ async function closeCashRegister(opts){
     totalDebe: stats.totalDebe,
     totalRecibido: stats.totalRecibido, totalVueltas: stats.totalVueltas,
     hourly: stats.hourly,
-    caja
+    caja,
+    // 1.81.0: número consecutivo (cierre Z), todos los medios de pago, por cajero, descuentos y devoluciones
+    z: (data.closures || []).reduce((a, c) => Math.max(a, Number(c.z) || 0), 0) + 1,
+    medios: stats.medios, cajeros: stats.cajeros, descuentos: Math.round(stats.descuentos), devoluciones: Math.round(stats.devoluciones),
+    by: (typeof authUser !== 'undefined' && authUser) || ''
   };
   try{ window.ventoTurno && window.ventoTurno.cerrar(caja); }catch(e){}
   if(!data.closures) data.closures = [];
@@ -1614,16 +1637,17 @@ function closureDateRangeStr(closure){
 
 function buildClosureText(closure){
   const lines = [];
-  lines.push(`*🔒 Cierre de caja — ${closure.businessName || data.businessName}*`);
+  lines.push(`*🔒 ${cierreZ(closure)} — ${closure.businessName || data.businessName}*`);
   lines.push(closureDateRangeStr(closure));
   lines.push('');
   lines.push(`Cuentas cerradas: ${closure.ticketCount}`);
   lines.push(`*Total vendido: ${fmt(closure.totalSold)}*`);
   lines.push('');
   lines.push('*Por método de pago:*');
-  lines.push(`Efectivo: ${fmt(closure.totalEfectivo)}`);
-  lines.push(`Transferencia: ${fmt(closure.totalTransferencia)}`);
-  if(closure.totalDebe > 0) lines.push(`⚠️ Quedó debiendo: ${fmt(closure.totalDebe)}`);
+  cierreMedios(closure).forEach(m => lines.push(`${m[0]}: ${fmt(m[1])}`));
+  if(closure.descuentos > 0) lines.push(`🏷️ Descuentos: ${fmt(closure.descuentos)}`);
+  if(closure.devoluciones > 0) lines.push(`↩️ Devoluciones: ${fmt(closure.devoluciones)}`);
+  if(closure.cajeros && Object.keys(closure.cajeros).length > 1){ lines.push('', '*Por cajero:*'); Object.keys(closure.cajeros).forEach(k => lines.push(`${k}: ${closure.cajeros[k].n} · ${fmt(closure.cajeros[k].total)}`)); }
   if(closure.hourly && closure.hourly.length){
     lines.push('');
     lines.push('*Ventas por hora:*');
@@ -1639,13 +1663,13 @@ function buildClosureHTML(closure){
   const hourlyHtml = (closure.hourly||[]).map(h=>`<div class="r-line"><span>${h.hour}</span><span>${fmt(h.total)}</span></div>`).join('') || '<div class="r-line"><span>Sin ventas registradas</span><span></span></div>';
   const debtHtml = closure.totalDebe > 0 ? `<div class="r-line r-debt"><span>Quedó debiendo</span><span>${fmt(closure.totalDebe)}</span></div>` : '';
   return `
-    <h3>🔒 Cierre de caja</h3>
+    <h3>🔒 ${cierreZ(closure)}</h3>
     <div class="r-sub">${closure.businessName || data.businessName} · ${closureDateRangeStr(closure)}</div>
     <div class="r-line"><span>Cuentas cerradas</span><span>${closure.ticketCount}</span></div>
     <div class="r-section">Por método de pago</div>
-    <div class="r-line"><span>Efectivo</span><span>${fmt(closure.totalEfectivo)}</span></div>
-    <div class="r-line"><span>Transferencia</span><span>${fmt(closure.totalTransferencia)}</span></div>
-    ${debtHtml}
+    ${cierreMedios(closure).map(m => `<div class="r-line${m[2] === 'debe' ? ' r-debt' : ''}"><span>${m[0]}</span><span>${fmt(m[1])}</span></div>`).join('')}
+    ${closure.descuentos > 0 ? `<div class="r-line"><span>🏷️ Descuentos</span><span>${fmt(closure.descuentos)}</span></div>` : ''}
+    ${closure.devoluciones > 0 ? `<div class="r-line"><span>↩️ Devoluciones</span><span>${fmt(closure.devoluciones)}</span></div>` : ''}
     <div class="r-section">Ventas por hora</div>
     ${hourlyHtml}
     ${closure.caja && window.ventoTurno ? window.ventoTurno.html(closure.caja, 'r') : ''}
@@ -1692,18 +1716,15 @@ function openClosureReport(closure){
     <div class="hist-detail-line"><span>${h.hour}</span><span>${fmt(h.total)}</span></div>
   `).join('') || '<div class="hist-detail-line"><span>Sin ventas registradas</span><span></span></div>';
   body.innerHTML = `
+    ${closure.z ? `<div class="hist-detail-title" style="margin-top:0">🔒 ${cierreZ(closure)}${closure.by ? ' · ' + closure.by : ''}</div>` : ''}
     <div class="total-row sub">
       <span class="label">Cuentas cerradas</span>
       <span class="amount">${closure.ticketCount}</span>
     </div>
-    <div class="total-row sub">
-      <span class="label">Efectivo</span>
-      <span class="amount paid">${fmt(closure.totalEfectivo)}</span>
-    </div>
-    <div class="total-row sub">
-      <span class="label">Transferencia</span>
-      <span class="amount paid">${fmt(closure.totalTransferencia)}</span>
-    </div>
+    ${cierreMedios(closure).filter(m => m[2] !== 'debe').map(m => `<div class="total-row sub"><span class="label">${m[0]}</span><span class="amount paid">${fmt(m[1])}</span></div>`).join('')}
+    ${closure.descuentos > 0 ? `<div class="total-row sub"><span class="label">🏷️ Descuentos</span><span class="amount">${fmt(closure.descuentos)}</span></div>` : ''}
+    ${closure.devoluciones > 0 ? `<div class="total-row sub"><span class="label">↩️ Devoluciones</span><span class="amount">${fmt(closure.devoluciones)}</span></div>` : ''}
+    ${closure.cajeros && Object.keys(closure.cajeros).length > 1 ? '<div class="hist-detail-title">👤 Por cajero</div>' + Object.keys(closure.cajeros).map(k => `<div class="hist-detail-line"><span>${k}</span><span>${closure.cajeros[k].n} · ${fmt(closure.cajeros[k].total)}</span></div>`).join('') : ''}
     ${closure.totalVueltas > 0 ? `<div class="total-row sub"><span class="label">💵 Recibido en efectivo · vueltas entregadas</span><span class="amount">${fmt(closure.totalRecibido)} · ${fmt(closure.totalVueltas)}</span></div>` : ''}
     ${closure.totalDebe > 0 ? `<div class="total-row sub"><span class="label">Quedó debiendo</span><span class="amount hist-debt-flag">${fmt(closure.totalDebe)}</span></div>` : ''}
     <div class="hist-detail-title">Ventas por hora</div>
