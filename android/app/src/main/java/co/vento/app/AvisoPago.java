@@ -74,7 +74,9 @@ public final class AvisoPago {
     // pago que trae «código de aprobación 604107» o «nunca compartas tu clave» SÍ es pago.
     static final Pattern CODIGO = Pattern.compile("(c[oó]digo|clave)( de)? (seguridad|verificaci[oó]n|acceso|ingreso|otp|din[aá]mica)( es)?\\s*:?\\s*\\d{4,8}|clave din[aá]mica|\\botp\\b[^.]{0,20}\\d{4,8}|tu c[oó]digo es \\d|es tu c[oó]digo", Pattern.CASE_INSENSITIVE);
     // Plata que SALE (nunca es un pago recibido, aunque el aviso diga «te»).
-    static final Pattern SALE = Pattern.compile("enviaste|pagaste|pasaste|compra exitosa|transferiste|retiraste|compraste|sacaste|usted (envi|pag|transfiri|pas)|retiro (exitoso|aprobado|en|por|de)|se debit[oó]|debitamos|compra aprobada|avance (por|de|en)|usted retir|c[oó]digo (de )?(seguridad|verificaci)|clave din[aá]mica|\\botp\\b", Pattern.CASE_INSENSITIVE);
+    // 1.81.1: los retiros, débitos y «compra aprobada» solo van en SALIDA (para anotarlos en Contabilidad), no aquí: aquí
+    // descartan avisos, y un aviso de pago de verdad que los nombrara (publicidad del banco al final) se iba al camino lento.
+    static final Pattern SALE = Pattern.compile("enviaste|pagaste|pasaste|compra exitosa|transferiste|retiraste|compraste|sacaste|usted (envi|pag|transfiri|pas)|c[oó]digo (de )?(seguridad|verificaci)|clave din[aá]mica|\\botp\\b", Pattern.CASE_INSENSITIVE);
 
     // 💸 1.66.5: plata que SALE de la cuenta del negocio (lo que el dueño envía o paga por Nequi, DaviPlata o el banco), para
     // clasificarla en Contabilidad (proveedor u otro gasto). Nunca suena ni sale del celular: solo queda para la página.
