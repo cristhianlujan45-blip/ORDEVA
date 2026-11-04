@@ -17,6 +17,7 @@
 //     a Contabilidad el día que se paga; el recordatorio por WhatsApp dice la cuota.
 // 15. 🎨 Variantes: al tocar el producto se elige la variante (o se escanea su código); cada una baja su stock.
 // 16. 🧾 Varias cajas: «Caja 2» con su propio turno, base y efectivo; la principal no se mezcla.
+// 17. 🔒 Con varias cajas, el cierre de cada una cuenta SOLO sus ventas, desde su propio último cierre.
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 
@@ -249,6 +250,23 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     });
     chk('16. «Caja 2»: su turno con base $10.000 y la venta marcada; debe haber $14.000 (no cuenta lo de las otras cajas)', v.caja === 'Caja 2' && v.base2 === 10000 && v.ventas2 === 4000 && v.esperado2 === 14000 && v.guardada, v);
     chk('16. La caja principal sigue aparte (sin abrir y sin el efectivo de la Caja 2)', v.ppal === false && v.ventas1 === v.sinCaja && (v.cajas || []).includes('Caja 2'), v);
+
+    // ===== 17. Cierre por caja =====
+    await pausa(9500);
+    v = await p.evaluate(async () => {
+      const T = window.ventoTurno;
+      document.querySelectorAll('.overlay.show').forEach(o => { if(o.id !== 'pzCajaOv') o.classList.remove('show'); });
+      T.ponerCajaNombre('Caja 2'); await closeCashRegister({ auto: true }); const c2 = data.closures[0];
+      document.getElementById('closureOverlay').classList.remove('show');
+      T.ponerCajaNombre(''); const antes = (data.closures.find(c => !c.caja) || {}).date;
+      window.ventoPOS.agregar('a', 1); await window.ventoPOS.cobrar({ pago: { method: 'efectivo', metodo: 'efectivo' } });
+      const esperadas = data.history.filter(h => !h.caja && (!antes || new Date(h.date) > new Date(antes))).length;
+      await closeCashRegister({ auto: true }); const c1 = data.closures[0];
+      document.getElementById('closureOverlay').classList.remove('show');
+      return { c2: { caja: c2.caja, n: c2.ticketCount, total: c2.totalSold, txt: buildClosureText(c2).split('\n')[0] }, c1: { caja: c1.caja || '', n: c1.ticketCount, esperadas } };
+    });
+    chk('17. El cierre de la «Caja 2» cuenta solo su venta ($4.000) y lo dice', v.c2.caja === 'Caja 2' && v.c2.n === 1 && v.c2.total === 4000 && /Caja 2/.test(v.c2.txt), v);
+    chk('17. El cierre de la principal no trae la venta de la Caja 2', v.c1.caja === '' && v.c1.n === v.c1.esperadas && v.c1.n >= 1, v);
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.stack || e)); }
   chk('Sin errores de página', !errs.length, errs);
   await b.close();

@@ -1495,12 +1495,13 @@ function renderHistorial(masPagina){
 }
 
 /* ---------- Cierre de caja del día ---------- */
-function computeClosureStats(fromISO, toISO){
+function computeClosureStats(fromISO, toISO, caja){
   const from = fromISO ? new Date(fromISO) : null;
   const to = new Date(toISO);
+  // 🧾 1.81.2: con varias cajas, cada caja cierra SOLO sus ventas (caja = nombre de esta caja; '' = la principal)
   const tickets = data.history.filter(h=>{
     const d = new Date(h.date);
-    return (!from || d > from) && d <= to;
+    return (!from || d > from) && d <= to && (caja == null || (h.caja || '') === caja);
   });
   const totalSold = tickets.reduce((s,h)=> s + h.total, 0);
   let totalEfectivo = 0, totalTransferencia = 0, totalDebe = 0, totalRecibido = 0, totalVueltas = 0, descuentos = 0, devoluciones = 0;
@@ -1541,7 +1542,7 @@ function cierreMedios(closure){
   if(closure.medios && Object.keys(closure.medios).length) return Object.keys(closure.medios).filter(k => closure.medios[k]).sort((a, b) => (a === 'debe') - (b === 'debe') || closure.medios[b] - closure.medios[a]).map(k => [CIERRE_MEDIOS[k] || k, closure.medios[k], k]);
   return [['💵 Efectivo', closure.totalEfectivo, 'efectivo'], ['🏦 Transferencia', closure.totalTransferencia, 'transferencia']].concat(closure.totalDebe > 0 ? [['📝 Fiado (quedó debiendo)', closure.totalDebe, 'debe']] : []);
 }
-const cierreZ = c => c && c.z ? 'Cierre Z N.º ' + String(c.z).padStart(4, '0') : 'Cierre de caja';
+const cierreZ = c => (c && c.z ? 'Cierre Z N.º ' + String(c.z).padStart(4, '0') : 'Cierre de caja') + (c && c.caja ? ' · ' + c.caja : '');
 
 // 1.55.0: lo que se le muestra antes de cerrar la caja (ventas desde el último cierre, mesas abiertas y qué pasa).
 function cierreResumenTexto(s, openIds, last){
@@ -1560,11 +1561,12 @@ function cierreResumenTexto(s, openIds, last){
 async function closeCashRegister(opts){
   const auto = !!(opts && opts.auto === true);   // el cierre automático programado no espera a que alguien cuente
   const openIds = getOpenTableIds();
-  const lastClosure = (data.closures && data.closures.length) ? data.closures[0] : null;
+  const T = window.ventoTurno, cajaN = T && T.variasCajas && T.variasCajas() ? (T.cajaNombre() || '') : null;
+  const lastClosure = (data.closures || []).find(c => cajaN == null || (c.caja || '') === cajaN) || null;
   const fromISO = lastClosure ? lastClosure.date : null;
   if(!auto){
     // Siempre pregunta antes de cerrar, con lo que se va a cerrar (antes solo preguntaba si había mesas abiertas).
-    const pre = computeClosureStats(fromISO, new Date().toISOString());
+    const pre = computeClosureStats(fromISO, new Date().toISOString(), cajaN);
     if(!pre.tickets.length && !openIds.length && !(window.ventoTurno && window.ventoTurno.turno())){
       showToast('No hay cuentas nuevas para cerrar. La caja ya está al día.');
       return;
@@ -1579,7 +1581,7 @@ async function closeCashRegister(opts){
     openIds.forEach(id => closeTableToHistory(id));
   }
   const toISO = new Date().toISOString();
-  const stats = computeClosureStats(fromISO, toISO);
+  const stats = computeClosureStats(fromISO, toISO, cajaN);
   // 🧮 Arqueo: contar el efectivo de la caja (base + ventas en efectivo + entradas − salidas). Cancelar = no se cierra.
   let caja = null;
   if(window.ventoTurno && (stats.tickets.length || window.ventoTurno.turno())){
@@ -1608,7 +1610,8 @@ async function closeCashRegister(opts){
     // 1.81.0: número consecutivo (cierre Z), todos los medios de pago, por cajero, descuentos y devoluciones
     z: (data.closures || []).reduce((a, c) => Math.max(a, Number(c.z) || 0), 0) + 1,
     medios: stats.medios, cajeros: stats.cajeros, descuentos: Math.round(stats.descuentos), devoluciones: Math.round(stats.devoluciones),
-    by: (typeof authUser !== 'undefined' && authUser) || ''
+    by: (typeof authUser !== 'undefined' && authUser) || '',
+    caja: cajaN || undefined
   };
   try{ window.ventoTurno && window.ventoTurno.cerrar(caja); }catch(e){}
   if(!data.closures) data.closures = [];
