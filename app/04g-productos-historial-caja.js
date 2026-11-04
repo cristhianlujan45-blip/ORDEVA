@@ -1208,9 +1208,7 @@ function buildReceiptText({businessName, tableLabel, dateStr, items, payments, t
   (items||[]).forEach(it=> lines.push(`${it.qty} x ${it.name}${it.size ? ' (' + it.size + ')' : ''}${it.person ? ' — ' + it.person : ''} - ${fmt(it.price*it.qty)}`));
   lines.push('');
   if(ivaResponsable){
-    const b = ivaBreakdown(total, ivaRate);
-    lines.push(`Subtotal: ${fmt(b.base)}`);
-    lines.push(`IVA (${ivaRate}%): ${fmt(b.iva)}`);
+    ivaLineas(items, total, ivaRate).forEach(r => lines.push(`${r[0]}: ${fmt(r[1])}`));
   } else {
     lines.push('No responsable de IVA');
   }
@@ -1246,7 +1244,7 @@ function buildReceiptHTML({businessName, tableLabel, dateStr, items, payments, t
   const bizLineHtml = [nit ? 'NIT/CC: ' + invEsc(nit) : '', bizAddress ? invEsc(bizAddress) : ''].filter(Boolean).join(' · ');
   const invoiceLineHtml = [invoiceNo ? 'Factura de venta N.º ' + invEsc(invoiceNo) : '', dianResolucionText ? invEsc(dianResolucionText) : ''].filter(Boolean).join(' · ');
   const ivaHtml = ivaResponsable
-    ? (() => { const b = ivaBreakdown(total, ivaRate); return `<div class="r-line"><span>Subtotal</span><span>${fmt(b.base)}</span></div><div class="r-line"><span>IVA (${ivaRate}%)</span><span>${fmt(b.iva)}</span></div>`; })()
+    ? ivaLineas(items, total, ivaRate).map(r => `<div class="r-line"><span>${r[0]}</span><span>${fmt(r[1])}</span></div>`).join('')
     : '<div class="r-line"><span>No responsable de IVA</span><span></span></div>';
   return `
     <h3>${businessName}</h3>
@@ -1332,7 +1330,7 @@ function printReceipt(receiptData){
   const bizLine = [receiptData.nit ? 'NIT/CC: ' + invEsc(receiptData.nit) : '', receiptData.bizAddress ? invEsc(receiptData.bizAddress) : ''].filter(Boolean).join(' · ');
   const invoiceLine = [receiptData.invoiceNo ? 'Factura de venta N.º ' + invEsc(receiptData.invoiceNo) : '', receiptData.dianResolucionText ? invEsc(receiptData.dianResolucionText) : ''].filter(Boolean).join('<br>');
   const ivaLine = receiptData.ivaResponsable
-    ? (() => { const b = ivaBreakdown(receiptData.total, receiptData.ivaRate); return '<div style="display:flex;justify-content:space-between"><span>Subtotal</span><span>' + fmt(b.base) + '</span></div><div style="display:flex;justify-content:space-between"><span>IVA (' + receiptData.ivaRate + '%)</span><span>' + fmt(b.iva) + '</span></div>'; })()
+    ? ivaLineas(receiptData.items, receiptData.total, receiptData.ivaRate).map(r => '<div style="display:flex;justify-content:space-between"><span>' + r[0] + '</span><span>' + fmt(r[1]) + '</span></div>').join('')
     : '<div style="display:flex;justify-content:space-between"><span>No responsable de IVA</span><span></span></div>';
   d.write('<title>Recibo</title><body style="font-family:monospace;max-width:320px;margin:16px auto;font-size:13px">' +
     '<h2 style="text-align:center;margin:0 0 4px">' + invEsc(receiptData.businessName) + '</h2>' +
@@ -1356,7 +1354,7 @@ document.getElementById('printReceiptBtn').addEventListener('click', ()=>{
 });
 
 /* ---------- Historial ---------- */
-const methodLabelHist = { efectivo: 'Efectivo', transferencia: 'Transferencia', debe: 'Debe' };
+const methodLabelHist = { efectivo: 'Efectivo', transferencia: 'Transferencia', debe: 'Debe', saldo: 'Saldo a favor' };
 
 /* Historial por páginas. Antes se dibujaban TODAS las cuentas de una vez (con 3.000 cuentas,
    unos meses de un bar, la app se congelaba casi 2 segundos al abrir el historial, al hacer el

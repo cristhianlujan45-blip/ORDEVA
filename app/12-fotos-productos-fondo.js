@@ -2812,7 +2812,7 @@ function ctCatsGasto(){
   const extra = CT_CATS_NEGOCIO[(typeof data !== 'undefined' && data && data.businessType) || ''] || [];
   return base.filter(c => c[0] !== 'otros').concat(extra.filter(e => !base.some(b => b[0] === e[0])), [otros]);
 }
-const CT_METODOS = { efectivo: '💵 Efectivo', transferencia: '🏦 Transferencia', nequi: '📱 Nequi / Daviplata', tarjeta: '💳 Tarjeta', debe: 'Fiado', otro: 'Otro' };
+const CT_METODOS = { efectivo: '💵 Efectivo', transferencia: '🏦 Transferencia', nequi: '📱 Nequi / Daviplata', tarjeta: '💳 Tarjeta', debe: 'Fiado', saldo: '💳 Saldo a favor', otro: 'Otro' };
 let ctPeriodo = 'mes', ctTipo = 'gasto', ctCsvData = null;
 const ctCatNombre = (t, c) => { const l = t === 'gasto' ? ctCatsGasto().concat(Object.values(CT_CATS_NEGOCIO).flat()) : (CT_CATS[t] || []); const x = l.find(y => y[0] === c); return x ? x[1] : (c || ''); };
 const ctDia = d => { const x = new Date(d); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };

@@ -119,6 +119,36 @@ function ivaBreakdown(total, rate){
   return { base: Math.round(base), iva: Math.round(total - base), total };
 }
 
+// 🧾 1.80.0: IVA separado por tarifa en el recibo. Cada producto con su tarifa (p.iva, o la del negocio), exento o
+// excluido (p.ivaTipo). Si todo va a la misma tarifa del negocio sale igual que antes: «Subtotal» e «IVA (19%)».
+// Devuelve filas [texto, valor]. La propina no lleva IVA (es de los empleados).
+function ivaLineas(items, total, rate){
+  rate = Number(rate) || 0;
+  const prods = (typeof data !== 'undefined' && data && data.products) || [];
+  const sinT = t => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  const g = {}; let exento = 0, excluido = 0, suma = 0;
+  (items || []).forEach(it => {
+    const v = (Number(it.qty) || 0) * (Number(it.price) || 0); if(!(v > 0) || /propina/i.test(it.name || '')) return;
+    suma += v;
+    const p = prods.find(x => (it.productId && x.id === it.productId) || sinT(x.name) === sinT(it.name)) || null;
+    if(p && p.ivaTipo === 'exento'){ exento += v; return; }
+    if(p && p.ivaTipo === 'excluido'){ excluido += v; return; }
+    const tr = p && p.iva != null && p.iva !== '' ? Math.max(0, Math.min(50, Number(p.iva) || 0)) : rate;
+    g[tr] = (g[tr] || 0) + v;
+  });
+  const tarifas = Object.keys(g).map(Number).sort((a, b) => b - a);
+  // Lo de siempre: una sola tarifa (la del negocio) y nada exento ni excluido.
+  if(!exento && !excluido && tarifas.length <= 1 && (!tarifas.length || tarifas[0] === rate)){
+    const b = ivaBreakdown(total, rate); return [['Subtotal', b.base], ['IVA (' + rate + '%)', b.iva]];
+  }
+  // Varias tarifas: lo de cada una se ajusta al total cobrado (si hubo descuento repartido o redondeo).
+  const f = suma > 0 ? (Number(total) || suma) / suma : 1, filas = [];
+  tarifas.forEach(t => { const v = g[t] * f; if(t > 0){ const b = ivaBreakdown(v, t); filas.push(['Base ' + t + ' %', b.base], ['IVA ' + t + ' %', b.iva]); } else filas.push(['Sin IVA', Math.round(v)]); });
+  if(exento) filas.push(['Exento (0 %)', Math.round(exento * f)]);
+  if(excluido) filas.push(['Excluido de IVA', Math.round(excluido * f)]);
+  return filas;
+}
+
 const hasNativeStorage = (typeof window !== 'undefined') && !!window.storage && typeof window.storage.get === 'function';
 
 // ---------- Almacén grande del equipo (IndexedDB) ----------

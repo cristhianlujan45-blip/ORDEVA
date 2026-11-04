@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<script src="lib/vento-errores.js"></script>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0a12">
+<title>Pantalla del cliente · ORDEVA</title>
+<link rel="icon" type="image/png" href="icons/ordeva-64.png">
+<!--
+  ORDEVA · 📺 Pantalla del cliente (1.80.0)
+  Lo que el cliente ve mientras le cobran: lo que se registra, el total, el QR para pagar y «¡Gracias!».
+  • En otra ventana del mismo computador (segundo monitor): llega por BroadcastChannel, al instante y sin internet.
+  • En una tablet o celular: se abre escaneando el QR de «📺 Pantalla cliente» en la caja (#c=<canal>) y llega por los
+    canales del servidor de ORDEVA (lib/vento-canal.js). Solo muestra: no puede cambiar nada de la caja.
+-->
+<style>
+  :root{ --bg:#0b0a12; --sf:#15141d; --line:#2a2937; --tx:#f5f3fb; --mut:#a9a6bb; --ok:#4cd97b; --am:#f5b83d; }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; height:100%; background:var(--bg); color:var(--tx); font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  body{ display:flex; flex-direction:column; padding:max(16px, env(safe-area-inset-top)) 22px max(16px, env(safe-area-inset-bottom)); }
+  header{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; padding-bottom:12px; border-bottom:1px solid var(--line); }
+  header h1{ margin:0; font-size:clamp(20px, 3vw, 30px); letter-spacing:-.3px; }
+  header span{ color:var(--mut); font-size:15px; font-variant-numeric:tabular-nums; }
+  main{ flex:1; min-height:0; display:grid; grid-template-columns:minmax(0,1.4fr) minmax(280px,1fr); gap:26px; padding-top:18px; }
+  .lista{ min-height:0; overflow:auto; }
+  .it{ display:flex; justify-content:space-between; gap:14px; padding:12px 4px; border-bottom:1px solid var(--line); font-size:clamp(16px, 2vw, 22px); }
+  .it b{ font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .it .q{ color:var(--am); font-weight:800; margin-right:8px; }
+  .it:last-child{ animation:entra .35s ease; }
+  @keyframes entra{ from{ background:rgba(245,184,61,.16); } to{ background:transparent; } }
+  .lado{ display:flex; flex-direction:column; justify-content:center; gap:14px; background:var(--sf); border:1px solid var(--line); border-radius:24px; padding:26px; text-align:center; }
+  .lado small{ color:var(--mut); font-size:16px; letter-spacing:.08em; text-transform:uppercase; font-weight:700; }
+  .total{ font-size:clamp(48px, 8vw, 96px); font-weight:900; letter-spacing:-2px; font-variant-numeric:tabular-nums; line-height:1; }
+  .desc{ color:var(--ok); font-size:18px; }
+  .qr{ background:#fff; border-radius:16px; padding:12px; margin:0 auto; line-height:0; }
+  .qr img{ width:min(260px, 40vh); height:auto; display:block; }
+  .llave{ font-size:18px; color:var(--am); font-weight:800; }
+  .grande{ grid-column:1/-1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:12px; }
+  .grande .ico{ font-size:clamp(60px, 12vw, 120px); }
+  .grande h2{ margin:0; font-size:clamp(30px, 6vw, 64px); }
+  .grande p{ margin:0; color:var(--mut); font-size:clamp(16px, 2.4vw, 24px); }
+  .vu{ font-size:clamp(28px, 5vw, 52px); font-weight:900; color:var(--ok); }
+  .sin{ color:var(--mut); font-size:14px; text-align:center; padding:6px; }
+  [hidden]{ display:none!important; }
+  @media (max-width:720px){ main{ grid-template-columns:1fr; } .lado{ order:-1; padding:18px; } }
+</style>
+</head>
+<body>
+<header><h1 id="neg">ORDEVA</h1><span id="reloj"></span></header>
+<main id="main">
+  <div class="grande" id="espera"><div class="ico">👋</div><h2>¡Bienvenido!</h2><p id="espSub">Aquí verás tu compra mientras te atienden.</p></div>
+  <div class="lista" id="lista" hidden></div>
+  <div class="lado" id="lado" hidden>
+    <small id="ladoT">Total</small>
+    <div class="total" id="total">$0</div>
+    <div class="desc" id="desc" hidden></div>
+    <div class="qr" id="qr" hidden><img id="qrImg" alt="Código QR para pagar"></div>
+    <div class="llave" id="llave" hidden></div>
+  </div>
+  <div class="grande" id="gracias" hidden><div class="ico">🎉</div><h2>¡Gracias por su compra!</h2><p id="graTot"></p><div class="vu" id="graVu" hidden></div></div>
+</main>
+<div class="sin" id="sin" hidden>Esperando a la caja…</div>
+<script>window.VENTO_REQUIERE_BD = false;</script>
+<script src="nube/config.js"></script>
+<script src="lib/vento-canal.js"></script>
+<script>
+(function(){
+  'use strict';
+  var $ = function(id){ return document.getElementById(id); };
+  var plata = function(n){ return '$' + Math.round(Number(n) || 0).toLocaleString('es-CO'); };
+  var esc = function(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  var ultimo = 0;
+  function pintar(e){
+    if(!e || e.t !== 'pantalla' || (e.ts && e.ts < ultimo)) return;
+    ultimo = e.ts || Date.now();
+    $('sin').hidden = true;
+    if(e.n){ $('neg').textContent = e.n; document.title = e.n + ' · Pantalla'; }
+    var f = e.f || 'espera', hayL = e.l && e.l.length;
+    $('espera').hidden = !(f === 'espera' || (f !== 'gracias' && !hayL));
+    $('gracias').hidden = f !== 'gracias';
+    $('lista').hidden = $('lado').hidden = !(hayL && f !== 'gracias');
+    if(f === 'gracias'){
+      $('graTot').textContent = 'Total ' + plata(e.total);
+      $('graVu').hidden = !(e.vu > 0); $('graVu').textContent = 'Su cambio: ' + plata(e.vu);
+      return;
+    }
+    if(!hayL) return;
+    $('lista').innerHTML = e.l.map(function(x){ return '<div class="it"><span><span class="q">' + esc(x[1]) + '×</span>' + esc(x[0]) + '</span><b>' + plata(x[2]) + '</b></div>'; }).join('');
+    $('lista').scrollTop = $('lista').scrollHeight;
+    $('ladoT').textContent = f === 'cobro' ? 'Total a pagar' : 'Total';
+    $('total').textContent = plata(e.total);
+    $('desc').hidden = !(e.desc > 0); $('desc').textContent = 'Ahorras ' + plata(e.desc);
+    $('qr').hidden = !(f === 'cobro' && e.qr); if(e.qr) $('qrImg').src = e.qr;
+    $('llave').hidden = !(f === 'cobro' && e.llave); $('llave').textContent = e.llave ? '🔑 Llave: ' + e.llave : '';
+  }
+  setInterval(function(){ $('reloj').textContent = new Date().toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' }); }, 1000);
+  // 1) Otra ventana de este computador
+  try{ var bc = new BroadcastChannel('ordeva-pantalla'); bc.onmessage = function(ev){ pintar(ev.data); }; bc.postMessage({ t: 'hola' }); }catch(e){}
+  try{ var g = JSON.parse(localStorage.getItem('vento_pantalla_ultimo') || 'null'); if(g && Date.now() - (g.ts || 0) < 30 * 60e3) pintar(g); }catch(e){}
+  window.addEventListener('storage', function(ev){ if(ev.key === 'vento_pantalla_ultimo') try{ pintar(JSON.parse(ev.newValue)); }catch(e){} });
+  // 2) Tablet o celular: el canal del servidor
+  var m = /[#&]c=(pt[A-Za-z0-9]{20,40})/.exec(location.hash || '');
+  if(m){
+    try{ localStorage.setItem('vento_pantalla_par', m[1]); }catch(e){}
+    try{
+      var es = new EventSource('https://canal.vento.local/' + m[1] + '/sse?since=2m&rapido=1');
+      es.onmessage = function(ev){ try{ var x = JSON.parse(ev.data); pintar(JSON.parse(x.message)); }catch(e){} };
+    }catch(e){ $('sin').hidden = false; }
+  }
+  // La pantalla no se apaga (si el equipo lo permite)
+  try{ var wk = function(){ if(navigator.wakeLock && !document.hidden) navigator.wakeLock.request('screen').catch(function(){}); }; wk(); document.addEventListener('visibilitychange', wk); }catch(e){}
+})();
+</script>
+</body>
+</html>
