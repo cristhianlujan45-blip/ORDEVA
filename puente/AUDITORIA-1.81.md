@@ -78,4 +78,8 @@ al contador y a la DIAN. Después, la **5 (comanda impresa)** para restaurantes 
 día)** para hoteles.
 
 ## 5. Las 65 pruebas que no corrían en GitHub
-(Se llena al terminar la tanda.)
+- **Se corrieron todas aquí** (67 con las repetidas). Pasan todas menos `cajavozlocal`, que se omite porque necesita el
+  programa de voz `espeak-ng` y este equipo no lo tiene.
+- **Tres fallaron la primera vez** (`dian`, `pagosequipos` y `appoweb`) porque corrían al mismo tiempo que otras y
+  compartían el servidor de pruebas. Solas pasan completas: `dian` 29 ✅, `pagosequipos` 50 ✅, `appoweb` 25 ✅.
+- **No hay nada dañado en la app.** Desde ahora corren todas cada noche en GitHub.
