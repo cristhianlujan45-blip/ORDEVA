@@ -2859,11 +2859,11 @@ function ctMovimientos(r){
     const pagoTarde = h.paidLater ? new Date(h.paidLater).getTime() : 0;
     (h.payments || []).forEach(p => {
       if(p.method === 'debe' || !(Number(p.amount) > 0)) return;
-      const tarde = pagoTarde && /pagó después/.test(p.note || '');
-      const cuando = tarde ? pagoTarde : t;
+      const tarde = p.abono ? true : pagoTarde && /pagó después/.test(p.note || '');   // 📅 1.81.0: cada abono de un crédito cuenta el día que se pagó
+      const cuando = p.abono && p.at ? Number(p.at) : tarde ? pagoTarde : t;
       if(cuando >= r.ini && cuando < r.fin){
         const quien = h.tableName || (h.table ? i18nPut(espacioN()) + ' ' + h.table : 'Venta');
-        mov.push({ tipo: 'venta', monto: Number(p.amount), metodo: p.method || 'otro', fecha: cuando, desc: tarde ? 'Fiado cobrado · ' + quien : quien });
+        mov.push({ tipo: 'venta', monto: Number(p.amount), metodo: p.method || 'otro', fecha: cuando, desc: p.abono ? 'Abono de crédito · ' + quien : tarde ? 'Fiado cobrado · ' + quien : quien });
       }
     });
   });

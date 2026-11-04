@@ -13,6 +13,8 @@
 // 11. 💳 Datáfono: con tarjeta espera el aviso del pago por ese valor y la venta se cobra sola.
 // 12. 🧾 Recibos de cualquier día desde la caja.
 // 13. 🔒 Cierre Z numerado con TODOS los medios (Nequi, tarjeta…) y el Excel de cierres del mes.
+// 14. 📅 Crédito con cuotas: al fiar se elige el plan; «📅 Créditos» muestra la vencida; el abono baja la deuda y entra
+//     a Contabilidad el día que se paga; el recordatorio por WhatsApp dice la cuota.
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 
@@ -197,6 +199,28 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     v = await p.evaluate(() => { const c = data.closures[0]; return { z: c.z, medios: c.medios, txt: buildClosureText(c), csv: window.ventoCajaMas.cierresCsv(0, Date.now() + 864e5).csv }; });
     chk('13. Cierre Z N.º 0001 con cada medio aparte (Efectivo, Nequi, Tarjeta, Saldo a favor)', v.z === 1 && v.medios.nequi > 0 && v.medios.tarjeta === 8000 && v.medios.efectivo > 0 && v.medios.saldo === 4200 && /Cierre Z N\.º 0001/.test(v.txt) && /Nequi/.test(v.txt) && /Tarjeta/.test(v.txt), v);
     chk('13. El Excel de cierres trae el número, las columnas de cada medio y el arqueo', /"Cierre Z"/.test(v.csv) && /"0001"/.test(v.csv) && /"Nequi"/.test(v.csv) && /"Tarjeta"/.test(v.csv) && /Efectivo contado/.test(v.csv), v.csv.slice(0, 400));
+
+    // ===== 14. Crédito con cuotas =====
+    await p.evaluate(() => { document.getElementById('closureOverlay').classList.remove('show'); window.ventoPOS.abrirCaja(); });   // el cierre deja la caja cerrada
+    await pausa(9500);
+    await p.evaluate(() => { window.ventoPOS.vaciar(); window.ventoPOS.agregar('a', 3); window.__cob = window.ventoPOS.cobrar(); }); await pausa(500);
+    await p.click('.pz-pago-ov .pz-fiado'); await pausa(150);
+    await p.fill('.pz-pago-ov .pz-deudor', 'Juan Crédito'); await p.selectOption('.pz-pago-ov .pz-cred-n', '3'); await p.selectOption('.pz-pago-ov .pz-cred-c', '15');
+    await p.fill('.pz-pago-ov .pz-cred-t', '3105556677'); await p.click('.pz-pago-ov .pz-fiado-ok'); await pausa(600);
+    v = await p.evaluate(() => { const h = data.history[0]; return { debt: h.debt, cr: h.credito && { n: h.credito.cuotas.length, suma: h.credito.cuotas.reduce((a, c) => a + c.valor, 0), tel: h.credito.tel, dias: Math.round((h.credito.cuotas[0].fecha - Date.now()) / 864e5) } }; });
+    chk('14. Fiado con plan: 3 cuotas cada quincena que suman los $15.000 (la primera en 15 días)', v.debt === 15000 && v.cr && v.cr.n === 3 && v.cr.suma === 15000 && v.cr.tel === '3105556677' && v.cr.dias === 15, v);
+    await pausa(9500);
+    await p.evaluate(() => { data.history[0].credito.cuotas[0].fecha = Date.now() - 864e5; saveData(); window.ventoPOS.ponerMeta(window.ventoPOS.meta()); }); await pausa(200);
+    v = await p.evaluate(R => (document.querySelector(R + ' [data-cm="creditos"]') || {}).textContent || '', R);
+    chk('14. Con una cuota vencida: «📅 Créditos (1 vencidos)»', /1 vencidos/.test(v), v);
+    await btn('creditos');
+    v = await p.evaluate(() => ({ txt: (document.querySelector('.cm-ov .cm-cred') || {}).innerText || '', venc: !!document.querySelector('.cm-ov .cm-cred.venc'), wa: window.ventoCajaMas.textoCuota(data.history[0]) }));
+    chk('14. La lista dice quién debe, la cuota 1/3 de $5.000 vencida, y el recordatorio por WhatsApp', v.venc && /Juan Crédito/.test(v.txt) && /Cuota 1\/3/.test(v.txt) && /venció/.test(v.wa) && /5\.000/.test(v.wa), v);
+    await p.click('.cm-ov [data-x="abonar"]'); await pausa(200);
+    await p.selectOption('.cm-ov:last-of-type .cm-am', 'nequi'); await p.click('.cm-ov:last-of-type .cm-ok'); await pausa(300);
+    v = await p.evaluate(() => { const h = data.history[0]; const x = ctMovimientos({ ini: Date.now() - 6e4, fin: Date.now() + 6e4 }); return { debt: h.debt, c1: h.credito.cuotas[0].pagado, mov: x.mov.filter(m => /Abono de crédito/.test(m.desc)).map(m => m.monto), lista: document.querySelectorAll('.cm-ov .cm-cred').length, venc: !!document.querySelector('.cm-ov .cm-cred.venc') }; });
+    chk('14. Abono de $5.000 por Nequi: debe $10.000, la cuota 1 queda pagada y el abono entra a Contabilidad hoy', v.debt === 10000 && v.c1 === 5000 && v.mov.join() === '5000' && v.lista === 1 && !v.venc, v);
+    await p.evaluate(() => document.querySelectorAll('.cm-ov').forEach(o => o.remove()));
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.stack || e)); }
   chk('Sin errores de página', !errs.length, errs);
   await b.close();
