@@ -39,6 +39,8 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
       total: window.ventoPOS.resumen().total, l: window.ventoPOS.carrito().map(x => (x.libre ? 'V' + x.price : x.id) + '×' + x.qty).join(',') }), R);
 
     // ===== 1 =====
+    // 1.80.0: en el celular el teclado está detrás del botón 🧮 (junto al buscador)
+    await p.click(R + ' .pz-tecbtn'); await pausa(150);
     let v = await p.evaluate(R => { const w = document.querySelector(R + ' .pz-tecw'); return { ver: !!w && !w.hidden && w.offsetParent !== null, n: document.querySelectorAll(R + ' .pz-tec-k button').length, ay: (document.querySelector(R + ' .pz-tec-ay') || {}).textContent }; }, R);
     chk('1. El teclado de la caja se ve con sus 16 teclas y dice qué hacer', v.ver && v.n === 16 && /calculadora/.test(v.ay), v);
     // ===== 2 =====
@@ -114,6 +116,11 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     const e = await p.evaluate(async () => { const en = await window.ventoPOS.cobrar({ pago: { method: 'efectivo' } }); return { total: en && en.total, items: en && en.items.map(i => ({ n: i.name, pid: i.productId || null, q: i.qty, p: i.price })), stockA: data.products.find(x => x.id === 'a').stock, hist: data.history.length }; });
     chk('6. Al cobrar: venta de $11.500 con «Varios» (sin producto) y Águila', e.total === 11500 && e.items.some(i => i.n === 'Varios' && !i.pid && i.p === 8000) && e.items.some(i => i.pid === 'a'), e);
     chk('6. El inventario solo baja lo que es producto (Águila 20 → 19)', e.stockA === 19, e);
+    // 1.80.0: después de cobrar la caja vuelve sola a cero (el vuelto se ve unos segundos)
+    v = await p.evaluate(R => ({ hecho: !document.querySelector(R + ' .pz-hecho').hidden }), R);
+    await pausa(9800);
+    const v6 = await p.evaluate(R => ({ hecho: !document.querySelector(R + ' .pz-hecho').hidden, total: document.querySelector(R + ' .pz-total b').textContent, lineas: window.ventoPOS.carrito().length, tec: document.querySelector(R + ' .pz-tec-num').textContent }), R);
+    chk('6. Al cobrar se ve el vuelto y a los pocos segundos la caja vuelve sola a cero para el siguiente', v.hecho && !v6.hecho && /\$\s?0$/.test(v6.total.trim()) && v6.lineas === 0, { v, v6 });
     // ===== 8. Precio en esta venta =====
     await p.evaluate(() => window.ventoPOS.vaciar()); await pausa(100);
     await p.click(R + ' .pz-grid [data-add="a"]'); await pausa(150);
@@ -138,11 +145,11 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     await p.evaluate(R => { const ov = document.getElementById('pzCajaOv'); [ov, ...ov.querySelectorAll('*')].forEach(x => { if(x.scrollTop) x.scrollTop = 0; }); }, R); await pausa(150);
     await p.screenshot({ path: process.env.VENTO_FOTO || '/tmp/cajalibre.png' });
     // ===== 7 =====
-    await p.click(R + ' .pz-tec-t'); await pausa(150);
-    v = await p.evaluate(R => ({ cerrado: getComputedStyle(document.querySelector(R + ' .pz-tec')).display === 'none', ls: localStorage.getItem('vento_pos_teclado') }), R);
+    await p.click(R + ' .pz-tecbtn'); await pausa(150);
+    v = await p.evaluate(R => ({ cerrado: document.querySelector(R + ' .pz-tecw').hidden, ls: localStorage.getItem('vento_pos_teclado:cel') }), R);
     chk('7. El teclado se puede esconder (y queda guardado así)', v.cerrado && v.ls === '0', v);
-    await p.click(R + ' .pz-tec-t'); await pausa(150);
-    v = await p.evaluate(R => getComputedStyle(document.querySelector(R + ' .pz-tec')).display !== 'none', R);
+    await p.click(R + ' .pz-tecbtn'); await pausa(150);
+    v = await p.evaluate(R => !document.querySelector(R + ' .pz-tecw').hidden && getComputedStyle(document.querySelector(R + ' .pz-tec')).display !== 'none', R);
     chk('7. … y volver a mostrar', v);
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.stack || e)); }
   chk('Sin errores de página', !errs.length, errs);

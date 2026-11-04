@@ -81,7 +81,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
 
     // ===== 4. Entra una reserva por el agente =====
     await p.evaluate(() => { document.getElementById('rsOv').classList.remove('show'); document.querySelector('nav button[data-view="mesas"]').click(); });
-    const hoy = await p.evaluate(() => { const d = new Date(Date.now() + 2 * 36e5); const h = new Date(); h.setDate(h.getDate() + 1); h.setHours(12, 0, 0, 0); return [d.toISOString(), h.toISOString()]; });
+    const hoy = await p.evaluate(() => { const fin = new Date(); fin.setHours(23, 59, 0, 0); const d = new Date(Date.now() + Math.min(2 * 36e5, Math.max(6e4, (fin - Date.now()) / 2)));   // siempre HOY (en GitHub corre de noche) const h = new Date(); h.setDate(h.getDate() + 1); h.setHours(12, 0, 0, 0); return [d.toISOString(), h.toISOString()]; });
     const anon = { apikey: sb.anonKey, 'Content-Type': 'application/json', Authorization: 'Bearer ' + sb.anonKey };
     const pub = await fetch(sb.url + '/rest/v1/rpc/reserva_publica_crear', { method: 'POST', headers: anon, body: JSON.stringify({ p_publico: PUB.publico, p_recurso: '3', p_desde: hoy[0], p_hasta: hoy[1], p_cliente: 'Carlos Pérez', p_telefono: '3105550000', p_personas: 2, p_nota: 'Llega en bus' }) }).then(r => r.json());
     chk('4. El agente reserva la habitación 3 para hoy', pub && pub.ok, pub);

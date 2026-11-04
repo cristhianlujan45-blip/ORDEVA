@@ -31,6 +31,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
   try{
     // ===== 1 =====
     const { p, ctx } = await abrir('restaurante', 'Restaurante El Fogón');
+    await p.waitForFunction(() => !!document.querySelector('#plVista [data-pl="plano"]') && document.querySelector('#plVista').offsetParent !== null, null, { timeout: 10000 }).catch(() => {});
     let v = await p.evaluate(() => ({ vs: document.body.classList.contains('vs-on'), seg: !!document.querySelector('#plVista [data-pl="plano"]') && document.querySelector('#plVista').offsetParent !== null, viejo: getComputedStyle(document.getElementById('mesaViewMapBtn')).display }));
     chk('1. Con la vista sencilla, «📋 Lista | 🗺️ Plano» está a la vista', v.vs && v.seg && v.viejo === 'none', v);
     await p.click('#plVista [data-pl="plano"]'); await p.waitForTimeout(400);

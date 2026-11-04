@@ -37,7 +37,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     chk('1. Un PIN con letras no se acepta', await esperar(() => /4 a 6 números/.test(document.getElementById('toast').textContent)) && !(await p.evaluate(() => !!JSON.parse(localStorage.getItem('cm-users')).find(u => u.user === 'juan').pin)));
     respuesta = '2468'; await fila('juan', '🔢');
     chk('1. «🔢» le pone el PIN 2468 a juan', await esperar(() => { const u = JSON.parse(localStorage.getItem('cm-users')).find(x => x.user === 'juan'); return !!(u && u.pin && u.pin.h); }));
-    chk('5. El PIN no se guarda en el equipo: solo su huella', !(await p.evaluate(() => localStorage.getItem('cm-users'))).includes('2468'));
+    chk('5. El PIN no se guarda en el equipo: solo su huella', await p.evaluate(() => { const u = JSON.parse(localStorage.getItem('cm-users')).find(x => x.user === 'juan'); const vals = []; const ver = o => { if(o && typeof o === 'object') Object.values(o).forEach(ver); else vals.push(String(o)); }; ver(u); return !vals.includes('2468') && !!(u.pin && u.pin.h) && u.pin.h !== '2468'; }));   // la huella puede traer «2468» por casualidad
 
     // 2. Entrar con el PIN
     await p.evaluate(() => { localStorage.removeItem('cm-session'); }); await p.reload(); await afuera();

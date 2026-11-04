@@ -135,7 +135,8 @@ const EAN = '7702535011119', QR_TXT = 'PROD-QR-4471';
     await cel.fill('#manoTxt', '7701111111111'); await cel.click('#mano button[type=submit]');
     chk('7. … y lo que lee el celular se suma a la venta de la caja', await esperar(pc, () => window.ventoPOS.carrito().some(l => l.name === 'Gaseosa Lector')), await pc.evaluate(() => window.ventoPOS.carrito()));
     // 1.65.7: un solo botón para escanear (pedido del dueño): ya no hay «📱 Celular lector» aparte; el celular está dentro de «📷».
-    chk('7. La caja tiene UN botón para escanear («📷»), sin botones de más', await pc.evaluate(() => !document.querySelector('#pzCajaOv [data-lcel-abrir]') && !!document.querySelector('#pzCajaOv [data-scan]')));
+    // 1.80.0: el dueño no encontraba cómo conectar el celular: «📱 Celular lector» va arriba en la caja y abre el QR.
+    chk('7. La caja tiene «📱 Celular lector» a la vista (abre el QR) y el «📷»', await pc.evaluate(() => { const b = document.querySelector('#pzCajaOv .pz-caja-top [data-lcel-abrir]'); return !!b && b.offsetParent !== null && !!document.querySelector('#pzCajaOv [data-scan]'); }));
     // 1.79.0: con la ventana del QR («📱 Celular como lector») abierta encima de la caja, lo que lee el celular igual entra
     // a la caja (antes el celular decía «no está escaneando») y la ventana se cierra sola.
     await pc.evaluate(() => window.ventoLectorCel.abrirPanel()); await pc.waitForTimeout(1500);
