@@ -3,6 +3,11 @@
 **Pedido del dueño:** «hazme una auditoría otra vez y mejora los pagos por transferencia, QR y todo eso. Antes el aviso
 llegaba más rápido cuando pagaban por Nequi y DaviPlata; ahora se demora más. Todo tiene que ser inmediato».
 
+> **Nota:** este trabajo se hizo sobre la 1.72.5. Mientras tanto se publicaron la 1.73 a la 1.81.2, así que se juntó con
+> la 1.81.2 y sale como **1.81.3**. La migración se llama `20261128000000_pagos_despierto.sql` para no chocar con
+> `20261125000000_reservas.sql`. Al volver a correr todas las pruebas sobre la 1.81.2 apareció un error de la 1.81.2 en el
+> cierre de caja (ver «Error del cierre de caja» abajo), ya arreglado.
+
 ## 1. El aviso de pago, paso por paso (medido)
 Un pago por Nequi o DaviPlata hace este camino:
 
@@ -70,6 +75,19 @@ también a **ORDEVA Admin → 🐞 Errores** como «Pago avisado tarde», con el
   - **Prueba nueva `qrimpresos`** (8 revisiones, sin internet): con la versión anterior falla con ese mismo mensaje; ahora
     lee la foto del QR de un link viejo `…/cuentas/`, lo agrega con la cámara sin repetir y lo fija.
 
+- **Error del cierre de caja (venía de la 1.81.2): ningún cierre guardaba el arqueo** (`app/04g-productos-historial-caja.js`).
+  - **Qué pasaba:** el cierre tenía dos veces el dato «caja». El nombre de la caja (que trajo «varias cajas») pisaba el
+    arqueo. Desde la 1.81.2 (4 de noviembre, 17:08 UTC) ningún cierre guardó **lo contado, el «faltan / sobran», los
+    billetes ni las entradas y salidas**. El resumen por WhatsApp y la pantalla del cierre salían sin la caja.
+  - **Cómo se encontró:** la prueba `mejoras` falló 4 revisiones en la 1.81.2 tal como está publicada, sin estos cambios.
+    También fallaba esa noche en GitHub.
+  - **Arreglo:** el nombre de la caja va ahora en su propio dato («cajaNombre»). Los cierres hechos en la 1.81.2 se siguen
+    leyendo bien: dicen su caja y no se rompe nada.
+  - **Lo que no se puede recuperar:** el conteo de los cierres hechos entre la 1.81.2 y esta versión. Nunca se guardó. Las
+    ventas, los totales y los medios de pago de esos cierres sí están completos.
+  - **Prueba:** `mejoras` pasa 32 de 32 (antes 28 y 4 mal). `cajamas` tiene 2 revisiones nuevas, 45 de 45: el cierre de
+    la «Caja 2» guarda su arqueo, y un cierre guardado en la 1.81.2 se sigue leyendo.
+
 ## 3. Auditoría de todo
 ### Seguridad
 - **Archivos públicos** (página, Android y programa de PC): solo está la clave **pública** (anon). No hay `service_role`,
@@ -77,11 +95,11 @@ también a **ORDEVA Admin → 🐞 Errores** como «Pago avisado tarde», con el
 - **ntfy:** no se usa ni hay dependencias. `lib/vento-canal.js` solo convierte las direcciones viejas de ntfy que hayan
   quedado guardadas en un equipo para que vayan al servidor de ORDEVA; nunca se conecta a ntfy.
 - **Base de datos:**
-  - las 53 migraciones se aplican sobre una base vacía;
+  - las 56 migraciones se aplican sobre una base vacía;
   - **todas** las tablas tienen RLS;
   - las migraciones nuevas no borran datos;
   - las funciones de administrador y del servidor no las puede llamar ni un usuario ni un visitante (comprobado).
-- **Pruebas del servidor:** las 25 contra PostgreSQL real pasan (aislamiento entre negocios, permisos, pagos privados,
+- **Pruebas del servidor:** las 27 contra PostgreSQL real pasan (aislamiento entre negocios, permisos, pagos privados,
   canales, respaldos, DIAN, Wompi, DaviPlata, suscripciones…).
 - **Contraseñas:** no se pueden ver ni desde ORDEVA Admin; el servidor solo guarda una huella cifrada.
 
@@ -94,12 +112,15 @@ también a **ORDEVA Admin → 🐞 Errores** como «Pago avisado tarde», con el
 - **Sincronización:** un dato que podía no subir nunca a la nube al crear el negocio. Por eso el canal del QR podía quedar
   sin proteger (1.72.4).
 
-### Pruebas
-- **La lista completa de CI (72):** 71 de 72 a la primera. La única que falló fue `codigoproducto`, por el error de la
-  cantidad de arriba; ya arreglado, pasa 23 de 23.
-- **Las pruebas cambiadas o nuevas, repetidas:** `codigoproducto` 23/23, `qrimpresos` 8/8, `qrrapido` 6/6,
-  `qrprivado` 9/9, `seguridadqr` 6/6, `canalseguro` 16/16, `canalvivo` 17/17, `pagostodos` 17/17.
-- **Las 25 del servidor:** pasan. La revisión de migraciones dice que `20261128000000_pagos_despierto.sql` «se puede
+### Pruebas (sobre la 1.81.2 + estos cambios)
+- **La lista completa de CI (94):** 2.296 revisiones bien. La única que falló fue `mejoras`, por el error del cierre de
+  caja de la 1.81.2; ya arreglado, pasa 32 de 32.
+- **Repetidas después de los arreglos:**
+  - `mejoras` 32/32, `cajamas` 45/45, `cajapos` 27/27, `cajapro` 56/56;
+  - `codigoproducto` 23/23, `qrimpresos` 8/8, `qrrapido` 6/6, `qrprivado` 9/9, `pagostodos` 17/17.
+- **Antes de juntarlo con la 1.81.2:** la lista de entonces (72) pasaba 71 de 72. La que fallaba, `codigoproducto`, tenía
+  detrás el error de la cantidad, ya arreglado.
+- **Las 27 del servidor:** pasan. Las 56 migraciones se aplican sobre una base vacía y la revisión dice «se puede
   desplegar».
 
 ### Pendientes conocidos (sin cambio)
