@@ -99,6 +99,7 @@ const ARROZ = '7701111111111', LECHE = '7702222222222', NUEVO = '7709999999991',
     await pc.evaluate(() => { document.activeElement && document.activeElement.blur && document.activeElement.blur(); });
     await lector(ARROZ);
     chk('5. Lector USB con la mesa abierta: el arroz se suma a la cuenta', await cuenta(pc, 2) === 'a×1', await cuenta(pc, 2));
+    chk('5. … y no queda el código escrito en el buscador', (await pc.inputValue('#addProductSearch')) === '', await pc.inputValue('#addProductSearch'));
     await lector(ARROZ);
     chk('5. Otra vez: 2 arroz (el lector sí repite)', await cuenta(pc, 2) === 'a×2', await cuenta(pc, 2));
     // ===== 6 =====
