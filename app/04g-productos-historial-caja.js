@@ -1542,7 +1542,12 @@ function cierreMedios(closure){
   if(closure.medios && Object.keys(closure.medios).length) return Object.keys(closure.medios).filter(k => closure.medios[k]).sort((a, b) => (a === 'debe') - (b === 'debe') || closure.medios[b] - closure.medios[a]).map(k => [CIERRE_MEDIOS[k] || k, closure.medios[k], k]);
   return [['💵 Efectivo', closure.totalEfectivo, 'efectivo'], ['🏦 Transferencia', closure.totalTransferencia, 'transferencia']].concat(closure.totalDebe > 0 ? [['📝 Fiado (quedó debiendo)', closure.totalDebe, 'debe']] : []);
 }
-const cierreZ = c => (c && c.z ? 'Cierre Z N.º ' + String(c.z).padStart(4, '0') : 'Cierre de caja') + (c && c.caja ? ' · ' + c.caja : '');
+// 🧾 1.81.3: el nombre de la caja va en «cajaNombre». En la 1.81.2 se guardó en «caja» y pisaba el arqueo (contado, faltan…):
+// estas dos funciones leen bien los cierres de antes, los de la 1.81.2 y los de ahora.
+const cajaNombreCierre = c => (c && (c.cajaNombre || (typeof c.caja === 'string' ? c.caja : ''))) || '';
+const arqueoCierre = c => (c && c.caja && typeof c.caja === 'object') ? c.caja : null;
+window.cajaNombreCierre = cajaNombreCierre; window.arqueoCierre = arqueoCierre;
+const cierreZ = c => (c && c.z ? 'Cierre Z N.º ' + String(c.z).padStart(4, '0') : 'Cierre de caja') + (cajaNombreCierre(c) ? ' · ' + cajaNombreCierre(c) : '');
 
 // 1.55.0: lo que se le muestra antes de cerrar la caja (ventas desde el último cierre, mesas abiertas y qué pasa).
 function cierreResumenTexto(s, openIds, last){
@@ -1562,7 +1567,7 @@ async function closeCashRegister(opts){
   const auto = !!(opts && opts.auto === true);   // el cierre automático programado no espera a que alguien cuente
   const openIds = getOpenTableIds();
   const T = window.ventoTurno, cajaN = T && T.variasCajas && T.variasCajas() ? (T.cajaNombre() || '') : null;
-  const lastClosure = (data.closures || []).find(c => cajaN == null || (c.caja || '') === cajaN) || null;
+  const lastClosure = (data.closures || []).find(c => cajaN == null || cajaNombreCierre(c) === cajaN) || null;
   const fromISO = lastClosure ? lastClosure.date : null;
   if(!auto){
     // Siempre pregunta antes de cerrar, con lo que se va a cerrar (antes solo preguntaba si había mesas abiertas).
@@ -1611,7 +1616,7 @@ async function closeCashRegister(opts){
     z: (data.closures || []).reduce((a, c) => Math.max(a, Number(c.z) || 0), 0) + 1,
     medios: stats.medios, cajeros: stats.cajeros, descuentos: Math.round(stats.descuentos), devoluciones: Math.round(stats.devoluciones),
     by: (typeof authUser !== 'undefined' && authUser) || '',
-    caja: cajaN || undefined
+    cajaNombre: cajaN || undefined   // 1.81.3: antes «caja», que pisaba el arqueo de arriba
   };
   try{ window.ventoTurno && window.ventoTurno.cerrar(caja); }catch(e){}
   if(!data.closures) data.closures = [];
@@ -1656,7 +1661,7 @@ function buildClosureText(closure){
     lines.push('*Ventas por hora:*');
     closure.hourly.forEach(h=> lines.push(`${h.hour} — ${fmt(h.total)}`));
   }
-  if(closure.caja && window.ventoTurno) lines.push(window.ventoTurno.texto(closure.caja));
+  if(arqueoCierre(closure) && window.ventoTurno) lines.push(window.ventoTurno.texto(arqueoCierre(closure)));
   lines.push('');
   lines.push('¡Buen cierre! 🍻');
   return lines.join('\n');
@@ -1675,7 +1680,7 @@ function buildClosureHTML(closure){
     ${closure.devoluciones > 0 ? `<div class="r-line"><span>↩️ Devoluciones</span><span>${fmt(closure.devoluciones)}</span></div>` : ''}
     <div class="r-section">Ventas por hora</div>
     ${hourlyHtml}
-    ${closure.caja && window.ventoTurno ? window.ventoTurno.html(closure.caja, 'r') : ''}
+    ${arqueoCierre(closure) && window.ventoTurno ? window.ventoTurno.html(arqueoCierre(closure), 'r') : ''}
     <div class="r-total"><span>Total vendido</span><span>${fmt(closure.totalSold)}</span></div>
   `;
 }
@@ -1732,7 +1737,7 @@ function openClosureReport(closure){
     ${closure.totalDebe > 0 ? `<div class="total-row sub"><span class="label">Quedó debiendo</span><span class="amount hist-debt-flag">${fmt(closure.totalDebe)}</span></div>` : ''}
     <div class="hist-detail-title">Ventas por hora</div>
     ${hourlyHtml}
-    ${closure.caja && window.ventoTurno ? window.ventoTurno.html(closure.caja) : ''}
+    ${arqueoCierre(closure) && window.ventoTurno ? window.ventoTurno.html(arqueoCierre(closure)) : ''}
     <div class="total-row">
       <span class="label">Total vendido</span>
       <span class="amount">${fmt(closure.totalSold)}</span>

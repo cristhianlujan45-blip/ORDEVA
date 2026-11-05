@@ -258,14 +258,17 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
       document.querySelectorAll('.overlay.show').forEach(o => { if(o.id !== 'pzCajaOv') o.classList.remove('show'); });
       T.ponerCajaNombre('Caja 2'); await closeCashRegister({ auto: true }); const c2 = data.closures[0];
       document.getElementById('closureOverlay').classList.remove('show');
-      T.ponerCajaNombre(''); const antes = (data.closures.find(c => !c.caja) || {}).date;
+      T.ponerCajaNombre(''); const antes = (data.closures.find(c => !c.cajaNombre) || {}).date;
       window.ventoPOS.agregar('a', 1); await window.ventoPOS.cobrar({ pago: { method: 'efectivo', metodo: 'efectivo' } });
       const esperadas = data.history.filter(h => !h.caja && (!antes || new Date(h.date) > new Date(antes))).length;
       await closeCashRegister({ auto: true }); const c1 = data.closures[0];
       document.getElementById('closureOverlay').classList.remove('show');
-      return { c2: { caja: c2.caja, n: c2.ticketCount, total: c2.totalSold, txt: buildClosureText(c2).split('\n')[0] }, c1: { caja: c1.caja || '', n: c1.ticketCount, esperadas } };
+      const viejo = { id: 'v1812', date: new Date().toISOString(), z: 7, ticketCount: 1, totalSold: 4000, totalEfectivo: 4000, totalTransferencia: 0, totalDebe: 0, caja: 'Caja 2' }; let txtViejo = ''; try{ txtViejo = buildClosureText(viejo); }catch(e){ txtViejo = 'ERROR ' + e.message; }
+      return { viejo: txtViejo.split('\n')[0], arqueo2: c2.caja && typeof c2.caja === 'object' ? c2.caja.contado : 'sin arqueo', c2: { caja: c2.cajaNombre, n: c2.ticketCount, total: c2.totalSold, txt: buildClosureText(c2).split('\n')[0] }, c1: { caja: c1.cajaNombre || '', n: c1.ticketCount, esperadas } };
     });
     chk('17. El cierre de la «Caja 2» cuenta solo su venta ($4.000) y lo dice', v.c2.caja === 'Caja 2' && v.c2.n === 1 && v.c2.total === 4000 && /Caja 2/.test(v.c2.txt), v);
+    chk('17. El cierre de la «Caja 2» guarda también su arqueo («sin contar» en el automático); en la 1.81.2 el nombre lo pisaba', v.arqueo2 === null, v);
+    chk('17. Un cierre guardado en la 1.81.2 (caja = nombre) se sigue leyendo: «Cierre Z N.º 0007 · Caja 2»', /0007 · Caja 2/.test(v.viejo), v);
     chk('17. El cierre de la principal no trae la venta de la Caja 2', v.c1.caja === '' && v.c1.n === v.c1.esperadas && v.c1.n >= 1, v);
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.stack || e)); }
   chk('Sin errores de página', !errs.length, errs);
