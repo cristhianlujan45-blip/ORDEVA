@@ -567,6 +567,16 @@
     });
   }
   setInterval(vigilar, 5000);
+  // ⚡ 1.72.6: cobro con QR recién creado (el cliente está pagando frente a la caja): se le pide al servidor que consulte al
+  // banco cada 2 s durante los primeros 3 minutos (antes cada 10 s; el webhook del banco sigue siendo lo primero). Después
+  // vuelve a cada 10 s. Solo con la pantalla a la vista y mientras haya un cobro esperando.
+  function hayPendienteReciente(){ return Object.keys(cache).some(function(k){ var p = cache[k]; return p.estado === 'pendiente' && Date.now() - Date.parse(p.creado_en || 0) < 3 * 60e3; }); }
+  setInterval(function(){
+    var n = negocio(); if(!n || !est.servidor || document.hidden || !hayPendienteReciente()) return;
+    if(est.apiSyncEnCurso || Date.now() - (est.ultimoApiSync || 0) < 2000) return;
+    est.ultimoApiSync = Date.now(); est.apiSyncEnCurso = true;
+    api('sync', { negocio: n.id }).then(function(){ return sincronizar(); }).catch(function(){}).then(function(){ est.apiSyncEnCurso = false; });
+  }, 1000);
   setInterval(function(){ if(negocio()){ latido(null); revisarSuena(true); } }, 5 * 60e3);
   window.addEventListener('vento-aviso-vivo', function(){ if(negocio()) setTimeout(function(){ revisarSuena(true); }, 300); });   // el administrador lo cambió
   window.addEventListener('online', function(){ if(negocio()){ mandarPendientes(); sincronizar(); conectarTiempoReal(); if(!est.avisoVivo) conectarAvisoVivo(); } });
