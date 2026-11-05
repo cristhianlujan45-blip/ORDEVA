@@ -1,4 +1,4 @@
-# ORDEVA 1.82.0 · Lector de códigos en las mesas, propinas aparte, INC 8 %, comanda impresa, hoteles y agencias
+# ORDEVA 1.82.0 · Un pago suena una sola vez, lector de códigos en las mesas, propinas aparte, INC 8 %, comanda impresa, hoteles y agencias
 
 **Pedidos del dueño:**
 - «escanear el código de barras con el celular… también en las mesas… productos que no estén inventariados… que funcione
@@ -28,6 +28,34 @@ computador. Prueba nueva `codigobarras`, 25 revisiones, sin internet.
 - El celular como lector del computador manda a la cuenta de la mesa que esté abierta.
 
 Con la versión anterior, la prueba falla en la mesa: la cámara no vuelve y el lector USB no suma.
+
+## 1b. 🔊 Un pago sonaba dos veces (app del banco + SMS)
+**El dueño:** «me avisa llegaron 200 pesos y después me dice llegaron otra vez 200 pesos por mensaje de texto».
+
+**Qué pasaba:** desde la 1.72.6, ORDEVA Android lee los SMS del banco DIRECTO (también con el celular bloqueado). El mismo
+SMS llega además por el aviso de la app de mensajes. Cuando el aviso de Nequi o DaviPlata llegaba primero:
+1. ORDEVA lo decía una vez (bien).
+2. El SMS directo quedaba emparejado con ese aviso, callado (bien), pero NO se marcaba como ya leído.
+3. El mismo SMS volvía por la app de mensajes y sonaba otra vez: «Llegó un mensaje de texto de 200 pesos…».
+
+También podía pasar al revés: la app de mensajes primero y después el SMS directo.
+
+**Arreglo** (`SmsBanco.java`, `VentoEscucha.java`):
+- **Cada SMS deja una marca apenas llega**, por el lado que llegue primero, antes de procesarlo y aunque quede callado.
+- **El otro lado gasta esa marca y no lo repite.** Reconoce el mismo SMS aunque el aviso de la app de mensajes lo traiga
+  cortado o con «DaviPlata:» adelante (mismo valor, en los últimos 3 minutos).
+- **Dos pagos iguales de verdad** (dos «Recibiste 1,000.») dejan dos marcas: suenan los dos, una vez cada uno.
+
+**Prueba:** `EscuchaPrueba` tiene 5 casos nuevos (A–E), que corren el mismo código de Android.
+- Con la versión anterior fallan 3 (A, B y C). El caso A repite exactamente la queja del dueño: «Llegaron 200 pesos por
+  Nequi», y después «Llegó un mensaje de texto de 200 pesos desde Nequi. Revísalo…».
+- Ahora pasan los 47.
+
+**De paso:** esa prueba y la de `Cruce` no compilaban desde la 1.72.6. Ya compilan: `javaavisos` pasa 328 de 328.
+- **Ojo:** en GitHub no corren, porque falta el `android-all` (`VENTO_ANDROID_ALL`). Aquí sí.
+
+**Para que llegue a los celulares:** la app Android se compila en GitHub al publicar y se actualiza sola en los celulares
+(revisa cada 3 horas).
 
 ## 2. 🤝 Las propinas ya no cuentan como venta
 La propina es de los empleados (Ley 1935 de 2018). Antes sumaba a «Vendido», a las entradas por ventas de Contabilidad y

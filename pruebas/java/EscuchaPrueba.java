@@ -206,6 +206,41 @@ public class EscuchaPrueba {
           chk("💸 Salidas: la página las toma una vez (después la lista queda vacía)", VentoEscucha.tomarSalidas(spS).equals("[]"), "");
           app(spS, "Nequi", "Envío", "Enviaste $250.000 a DISTRIBUIDORA EL SOL", "ks1:");
           chk("💸 Salidas: el mismo aviso publicado otra vez no se guarda dos veces", VentoEscucha.tomarSalidas(spS).equals("[]"), ""); }
+        // ===== 1.82.1 · Un pago = UNA voz, aunque llegue por la app del banco, por SMS directo y por la app de mensajes =====
+        // El dueño: «me avisa llegaron 200 pesos y después me dice llegaron otra vez 200 pesos por mensaje de texto».
+        { // A) Nequi: primero el aviso de la app (con valor), después el SMS (directo) y el mismo SMS por la app de mensajes
+          Preferencias s2 = nuevo(); long t = System.currentTimeMillis();
+          app(s2, "Nequi", "Nequi", "¡Te llegó plata! JUAN PEREZ te envió $200", "dA:");
+          SmsBanco.recibir(s2, "85954", "Nequi: Recibiste $200 de JUAN PEREZ en tu Nequi.", t);
+          VentoEscucha.leerSms(s2, "85954", "Nequi: Recibiste $200 de JUAN PEREZ en tu Nequi.", conv(new Object[]{"Nequi: Recibiste $200 de JUAN PEREZ en tu Nequi.", t}), "dA2:", false);
+          VentoApp.ui.correr();
+          chk("1.82.1 A) Nequi por la app + el mismo pago por SMS (directo y por la app de mensajes): suena UNA vez", VentoApp.dichos.size() == 1, VentoApp.dichos); }
+        { // B) DaviPlata 85888: el SMS directo y después el aviso de la app de mensajes con otro encabezado (texto distinto)
+          Preferencias s2 = nuevo(); long t = System.currentTimeMillis();
+          SmsBanco.recibir(s2, "85888", "Recibiste 200. Para saber mas, consulta tus movimientos.", t);
+          VentoEscucha.leerSms(s2, "85888", "DaviPlata: Recibiste 200. Para saber mas, consulta tus mov", conv(new Object[]{"DaviPlata: Recibiste 200. Para saber mas, consulta tus mov", t + 1500}), "dB:", false);
+          VentoApp.ui.correr();
+          chk("1.82.1 B) El mismo SMS directo y por la app de mensajes (cortado y con «DaviPlata:» adelante): suena UNA vez", VentoApp.dichos.size() == 1 && VentoApp.dichos.get(0).equals("Llegaron 200 pesos por DaviPlata."), VentoApp.dichos); }
+        { // C) La app de mensajes llega PRIMERO y después el SMS directo
+          Preferencias s2 = nuevo(); long t = System.currentTimeMillis();
+          VentoEscucha.leerSms(s2, "85888", "Recibiste 5,000. Para saber mas, consulta tus movimientos.", conv(new Object[]{"Recibiste 5,000. Para saber mas, consulta tus movimientos.", t}), "dC:", false);
+          SmsBanco.recibir(s2, "85888", "Recibiste 5,000. Para saber mas, consulta tus movimientos.", t);
+          VentoApp.ui.correr();
+          chk("1.82.1 C) Primero por la app de mensajes y después directo: suena UNA vez", VentoApp.dichos.size() == 1, VentoApp.dichos); }
+        { // D) Dos pagos IGUALES de verdad (dos «Recibiste 1,000.»), cada uno directo y por la app de mensajes: suenan DOS veces
+          Preferencias s2 = nuevo(); long t = System.currentTimeMillis();
+          SmsBanco.recibir(s2, "85888", "Recibiste 1,000. Para saber mas, consulta tus movimientos.", t - 40_000);
+          SmsBanco.recibir(s2, "85888", "Recibiste 1,000. Para saber mas, consulta tus movimientos.", t);
+          VentoEscucha.leerSms(s2, "85888", "", conv(new Object[]{"Recibiste 1,000. Para saber mas, consulta tus movimientos.", t - 40_000}, new Object[]{"Recibiste 1,000. Para saber mas, consulta tus movimientos.", t}), "dD:", false);
+          VentoApp.ui.correr();
+          chk("1.82.1 D) Dos pagos iguales de verdad (directo + app de mensajes cada uno): suenan los DOS, una vez cada uno", VentoApp.dichos.size() == 2, VentoApp.dichos); }
+        { // E) Dos SMS distintos (200 y 300) por los dos lados: suena cada uno una vez
+          Preferencias s2 = nuevo(); long t = System.currentTimeMillis();
+          SmsBanco.recibir(s2, "85888", "Recibiste 200. Para saber mas, consulta tus movimientos.", t - 20_000);
+          SmsBanco.recibir(s2, "85888", "Recibiste 300. Para saber mas, consulta tus movimientos.", t);
+          VentoEscucha.leerSms(s2, "85888", "", conv(new Object[]{"Recibiste 200. Para saber mas, consulta tus movimientos.", t - 20_000}, new Object[]{"Recibiste 300. Para saber mas, consulta tus movimientos.", t}), "dE:", false);
+          VentoApp.ui.correr();
+          chk("1.82.1 E) Dos SMS distintos ($200 y $300) por los dos lados: cada uno una vez", VentoApp.dichos.size() == 2 && VentoApp.dichos.contains("Llegaron 200 pesos por DaviPlata.") && VentoApp.dichos.contains("Llegaron 300 pesos por DaviPlata."), VentoApp.dichos); }
         System.out.println("RESULTADO " + ok + " bien " + mal + " mal");
         System.exit(mal > 0 ? 1 : 0);
     }

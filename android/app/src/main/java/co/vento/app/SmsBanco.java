@@ -53,10 +53,7 @@ public class SmsBanco extends BroadcastReceiver {
                 VentoApp.mantenerDespierto();
                 for (java.util.Map.Entry<String, StringBuilder> e : porRemitente.entrySet()) {
                     String remitente = e.getKey(), cuerpo = e.getValue().toString().replaceAll("\\s+", " ").trim();
-                    if (!AvisoPago.remitenteBanco(remitente) || "celular".equals(AvisoPago.tipoRemitente(remitente))) continue;
-                    VentoEscucha.tiempos(cuando, System.currentTimeMillis());
-                    boolean tomado = VentoEscucha.smsDirecto(sp, remitente, cuerpo, "D:" + cuando + ":");
-                    if (tomado) anotar(sp, cuerpo);
+                    recibir(sp, remitente, cuerpo, cuando);
                 }
             } catch (Throwable ignorado) {
             } finally {
@@ -65,35 +62,71 @@ public class SmsBanco extends BroadcastReceiver {
         }, "vento-sms").start();
     }
 
+    /** Un SMS que llegó directo (también lo usan las pruebas). true si se tomó como pago. */
+    static boolean recibir(SharedPreferences sp, String remitente, String cuerpo, long cuando) {
+                    if (!AvisoPago.remitenteBanco(remitente) || "celular".equals(AvisoPago.tipoRemitente(remitente))) return false;
+                    VentoEscucha.tiempos(cuando, System.currentTimeMillis());
+                    // 1.82.1: si la app de mensajes ya lo trajo (llegó antes por su aviso), es el MISMO SMS: no se repite.
+                    if (tomar(sp, PREF_AVISO, remitente, cuerpo)) return false;
+                    // Se anota ANTES de procesarlo (y siempre, aunque quede emparejado callado con el aviso de la app del banco):
+                    // así el aviso de la app de mensajes con este mismo SMS se salta. Antes solo se anotaba si se decía: el SMS
+                    // que quedaba emparejado con el aviso de Nequi / DaviPlata volvía a entrar por la app de mensajes y sonaba
+                    // otra vez («llegaron 200 pesos… llegaron 200 pesos por mensaje de texto»).
+                    anotar(sp, PREF_TOMADOS, remitente, cuerpo);
+                    return VentoEscucha.smsDirecto(sp, remitente, cuerpo, "D:" + cuando + ":");
+    }
+
     private static String clave(String cuerpo) { return Integer.toHexString(String.valueOf(cuerpo).replaceAll("\\s+", " ").trim().toLowerCase().hashCode()); }
 
-    /** Este SMS ya lo tomó el receptor: el aviso de la app de mensajes con el mismo texto se salta (una vez). */
-    static synchronized void anotar(SharedPreferences sp, String cuerpo) {
+    /** 1.82.1: los SMS que ya trajo el aviso de la app de mensajes (por si llega antes que el receptor directo). */
+    static final String PREF_AVISO = "smsPorAviso";
+    /** Lo que vale un SMS (o 0). */
+    static long montoDe(String remitente, String cuerpo) {
+        long m = AvisoPago.monto(cuerpo);
+        if (m <= 0) m = AvisoPago.monto(String.valueOf(remitente) + " " + cuerpo);
+        return m;
+    }
+    /** Este SMS ya lo tomó un lado (el receptor directo o el aviso de la app de mensajes): el otro lado lo salta UNA vez.
+     *  Cada SMS deja su marca: dos pagos iguales (dos «Recibiste 1,000.») dejan dos y los dos suenan una vez cada uno. */
+    static synchronized void anotar(SharedPreferences sp, String lista, String remitente, String cuerpo) {
         try {
-            JSONArray l = vigentes(sp);
-            l.put(new JSONObject().put("h", clave(cuerpo)).put("t", System.currentTimeMillis()));
+            JSONArray l = vigentes(sp, lista);
+            // La app de mensajes vuelve a publicar la misma conversación: ese mismo texto no deja otra marca.
+            if (PREF_AVISO.equals(lista)) for (int i = 0; i < l.length(); i++) if (clave(cuerpo).equals(l.getJSONObject(i).optString("h"))) return;
+            l.put(new JSONObject().put("h", clave(cuerpo)).put("m", montoDe(remitente, cuerpo)).put("t", System.currentTimeMillis()));
             while (l.length() > 40) l.remove(0);
-            sp.edit().putString(PREF_TOMADOS, l.toString()).apply();
+            sp.edit().putString(lista, l.toString()).apply();
         } catch (Exception ignorado) { }
     }
-
-    /** ¿Este SMS (que llega por el aviso de la app de mensajes) ya lo tomó el receptor? Si sí, queda emparejado. */
-    static synchronized boolean yaTomado(SharedPreferences sp, String cuerpo) {
+    /** ¿El otro lado ya tomó este mismo SMS? Si sí, gasta su marca y devuelve true. El mismo texto, o (el aviso de la app de
+     *  mensajes a veces lo trae cortado o con otro encabezado) el mismo valor en los últimos 3 minutos. */
+    static synchronized boolean tomar(SharedPreferences sp, String lista, String remitente, String cuerpo) {
         try {
-            JSONArray l = vigentes(sp);
+            JSONArray l = vigentes(sp, lista);
             String h = clave(cuerpo);
-            for (int i = 0; i < l.length(); i++) {
-                JSONObject o = l.getJSONObject(i);
-                if (h.equals(o.optString("h"))) { l.remove(i); sp.edit().putString(PREF_TOMADOS, l.toString()).apply(); return true; }
-            }
-        } catch (Exception ignorado) { }
+            long m = montoDe(remitente, cuerpo), ahora = System.currentTimeMillis();
+            int k = -1;
+            for (int i = 0; i < l.length() && k < 0; i++) if (h.equals(l.getJSONObject(i).optString("h"))) k = i;
+            for (int i = 0; i < l.length() && k < 0 && m > 0; i++) { JSONObject o = l.getJSONObject(i); if (o.optLong("m") == m && ahora - o.optLong("t") <= 3 * 60_000L) k = i; }
+            if (k < 0) return false;
+            l.remove(k); sp.edit().putString(lista, l.toString()).apply();
+            return true;
+        } catch (Exception ignorado) { return false; }
+    }
+    /** El aviso de la app de mensajes: ¿ya lo tomó el receptor directo? Si no, queda anotado para que el receptor no lo
+     *  repita si llega después. */
+    static boolean yaTomado(SharedPreferences sp, String remitente, String cuerpo) {
+        if (tomar(sp, PREF_TOMADOS, remitente, cuerpo)) return true;
+        if (AvisoPago.remitenteBanco(remitente) && !"celular".equals(AvisoPago.tipoRemitente(remitente))) anotar(sp, PREF_AVISO, remitente, cuerpo);
         return false;
     }
+    static boolean yaTomado(SharedPreferences sp, String cuerpo) { return yaTomado(sp, "", cuerpo); }
 
-    private static JSONArray vigentes(SharedPreferences sp) {
+    private static JSONArray vigentes(SharedPreferences sp) { return vigentes(sp, PREF_TOMADOS); }
+    private static JSONArray vigentes(SharedPreferences sp, String lista) {
         JSONArray out = new JSONArray();
         try {
-            JSONArray l = new JSONArray(sp.getString(PREF_TOMADOS, "[]"));
+            JSONArray l = new JSONArray(sp.getString(lista, "[]"));
             long ahora = System.currentTimeMillis();
             for (int i = 0; i < l.length(); i++) { JSONObject o = l.getJSONObject(i); if (ahora - o.optLong("t") < JUNTAR_MS) out.put(o); }
         } catch (Exception ignorado) { }

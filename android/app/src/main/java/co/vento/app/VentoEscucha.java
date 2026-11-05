@@ -263,11 +263,11 @@ public class VentoEscucha extends NotificationListenerService {
             // reconoce por su hora y su texto: el mismo nunca suena dos veces.
             if (i != nuevo && ahora - hora > 10 * 60_000L) continue;
             // 1.72.6: ya lo tomó el lector directo de SMS (SmsBanco), apenas llegó: este aviso no vuelve a sonar.
-            if (SmsBanco.yaTomado(sp, (String) m[0])) continue;
+            if (SmsBanco.yaTomado(sp, remitente, (String) m[0])) continue;
             tiempos(hora, ahora);
             if (procesarSms(sp, remitente, (String) m[0], "M:" + hora + ":", callado)) alguno = true;
         }
-        if (nuevo < 0 && !SmsBanco.yaTomado(sp, principal) && procesarSms(sp, remitente, principal, prefijo, callado)) alguno = true;
+        if (nuevo < 0 && !SmsBanco.yaTomado(sp, remitente, principal) && procesarSms(sp, remitente, principal, prefijo, callado)) alguno = true;
         return alguno;
     }
 
