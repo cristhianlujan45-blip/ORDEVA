@@ -2,6 +2,8 @@
 #  • En cada publicación de la rama principal que cambia la app: las pruebas CRÍTICAS (pedidos y QR seguros, pagos, caja,
 #    recetas, entrar y recuperar la cuenta…). Si una falla, queda en rojo en GitHub Actions para revisarla de inmediato.
 #  • A mano (Actions → «Pruebas de la app» → Run workflow, «todas»): la batería completa (más de una hora).
+#  • 1.81.2: TODAS cada noche (2:17 a. m. de Colombia), para que una prueba que no está en la lista rápida no se dañe sin que
+#    nadie lo note (en la auditoría de la 1.81 había 65 pruebas que solo corrían a mano).
 # (1.56.0, auditoría ORDEVA R5.)
 name: Pruebas de la app
 
@@ -12,6 +14,8 @@ on:
         description: "Correr TODAS las pruebas (más de una hora)"
         type: boolean
         default: false
+  schedule:
+    - cron: "17 7 * * *"
   push:
     branches: [claude/precio-margen-productos-tabla-mioclt]
     paths:
@@ -56,10 +60,10 @@ jobs:
         env:
           VENTO_PG_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres
           PLAYWRIGHT_PATH: ${{ github.workspace }}/pruebas/node_modules/playwright
-          TODAS: ${{ inputs.todas }}
+          TODAS: ${{ inputs.todas || github.event_name == 'schedule' }}
         run: |
           if [ "$TODAS" = "true" ]; then
             bash pruebas/correr.sh
           else
-            bash pruebas/correr.sh canalseguro canalvivo qrprivado seguridadqr flujocompleto pagosaviso confirmapago alertaspagos cerrarcaja mejoras recetas practica facil cajapos entrar recuperacion clavelocal tactorapido comprobantepantallazo iphone erroresreal safari modulos cuentacliente usuariosequipo abririnstante pinempleado pagossuenan vistasencilla modulosnegocio mesarepetida lectorcel codigoproducto nubetrabada ordeva2 ordeva2pantallas salidas vueltas cajaextra inventario5 cajavoz cajapro loginotro contraste mesacomoda musicafacil cajateclado hotel comanda errorarranque clavevarios escanercaja adminmasdatos cobrosimple qrrapido qrimpresos sincmesas cajagastos layafinanzas ivaexcel catalogoco finanzas facturacategorias fondoapp javaenvivo pagostodos swpush equiposprobar apariencias autoactualiza escanear facturapdf libreta
+            bash pruebas/correr.sh canalseguro canalvivo qrprivado seguridadqr flujocompleto pagosaviso confirmapago alertaspagos cerrarcaja mejoras recetas practica facil cajapos entrar recuperacion clavelocal tactorapido comprobantepantallazo iphone erroresreal safari modulos cuentacliente usuariosequipo abririnstante pinempleado pagossuenan vistasencilla modulosnegocio mesarepetida lectorcel codigoproducto nubetrabada ordeva2 ordeva2pantallas salidas vueltas cajaextra inventario5 cajavoz cajapro loginotro contraste mesacomoda musicafacil cajateclado hotel comanda errorarranque clavevarios escanercaja adminmasdatos cobrosimple sincmesas cajagastos layafinanzas ivaexcel catalogoco finanzas facturacategorias fondoapp javaenvivo pagostodos swpush equiposprobar apariencias autoactualiza escanear facturapdf libreta javaavisos pedidodesliza reservas agente mapa modos comandaanula pasos guia sonidos huespedes opciones cocinatiempo proveedores resumendia registrotipo reservasavisos plano inventariosimple cajalibre cajamas qrrapido qrimpresos
           fi

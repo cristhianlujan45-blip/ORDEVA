@@ -30,8 +30,9 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
  await p.evaluate(()=>openTableModal(1)); await p.waitForTimeout(300);
  await p.click('#favChips .fav-chip'); await pausa(); await p.click('#favChips .fav-chip'); await pausa();
  chk('Mesa: agregar 2 Águilas descuenta el inventario al agregar (20 → 18)', (await stock(p,'ag'))===18, String(await stock(p,'ag')));
- await p.click('#chargeBtn'); await p.waitForTimeout(300);
- await p.click('button[data-m="efectivo"]'); await p.waitForTimeout(400);
+ // 1.72.5: el cobro puede estar en «💰 Cobrar» de la vista sencilla o en el botón de siempre (el que se vea)
+ await p.evaluate(()=>{ const b=[document.getElementById('vsCobrarBtn'),document.getElementById('chargeBtn')].find(x=>x&&x.offsetParent); b.click(); }); await p.waitForTimeout(400);
+ await p.evaluate(()=>{ const b=[...document.querySelectorAll('button[data-m="efectivo"]')].find(x=>x.offsetParent); b&&b.click(); }); await p.waitForTimeout(500);
  r=await p.evaluate(()=>({h:data.history.length, tot:data.history[0]&&data.history[0].total, mesa:data.history[0]&&data.history[0].table, libre:!data.tables[1].items.length}));
  chk('Mesa cobrada: venta en el historial y la mesa queda libre', r.h===1 && r.tot===8000 && r.mesa===1 && r.libre, JSON.stringify(r));
  chk('Mesa cobrada: el inventario NO se descuenta otra vez (sigue en 18)', (await stock(p,'ag'))===18, String(await stock(p,'ag')));

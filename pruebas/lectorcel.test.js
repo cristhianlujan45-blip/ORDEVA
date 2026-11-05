@@ -135,7 +135,26 @@ const EAN = '7702535011119', QR_TXT = 'PROD-QR-4471';
     await cel.fill('#manoTxt', '7701111111111'); await cel.click('#mano button[type=submit]');
     chk('7. … y lo que lee el celular se suma a la venta de la caja', await esperar(pc, () => window.ventoPOS.carrito().some(l => l.name === 'Gaseosa Lector')), await pc.evaluate(() => window.ventoPOS.carrito()));
     // 1.65.7: un solo botón para escanear (pedido del dueño): ya no hay «📱 Celular lector» aparte; el celular está dentro de «📷».
-    chk('7. La caja tiene UN botón para escanear («📷»), sin botones de más', await pc.evaluate(() => !document.querySelector('#pzCajaOv [data-lcel-abrir]') && !!document.querySelector('#pzCajaOv [data-scan]')));
+    // 1.80.0: el dueño no encontraba cómo conectar el celular: «📱 Celular lector» va arriba en la caja y abre el QR.
+    chk('7. La caja tiene «📱 Celular lector» a la vista (abre el QR) y el «📷»', await pc.evaluate(() => { const b = document.querySelector('#pzCajaOv .pz-caja-top [data-lcel-abrir]'); return !!b && b.offsetParent !== null && !!document.querySelector('#pzCajaOv [data-scan]'); }));
+    // 1.79.0: con la ventana del QR («📱 Celular como lector») abierta encima de la caja, lo que lee el celular igual entra
+    // a la caja (antes el celular decía «no está escaneando») y la ventana se cierra sola.
+    await pc.evaluate(() => window.ventoLectorCel.abrirPanel()); await pc.waitForTimeout(1500);
+    chk('7. Con el QR abierto encima de la caja, el celular sigue diciendo «🧾 Caja…»', await esperar(cel, () => /Caja: cada código se suma/.test(document.getElementById('estSub').textContent)),
+      await cel.evaluate(() => document.getElementById('estado').textContent));
+    await cel.fill('#manoTxt', '7701111111111'); await cel.click('#mano button[type=submit]');
+    chk('7. … lo que lee entra a la caja y la ventana del QR se cierra sola', await esperar(pc, () => (window.ventoPOS.carrito().find(l => l.name === 'Gaseosa Lector') || {}).qty === 2 && !document.getElementById('lcelOv').classList.contains('show')),
+      await pc.evaluate(() => ({ c: window.ventoPOS.carrito(), ov: document.getElementById('lcelOv').className })));
+    // 1.79.0: la cámara del celular queda prendida hasta «⏹ Finalizar»; si el sistema la corta, vuelve sola.
+    const camViva = () => cel.evaluate(() => { const v = document.getElementById('video'), t = v.srcObject && v.srcObject.getVideoTracks()[0]; return !!t && t.readyState === 'live'; });
+    chk('9. El celular tiene «⏹ Finalizar» y la cámara está prendida', await cel.evaluate(() => !document.getElementById('finalizar').hidden) && await camViva());
+    await cel.evaluate(() => { const t = document.getElementById('video').srcObject.getVideoTracks()[0]; t.stop(); });
+    chk('9. Si el celular suelta la cámara, vuelve a prenderse sola', await esperar(cel, () => { const v = document.getElementById('video'), t = v.srcObject && v.srcObject.getVideoTracks()[0]; return !!t && t.readyState === 'live'; }, null, 9000));
+    await cel.click('#finalizar'); await cel.waitForTimeout(3500);
+    const r9 = await cel.evaluate(() => ({ msg: !document.getElementById('camMsg').hidden && document.getElementById('camTxt').textContent, btn: document.getElementById('camBtn').textContent, viva: !!(document.getElementById('video').srcObject && document.getElementById('video').srcObject.getVideoTracks().some(t => t.readyState === 'live')) }));
+    chk('9. «⏹ Finalizar» apaga la cámara (y no se vuelve a prender sola)', /Cámara apagada/.test(r9.msg || '') && /Escanear otra vez/.test(r9.btn) && !await camViva(), r9);
+    await cel.click('#camBtn');
+    chk('9. «▶ Escanear otra vez» la vuelve a prender', await esperar(cel, () => { const v = document.getElementById('video'), t = v.srcObject && v.srcObject.getVideoTracks()[0]; return !!t && t.readyState === 'live' && document.getElementById('camMsg').hidden; }, null, 9000));
     await pc.evaluate(() => window.ventoPOS.cerrarCaja());
     // 8. … y la toma de inventario
     await pc.evaluate(() => {

@@ -74,6 +74,11 @@ public class AvisoPagoPrueba {
         chk("SMS de pago: «DaviPlata: Le llegó plata. Recibió $200 de JUAN»", AvisoPago.esSmsDePago("85888", "DaviPlata: Le llegó plata. Recibió $200 de JUAN"), "");
         chk("SMS de pago desde «Nequi» (contacto guardado): «Te llegó plata $15.000»", AvisoPago.esSmsDePago("Nequi", "¡Te llegó plata! ANA te envió $15.000"), "");
         chk("SMS personal (sin banco) NO se toma: «Te envié $20.000 de lo del almuerzo»", !AvisoPago.esSmsDePago("Mamá", "Te llegaron los $20.000 de lo del almuerzo?"), "");
+        // 1.72.6: Bold (890412) por la llave.
+        String bold = "BoldCF: Has recibido una transferencia a traves de llaves por valor de $45.000 desde JUAN PEREZ el 02/11/2026 10:15AM";
+        chk("SMS Bold 890412 «Has recibido una transferencia a traves de llaves por valor de $45.000»: pago de 45000 de Bold", AvisoPago.esSmsDePago("890412", bold) && AvisoPago.monto(bold) == 45000 && "Bold".equals(AvisoPago.bancoDeCodigo("890412")), AvisoPago.monto(bold));
+        chk("SMS Bold «Realizaste una transferencia…» (sale) NO es pago", !AvisoPago.esSmsDePago("890412", "BoldCF: Realizaste una transferencia a traves de llaves por un valor de $30.000 desde tu cuenta terminada en *1234"), "");
+        chk("SMS Bold «te informa compra por $…» NO es pago", !AvisoPago.esSmsDePago("890412", "Bold: te informa compra por $12.000 en TIENDA*X a las 10:20"), "");
         chk("SMS de código NO se toma", !AvisoPago.esSmsDePago("85888", "DaviPlata: su clave para recibir $5.000 es 4455"), "");
         chk("Remitente celular (3001234567) → «celular» (falso)", AvisoPago.tipoRemitente("+57 300 123 4567").equals("celular"), AvisoPago.tipoRemitente("+57 300 123 4567"));
         chk("Remitente código corto (85888) → «corto»", AvisoPago.tipoRemitente("85888").equals("corto"), "");
@@ -186,6 +191,9 @@ public class AvisoPagoPrueba {
         chk("Voz de la llave con el valor del SMS: «Llegaron 140000 pesos por Bre-B, en DaviPlata.»", "Llegaron 140000 pesos por Bre-B, en DaviPlata.".equals(AvisoPago.frase("DaviPlata", 140000, llaves)), AvisoPago.frase("DaviPlata", 140000, llaves));
         String[] salen = { "DaviPlata | Pasaste $100 a otro DaviPlata. Para saber mas, consulta tus movimientos.", "DaviPlata: Compra exitosa en la Tienda Virtual por  20,000. Para saber mas, consulta tus movimientos" };
         for (String x : salen) chk("Plata que SALE no es pago: «" + x + "»", !AvisoPago.esRecibido(x) && !AvisoPago.esSmsDePago("85888", x), x);
+        // 1.79.0: retiros y débitos también son plata que sale (van a Contabilidad), nunca un pago recibido.
+        String[] retiros = { "Bancolombia: Retiraste $50.000 en cajero Bancolombia", "DaviPlata: Retiro exitoso por $200.000 en corresponsal", "Davivienda: Se debito $45.000 de tu cuenta por pago de servicios", "Bancolombia: Compra aprobada por $32.500 en EXITO" };
+        for (String x : retiros) chk("Retiro o débito es salida y no pago: «" + x + "»", AvisoPago.esSalida(x) && !AvisoPago.esRecibido(x), x);
         chk("Valores sin signo pequeños: «Recibiste 100 pesos» → 100; «recibiste 1000» → 1000", AvisoPago.monto("Recibiste 100 pesos") == 100 && AvisoPago.monto("DaviPlata: recibiste 1000 en tu DaviPlata") == 1000, AvisoPago.monto("Recibiste 100 pesos"));
         chk("Un número de celular no es el valor («Recibiste plata de 3001234567»)", AvisoPago.monto("Recibiste plata de 3001234567") == 0, AvisoPago.monto("Recibiste plata de 3001234567"));
         // Un pago con «código de aprobación» o «código de confirmación» SÍ es pago (antes se descartaba)

@@ -4,11 +4,14 @@
 //     SMS del 85888 «Compra exitosa en la Tienda Virtual por 20,000», «$1.250.000,00»).
 //  2. Un empleado (no administrador) NO las toma ni las ve.
 //  3. El administrador: salen en Contabilidad con valor, app y a quién; sin valor no se anota nada; y en Inicio, la alerta.
-//  4. Las salidas NO van al documento compartido (data) ni al servidor: solo en este celular.
-//  5. 📦 Proveedor → gasto «Proveedores» con el nombre; la próxima vez a ese mismo nombre se sugiere «Proveedor».
+//  4. 1.79.0: cada salida queda en Contabilidad APENAS llega («Otros gastos», por revisar), sin esperar a clasificarla.
+//  5. 📦 Proveedor → el gasto pasa a «Proveedores» con el nombre (sin duplicarlo); la próxima vez a ese nombre queda sola
+//     como proveedor.
 //  6. 🗂️ Otro gasto → gasto de la categoría elegida (Arriendo).
 //  7. Pago de una factura escaneada (mismo proveedor y valor) → se sugiere «Ya estaba anotada» y no se suma dos veces.
-//  8. 🙈 No es del negocio → pide confirmación; con «No» queda; con «Sí» se quita sin gasto.
+//  8. 🙈 No es del negocio → pide confirmación; con «No» queda; con «Sí» se quita el gasto.
+//  9. 🏧 Retiro en cajero o corresponsal → «retiro: de banco a efectivo», que no suma a gastos ni a entradas.
+// 10. ➖ Salida de efectivo de la caja → también queda en Contabilidad (y «Retiro del dueño» no es gasto).
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 
@@ -74,38 +77,44 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     chk('3. El administrador las toma: 2 con valor (la que no trae valor no se anota)', n === 2 && F.length === 2, { n, F });
     chk('3. Cada una con valor, app y a quién («$250.000 · Nequi · A DISTRIBUIDORA EL SOL»)', F.some(f => /250\.000/.test(f.txt) && /Nequi/.test(f.txt) && /A DISTRIBUIDORA EL SOL/.test(f.txt)) && F.some(f => /800\.000/.test(f.txt) && /DaviPlata/.test(f.txt)), F);
     v = await p.evaluate(() => { const a = window.ordeva2 && window.ordeva2.calc ? window.ordeva2.calc('hoy').alertas : []; return a.map(x => x.t); });
-    chk('3. En Inicio sale la alerta «2 salidas de Nequi / DaviPlata por clasificar»', v.some(t => /2 salidas de Nequi \/ DaviPlata por clasificar/.test(t)), v);
+    chk('3. En Inicio sale la alerta «2 salidas del banco por revisar»', v.some(t => /2 salidas del banco por revisar/.test(t)), v);
 
-    // ===== 4. Privacidad =====
-    v = await p.evaluate(() => JSON.stringify(data));
-    chk('4. Las salidas NO están en los datos compartidos del negocio (solo en este celular)', !/DISTRIBUIDORA|JUAN ARRENDADOR/.test(v), v.length);
+    // ===== 4. Ya en Contabilidad =====
+    v = await p.evaluate(() => (data.contab || []).map(g => ({ tipo: g.tipo, cat: g.cat, monto: g.monto, nota: g.nota, metodo: g.metodo, origen: g.origen, ref: g.ref })));
+    chk('4. Las 2 salidas ya quedaron en Contabilidad como gasto «Otros» (sin clasificar todavía)', v.length === 2 && v.every(g => g.tipo === 'gasto' && g.cat === 'otros' && g.origen === 'salida') && v.some(g => g.monto === 250000 && /DISTRIBUIDORA EL SOL/.test(g.nota)), v);
+    F = await filas();
+    chk('4. En la lista dice cómo quedó y deja «✅ Así está bien»', F.every(f => /Quedó como gasto: «Otros gastos»/.test(f.txt) && /Así está bien/.test(f.txt)), F);
 
     // ===== 5. Proveedor =====
     await p.click('#salidasBox [data-id="n1"] [data-sl="prov"]'); await p.waitForTimeout(300);
     v = await p.evaluate(() => (data.contab || []).map(g => ({ cat: g.cat, monto: g.monto, nota: g.nota, metodo: g.metodo, origen: g.origen })));
-    chk('5. 📦 Proveedor → gasto «proveedores» de $250.000 por Nequi, con el nombre', v.length === 1 && v[0].cat === 'proveedores' && v[0].monto === 250000 && v[0].metodo === 'nequi' && /DISTRIBUIDORA EL SOL/.test(v[0].nota) && v[0].origen === 'salida', v);
+    chk('5. 📦 Proveedor → el gasto de $250.000 pasa a «proveedores» por Nequi, con el nombre (sin duplicar)', v.length === 2 && v.filter(g => g.monto === 250000).length === 1 && (v = v.find(g => g.monto === 250000)) && (v = [v]) && v[0].cat === 'proveedores' && v[0].monto === 250000 && v[0].metodo === 'nequi' && /DISTRIBUIDORA EL SOL/.test(v[0].nota) && v[0].origen === 'salida', v);
     F = await filas();
     chk('5. … y sale de la lista de por clasificar', F.length === 1 && F[0].id === 'd1', F);
     await llegan([{ id: 'n2', app: 'Nequi', txt: 'Nequi | Envío | Enviaste $90.000 a DISTRIBUIDORA EL SOL', t: ahora }]);
     F = await filas();
-    chk('5. Otra salida a DISTRIBUIDORA EL SOL: se sugiere «Proveedor» (no se clasifica sola)', (F.find(f => f.id === 'n2') || {}).sug.join() === 'prov' && F.length === 2, F);
+    v = await p.evaluate(() => (data.contab || []).find(g => g.ref === 'n2') || null);
+    chk('5. Otra salida a DISTRIBUIDORA EL SOL: queda sola como proveedor', v && v.cat === 'proveedores' && v.monto === 90000 && /Quedó como gasto de proveedor/.test((F.find(f => f.id === 'n2') || {}).txt) && F.length === 2, { v, F });
 
     // ===== 6. Otro gasto =====
     await p.click('#salidasBox [data-id="d1"] [data-sl="gasto"]');
     await p.selectOption('#salidasBox [data-id="d1"] .sl-cat select', 'arriendo');
     await p.click('#salidasBox [data-id="d1"] [data-sl="gok"]'); await p.waitForTimeout(300);
-    v = await p.evaluate(() => (data.contab || []).find(g => g.monto === 800000) || null);
-    chk('6. 🗂️ Otro gasto → «Arriendo» de $800.000 por DaviPlata', v && v.cat === 'arriendo' && v.metodo === 'nequi' && /JUAN ARRENDADOR/.test(v.nota), v);
+    v = await p.evaluate(() => (data.contab || []).filter(g => g.monto === 800000));
+    chk('6. 🗂️ Otra categoría → «Arriendo» de $800.000 por DaviPlata (uno solo)', v.length === 1 && v[0].cat === 'arriendo' && v[0].metodo === 'nequi' && /JUAN ARRENDADOR/.test(v[0].nota), v);
 
     // ===== 7. Factura escaneada =====
-    await p.evaluate(t => { data.purchases = [{ id: 'f1', supplier: 'Distribuidora El Sol S.A.S.', date: new Date(t - 2 * 864e5).toISOString().slice(0, 10), at: t - 2 * 864e5, total: 90000, items: [] }]; saveData(); window.ventoSalidas.pintar(); }, ahora);
-    F = await filas();
-    const f7 = F.find(f => f.id === 'n2') || {};
-    chk('7. Pago de la factura escaneada (mismo proveedor y valor): sugiere «Ya estaba anotada»', f7.sug && f7.sug.join() === 'ya' && /ya cuenta como compra/.test(f7.txt), f7);
+    await p.click('#salidasBox [data-id="n2"] [data-sl="ok"]'); await p.waitForTimeout(300);
+    await p.evaluate(t => { data.purchases = [{ id: 'f1', supplier: 'Distribuidora El Sol S.A.S.', date: new Date(t - 2 * 864e5).toISOString().slice(0, 10), at: t - 2 * 864e5, total: 120000, items: [] }]; saveData(); }, ahora);
     const antes = await p.evaluate(() => (data.contab || []).length);
-    await p.click('#salidasBox [data-id="n2"] [data-sl="ya"]'); await p.waitForTimeout(300);
+    await llegan([{ id: 'n3', app: 'Nequi', txt: 'Nequi | Envío | Enviaste $120.000 a DISTRIBUIDORA EL SOL', t: ahora }]);
+    F = await filas();
+    const f7 = F.find(f => f.id === 'n3') || {};
+    v = await p.evaluate(() => (data.contab || []).length);
+    chk('7. Pago de la factura escaneada (mismo proveedor y valor): NO se suma otra vez y lo dice', v === antes && /parece el pago de una factura/.test(f7.txt || ''), { v, antes, f7 });
+    await p.click('#salidasBox [data-id="n3"] [data-sl="ok"]'); await p.waitForTimeout(300);
     v = await p.evaluate(() => ({ n: (data.contab || []).length, filas: document.querySelectorAll('#salidasBox .sl-fila').length }));
-    chk('7. «Ya estaba anotada» → no se suma otro gasto', v.n === antes && v.filas === 0, v);
+    chk('7. «Así está bien» la quita de la lista sin sumar nada', v.n === antes && v.filas === 0, v);
 
     // ===== 8. No es del negocio =====
     await llegan([{ id: 'p1', app: 'Nequi', txt: 'Nequi | Envío | Enviaste $40.000 a MAMÁ', t: ahora }]);
@@ -118,6 +127,29 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     await p.click('#confirmOkBtn'); await p.waitForTimeout(300);
     v = await p.evaluate(() => ({ filas: document.querySelectorAll('#salidasBox .sl-fila').length, oculto: document.getElementById('salidasBox').hidden, gasto: (data.contab || []).some(g => /MAM/.test(g.nota || '')) }));
     chk('8. Con «Sí» se quita, sin gasto, y la tarjeta se esconde', v.filas === 0 && v.oculto && !v.gasto, v);
+    await llegan([{ id: 'p2', app: 'Nequi', txt: 'Nequi | Envío | Enviaste $15.000 a MAMÁ', t: ahora }]);
+    v = await p.evaluate(() => ({ filas: document.querySelectorAll('#salidasBox .sl-fila').length, gasto: (data.contab || []).some(g => /MAM/.test(g.nota || '')) }));
+    chk('8. La próxima vez a MAMÁ ya no se anota sola', v.filas === 0 && !v.gasto, v);
+
+    // ===== 9. Retiros =====
+    const L9 = await p.evaluate(() => { const S = window.ventoSalidas; return ['Bancolombia | Bancolombia | Retiraste $50.000 en cajero Bancolombia', 'DaviPlata | DaviPlata | Retiro exitoso por $200.000 en corresponsal', 'Nequi | Nequi | Enviaste $5.000 a JUAN'].map(t => [S.esRetiro(t), S.montoDe(t)]); });
+    chk('9. «Retiraste $50.000 en cajero» y «Retiro exitoso por $200.000 en corresponsal» son retiros; «Enviaste» no', L9[0][0] && L9[0][1] === 50000 && L9[1][0] && L9[1][1] === 200000 && !L9[2][0], L9);
+    const res0 = await p.evaluate(() => { const x = ctMovimientos({ ini: 0, fin: Date.now() + 864e5 }); const s = t => x.mov.filter(m => m.tipo === t).reduce((a, m) => a + m.monto, 0); return { g: s('gasto'), i: s('venta') + s('ingreso') }; });
+    await llegan([{ id: 'r1', app: 'DaviPlata', txt: 'DaviPlata | DaviPlata | Retiro exitoso por $200.000 en corresponsal', t: ahora }]);
+    await p.evaluate(() => renderConta()); await p.waitForTimeout(200);
+    v = await p.evaluate(() => { const g = (data.contab || []).find(x => x.ref === 'r1'); const x = ctMovimientos({ ini: 0, fin: Date.now() + 864e5 }); const s = t => x.mov.filter(m => m.tipo === t).reduce((a, m) => a + m.monto, 0);
+      const fila = [...document.querySelectorAll('#ctLista .ct-mov')].map(d => d.innerText.replace(/\s+/g, ' ')).find(t => /200\.000/.test(t)) || '';
+      return { g, gastos: s('gasto'), entradas: s('venta') + s('ingreso'), fila, quedo: (document.querySelector('#salidasBox [data-id="r1"]') || {}).innerText || '' }; });
+    chk('9. El retiro queda como «traslado» de banco a efectivo y no suma a gastos ni a entradas', v.g && v.g.tipo === 'traslado' && v.g.cat === 'banco_efectivo' && v.gastos === res0.g && v.entradas === res0.i, { v, res0 });
+    chk('9. En los movimientos se ve con 🏧 y «no es gasto»', /🏧/.test(v.fila) && /no es gasto/.test(v.fila) && /Quedó como retiro/.test(v.quedo), v);
+    await p.click('#salidasBox [data-id="r1"] [data-sl="dueno"]'); await p.waitForTimeout(300);
+    v = await p.evaluate(() => (data.contab || []).filter(x => x.ref === 'r1'));
+    chk('9. Se puede cambiar a «Retiro del dueño» (uno solo)', v.length === 1 && v[0].tipo === 'traslado' && v[0].cat === 'retiro_dueno', v);
+
+    // ===== 10. Salida de efectivo de la caja =====
+    v = await p.evaluate(() => { window.ventoTurno.movimiento('salida', 30000, 'Pago a proveedor'); window.ventoTurno.movimiento('salida', 100000, 'Retiro del dueño'); window.ventoTurno.movimiento('salida', 8000, 'Devolución: dañado');
+      return (data.contab || []).filter(g => g.origen === 'caja').map(g => ({ tipo: g.tipo, cat: g.cat, monto: g.monto, metodo: g.metodo })); });
+    chk('10. ➖ Salida de caja «Pago a proveedor» → gasto de proveedores en efectivo; «Retiro del dueño» → retiro; la devolución no se duplica', v.length === 2 && v.some(g => g.tipo === 'gasto' && g.cat === 'proveedores' && g.monto === 30000 && g.metodo === 'efectivo') && v.some(g => g.tipo === 'traslado' && g.cat === 'retiro_dueno' && g.monto === 100000), v);
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.stack || e)); }
   chk('Sin errores de página', !errs.length, errs);
   await b.close();

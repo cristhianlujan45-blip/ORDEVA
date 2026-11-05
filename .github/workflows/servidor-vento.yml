@@ -277,6 +277,17 @@ jobs:
           done
           echo "::warning title=Suscripciones::La función se desplegó pero no responde todavía."
 
+      - name: Calendario con Booking y Airbnb (Edge Function vento-ical)
+        if: steps.listo.outputs.ok == 'true'
+        continue-on-error: true   # nueva (1.76.0): si falla, avisa pero no frena el resto del despliegue
+        run: |
+          supabase functions deploy vento-ical --project-ref "$PROJECT_REF" --no-verify-jwt
+          for i in 1 2 3 4 5 6; do
+            if R=$(curl -fsS "https://${PROJECT_REF}.supabase.co/functions/v1/vento-ical/salud"); then echo "Calendario: $R"; exit 0; fi
+            sleep 10
+          done
+          echo "::warning title=Calendario::La función se desplegó pero no responde todavía."
+
       # 1.53.1: un primer repaso autorizado deja en el servidor la dirección y el secreto para que Supabase dispare los
       # repasos solo, cada 5 minutos (pg_cron + pg_net). Así no dependen de que GitHub corra el «schedule» a tiempo.
       - name: Repasos automáticos dentro de Supabase

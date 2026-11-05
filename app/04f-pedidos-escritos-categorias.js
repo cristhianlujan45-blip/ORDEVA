@@ -70,7 +70,7 @@ function qsRegistrarVenta(cart, opts){
     qty: it.qty,
     price: it.price,
     cost: (data.products.find(p=>p.id===it.productId)||{}).cost ?? null
-  }, it.unidad ? { unidad: it.unidad } : {}, it.productId ? { productId: it.productId } : {}, it.precioLista != null && it.precioLista !== it.price ? { precioLista: it.precioLista } : {}));      // ⚖️ por kilo/libra · 🏷️ precio antes del descuento
+  }, it.unidad ? { unidad: it.unidad } : {}, it.productId ? { productId: it.productId } : {}, it.precioLista != null && it.precioLista !== it.price ? { precioLista: it.precioLista } : {}, it.variante ? { variante: String(it.variante).slice(0, 30) } : {}));      // ⚖️ por kilo/libra · 🏷️ precio antes del descuento
   // El valor del domicilio se suma como una línea más (igual que la propina),
   // así el total del recibo y de las estadísticas ya lo incluyen sin tener
   // que tocar nada más en la app.
@@ -507,7 +507,7 @@ function asisContext(q){
     // Cuentas cerradas que quedaron debiendo (fiados).
     deudas: asisDeudas().slice(0, 30).map(d => ({ quien: d.quien, debe: d.debe, fecha: new Date(d.fecha).toLocaleDateString('es-CO') })),
     clientesFrecuentes: (data.clientesFrecuentes || []).slice().sort((a, b) => b.visitas - a.visitas).slice(0, 10).map(c => ({ cliente: c.nombre || c.telefono, visitas: c.visitas, gastado: c.totalGastado })),
-    contabilidadEsteMes: (() => { try{ const m0 = new Date(); m0.setHours(0, 0, 0, 0); m0.setDate(1); const x = ctMovimientos({ ini: m0.getTime(), fin: Date.now() + 1 }); const ent = x.mov.filter(m => m.tipo !== 'gasto').reduce((a, m) => a + m.monto, 0), gas = x.mov.filter(m => m.tipo === 'gasto').reduce((a, m) => a + m.monto, 0); return { entradas: ent, gastos: gas, resultado: ent - gas, gastosPorCategoria: x.mov.filter(m => m.tipo === 'gasto').reduce((o, m) => { const k = ctCatNombre('gasto', m.cat); o[k] = (o[k] || 0) + m.monto; return o; }, {}) }; }catch(e){ return null; } })(),
+    contabilidadEsteMes: (() => { try{ const m0 = new Date(); m0.setHours(0, 0, 0, 0); m0.setDate(1); const x = ctMovimientos({ ini: m0.getTime(), fin: Date.now() + 1 }); const ent = x.mov.filter(m => m.tipo === 'venta' || m.tipo === 'ingreso').reduce((a, m) => a + m.monto, 0), gas = x.mov.filter(m => m.tipo === 'gasto').reduce((a, m) => a + m.monto, 0); return { entradas: ent, gastos: gas, resultado: ent - gas, gastosPorCategoria: x.mov.filter(m => m.tipo === 'gasto').reduce((o, m) => { const k = ctCatNombre('gasto', m.cat); o[k] = (o[k] || 0) + m.monto; return o; }, {}) }; }catch(e){ return null; } })(),
     reclamosAbiertos: (data.casos || []).filter(c => c.estado !== 'resuelto').slice(0, 10).map(c => ({ tipo: CASO_CATEGORIAS[c.categoria] || c.categoria, urgencia: c.urgencia, detalle: c.descripcion, asignadoA: c.asignadoA || '' })),
     // Lo que ORDEVA sabe de compras, pedidos, preparación y música (resumido, datos reales).
     comprasEsteMes: (() => { try{ const d0 = new Date(); d0.setHours(0, 0, 0, 0); d0.setDate(1); const x = window.Laya.resumenCompras({ desde: d0.getTime(), hasta: Date.now() + 1 }); return { facturas: x.n, total: Math.round(x.total), sinIva: Math.round(x.sub), iva: Math.round(x.iva) }; }catch(e){ return null; } })(),

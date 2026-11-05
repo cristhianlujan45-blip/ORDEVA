@@ -123,7 +123,8 @@ function videoY4m(bits){
     // ===== 6. Un solo botón =====
     const botones = await p.evaluate(() => ({ caja: document.querySelectorAll('#pzCajaOv [data-scan]').length, celCaja: document.querySelectorAll('#pzCajaOv [data-lcel-abrir]').length,
       ventaRapida: document.querySelectorAll('#qsScanBtn').length, celVenta: !!(document.getElementById('qsScanBtn') && document.getElementById('qsScanBtn').parentNode.querySelector('[data-lcel-abrir]')) }));
-    chk('6. Un solo botón para escanear en la caja y en la venta rápida (el celular como lector está dentro de la cámara)', botones.caja >= 1 && !botones.celCaja && botones.ventaRapida === 1 && !botones.celVenta, botones);
+    // 1.79.1: el dueño no encontraba cómo conectar el celular: en la Caja POS «📱 Celular lector» va UNA vez, arriba.
+    chk('6. Un solo botón para escanear en la venta rápida; en la caja el 📷 y «📱 Celular lector» una sola vez (arriba)', botones.caja >= 1 && botones.celCaja === 1 && botones.ventaRapida === 1 && !botones.celVenta, botones);
     await p.evaluate(() => { window.ventoPOS.cerrarCaja(); document.getElementById('qsScanBtn').click(); });
     chk('6. «📷 Escanear» de la venta rápida abre la cámara y ofrece el celular como lector adentro', await esperar(() => document.getElementById('scanVideo').videoWidth > 0 && !!document.querySelector('#scanCelBox [data-lcel="ver"]'), null, 8000), await estado());
     await p.evaluate(() => closeScanOverlay());

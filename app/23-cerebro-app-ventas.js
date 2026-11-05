@@ -67,21 +67,82 @@
     const g = {}; l.forEach(x => { (g[x.prov] = g[x.prov] || []).push(x); });
     return '🛒 Pedido para ' + (data.businessName || 'el negocio') + '\n' + Object.entries(g).map(([prov, xs]) => '\n*' + prov + '*\n' + xs.map(x => '• ' + x.pedir + ' × ' + x.p.name).join('\n')).join('\n');
   }
+  // 1.76.0 · 🛒 Pedido a cada proveedor: su WhatsApp (se guarda), «📲 Enviar a …» directo, el pedido queda anotado y
+  // «✅ Llegó» suma lo pedido al inventario (o «📸 Escanear la factura» si llegó con factura).
+  const SIN_PROV = 'Sin proveedor registrado';
+  const telDe = prov => ((data.proveedoresTel || {})[prov] || '');
+  const telWa = t => { const d = String(t || '').replace(/\D/g, ''); return d.length === 10 && d[0] === '3' ? '57' + d : d; };
+  const pendientesProv = () => (data.pedidosProv || []).filter(x => !x.llego && !x.quitado);
+  function anotarPedido(prov, xs){
+    data.pedidosProv = (data.pedidosProv || []).filter(x => Date.now() - x.at < 90 * 864e5).slice(-60);
+    data.pedidosProv.push({ id: 'pp' + Date.now().toString(36), prov, at: Date.now(), items: xs.map(x => ({ id: x.p.id, n: x.p.name, q: x.pedir })), llego: null });
+    try{ saveData(); }catch(e){}
+  }
+  function llego(id){
+    const o = (data.pedidosProv || []).find(x => x.id === id); if(!o || o.llego) return 0;
+    let n = 0;
+    o.items.forEach(it => { const p = data.products.find(x => x.id === it.id); if(!p || !(it.q > 0)) return; p.stock = (Number(p.stock) || 0) + it.q; n += it.q; });
+    o.llego = Date.now();
+    try{ saveData(); }catch(e){}
+    try{ window.ventoAuditar && window.ventoAuditar('mercancía recibida', o.prov + ': ' + o.items.map(i => i.q + ' ' + i.n).join(', ').slice(0, 200)); }catch(e){}
+    try{ typeof renderInventario === 'function' && renderInventario(); }catch(e){}
+    return n;
+  }
   function abrirLista(){
     const l = listaCompras();
     let ov = document.getElementById('layaListaOv');
     if(!ov){ ov = document.createElement('div'); ov.id = 'layaListaOv'; ov.className = 'overlay'; document.body.appendChild(ov);
       ov.addEventListener('click', e => { if(e.target === ov || e.target.closest('[data-ll="cerrar"]')) ov.classList.remove('show'); }); }
     const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-    ov.innerHTML = '<div class="modal" style="max-width:520px"><h2>🛒 Lista de compras de ORDEVA</h2><div class="modal-sub">' + (l.length ? 'Para cubrir una semana de ventas (según lo que se vendió en los últimos 14 días). Cambia las cantidades si quieres.' : 'No hay productos por comprar: todo tiene stock suficiente. ✅') + '</div>' +
-      (l.length ? '<div class="ll-tabla">' + l.map((x, i) => '<div class="ll-fila"><span><b>' + esc(x.p.name) + '</b><small>' + esc(x.prov) + ' · quedan ' + x.quedan + (x.porDia ? ' · se venden ~' + (Math.round(x.porDia * 10) / 10) + '/día' : '') + '</small></span><input type="number" min="0" inputmode="numeric" data-i="' + i + '" value="' + x.pedir + '"></div>').join('') + '</div>' +
-        '<div class="modal-actions" style="flex-wrap:wrap;gap:8px"><button type="button" class="btn-primary" data-ll="wa">📲 Enviar por WhatsApp</button><button type="button" class="btn-ghost" data-ll="copiar">📋 Copiar</button><button type="button" class="btn-close" data-ll="cerrar">Cerrar</button></div>' :
+    const fecha = t => new Date(t).toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' });
+    const grupos = {}; l.forEach((x, i) => { (grupos[x.prov] = grupos[x.prov] || []).push([x, i]); });
+    const pend = pendientesProv();
+    const htmlPend = pend.length ? '<h3 class="ll-h">📦 Pedidos por llegar</h3>' + pend.map(o => '<div class="ll-pend"><span><b>' + esc(o.prov) + '</b><small>Pedido el ' + esc(fecha(o.at)) + ' · ' + o.items.map(i => i.q + ' ' + esc(i.n)).join(', ').slice(0, 140) + '</small></span>' +
+      '<div class="ll-acc"><button type="button" class="btn-primary" data-ll="llego" data-id="' + o.id + '">✅ Llegó: sumar al inventario</button><button type="button" class="btn-ghost" data-ll="factura">📸 Escanear la factura</button><button type="button" class="btn-ghost" data-ll="quitar" data-id="' + o.id + '" title="No va a llegar">✕</button></div></div>').join('') : '';
+    const htmlGrupos = Object.keys(grupos).map(prov => {
+      const filas = grupos[prov].map(([x, i]) => '<div class="ll-fila"><span><b>' + esc(x.p.name) + '</b><small>quedan ' + x.quedan + (x.porDia ? ' · se venden ~' + (Math.round(x.porDia * 10) / 10) + '/día' : '') + '</small></span><input type="number" min="0" inputmode="numeric" data-i="' + i + '" value="' + x.pedir + '"></div>').join('');
+      const ya = pend.find(o => o.prov === prov);
+      const cab = prov === SIN_PROV ? '<div class="ll-ph"><b>' + esc(prov) + '</b></div>'
+        : '<div class="ll-ph"><b>' + esc(prov) + '</b><input type="tel" data-tel="' + esc(prov) + '" placeholder="WhatsApp del proveedor" value="' + esc(telDe(prov)) + '"><button type="button" class="btn-primary" data-ll="wa1" data-prov="' + esc(prov) + '">📲 Enviar</button></div>' + (ya ? '<small class="ll-ya">Ya le pediste el ' + esc(fecha(ya.at)) + '</small>' : '');
+      return '<div class="ll-prov">' + cab + '<div class="ll-tabla">' + filas + '</div></div>';
+    }).join('');
+    ov.innerHTML = '<div class="modal" style="max-width:560px;max-height:92vh;overflow:auto"><h2>🛒 Pedido a proveedores</h2><div class="modal-sub">' + (l.length ? 'Lo que se está acabando, para cubrir una semana de ventas (según los últimos 14 días). Cambia las cantidades si quieres y envíale a cada proveedor su parte por WhatsApp.' : 'No hay productos por comprar: todo tiene stock suficiente. ✅') + '</div>' +
+      htmlPend + (l.length ? htmlGrupos +
+        '<div class="modal-actions" style="flex-wrap:wrap;gap:8px"><button type="button" class="btn-ghost" data-ll="wa">📲 Enviar todo</button><button type="button" class="btn-ghost" data-ll="copiar">📋 Copiar</button><button type="button" class="btn-close" data-ll="cerrar">Cerrar</button></div>' :
         '<div class="modal-actions"><button type="button" class="btn-close" data-ll="cerrar">Cerrar</button></div>') + '</div>';
     const leer = () => l.map((x, i) => Object.assign({}, x, { pedir: Math.max(0, parseInt(ov.querySelector('[data-i="' + i + '"]').value, 10) || 0) })).filter(x => x.pedir > 0);
-    const bw = ov.querySelector('[data-ll="wa"]'); if(bw) bw.onclick = () => { reg('ejecución', 'Lista de compras enviada por WhatsApp'); window.open('https://wa.me/?text=' + encodeURIComponent(textoLista(leer())), '_blank'); };
-    const bc = ov.querySelector('[data-ll="copiar"]'); if(bc) bc.onclick = () => { const t = textoLista(leer()); (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => showToast('📋 Lista copiada.'), () => prompt('Copia la lista:', t)); };
+    const abrirWa = (tel, txt) => window.open('https://wa.me/' + telWa(tel) + '?text=' + encodeURIComponent(txt), '_blank');
+    ov.onclick = e => {
+      if(e.target === ov) return;
+      const b = e.target.closest('[data-ll]'); if(!b) return;
+      const a = b.dataset.ll;
+      if(a === 'wa'){ reg('ejecución', 'Lista de compras enviada por WhatsApp'); abrirWa('', textoLista(leer())); }
+      else if(a === 'copiar'){ const t = textoLista(leer()); (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => showToast('📋 Lista copiada.'), () => prompt('Copia la lista:', t)); }
+      else if(a === 'wa1'){
+        const prov = b.dataset.prov, inp = ov.querySelector('[data-tel="' + CSS.escape(prov) + '"]'), tel = inp ? inp.value.trim() : '';
+        if(telWa(tel).length < 10){ showToast('📱 Escribe el WhatsApp de ' + prov + ' (10 números).'); if(inp) inp.focus(); return; }
+        const xs = leer().filter(x => x.prov === prov); if(!xs.length){ showToast('No hay nada por pedirle a ' + prov + '.'); return; }
+        data.proveedoresTel = Object.assign({}, data.proveedoresTel, { [prov]: tel });
+        const txt = '🛒 Hola, pedido de ' + (data.businessName || 'nuestro negocio') + ':\n' + xs.map(x => '• ' + x.pedir + ' × ' + x.p.name).join('\n') + '\n\n¡Gracias!';
+        anotarPedido(prov, xs); reg('ejecución', 'Pedido enviado a ' + prov);
+        abrirWa(tel, txt);
+        showToast('📲 Pedido para ' + prov + ' listo en WhatsApp. Cuando llegue, toca «✅ Llegó».', 6000);
+        abrirLista();
+      }
+      else if(a === 'llego'){ const n = llego(b.dataset.id); showToast('📦 ' + n + ' unidades sumadas al inventario.'); abrirLista(); }
+      else if(a === 'quitar'){ const o = (data.pedidosProv || []).find(x => x.id === b.dataset.id); if(o){ o.quitado = Date.now(); try{ saveData(); }catch(x){} } abrirLista(); }
+      else if(a === 'factura'){ ov.classList.remove('show'); const c = document.getElementById('invInvoiceCamBtn') || document.getElementById('invInvoiceGalBtn'); if(c) c.click(); else showToast('Abre 📦 Inventario → escanear factura.'); }
+    };
     ov.classList.add('show');
   }
+  // Botón en 📦 Inventario
+  setInterval(() => {
+    try{
+      const h = document.querySelector('#view-inventario .inv-head'); if(!h || document.getElementById('llBtn')) return;
+      const b = document.createElement('button'); b.type = 'button'; b.id = 'llBtn'; b.className = 'btn-ghost'; b.textContent = '🛒 Pedido a proveedores';
+      b.onclick = () => abrirLista(); h.appendChild(b);
+    }catch(e){}
+  }, 1500);
 
   // ---------- Sugerencias (el «piloto automático») ----------
   const precioRedondo = v => Math.ceil(v / 100) * 100;
@@ -288,7 +349,7 @@
   const responderBase = window.Laya.responder, ejecutarBase = window.Laya.ejecutar;
   window.Laya.responder = raw => { let r = null; try{ r = cerebro(raw); }catch(e){ console.error(e); } return r || responderBase(raw); };
   window.Laya.ejecutar = a => { const r = ejecutarNuevo(a); return r != null ? r : ejecutarBase(a); };
-  Object.assign(window.Laya, { ventas, sugerencias, listaCompras, abrirLista });
+  Object.assign(window.Laya, { ventas, sugerencias, listaCompras, abrirLista, llegoPedido: llego, pedidosPorLlegar: pendientesProv });
 
   // ---------- Tarjeta «🧠 ORDEVA» en el inicio ----------
   function pintarTarjeta(){
@@ -347,6 +408,8 @@
     '.lh-tx{flex:1;min-width:0;font-size:14px;line-height:1.4;overflow-wrap:anywhere}.lh-bt{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.lh-bt .btn-ghost{padding:6px 10px;font-size:13px}' +
     '.lh-x{border:0;background:none;color:var(--ink-soft);font-size:16px;cursor:pointer;padding:2px 4px}.lh-sw{display:flex;gap:8px;align-items:center;padding:6px 0;font-size:14px}' +
     '.ll-tabla{display:flex;flex-direction:column;gap:6px;max-height:50vh;overflow:auto;margin:8px 0}.ll-fila{display:flex;gap:8px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:8px}' +
+    '.ll-prov{border:1px solid var(--line);border-radius:12px;padding:8px 10px;margin:8px 0}.ll-ph{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.ll-ph b{flex:1 1 140px}.ll-ph input{width:150px;padding:7px 9px;border-radius:9px;border:1px solid var(--line);background:var(--surface-2,#fff);color:var(--ink);font:inherit}.ll-ph .btn-primary{padding:7px 12px}.ll-ya{display:block;color:var(--ink-soft);font-size:12px;margin-top:2px}' +
+    '.ll-h{margin:10px 0 4px;font-size:15px}.ll-pend{border:1px solid #f59e0b;border-radius:12px;padding:8px 10px;margin:6px 0;display:flex;flex-direction:column;gap:6px}.ll-pend small{display:block;color:var(--ink-soft);font-size:12px}.ll-acc{display:flex;gap:6px;flex-wrap:wrap}.ll-acc button{padding:6px 10px;font-size:13px}' +
     '.ll-fila span{flex:1;min-width:0}.ll-fila small{display:block;color:var(--ink-soft);font-size:12px}.ll-fila input{width:70px;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--surface-2,transparent);color:inherit;font-size:16px;text-align:center}';
   document.head.appendChild(st);
 })();

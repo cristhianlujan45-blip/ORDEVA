@@ -9,3 +9,7 @@ verify_jwt = false
 [functions.vento-ia]
 # La llama la app sin sesión de Supabase; la función solo acepta la página de Vento y limita los pedidos por IP.
 verify_jwt = false
+
+[functions.vento-ical]
+# Booking / Airbnb leen el calendario sin sesión; «leer» revisa la sesión del usuario por su cuenta.
+verify_jwt = false

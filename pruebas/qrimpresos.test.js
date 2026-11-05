@@ -1,4 +1,4 @@
-// 📌 ORDEVA 1.72.6 · «Ya no me deja subir los QR que ya están impresos». Sin internet (como el programa de PC en Windows).
+// 📌 ORDEVA 1.81.3 · «Ya no me deja subir los QR que ya están impresos». Sin internet (como el programa de PC en Windows).
 // El lector del navegador no existe en Chrome de Windows ni en el programa de PC, y el de internet no carga sin internet:
 // salía «No pude leer ningún código QR». Ahora se usa el lector propio de ORDEVA (ZXing, sin internet).
 //  1. Ajustes → Pedidos: «📌 Fijar mis QR impresos» a la vista.

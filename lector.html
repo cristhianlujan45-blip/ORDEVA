@@ -59,6 +59,8 @@
   .modos .btn{ flex:1; padding:9px 10px; font-size:14px; }
   .modos .btn.on{ background:var(--am); border-color:var(--am); color:#1a1300; }
   #btAcc{ margin-top:8px; }
+  .btn.fin{ border-color:rgba(255,107,107,.55); color:#ffd4d4; }
+  .btn.fin[hidden]{ display:none; }
 </style>
 </head>
 <body>
@@ -82,6 +84,7 @@
       <div class="msg" id="camMsg"><div id="camTxt">Abriendo la cámara…</div><button type="button" class="btn pri" id="camBtn" hidden>📷 Abrir la cámara</button></div>
     </div>
     <div class="fila">
+      <button type="button" class="btn fin" id="finalizar">⏹ Finalizar</button>
       <button type="button" class="btn" id="linterna" hidden>🔦 Linterna</button>
       <button type="button" class="btn" id="otraCam" hidden>🔄 Otra cámara</button>
     </div>
@@ -113,6 +116,9 @@ window.VENTO_REQUIERE_BD = (function(){ try{ return !(window.VentoAndroid && win
   var $ = function(id){ return document.getElementById(id); };
   var c = '', pc = { on: false, s: '', h: '', n: '', t: 0 }, items = [], stream = null, detector = null, vivo = false, vez = 0;
   var ultimo = '', ultimoAt = 0, camaras = [], camIdx = -1;
+  // 1.79.0: la cámara queda prendida hasta «⏹ Finalizar» (como una pistola lectora): la pantalla no se apaga mientras
+  // lee, y si el celular suelta la cámara (otra app, la pantalla se bloqueó, el sistema la cortó) se vuelve a abrir sola.
+  var finalizado = false, abriendo = false, sinPermiso = false, wake = null;
 
   // ---------- Emparejamiento: #c=… en la dirección (el QR del computador) o el guardado en este celular ----------
   (function(){
@@ -237,9 +243,21 @@ window.VENTO_REQUIERE_BD = (function(){ try{ return !(window.VentoAndroid && win
 
   // ---------- Cámara ----------
   function camMsg(t, boton){ $('camTxt').textContent = t || ''; $('camBtn').hidden = !boton; $('camMsg').hidden = !t; }
-  function parar(){ vivo = false; vez++; if(stream){ stream.getTracks().forEach(function(t){ t.stop(); }); stream = null; } }
+  function parar(){ vivo = false; vez++; abriendo = false; if(stream){ stream.getTracks().forEach(function(t){ t.onended = null; t.stop(); }); stream = null; } }
+  function despierto(on){
+    try{
+      if(on && !wake && navigator.wakeLock && !document.hidden) navigator.wakeLock.request('screen').then(function(w){ wake = w; w.addEventListener('release', function(){ if(wake === w) wake = null; }); }, function(){});
+      if(!on && wake){ var w = wake; wake = null; w.release().catch(function(){}); }
+    }catch(e){}
+  }
+  function finalizar(){
+    finalizado = true; parar(); despierto(false);
+    $('finalizar').hidden = true; $('linterna').hidden = true; $('otraCam').hidden = true;
+    camMsg('Cámara apagada. Toca para volver a escanear.', true); $('camBtn').textContent = '▶ Escanear otra vez';
+  }
   function abrir(){
     parar();
+    finalizado = false; sinPermiso = false; abriendo = true; ultimoAt = Date.now();   // lo que sigue enfrente al reabrir no se repite $('finalizar').hidden = false; $('camBtn').textContent = '📷 Abrir la cámara';
     var mia = vez, video = $('video');
     if(!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)){ camMsg('Este navegador no deja usar la cámara. Ábrelo en Chrome (Android) o Safari (iPhone). Puedes escribir los códigos abajo.'); return; }
     camMsg('Abriendo la cámara…');
@@ -250,15 +268,18 @@ window.VENTO_REQUIERE_BD = (function(){ try{ return !(window.VentoAndroid && win
       .catch(function(){ return navigator.mediaDevices.getUserMedia({ video: dev }); })
       .then(function(s){
         if(mia !== vez){ s.getTracks().forEach(function(t){ t.stop(); }); return; }
-        stream = s; video.srcObject = s;
+        stream = s; video.srcObject = s; abriendo = false; despierto(true);
+        // Si el sistema corta la cámara (otra app, una llamada…), se vuelve a abrir sola mientras no se toque «Finalizar».
+        s.getVideoTracks().forEach(function(t){ t.onended = function(){ if(mia === vez && !finalizado && !document.hidden) setTimeout(function(){ if(mia === vez && !finalizado) abrir(); }, 400); }; });
         return video.play().catch(function(){}).then(function(){ return lector; }).then(function(d){
           if(mia !== vez) return;
           detector = d; camMsg('');
           linterna(); otrasCamaras();
           vivo = true; leer(mia);
         }, function(){ camMsg('No se pudo preparar el lector de códigos. Revisa el internet y vuelve a abrir.', true); });
-      }, function(){
+      }, function(e){
         if(mia !== vez) return;
+        abriendo = false; sinPermiso = true;
         camMsg('No se pudo abrir la cámara. Dale permiso a esta página para usar la cámara y toca el botón.', true);
       });
   }
@@ -299,6 +320,15 @@ window.VENTO_REQUIERE_BD = (function(){ try{ return !(window.VentoAndroid && win
   }
   $('otraCam').addEventListener('click', function(){ if(camaras.length < 2) return; camIdx = (camIdx + 1) % camaras.length; abrir(); });
   $('camBtn').addEventListener('click', abrir);
+  $('finalizar').addEventListener('click', finalizar);
+  // Vigilante: la cámara sigue prendida aunque el celular la haya soltado sin avisar (pantalla negra o congelada).
+  setInterval(function(){
+    if(finalizado || abriendo || sinPermiso || document.hidden) return;
+    var tr = stream && stream.getVideoTracks()[0], v = $('video');
+    if(!stream || !tr || tr.readyState === 'ended' || (v && v.paused && v.readyState < 2)) abrir();
+    else if(v && v.paused) v.play().catch(function(){});
+    if(stream && !wake) despierto(true);
+  }, 2500);
   $('olvidar').addEventListener('click', function(){
     if(!confirm('¿Dejar de ser lector de ese equipo? Para volver, escanea otra vez su código QR.')) return;
     try{ localStorage.removeItem(LS); }catch(e){}
@@ -306,8 +336,8 @@ window.VENTO_REQUIERE_BD = (function(){ try{ return !(window.VentoAndroid && win
   });
   // En segundo plano el celular apaga la cámara: al volver se abre de nuevo y se avisa «aquí estoy».
   document.addEventListener('visibilitychange', function(){
-    if(document.hidden){ parar(); return; }
-    hola(); abrir();
+    if(document.hidden){ parar(); wake = null; return; }
+    hola(); if(!finalizado) abrir();
   });
 
   pintarEstado(); pintarLista();

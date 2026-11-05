@@ -1119,6 +1119,12 @@ function sincronizarProductoEnMesas(p, nombreAnterior){
     (t.items || []).forEach(it => {
       const es = it.productId ? it.productId === p.id : (viejo && String(it.name || '').trim().toLowerCase() === viejo);
       if(!es) return;
+      // 🧩 1.76.0: un plato con opciones elegidas (término, adiciones…) las conserva: precio nuevo + lo que suman.
+      if(it.opc){
+        const pr = (Number(p.price) || 0) + (Number(it.opc.extra) || 0), sz = [p.size || '', it.opc.txt || ''].filter(Boolean).join(' · ');
+        if(it.name !== p.name || it.price !== pr || (it.size || '') !== sz){ it.name = p.name; it.price = pr; it.size = sz; cambio = true; }
+        return;
+      }
       if(it.name !== p.name || it.price !== p.price || (it.size || '') !== (p.size || '')){
         it.name = p.name; it.price = p.price; it.size = p.size || ''; if(!it.productId) it.productId = p.id; cambio = true;
       }
@@ -1202,9 +1208,7 @@ function buildReceiptText({businessName, tableLabel, dateStr, items, payments, t
   (items||[]).forEach(it=> lines.push(`${it.qty} x ${it.name}${it.size ? ' (' + it.size + ')' : ''}${it.person ? ' — ' + it.person : ''} - ${fmt(it.price*it.qty)}`));
   lines.push('');
   if(ivaResponsable){
-    const b = ivaBreakdown(total, ivaRate);
-    lines.push(`Subtotal: ${fmt(b.base)}`);
-    lines.push(`IVA (${ivaRate}%): ${fmt(b.iva)}`);
+    ivaLineas(items, total, ivaRate).forEach(r => lines.push(`${r[0]}: ${fmt(r[1])}`));
   } else {
     lines.push('No responsable de IVA');
   }
@@ -1240,7 +1244,7 @@ function buildReceiptHTML({businessName, tableLabel, dateStr, items, payments, t
   const bizLineHtml = [nit ? 'NIT/CC: ' + invEsc(nit) : '', bizAddress ? invEsc(bizAddress) : ''].filter(Boolean).join(' · ');
   const invoiceLineHtml = [invoiceNo ? 'Factura de venta N.º ' + invEsc(invoiceNo) : '', dianResolucionText ? invEsc(dianResolucionText) : ''].filter(Boolean).join(' · ');
   const ivaHtml = ivaResponsable
-    ? (() => { const b = ivaBreakdown(total, ivaRate); return `<div class="r-line"><span>Subtotal</span><span>${fmt(b.base)}</span></div><div class="r-line"><span>IVA (${ivaRate}%)</span><span>${fmt(b.iva)}</span></div>`; })()
+    ? ivaLineas(items, total, ivaRate).map(r => `<div class="r-line"><span>${r[0]}</span><span>${fmt(r[1])}</span></div>`).join('')
     : '<div class="r-line"><span>No responsable de IVA</span><span></span></div>';
   return `
     <h3>${businessName}</h3>
@@ -1326,7 +1330,7 @@ function printReceipt(receiptData){
   const bizLine = [receiptData.nit ? 'NIT/CC: ' + invEsc(receiptData.nit) : '', receiptData.bizAddress ? invEsc(receiptData.bizAddress) : ''].filter(Boolean).join(' · ');
   const invoiceLine = [receiptData.invoiceNo ? 'Factura de venta N.º ' + invEsc(receiptData.invoiceNo) : '', receiptData.dianResolucionText ? invEsc(receiptData.dianResolucionText) : ''].filter(Boolean).join('<br>');
   const ivaLine = receiptData.ivaResponsable
-    ? (() => { const b = ivaBreakdown(receiptData.total, receiptData.ivaRate); return '<div style="display:flex;justify-content:space-between"><span>Subtotal</span><span>' + fmt(b.base) + '</span></div><div style="display:flex;justify-content:space-between"><span>IVA (' + receiptData.ivaRate + '%)</span><span>' + fmt(b.iva) + '</span></div>'; })()
+    ? ivaLineas(receiptData.items, receiptData.total, receiptData.ivaRate).map(r => '<div style="display:flex;justify-content:space-between"><span>' + r[0] + '</span><span>' + fmt(r[1]) + '</span></div>').join('')
     : '<div style="display:flex;justify-content:space-between"><span>No responsable de IVA</span><span></span></div>';
   d.write('<title>Recibo</title><body style="font-family:monospace;max-width:320px;margin:16px auto;font-size:13px">' +
     '<h2 style="text-align:center;margin:0 0 4px">' + invEsc(receiptData.businessName) + '</h2>' +
@@ -1350,7 +1354,7 @@ document.getElementById('printReceiptBtn').addEventListener('click', ()=>{
 });
 
 /* ---------- Historial ---------- */
-const methodLabelHist = { efectivo: 'Efectivo', transferencia: 'Transferencia', debe: 'Debe' };
+const methodLabelHist = { efectivo: 'Efectivo', transferencia: 'Transferencia', debe: 'Debe', saldo: 'Saldo a favor' };
 
 /* Historial por páginas. Antes se dibujaban TODAS las cuentas de una vez (con 3.000 cuentas,
    unos meses de un bar, la app se congelaba casi 2 segundos al abrir el historial, al hacer el
@@ -1491,15 +1495,17 @@ function renderHistorial(masPagina){
 }
 
 /* ---------- Cierre de caja del día ---------- */
-function computeClosureStats(fromISO, toISO){
+function computeClosureStats(fromISO, toISO, caja){
   const from = fromISO ? new Date(fromISO) : null;
   const to = new Date(toISO);
+  // 🧾 1.81.2: con varias cajas, cada caja cierra SOLO sus ventas (caja = nombre de esta caja; '' = la principal)
   const tickets = data.history.filter(h=>{
     const d = new Date(h.date);
-    return (!from || d > from) && d <= to;
+    return (!from || d > from) && d <= to && (caja == null || (h.caja || '') === caja);
   });
   const totalSold = tickets.reduce((s,h)=> s + h.total, 0);
-  let totalEfectivo = 0, totalTransferencia = 0, totalDebe = 0, totalRecibido = 0, totalVueltas = 0;
+  let totalEfectivo = 0, totalTransferencia = 0, totalDebe = 0, totalRecibido = 0, totalVueltas = 0, descuentos = 0, devoluciones = 0;
+  const medios = {}, cajeros = {};
   tickets.forEach(h=>{
     (h.payments||[]).forEach(p=>{
       // 1.69.0: lo que entregó el cliente en efectivo y las vueltas que se le dieron (no cambian lo que debe haber en caja:
@@ -1508,7 +1514,11 @@ function computeClosureStats(fromISO, toISO){
       if(p.method === 'efectivo') totalEfectivo += p.amount;
       else if(p.method === 'transferencia') totalTransferencia += p.amount;
       else if(p.method === 'debe') totalDebe += p.amount;
+      const k = medioDePago(p); medios[k] = (medios[k] || 0) + (Number(p.amount) || 0);   // 1.81.0: TODOS los medios (Nequi, tarjeta…)
     });
+    const c = h.by || 'Sin usuario', x = cajeros[c] || (cajeros[c] = { n: 0, total: 0 }); x.n++; x.total += Number(h.total) || 0;
+    if(h.descuento) descuentos += Number(h.descuento.valor) || 0;
+    (h.devoluciones || []).forEach(d => { devoluciones += Number(d.total) || 0; });
   });
   const hourlyMap = {};
   tickets.forEach(h=>{
@@ -1517,8 +1527,22 @@ function computeClosureStats(fromISO, toISO){
     hourlyMap[hourKey] = (hourlyMap[hourKey]||0) + h.total;
   });
   const hourly = Object.keys(hourlyMap).sort().map(h=>({ hour: h, total: hourlyMap[h] }));
-  return { tickets, totalSold, totalEfectivo, totalTransferencia, totalDebe, totalRecibido, totalVueltas, hourly };
+  return { tickets, totalSold, totalEfectivo, totalTransferencia, totalDebe, totalRecibido, totalVueltas, hourly, medios, cajeros, descuentos, devoluciones };
 }
+// 🔒 1.81.0: cierre Z numerado y con todos los medios de pago. Nombre de cada medio para el informe.
+// La caja guarda Nequi, DaviPlata, tarjeta… como «transferencia» con el nombre en la nota: aquí se separan.
+function medioDePago(p){
+  const m = (p && p.method) || 'otro'; if(m !== 'transferencia') return m;
+  const n = String(p.note || '').toLowerCase();
+  return /nequi/.test(n) ? 'nequi' : /daviplata/.test(n) ? 'daviplata' : /tarjeta|dat[aá]fono|bold|redeban|cr[eé]dito|d[eé]bito/.test(n) ? 'tarjeta' : /bre-?b|llave/.test(n) ? 'breb' : /\bqr\b/.test(n) ? 'qr' : 'transferencia';
+}
+window.medioDePago = medioDePago;
+const CIERRE_MEDIOS = { efectivo: '💵 Efectivo', transferencia: '🏦 Transferencia', nequi: '📱 Nequi', daviplata: '📱 DaviPlata', tarjeta: '💳 Tarjeta', saldo: '💳 Saldo a favor', breb: '🔑 Bre-B', qr: '📲 QR', debe: '📝 Fiado (quedó debiendo)', otro: 'Otro' };
+function cierreMedios(closure){
+  if(closure.medios && Object.keys(closure.medios).length) return Object.keys(closure.medios).filter(k => closure.medios[k]).sort((a, b) => (a === 'debe') - (b === 'debe') || closure.medios[b] - closure.medios[a]).map(k => [CIERRE_MEDIOS[k] || k, closure.medios[k], k]);
+  return [['💵 Efectivo', closure.totalEfectivo, 'efectivo'], ['🏦 Transferencia', closure.totalTransferencia, 'transferencia']].concat(closure.totalDebe > 0 ? [['📝 Fiado (quedó debiendo)', closure.totalDebe, 'debe']] : []);
+}
+const cierreZ = c => (c && c.z ? 'Cierre Z N.º ' + String(c.z).padStart(4, '0') : 'Cierre de caja') + (c && c.caja ? ' · ' + c.caja : '');
 
 // 1.55.0: lo que se le muestra antes de cerrar la caja (ventas desde el último cierre, mesas abiertas y qué pasa).
 function cierreResumenTexto(s, openIds, last){
@@ -1537,11 +1561,12 @@ function cierreResumenTexto(s, openIds, last){
 async function closeCashRegister(opts){
   const auto = !!(opts && opts.auto === true);   // el cierre automático programado no espera a que alguien cuente
   const openIds = getOpenTableIds();
-  const lastClosure = (data.closures && data.closures.length) ? data.closures[0] : null;
+  const T = window.ventoTurno, cajaN = T && T.variasCajas && T.variasCajas() ? (T.cajaNombre() || '') : null;
+  const lastClosure = (data.closures || []).find(c => cajaN == null || (c.caja || '') === cajaN) || null;
   const fromISO = lastClosure ? lastClosure.date : null;
   if(!auto){
     // Siempre pregunta antes de cerrar, con lo que se va a cerrar (antes solo preguntaba si había mesas abiertas).
-    const pre = computeClosureStats(fromISO, new Date().toISOString());
+    const pre = computeClosureStats(fromISO, new Date().toISOString(), cajaN);
     if(!pre.tickets.length && !openIds.length && !(window.ventoTurno && window.ventoTurno.turno())){
       showToast('No hay cuentas nuevas para cerrar. La caja ya está al día.');
       return;
@@ -1556,7 +1581,7 @@ async function closeCashRegister(opts){
     openIds.forEach(id => closeTableToHistory(id));
   }
   const toISO = new Date().toISOString();
-  const stats = computeClosureStats(fromISO, toISO);
+  const stats = computeClosureStats(fromISO, toISO, cajaN);
   // 🧮 Arqueo: contar el efectivo de la caja (base + ventas en efectivo + entradas − salidas). Cancelar = no se cierra.
   let caja = null;
   if(window.ventoTurno && (stats.tickets.length || window.ventoTurno.turno())){
@@ -1581,7 +1606,12 @@ async function closeCashRegister(opts){
     totalDebe: stats.totalDebe,
     totalRecibido: stats.totalRecibido, totalVueltas: stats.totalVueltas,
     hourly: stats.hourly,
-    caja
+    caja,
+    // 1.81.0: número consecutivo (cierre Z), todos los medios de pago, por cajero, descuentos y devoluciones
+    z: (data.closures || []).reduce((a, c) => Math.max(a, Number(c.z) || 0), 0) + 1,
+    medios: stats.medios, cajeros: stats.cajeros, descuentos: Math.round(stats.descuentos), devoluciones: Math.round(stats.devoluciones),
+    by: (typeof authUser !== 'undefined' && authUser) || '',
+    caja: cajaN || undefined
   };
   try{ window.ventoTurno && window.ventoTurno.cerrar(caja); }catch(e){}
   if(!data.closures) data.closures = [];
@@ -1610,16 +1640,17 @@ function closureDateRangeStr(closure){
 
 function buildClosureText(closure){
   const lines = [];
-  lines.push(`*🔒 Cierre de caja — ${closure.businessName || data.businessName}*`);
+  lines.push(`*🔒 ${cierreZ(closure)} — ${closure.businessName || data.businessName}*`);
   lines.push(closureDateRangeStr(closure));
   lines.push('');
   lines.push(`Cuentas cerradas: ${closure.ticketCount}`);
   lines.push(`*Total vendido: ${fmt(closure.totalSold)}*`);
   lines.push('');
   lines.push('*Por método de pago:*');
-  lines.push(`Efectivo: ${fmt(closure.totalEfectivo)}`);
-  lines.push(`Transferencia: ${fmt(closure.totalTransferencia)}`);
-  if(closure.totalDebe > 0) lines.push(`⚠️ Quedó debiendo: ${fmt(closure.totalDebe)}`);
+  cierreMedios(closure).forEach(m => lines.push(`${m[0]}: ${fmt(m[1])}`));
+  if(closure.descuentos > 0) lines.push(`🏷️ Descuentos: ${fmt(closure.descuentos)}`);
+  if(closure.devoluciones > 0) lines.push(`↩️ Devoluciones: ${fmt(closure.devoluciones)}`);
+  if(closure.cajeros && Object.keys(closure.cajeros).length > 1){ lines.push('', '*Por cajero:*'); Object.keys(closure.cajeros).forEach(k => lines.push(`${k}: ${closure.cajeros[k].n} · ${fmt(closure.cajeros[k].total)}`)); }
   if(closure.hourly && closure.hourly.length){
     lines.push('');
     lines.push('*Ventas por hora:*');
@@ -1635,13 +1666,13 @@ function buildClosureHTML(closure){
   const hourlyHtml = (closure.hourly||[]).map(h=>`<div class="r-line"><span>${h.hour}</span><span>${fmt(h.total)}</span></div>`).join('') || '<div class="r-line"><span>Sin ventas registradas</span><span></span></div>';
   const debtHtml = closure.totalDebe > 0 ? `<div class="r-line r-debt"><span>Quedó debiendo</span><span>${fmt(closure.totalDebe)}</span></div>` : '';
   return `
-    <h3>🔒 Cierre de caja</h3>
+    <h3>🔒 ${cierreZ(closure)}</h3>
     <div class="r-sub">${closure.businessName || data.businessName} · ${closureDateRangeStr(closure)}</div>
     <div class="r-line"><span>Cuentas cerradas</span><span>${closure.ticketCount}</span></div>
     <div class="r-section">Por método de pago</div>
-    <div class="r-line"><span>Efectivo</span><span>${fmt(closure.totalEfectivo)}</span></div>
-    <div class="r-line"><span>Transferencia</span><span>${fmt(closure.totalTransferencia)}</span></div>
-    ${debtHtml}
+    ${cierreMedios(closure).map(m => `<div class="r-line${m[2] === 'debe' ? ' r-debt' : ''}"><span>${m[0]}</span><span>${fmt(m[1])}</span></div>`).join('')}
+    ${closure.descuentos > 0 ? `<div class="r-line"><span>🏷️ Descuentos</span><span>${fmt(closure.descuentos)}</span></div>` : ''}
+    ${closure.devoluciones > 0 ? `<div class="r-line"><span>↩️ Devoluciones</span><span>${fmt(closure.devoluciones)}</span></div>` : ''}
     <div class="r-section">Ventas por hora</div>
     ${hourlyHtml}
     ${closure.caja && window.ventoTurno ? window.ventoTurno.html(closure.caja, 'r') : ''}
@@ -1688,18 +1719,15 @@ function openClosureReport(closure){
     <div class="hist-detail-line"><span>${h.hour}</span><span>${fmt(h.total)}</span></div>
   `).join('') || '<div class="hist-detail-line"><span>Sin ventas registradas</span><span></span></div>';
   body.innerHTML = `
+    ${closure.z ? `<div class="hist-detail-title" style="margin-top:0">🔒 ${cierreZ(closure)}${closure.by ? ' · ' + closure.by : ''}</div>` : ''}
     <div class="total-row sub">
       <span class="label">Cuentas cerradas</span>
       <span class="amount">${closure.ticketCount}</span>
     </div>
-    <div class="total-row sub">
-      <span class="label">Efectivo</span>
-      <span class="amount paid">${fmt(closure.totalEfectivo)}</span>
-    </div>
-    <div class="total-row sub">
-      <span class="label">Transferencia</span>
-      <span class="amount paid">${fmt(closure.totalTransferencia)}</span>
-    </div>
+    ${cierreMedios(closure).filter(m => m[2] !== 'debe').map(m => `<div class="total-row sub"><span class="label">${m[0]}</span><span class="amount paid">${fmt(m[1])}</span></div>`).join('')}
+    ${closure.descuentos > 0 ? `<div class="total-row sub"><span class="label">🏷️ Descuentos</span><span class="amount">${fmt(closure.descuentos)}</span></div>` : ''}
+    ${closure.devoluciones > 0 ? `<div class="total-row sub"><span class="label">↩️ Devoluciones</span><span class="amount">${fmt(closure.devoluciones)}</span></div>` : ''}
+    ${closure.cajeros && Object.keys(closure.cajeros).length > 1 ? '<div class="hist-detail-title">👤 Por cajero</div>' + Object.keys(closure.cajeros).map(k => `<div class="hist-detail-line"><span>${k}</span><span>${closure.cajeros[k].n} · ${fmt(closure.cajeros[k].total)}</span></div>`).join('') : ''}
     ${closure.totalVueltas > 0 ? `<div class="total-row sub"><span class="label">💵 Recibido en efectivo · vueltas entregadas</span><span class="amount">${fmt(closure.totalRecibido)} · ${fmt(closure.totalVueltas)}</span></div>` : ''}
     ${closure.totalDebe > 0 ? `<div class="total-row sub"><span class="label">Quedó debiendo</span><span class="amount hist-debt-flag">${fmt(closure.totalDebe)}</span></div>` : ''}
     <div class="hist-detail-title">Ventas por hora</div>

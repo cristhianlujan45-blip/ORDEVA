@@ -37,14 +37,19 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     version = '2099-01-01 · v9.9.9';
     await p.evaluate(() => { data.products = [{ id: 'x', name: 'Producto que no se pierde', price: 1000 }]; saveData(); document.getElementById('overlay').classList.add('show'); });
     const c0 = cargas;
+    await p.evaluate(() => { mesoraUltimoUso = 0; });
     await revisar();
     await p.waitForTimeout(2500);
-    chk('2. Con una ventana abierta: avisa y espera a que termine', /cuando termines/.test(await aviso() || '') && cargas === c0, await aviso());
+    chk('2. Con una ventana abierta: avisa y espera a que termine', /cuando dejes de usar/.test(await aviso() || '') && cargas === c0, await aviso());
     await p.waitForTimeout(16000);
     chk('2. … y no recarga mientras sigue ocupado (aunque pasen los 15 s)', cargas === c0);
 
-    // ===== 1. Se libera: cuenta y recarga sola =====
+    // ===== 1b. 1.72.6: deslizando (usándola) tampoco recarga =====
     await p.evaluate(() => document.getElementById('overlay').classList.remove('show'));
+    await p.mouse.wheel(0, 300); await p.waitForTimeout(2500);
+    chk('1b. Si se acaba de deslizar (usándola), no recarga: espera a que se deje de usar', /cuando dejes de usar/.test(await aviso() || '') && cargas === c0, await aviso());
+    // ===== 1. Se libera: cuenta y recarga sola =====
+    await p.evaluate(() => { mesoraUltimoUso = 0; });
     await p.waitForTimeout(2200);
     chk('1. Sin hacer nada: «Se actualiza sola en … s»', /Se actualiza sola en \d+ s/.test(await aviso() || ''), await aviso());
     for(let i = 0; i < 40 && cargas === c0; i++) await p.waitForTimeout(500);

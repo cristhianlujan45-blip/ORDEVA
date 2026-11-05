@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#7c3aed">
+<title>Reservas y pedidos</title>
+<script src="lib/vento-errores.js"></script>
+<style>
+/* 🤖 ORDEVA 1.73.0 · El agente del negocio: un chat que atiende a los clientes (reservas de habitaciones o mesas y domicilios).
+   La IA entiende lo que escribe el cliente y conversa; la disponibilidad, los precios y el total los pone SIEMPRE el
+   sistema (el Servidor ORDEVA y la carta del negocio), y nada se reserva ni se pide sin que el cliente toque «Confirmar». */
+:root{--bg:#f6f5fb;--card:#fff;--ink:#17151f;--soft:#5d5970;--line:#e4e1ee;--acc:#7c3aed;--acc2:#5b21b6;--on:#fff;--ok:#15803d;--mal:#c0262d;--me:#ede7fe;--bot:#fff}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f0e15;--card:#181722;--ink:#f1f0f6;--soft:#a5a1b8;--line:#2b2938;--acc:#8b5cf6;--acc2:#a78bfa;--on:#fff;--ok:#34d399;--mal:#f87171;--me:#2a2340;--bot:#1d1b28}}
+:root[data-theme="dark"]{--bg:#0f0e15;--card:#181722;--ink:#f1f0f6;--soft:#a5a1b8;--line:#2b2938;--acc:#8b5cf6;--acc2:#a78bfa;--on:#fff;--ok:#34d399;--mal:#f87171;--me:#2a2340;--bot:#1d1b28}
+*{box-sizing:border-box}html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column}
+header{display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:2}
+header .av{width:40px;height:40px;border-radius:50%;background:var(--acc);color:var(--on);display:grid;place-items:center;font-size:20px;flex:none}
+header b{display:block;font-size:16px}header small{color:var(--soft);font-size:12.5px}
+#chat{flex:1;overflow-y:auto;padding:14px 16px 8px;display:flex;flex-direction:column;gap:10px;max-width:760px;width:100%;margin:0 auto}
+.m{max-width:86%;padding:10px 13px;border-radius:16px;white-space:pre-wrap;word-wrap:break-word}
+.m.bot{background:var(--bot);border:1px solid var(--line);border-bottom-left-radius:4px;align-self:flex-start}
+.m.yo{background:var(--me);border-bottom-right-radius:4px;align-self:flex-end}
+.m.pensando{color:var(--soft);font-style:italic}
+.chips{display:flex;flex-wrap:wrap;gap:8px;align-self:flex-start}
+.chips button,.card button,.card a.b{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:8px 14px;font:inherit;font-size:14.5px;cursor:pointer;text-decoration:none;display:inline-block}
+.card{align-self:stretch;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.card h3{margin:0;font-size:15.5px}.card .fila{display:flex;justify-content:space-between;gap:10px;font-size:14.5px}.card .tot{font-weight:800;font-size:16px}
+.card label{display:flex;flex-direction:column;gap:3px;font-size:12.5px;color:var(--soft)}
+.card input,.card select,.card textarea{font:inherit;font-size:15px;padding:9px 10px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);width:100%}
+.card .dos{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.card button.pri{background:var(--acc);color:var(--on);border-color:var(--acc);font-weight:800;border-radius:12px;padding:12px}
+.card .opc{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:12px;cursor:pointer}
+.card .opc.on{border-color:var(--acc);box-shadow:0 0 0 2px color-mix(in srgb,var(--acc) 30%,transparent)}
+.card .opc small{color:var(--soft);display:block}
+.ok{color:var(--ok);font-weight:700}.mal{color:var(--mal);font-weight:700}
+.cod{font:800 22px ui-monospace,monospace;letter-spacing:.12em;text-align:center;padding:6px;border:1px dashed var(--acc);border-radius:10px}
+footer{position:sticky;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:10px 12px calc(10px + env(safe-area-inset-bottom))}
+footer form{display:flex;gap:8px;max-width:760px;margin:0 auto}
+footer input{flex:1;font:inherit;padding:12px 14px;border-radius:999px;border:1px solid var(--line);background:var(--bg);color:var(--ink);min-width:0}
+footer button{border:0;background:var(--acc);color:var(--on);border-radius:999px;padding:0 18px;font:inherit;font-weight:800;cursor:pointer}
+.pie{font-size:11.5px;color:var(--soft);text-align:center;margin-top:6px}
+@media (max-width:420px){.card .dos{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header><div class="av">🤖</div><div><b id="nom">Cargando…</b><small id="sub">Asistente de reservas y pedidos</small></div></header>
+<main id="chat" aria-live="polite"></main>
+<footer><form id="f" autocomplete="off"><input id="txt" placeholder="Escribe aquí… (ej. «una habitación para 2 del 5 al 7»)" enterkeyhint="send" maxlength="500"><button type="submit">Enviar</button></form>
+<div class="pie">Asistente con IA de <b>ORDEVA</b>. Las reservas y pedidos solo se hacen cuando tú confirmas.</div></footer>
+<script src="nube/config.js"></script>
+<script src="lib/vento-canal.js"></script>
+<script>
+(function(){
+'use strict';
+const $ = id => document.getElementById(id);
+const P = new URLSearchParams(location.search), PUB = (P.get('n') || '').replace(/[^0-9a-z]/gi, '').slice(0, 20);
+const CFG = window.VENTO_NUBE_DEFAULT || {}, URL0 = String(CFG.url || '').replace(/\/+$/, ''), KEY = CFG.key || '';
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const plata = n => '$' + Math.round(Number(n) || 0).toLocaleString('es-CO');
+const nrm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9ñ ]/g, ' ').replace(/\s+/g, ' ').trim();
+const DIA = 864e5;
+const st = { info: null, cat: [], hist: [], reserva: {}, dom: { items: [] }, opciones: null, elegida: null, ocupado: false };
+
+async function rpc(fn, args){
+  const r = await fetch(URL0 + '/rest/v1/rpc/' + fn, { method: 'POST', headers: { apikey: KEY, Authorization: 'Bearer ' + KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(args || {}) });
+  const j = await r.json().catch(() => null);
+  if(!r.ok) throw new Error((j && (j.message || j.error)) || ('error ' + r.status));
+  return j;
+}
+function burbuja(txt, quien, html){
+  const d = document.createElement('div'); d.className = 'm ' + (quien || 'bot');
+  if(html) d.innerHTML = txt; else d.textContent = txt;
+  $('chat').appendChild(d); d.scrollIntoView({ behavior: 'smooth', block: 'end' }); return d;
+}
+function tarjeta(html){ const d = document.createElement('div'); d.className = 'card'; d.innerHTML = html; $('chat').appendChild(d); d.scrollIntoView({ behavior: 'smooth', block: 'end' }); return d; }
+function chips(l){ const d = document.createElement('div'); d.className = 'chips'; l.forEach(([t, f]) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.onclick = () => { d.remove(); f(); }; d.appendChild(b); }); $('chat').appendChild(d); d.scrollIntoView({ block: 'end' }); }
+
+// ---------- Fechas ----------
+const hm = s => { const m = /^(\d{1,2}):(\d{2})$/.exec(String(s || '')); return m ? [+m[1], +m[2]] : [12, 0]; };
+const reglas = () => Object.assign({ entrada: '15:00', salida: '12:00', duracion_min: 120, abre: '12:00', cierra: '22:00' }, (st.info && st.info.reglas) || {});
+const esHotel = () => st.info && st.info.tipo === 'habitacion';
+const hayReservas = () => st.info && (st.info.tipo === 'habitacion' || st.info.tipo === 'mesa') && (st.info.recursos || []).length;
+const hayDom = () => st.info && st.info.reglas && st.info.reglas.domicilios && st.info.reglas.c;
+const local = t => { const d = new Date(t); return new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 16); };
+const fecha = t => new Date(t).toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' });
+const hora = t => new Date(t).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' });
+function parseLocal(s){ if(!s) return null; const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{1,2}):(\d{2}))?/.exec(String(s)); if(!m) return null; return new Date(+m[1], +m[2] - 1, +m[3], m[4] != null ? +m[4] : 0, m[5] != null ? +m[5] : 0); }
+// Lo que dijo la IA, pasado a fechas de verdad con las horas del negocio (hotel: entrada y salida; mesa: hora y duración).
+function rangos(){
+  const r = st.reserva; let d = parseLocal(r.desde), h = parseLocal(r.hasta);
+  if(!d) return null;
+  if(esHotel()){
+    const [eh, em] = hm(reglas().entrada), [sh, sm] = hm(reglas().salida);
+    d.setHours(eh, em, 0, 0);
+    if(!h || h <= d){ h = new Date(d.getTime() + Math.max(1, Number(r.noches) || 1) * DIA); }
+    h.setHours(sh, sm, 0, 0);
+    if(h <= d) h = new Date(h.getTime() + DIA);
+  } else {
+    if(!/[T ]\d/.test(String(r.desde))) return null;           // una mesa necesita la hora
+    h = new Date(d.getTime() + (Number(reglas().duracion_min) || 120) * 6e4);
+  }
+  return [d, h];
+}
+
+// ---------- IA ----------
+const MODELOS = ['gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-flash-latest', 'gemini-2.5-flash'];
+function contexto(){
+  const i = st.info || {}, rg = reglas(), ahora = new Date();
+  const recs = (i.recursos || []).map(x => '- ' + x.nombre + (x.capacidad ? ' (hasta ' + x.capacidad + ' personas)' : '') + (x.precio ? ' · ' + plata(x.precio) + (esHotel() ? ' la noche' : '') : '') + (x.detalle ? ' · ' + x.detalle : '')).join('\n');
+  const carta = st.cat.slice(0, 120).map(p => '- ' + p[0] + ' · ' + plata(p[1]) + (p[2] ? ' (' + p[2] + ')' : '') + (p[3] == 2 ? ' · AGOTADO' : '')).join('\n');
+  return 'Eres el asistente virtual de «' + (i.nombre || 'el negocio') + '» en Colombia. Hablas en español colombiano, cálido, breve (1 a 3 frases) y claro.\n' +
+    'Hoy es ' + ahora.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) + ', son las ' + hora(ahora) + ' (fecha ISO ' + local(ahora).slice(0, 10) + ').\n' +
+    (hayReservas() ? (esHotel() ? 'Reservas de HABITACIONES. Entrada ' + rg.entrada + ', salida ' + rg.salida + '.\nHabitaciones:\n' + recs : 'Reservas de MESAS. Horario ' + rg.abre + ' a ' + rg.cierra + '. Cada reserva dura ' + rg.duracion_min + ' minutos.\nMesas:\n' + recs) + '\n' : 'No recibe reservas.\n') +
+    (hayDom() ? 'Domicilios con esta carta (precios en pesos):\n' + (carta || '(la carta no cargó)') + '\n' : 'No recibe domicilios por aquí.\n') +
+    (rg.info ? 'Información del negocio: ' + rg.info + '\n' : '') +
+    'REGLAS: 1) NUNCA digas que hay o no hay disponibilidad ni confirmes una reserva o pedido: eso lo hace el sistema cuando el cliente toca «Confirmar». 2) No inventes precios, habitaciones, platos ni datos del negocio que no estén arriba. 3) Pide lo que falte, de a poco: ' +
+    (hayReservas() ? 'para reservar: fechas' + (esHotel() ? ' (llegada y salida o noches)' : ' y hora') + ', cuántas personas, nombre y celular; ' : '') + (hayDom() ? 'para domicilio: qué quiere y cuánto, nombre, celular y dirección; ' : '') +
+    '4) Si pide algo que no se puede, ofrece hablar con una persona.\n' +
+    'Responde SOLO con JSON: {"respuesta":"texto para el cliente","intencion":"reserva|domicilio|pregunta|humano|consulta|otro",' +
+    '"reserva":{"desde":"AAAA-MM-DD o AAAA-MM-DDTHH:MM","hasta":"AAAA-MM-DD o null","noches":n|null,"personas":n|null,"nombre":"","telefono":"","nota":""},' +
+    '"domicilio":{"items":[{"nombre":"tal cual está en la carta","cantidad":n}],"nombre":"","telefono":"","direccion":"","nota":""}}. ' +
+    'En reserva y domicilio pon SOLO lo que el cliente ya dijo en toda la conversación (lo demás vacío o null). Las fechas sin año son de este año o el próximo (nunca en el pasado).';
+}
+async function preguntarIA(){
+  const contents = [{ role: 'user', parts: [{ text: contexto() }] }, { role: 'model', parts: [{ text: '{"respuesta":"Entendido.","intencion":"otro"}' }] }]
+    .concat(st.hist.slice(-14).map(m => ({ role: m.yo ? 'user' : 'model', parts: [{ text: m.t }] })));
+  const body = JSON.stringify({ contents, generationConfig: { responseMimeType: 'application/json', temperature: 0.3, maxOutputTokens: 800 } });
+  let ult = null;
+  for(const mod of MODELOS){
+    try{
+      const ctrl = new AbortController(), tm = setTimeout(() => ctrl.abort(), 20000);
+      const r = await fetch(URL0 + '/functions/v1/vento-ia/v1beta/models/' + mod + ':generateContent', { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: KEY, Authorization: 'Bearer ' + KEY }, body, signal: ctrl.signal });
+      clearTimeout(tm);
+      const j = await r.json().catch(() => null);
+      if(!r.ok){ ult = (j && j.error && j.error.message) || r.status; if(r.status === 429 && /límite/.test(String(ult))) break; continue; }
+      const txt = j && j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts.map(p => p.text || '').join('');
+      const m = /\{[\s\S]*\}/.exec(txt || ''); if(!m) { ult = 'sin JSON'; continue; }
+      return JSON.parse(m[0]);
+    }catch(e){ ult = e.message || e; }
+  }
+  throw new Error(String(ult || 'sin respuesta'));
+}
+
+// ---------- Conversación ----------
+async function decir(txt){
+  txt = String(txt || '').trim(); if(!txt || st.ocupado) return;
+  burbuja(txt, 'yo'); st.hist.push({ yo: true, t: txt });
+  st.ocupado = true; const pens = burbuja('Escribiendo…', 'bot pensando');
+  let r = null;
+  try{ r = await preguntarIA(); }catch(e){ r = null; }
+  pens.remove(); st.ocupado = false;
+  if(!r){
+    burbuja('Ahora mismo no logro entenderte bien. Te dejo las opciones para hacerlo directo 👇');
+    menu(); return;
+  }
+  if(r.respuesta){ burbuja(r.respuesta); st.hist.push({ yo: false, t: r.respuesta }); }
+  if(r.intencion === 'humano' && st.info.reglas && st.info.reglas.wa) return humano();
+  if(r.intencion === 'consulta') return consulta();
+  if(hayReservas() && r.reserva && (r.intencion === 'reserva' || st.reserva.desde)){
+    const x = r.reserva; ['desde', 'hasta', 'noches', 'personas', 'nombre', 'telefono', 'nota'].forEach(k => { if(x[k] != null && x[k] !== '') st.reserva[k] = x[k]; });
+    if(st.reserva.desde) return revisarReserva();
+  }
+  if(hayDom() && r.domicilio && (r.intencion === 'domicilio' || st.dom.items.length)){
+    const x = r.domicilio;
+    (x.items || []).forEach(it => { const p = buscarProducto(it.nombre); if(p){ const y = st.dom.items.find(z => z.n === p[0]); if(y) y.q = Math.max(1, Number(it.cantidad) || 1); else st.dom.items.push({ n: p[0], q: Math.max(1, Number(it.cantidad) || 1), v: p[1] }); } });
+    ['nombre', 'telefono', 'direccion', 'nota'].forEach(k => { if(x[k]) st.dom[k] = x[k]; });
+    if(st.dom.items.length) return tarjetaDomicilio();
+  }
+}
+function menu(){
+  const l = [];
+  if(hayReservas()) l.push([esHotel() ? '🛏️ Reservar habitación' : '🍽️ Reservar mesa', () => { st.reserva = {}; tarjetaReserva(); }]);
+  if(hayDom()) l.push(['🛵 Pedir domicilio', () => tarjetaDomicilio()]);
+  if(hayReservas()) l.push(['🔎 Mi reserva', consulta]);
+  if(st.info && st.info.reglas && st.info.reglas.wa) l.push(['💬 Hablar con una persona', humano]);
+  chips(l);
+}
+function humano(){
+  const w = String(st.info.reglas.wa || '').replace(/\D/g, ''), n = w.length === 10 ? '57' + w : w;
+  tarjeta('<h3>💬 Hablar con una persona</h3><a class="b" target="_blank" rel="noopener" href="https://wa.me/' + n + '?text=' + encodeURIComponent('Hola, vengo del asistente de ' + st.info.nombre + '.') + '">Escribir por WhatsApp</a>');
+}
+
+// ---------- Reservas ----------
+async function revisarReserva(){
+  const rg = rangos();
+  if(!rg){ return; }                                             // falta la hora (mesa): la IA la pide
+  const [d, h] = rg;
+  if(d.getTime() < Date.now() - 10 * 6e4){ burbuja('⚠️ Esa fecha ya pasó. ¿Para qué fecha la quieres?'); st.reserva.desde = null; return; }
+  let l = [];
+  try{ l = await rpc('reservas_disponibles', { p_publico: PUB, p_desde: d.toISOString(), p_hasta: h.toISOString(), p_personas: Number(st.reserva.personas) || 1 }); }
+  catch(e){ burbuja('No pude revisar la disponibilidad ahora (' + e.message + '). Intenta en un momento.'); return; }
+  st.opciones = { d, h, l }; st.elegida = l[0] ? l[0].id : null;
+  tarjetaReserva();
+}
+function tarjetaReserva(){
+  const r = st.reserva, o = st.opciones, hotel = esHotel(), rg = rangos();
+  const d = rg ? rg[0] : null, h = rg ? rg[1] : null;
+  const noches = d && h ? Math.max(1, Math.round((new Date(h).setHours(0, 0, 0, 0) - new Date(d).setHours(0, 0, 0, 0)) / DIA)) : 0;
+  let opc = '';
+  if(o && d && o.d.getTime() === d.getTime()){
+    opc = o.l.length ? '<div class="ok">✅ Hay disponibilidad del ' + esc(fecha(d)) + (hotel ? ' al ' + esc(fecha(h)) + ' (' + noches + (noches === 1 ? ' noche' : ' noches') + ')' : ' a las ' + esc(hora(d))) + ':</div>' +
+      o.l.map(x => '<div class="opc' + (x.id === st.elegida ? ' on' : '') + '" data-opc="' + esc(x.id) + '"><div><b>' + esc(x.nombre) + '</b><small>' + (x.capacidad ? 'Hasta ' + x.capacidad + ' personas' : '') + (x.detalle ? ' · ' + esc(x.detalle) : '') + '</small></div>' +
+        (x.precio ? '<b>' + plata(hotel ? x.precio * noches : x.precio) + '</b>' : '') + '</div>').join('')
+      : '<div class="mal">😕 No hay ' + (hotel ? 'habitaciones' : 'mesas') + ' libres para ' + (r.personas || 1) + ' personas en esas fechas. Prueba otras fechas' + (st.info.reglas.wa ? ' o escríbenos' : '') + '.</div>';
+  }
+  const c = tarjeta('<h3>' + (hotel ? '🛏️ Reserva de habitación' : '🍽️ Reserva de mesa') + '</h3>' +
+    '<div class="dos"><label>' + (hotel ? 'Llegada' : 'Día y hora') + '<input type="' + (hotel ? 'date' : 'datetime-local') + '" data-k="desde" value="' + (d ? (hotel ? local(d).slice(0, 10) : local(d)) : '') + '"></label>' +
+    (hotel ? '<label>Salida<input type="date" data-k="hasta" value="' + (h ? local(h).slice(0, 10) : '') + '"></label>' : '<label>Personas<input type="number" min="1" max="99" data-k="personas" value="' + esc(r.personas || 2) + '"></label>') + '</div>' +
+    (hotel ? '<label>Personas<input type="number" min="1" max="99" data-k="personas" value="' + esc(r.personas || 2) + '"></label>' : '') +
+    '<button type="button" data-a="ver">🔎 Ver disponibilidad</button>' + opc +
+    (o && o.l.length ? '<div class="dos"><label>Nombre<input data-k="nombre" value="' + esc(r.nombre || '') + '" autocomplete="name"></label><label>Celular<input data-k="telefono" inputmode="tel" value="' + esc(r.telefono || '') + '" autocomplete="tel"></label></div>' +
+      '<label>Nota (opcional)<input data-k="nota" value="' + esc(r.nota || '') + '" placeholder="Ej. llegamos tarde, cumpleaños"></label><button type="button" class="pri" data-a="confirmar">✅ Confirmar reserva</button>' : ''));
+  c.addEventListener('click', async e => {
+    const opcEl = e.target.closest('[data-opc]'); if(opcEl){ st.elegida = opcEl.dataset.opc; c.querySelectorAll('.opc').forEach(x => x.classList.toggle('on', x === opcEl)); return; }
+    const a = e.target.closest('[data-a]'); if(!a) return;
+    leer(c);
+    if(a.dataset.a === 'ver'){ c.remove(); return revisarReserva(); }
+    if(a.dataset.a === 'confirmar') return confirmarReserva(c, a);
+  });
+}
+function leer(c){
+  c.querySelectorAll('[data-k]').forEach(i => { const k = i.dataset.k, v = i.value.trim(); if(k === 'desde' || k === 'hasta'){ if(v) st.reserva[k] = v; if(k === 'hasta' && v) st.reserva.noches = null; } else if(st.dom && c.dataset.dom) st.dom[k] = v; else st.reserva[k] = v; });
+}
+async function confirmarReserva(c, b){
+  const r = st.reserva, o = st.opciones;
+  if(!o || !o.l.length) return;
+  if(String(r.nombre || '').length < 2) return burbuja('Escribe tu nombre para la reserva 🙂');
+  if(String(r.telefono || '').replace(/\D/g, '').length < 7) return burbuja('Escribe tu celular para confirmarte la reserva 🙂');
+  b.disabled = true; b.textContent = 'Reservando…';
+  let x = null;
+  try{ x = await rpc('reserva_publica_crear', { p_publico: PUB, p_recurso: st.elegida, p_desde: o.d.toISOString(), p_hasta: o.h.toISOString(), p_cliente: r.nombre, p_telefono: r.telefono, p_personas: Number(r.personas) || 1, p_nota: r.nota || null }); }
+  catch(e){ x = { ok: false, error: e.message }; }
+  if(!x || !x.ok){
+    b.disabled = false; b.textContent = '✅ Confirmar reserva';
+    const msg = { ocupado: 'Alguien acaba de tomar esa opción 😕. Revisemos otra vez la disponibilidad.', demasiadas: 'Ya hiciste varias reservas hoy con ese celular. Si necesitas más, escríbenos.', fechas_invalidas: 'Revisa las fechas.', falta_nombre: 'Falta tu nombre.', falta_telefono: 'Revisa tu celular.' }[x && x.error] || ('No se pudo reservar (' + (x && x.error) + ').');
+    burbuja(msg); if(x && x.error === 'ocupado'){ c.remove(); revisarReserva(); }
+    return;
+  }
+  c.remove();
+  const rv = x.reserva, pend = rv.estado === 'pendiente';
+  tarjeta('<h3>' + (pend ? '🟡 Reserva recibida' : '🎉 ¡Reserva confirmada!') + '</h3><div class="fila"><span>' + esc(rv.recurso_nombre || '') + '</span><b>' + (rv.valor ? plata(rv.valor) : '') + '</b></div>' +
+    '<div>' + esc(fecha(rv.desde)) + ', ' + esc(hora(rv.desde)) + (esHotel() ? ' → ' + esc(fecha(rv.hasta)) + ', ' + esc(hora(rv.hasta)) : '') + '</div>' +
+    '<div>Tu código de reserva:</div><div class="cod">' + esc(rv.codigo) + '</div><small>Guárdalo: con él y tu celular puedes consultarla o cancelarla aquí.</small>' +
+    (pend ? '<div>El negocio la confirma en un momento.</div>' : ''));
+  st.hist.push({ yo: false, t: 'Reserva ' + (pend ? 'recibida' : 'confirmada') + ' con código ' + rv.codigo });
+  st.reserva = {}; st.opciones = null;
+}
+function consulta(){
+  const c = tarjeta('<h3>🔎 Mi reserva</h3><div class="dos"><label>Código<input data-c="cod" autocapitalize="characters" maxlength="8"></label><label>Celular (para cancelar)<input data-c="tel" inputmode="tel"></label></div><div class="dos"><button type="button" data-a="ver">Ver</button><button type="button" data-a="cancelar">Cancelar reserva</button></div><div data-c="res"></div>');
+  c.addEventListener('click', async e => {
+    const a = e.target.closest('[data-a]'); if(!a) return;
+    const cod = c.querySelector('[data-c="cod"]').value.trim(), tel = c.querySelector('[data-c="tel"]').value.trim(), res = c.querySelector('[data-c="res"]');
+    try{
+      if(a.dataset.a === 'ver'){ const r = await rpc('reserva_publica_ver', { p_codigo: cod }); res.innerHTML = r ? '<b>' + esc(r.recurso_nombre || '') + '</b> · ' + esc(fecha(r.desde)) + ' ' + esc(hora(r.desde)) + ' · <b>' + esc({ confirmada: 'Confirmada', pendiente: 'Por confirmar', cancelada: 'Cancelada', ocupada: 'En curso', terminada: 'Terminada', no_llego: 'No llegó' }[r.estado] || r.estado) + '</b>' : '<span class="mal">No encontré esa reserva.</span>'; }
+      else { const r = await rpc('reserva_publica_cancelar', { p_codigo: cod, p_telefono: tel }); res.innerHTML = r && r.ok ? '<span class="ok">✅ Reserva cancelada.</span>' : '<span class="mal">No se pudo cancelar (revisa el código y el celular).</span>'; }
+    }catch(err){ res.innerHTML = '<span class="mal">' + esc(err.message) + '</span>'; }
+  });
+}
+
+// ---------- Domicilios ----------
+async function cargarCarta(){
+  const c = st.info.reglas.c;
+  try{
+    const r = await fetch('https://canal.vento.local/' + c + 'k/json?poll=1&since=12h', { cache: 'no-store' });
+    const ls = (await r.text()).trim().split('\n').filter(Boolean);
+    for(let i = ls.length - 1; i >= 0; i--){ const m = JSON.parse(ls[i]); if(m.event === 'message'){ const cat = JSON.parse(m.message); st.cat = Array.isArray(cat.p) ? cat.p : []; break; } }
+  }catch(e){}
+}
+function buscarProducto(n){
+  const q = nrm(n); if(!q) return null;
+  let mejor = null, punt = 0;
+  st.cat.forEach(p => {
+    if(p[3] == 2) return;                                         // agotado
+    const k = nrm(p[0]); if(k === q) { mejor = p; punt = 99; return; }
+    const ws = q.split(' ').filter(w => w.length > 2), n2 = ws.filter(w => k.includes(w.replace(/(es|s)$/, ''))).length;
+    if(n2 > punt){ punt = n2; mejor = p; }
+  });
+  return punt > 0 ? mejor : null;
+}
+function tarjetaDomicilio(){
+  const x = st.dom, tot = x.items.reduce((a, it) => a + it.q * it.v, 0);
+  const c = tarjeta('<h3>🛵 Tu domicilio</h3>' + (x.items.length ? x.items.map((it, i) => '<div class="fila"><span>' + it.q + ' × ' + esc(it.n) + '</span><span>' + plata(it.q * it.v) + ' <button type="button" data-q="' + i + '" title="Quitar">✕</button></span></div>').join('') +
+      '<div class="fila tot"><span>Total</span><span>' + plata(tot) + '</span></div><small>El domicilio se cobra aparte si aplica.</small>' : '<div>Escríbeme qué quieres (ej. «2 hamburguesas y una gaseosa») o elígelo aquí:</div>') +
+    '<label>Agregar de la carta<select data-a="agregar"><option value="">— Elegir —</option>' + st.cat.filter(p => p[3] != 2).slice(0, 200).map((p, i) => '<option value="' + i + '">' + esc(p[0]) + ' · ' + plata(p[1]) + '</option>').join('') + '</select></label>' +
+    (x.items.length ? '<div class="dos"><label>Nombre<input data-k="nombre" value="' + esc(x.nombre || '') + '" autocomplete="name"></label><label>Celular<input data-k="telefono" inputmode="tel" value="' + esc(x.telefono || '') + '" autocomplete="tel"></label></div>' +
+      '<label>Dirección<input data-k="direccion" value="' + esc(x.direccion || '') + '" autocomplete="street-address" placeholder="Calle, número, barrio"></label><label>Nota (opcional)<input data-k="nota" value="' + esc(x.nota || '') + '"></label>' +
+      '<button type="button" class="pri" data-a="enviar">✅ Enviar pedido</button>' : ''));
+  c.dataset.dom = '1';
+  const rehacer = () => { leer(c); c.remove(); tarjetaDomicilio(); };
+  c.addEventListener('change', e => { if(e.target.dataset.a === 'agregar' && e.target.value !== ''){ const p = st.cat.filter(p => p[3] != 2)[+e.target.value]; const y = x.items.find(z => z.n === p[0]); if(y) y.q++; else x.items.push({ n: p[0], q: 1, v: p[1] }); rehacer(); } });
+  c.addEventListener('click', async e => {
+    const q = e.target.closest('[data-q]'); if(q){ x.items.splice(+q.dataset.q, 1); rehacer(); return; }
+    const a = e.target.closest('[data-a="enviar"]'); if(!a) return;
+    leer(c);
+    if(String(x.nombre || '').length < 2 || String(x.direccion || '').length < 5) return burbuja('Me falta tu nombre y la dirección completa 🙂');
+    if(String(x.telefono || '').replace(/\D/g, '').length < 7) return burbuja('Escribe tu celular para avisarte del pedido 🙂');
+    a.disabled = true; a.textContent = 'Enviando…';
+    const limpio = s => String(s || '').replace(/[|\n]/g, ' ').replace(/\s+/g, ' ').trim();
+    const cuerpo = 'DOMICILIO: ' + limpio(x.nombre).slice(0, 40) + ' | ' + String(x.telefono).replace(/[^\d+ ]/g, '').slice(0, 15) + ' | ' + limpio(x.direccion).slice(0, 90) + ' | ' + x.items.map(it => it.q + ' ' + it.n).join(', ') + (x.nota ? ' (nota: ' + limpio(x.nota).slice(0, 80) + ')' : '') + ' · 🤖 agente';
+    let ok = false;
+    for(const w of [0, 1500, 4000]){ if(w) await new Promise(r => setTimeout(r, w)); try{ const r = await fetch('https://canal.vento.local/' + st.info.reglas.c, { method: 'POST', body: cuerpo }); if(r.ok){ ok = true; break; } }catch(err){} }
+    if(!ok){ a.disabled = false; a.textContent = '✅ Enviar pedido'; return burbuja('No pude enviar el pedido (¿sin internet?). Intenta otra vez' + (st.info.reglas.wa ? ' o escríbenos por WhatsApp' : '') + '.'); }
+    c.remove();
+    tarjeta('<h3>🎉 ¡Pedido enviado!</h3><div>' + esc(x.items.map(it => it.q + ' × ' + it.n).join(', ')) + '</div><div class="fila tot"><span>Total</span><span>' + plata(tot) + '</span></div><div>Ya le llegó a ' + esc(st.info.nombre) + '. Te contactan al ' + esc(x.telefono) + '.</div>');
+    st.hist.push({ yo: false, t: 'Pedido de domicilio enviado.' });
+    st.dom = { items: [] };
+  });
+}
+
+// ---------- Arranque ----------
+$('f').addEventListener('submit', e => { e.preventDefault(); const t = $('txt').value; $('txt').value = ''; decir(t); });
+(async () => {
+  if(!PUB || !URL0){ $('nom').textContent = 'Link incompleto'; burbuja('Este link no está completo. Pídele al negocio su link de reservas y pedidos.'); return; }
+  try{ st.info = await rpc('reservas_publico_info', { p_publico: PUB }); }catch(e){ st.info = null; }
+  if(!st.info){ $('nom').textContent = 'No disponible'; burbuja('Este negocio no está recibiendo reservas ni pedidos por aquí en este momento.'); return; }
+  $('nom').textContent = st.info.nombre || 'Reservas y pedidos'; document.title = (st.info.nombre || 'Reservas') + ' · Asistente';
+  if(hayDom()) await cargarCarta();
+  const que = [hayReservas() ? (esHotel() ? 'reservar tu habitación' : 'reservar tu mesa') : null, hayDom() ? 'pedir un domicilio' : null].filter(Boolean).join(' o ');
+  $('sub').textContent = 'Asistente · ' + (que ? que.charAt(0).toUpperCase() + que.slice(1) : 'Información');
+  burbuja('¡Hola! 👋 Soy el asistente de ' + st.info.nombre + '.' + (que ? ' Te ayudo a ' + que + '. Escríbeme como le escribirías a una persona, o toca una opción:' : ''));
+  st.hist.push({ yo: false, t: 'Hola, soy el asistente de ' + st.info.nombre + '.' });
+  menu();
+})();
+})();
+</script>
+</body>
+</html>

@@ -15,7 +15,7 @@ public final class AvisoPago {
     private AvisoPago() { }
 
     static final Pattern BANCO = Pattern.compile("daviplata|nequi|bancolombia|davivienda|movii|\\bdale\\b|bre-?b|banco|\\bnu\\b|lulo|rappipay|powwi|ual[aá]|bbva|scotiabank|av villas|colpatria|occidente|caja social"
-            + "|ita[uú]|popular|bogot[aá]|pibank|coltefinanciera|bancam[ií]a|mibanco|falabella|finandina|serfinanza|confiar|global66|ban100|coomeva|cooperativa|tpaga|transfiya|\\bbold\\b|agrario|gnb|sudameris", Pattern.CASE_INSENSITIVE);
+            + "|ita[uú]|popular|bogot[aá]|pibank|coltefinanciera|bancam[ií]a|mibanco|falabella|finandina|serfinanza|confiar|global66|ban100|coomeva|cooperativa|tpaga|transfiya|\\bbold(?:cf)?\\b|agrario|gnb|sudameris", Pattern.CASE_INSENSITIVE);
     // DaviPlata escribe de «usted»: «Le llegó plata», «Le pasaron»; Nequi de «tú»: «Te llegó plata».
     // También las transferencias de OTROS bancos por la llave Bre-B («Llegaron $50.000 a tu llave», «Recibiste $X por Bre-B»,
     // «Te mandaron», «Te giraron», «Se acreditó en tu cuenta»).
@@ -74,12 +74,14 @@ public final class AvisoPago {
     // pago que trae «código de aprobación 604107» o «nunca compartas tu clave» SÍ es pago.
     static final Pattern CODIGO = Pattern.compile("(c[oó]digo|clave)( de)? (seguridad|verificaci[oó]n|acceso|ingreso|otp|din[aá]mica)( es)?\\s*:?\\s*\\d{4,8}|clave din[aá]mica|\\botp\\b[^.]{0,20}\\d{4,8}|tu c[oó]digo es \\d|es tu c[oó]digo", Pattern.CASE_INSENSITIVE);
     // Plata que SALE (nunca es un pago recibido, aunque el aviso diga «te»).
+    // 1.81.1: los retiros, débitos y «compra aprobada» solo van en SALIDA (para anotarlos en Contabilidad), no aquí: aquí
+    // descartan avisos, y un aviso de pago de verdad que los nombrara (publicidad del banco al final) se iba al camino lento.
     static final Pattern SALE = Pattern.compile("enviaste|pagaste|pasaste|compra exitosa|transferiste|retiraste|compraste|sacaste|usted (envi|pag|transfiri|pas)|c[oó]digo (de )?(seguridad|verificaci)|clave din[aá]mica|\\botp\\b", Pattern.CASE_INSENSITIVE);
 
     // 💸 1.66.5: plata que SALE de la cuenta del negocio (lo que el dueño envía o paga por Nequi, DaviPlata o el banco), para
     // clasificarla en Contabilidad (proveedor u otro gasto). Nunca suena ni sale del celular: solo queda para la página.
     // Nunca un código o clave, ni algo rechazado, fallido, programado o una solicitud.
-    static final Pattern SALIDA = Pattern.compile("enviaste|pagaste|pasaste|transferiste|compraste|compra exitosa|retiraste|sacaste|usted (envi|pag|transfiri|pas)", Pattern.CASE_INSENSITIVE);
+    static final Pattern SALIDA = Pattern.compile("enviaste|pagaste|pasaste|transferiste|compraste|compra exitosa|retiraste|sacaste|usted (envi|pag|transfiri|pas)|retiro (exitoso|aprobado|en|por|de)|se debit[oó]|debitamos|compra aprobada|avance (por|de|en)|usted retir", Pattern.CASE_INSENSITIVE);
     static boolean esSalida(String todo) {
         if (todo == null || !SALIDA.matcher(todo).find() || CODIGO.matcher(todo).find() || NUNCA.matcher(todo).find()) return false;
         if (Pattern.compile("clave din[aá]mica|\\botp\\b|c[oó]digo (de )?(seguridad|verificaci)", Pattern.CASE_INSENSITIVE).matcher(todo).find()) return false;
@@ -245,7 +247,9 @@ public final class AvisoPago {
     }
 
     /** Códigos cortos de los bancos que avisan por SMS (el SMS a veces no dice el nombre del banco). */
-    static final String[][] CODIGOS = { {"85888", "DaviPlata"} };
+    // 1.72.6: Bold avisa las transferencias que entran por la llave desde el 890412 («BoldCF: Has recibido una transferencia a
+    // traves de llaves por valor de $…»). Antes no se tomaban: «BoldCF» no contaba como Bold y el código no era de un banco.
+    static final String[][] CODIGOS = { {"85888", "DaviPlata"}, {"890412", "Bold"} };
     static String bancoDeCodigo(String remitente) {
         String d = remitente == null ? "" : remitente.replaceAll("\\D", "");
         if (d.isEmpty() || d.length() > 6) return null;

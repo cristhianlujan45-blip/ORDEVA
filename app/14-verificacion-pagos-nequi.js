@@ -503,6 +503,10 @@ function pagoHuella(t){
     else if(!A.pagosLectura) k = 'vieja';
     else if(e.permiso === false) k = 'permiso';
     else if(pgSinVivo >= 2) k = 'desconectada';
+    // 📩 1.72.6: sin el permiso de SMS, DaviPlata y Bold (avisan por SMS) no suenan con el celular bloqueado cuando Android
+    // corta la lectura de avisos. Con él, el SMS del banco llega directo (SmsBanco.java).
+    if(!k && e.on){ let pm = {}; try{ pm = JSON.parse(A.permisos ? A.permisos() || '{}' : '{}'); }catch(x){}
+      if(pm.sms === false){ k = 'sms'; pgSaludReportar('sms', 'Sin el permiso de SMS: los pagos por SMS del banco (DaviPlata, Bold) dependen de la lectura de avisos'); } }
     if(k === 'permiso') pgSaludReportar('permiso', 'La app no tiene el permiso «Acceso a notificaciones»: los pagos no suenan');
     if(k === 'desconectada') pgSaludReportar('desconectada', 'Android desconectó la lectura de avisos de pago');
     if(k === 'vieja') pgSaludReportar('vieja', 'App Android vieja: no pasa a la página los avisos que no entiende');
@@ -538,11 +542,13 @@ function pagoHuella(t){
         const A = AND(), a = x.dataset.pgs;
         if(a === 'cerrar'){ if(b.dataset.k === 'bancos' || b.dataset.k === 'ventana'){ try{ localStorage.setItem(b.dataset.k === 'bancos' ? PG_BAT_LUEGO : 'vento-ventana-luego', String(Date.now() + 3 * 864e5)); }catch(e){} } else pgSaludOculto = Date.now() + 3600e3; b.hidden = true; return; }
         if(a === 'vent-encima' || a === 'vent-completa' || a === 'vent-xiaomi'){ const c = a.slice(5); try{ A && A.ventanaPagoPermiso(c); }catch(e){} showToast(c === 'xiaomi' ? 'En «Otros permisos» activa «Mostrar ventanas emergentes mientras se ejecuta en segundo plano» y «Mostrar en pantalla de bloqueo», y vuelve.' : c === 'completa' ? 'Activa «ORDEVA» en «Notificaciones de pantalla completa» y vuelve.' : 'Activa «ORDEVA» en «Aparecer encima de otras apps» y vuelve.', 12000); return; }
+        if(a === 'sms'){ try{ A && A.pedirPermisos && A.pedirPermisos(); }catch(e){} b.hidden = true; return; }
         if(a === 'permiso' || a === 'reconectar'){ try{ A && A.mediosPermiso(); }catch(e){} if(a === 'reconectar') showToast('En la pantalla que se abre, APAGA «ORDEVA» y vuélvelo a PRENDER. Luego regresa.', 10000); }
       });
       document.body.appendChild(b);
     }
     const txt = {
+      sms: '📩 <b>Para que DaviPlata, Bold y los bancos que avisan por SMS suenen con el celular bloqueado</b>, deja que ORDEVA lea los SMS del banco (solo los de códigos de bancos, nunca los de personas).',
       vieja: '📲 <b>Instala la app ORDEVA nueva una última vez</b>: desde esa versión se actualiza sola, sin instalar a mano.',
       permiso: '⚠️ <b>Los pagos no van a sonar:</b> ORDEVA no tiene el permiso «Acceso a notificaciones» en este celular.',
       desconectada: '⚠️ <b>Los pagos no van a sonar:</b> Android desconectó la lectura de avisos de ORDEVA.',
@@ -552,6 +558,7 @@ function pagoHuella(t){
     }[k];
     const btn = k === 'ventana' ? '<button type="button" data-pgs="vent-' + (faltaVent || 'encima') + '" style="background:#fff;color:#7a1f1f;border:0;border-radius:10px;padding:7px 12px;font-weight:800">' + (faltaVent === 'xiaomi' ? '📱 Abrir permisos' : '🪟 Permitir') + '</button>'
       : k === 'bancos' ? '<button type="button" data-banco="' + escp((lentos || [])[0] ? lentos[0].pkg : '') + '" style="background:#fff;color:#7a1f1f;border:0;border-radius:10px;padding:7px 12px;font-weight:800">🔋 Arreglar ' + escp((lentos || [])[0] ? lentos[0].nombre : '') + '</button>'
+      : k === 'sms' ? '<button type="button" data-pgs="sms" style="background:#fff;color:#7a1f1f;border:0;border-radius:10px;padding:7px 12px;font-weight:800">📩 Permitir SMS</button>'
       : k === 'vieja' ? '<a href="' + PG_APK + '" download="vento.apk" rel="noopener" style="background:#fff;color:#7a1f1f;border-radius:10px;padding:7px 12px;font-weight:800;text-decoration:none">⬇️ Instalar la nueva</a>'
       : '<button type="button" data-pgs="' + (k === 'permiso' ? 'permiso' : 'reconectar') + '" style="background:#fff;color:#7a1f1f;border:0;border-radius:10px;padding:7px 12px;font-weight:800">' + (k === 'permiso' ? '🔓 Dar el permiso' : '🔄 Reconectar') + '</button>';
     b.innerHTML = '<div>' + txt + '</div><div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">' + btn + '<button type="button" data-pgs="cerrar" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,.6);border-radius:10px;padding:6px 10px">Luego</button></div>';
@@ -840,6 +847,9 @@ function pagoHuella(t){
       const b = +((r.match(/el banco lo mandó (\d+) s tarde/) || [])[1] || 0), v = +((r.match(/Vento lo leyó (\d+) s después/) || [])[1] || 0);
       if((b >= 20 || v >= 5) && !pgDiagVistos.has('t' + x.t)){ pgDiagVistos.add('t' + x.t);
         try{ window.ventoError && window.ventoError('pago', 'Pago avisado tarde: ' + (b >= 20 ? 'el banco lo mandó ' + b + ' s tarde' : '') + (b >= 20 && v >= 5 ? ' y ' : '') + (v >= 5 ? 'Vento lo leyó ' + v + ' s después' : ''), { app: String(x.app || '').slice(0, 40), texto: String(x.txt || '').slice(0, 220), banco_s: b, vento_s: v, app_version: window.ventoAppVersion ? window.ventoAppVersion() : '' }, 'pago|demora|' + (b >= 20 ? 'banco' : 'vento')); }catch(e){} }
+      // 1.72.6: 🔌 cuándo Android corta / vuelve a conectar la lectura y si el celular estaba bloqueado (causa del «no suena bloqueado»).
+      if(/^🔌/.test(r) && !pgDiagVistos.has('t' + x.t)){ pgDiagVistos.add('t' + x.t);
+        try{ window.ventoError && window.ventoError('pago', r.replace(/^\S+\s*/, ''), { app_version: window.ventoAppVersion ? window.ventoAppVersion() : '' }, 'pago|lectura|' + (/CORTÓ/.test(r) ? 'corta' : 'vuelve') + (/bloqueado/.test(r) ? '-bloq' : '-uso')); }catch(e){} }
       if(/^🧹/.test(r) && !pgDiagVistos.has('t' + x.t)){ pgDiagVistos.add('t' + x.t);
         try{ window.ventoError && window.ventoError('pago', 'Android no le pasó el aviso del pago a ORDEVA: lo tomó el barrido de la barra', { app_version: window.ventoAppVersion ? window.ventoAppVersion() : '' }, 'pago|barrido'); }catch(e){} } });
     return d;

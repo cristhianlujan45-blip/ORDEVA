@@ -781,6 +781,48 @@ function agregar(cant,nombre){
   if(l)l.q=Math.min(50,l.q+cant);else lineas.push({k:k,q:Math.min(50,cant),n:nombre});
   pintarLineas();
 }
+/* 🧩 1.76.0 · Opciones del producto (término, sin…, adiciones): el negocio las manda en la carta (cat.op). Al pedir ese
+   producto se elige cómo lo quiere; la línea queda «Hamburguesa (Término medio · +Queso extra)». El precio de las
+   adiciones se muestra aquí, pero el negocio lo vuelve a calcular con SUS opciones al recibir el pedido. */
+const escOp=x=>String(x==null?'':x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const OPX={};
+const agregarSinOp=agregar;
+function opcionesDe(nombre){const o=cat&&cat.op;if(!o)return null;const k=norm(nombre);const key=Object.keys(o).find(x=>norm(x)===k);return key?o[key]:null}
+agregar=function(cant,nombre){const G=opcionesDe(nombre);if(!G)return agregarSinOp(cant,nombre);elegirOp(nombre,G,cant)};
+function elegirOp(nombre,G,cant){
+  let ov=$('opPed');
+  if(!ov){ov=document.createElement('div');ov.id='opPed';ov.className='op-ped';document.body.appendChild(ov);}
+  const sel=G.map(()=>[]);
+  const pesos=n=>'$'+Math.round(n).toLocaleString('es-CO');
+  const pintar=()=>{
+    let extra=0;G.forEach((g,gi)=>sel[gi].forEach(i=>{extra+=+g[2][i][1]||0}));
+    ov.innerHTML='<div class="op-box"><b class="op-t">'+escOp(nombre)+'</b><p class="op-s">¿Cómo lo quiere?'+(cant>1?' ('+cant+')':'')+'</p>'+
+      G.map((g,gi)=>'<div class="op-g"><b>'+escOp(g[0])+'</b> <small>'+(g[1]?'(varias)':'(elige una)')+'</small><div>'+g[2].map((o,oi)=>'<button type="button" class="op-o'+(sel[gi].includes(oi)?' on':'')+'" data-g="'+gi+'" data-i="'+oi+'">'+escOp(o[0])+(o[1]?' +'+pesos(o[1]):'')+'</button>').join('')+'</div></div>').join('')+
+      '<p class="op-m" id="opPedMsg"></p><div class="op-a"><button type="button" class="op-x">Cancelar</button><button type="button" class="op-ok">Agregar'+(extra?' (+'+pesos(extra)+')':'')+'</button></div></div>';
+  };
+  pintar();ov.hidden=false;
+  ov.onclick=e=>{
+    const b=e.target.closest('button');if(!b)return;
+    if(b.classList.contains('op-x')){ov.hidden=true;return}
+    if(b.classList.contains('op-o')){const gi=+b.dataset.g,oi=+b.dataset.i,s=sel[gi];if(G[gi][1]){const k=s.indexOf(oi);if(k>=0)s.splice(k,1);else s.push(oi)}else sel[gi]=s[0]===oi?[]:[oi];pintar();return}
+    if(b.classList.contains('op-ok')){
+      const f=G.findIndex((g,gi)=>!g[1]&&!sel[gi].length);
+      if(f>=0){$('opPedMsg').textContent='⚠️ Elige '+String(G[f][0]).toLowerCase()+'.';return}
+      const partes=[];let extra=0;
+      G.forEach((g,gi)=>{const els=sel[gi].map(i=>g[2][i]);if(!els.length)return;els.forEach(o=>{extra+=+o[1]||0});const ng=norm(g[0]);
+        if(/^sin\b/.test(ng))partes.push('Sin '+els.map(o=>String(o[0]).replace(/^sin\s+/i,'')).join(', '));
+        else if(g[1])els.forEach(o=>partes.push('+'+o[0]));else partes.push(g[0]+' '+String(els[0][0]).charAt(0).toLowerCase()+String(els[0][0]).slice(1));});
+      const full=nombre+(partes.length?' ('+partes.join(' · ')+')':'');
+      OPX[norm(full)]=extra;ov.hidden=true;agregarSinOp(cant,full);
+    }
+  };
+}
+const opCss=document.createElement('style');
+opCss.textContent='.op-ped{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center}.op-ped[hidden]{display:none}'+
+  '.op-box{background:var(--card,#171033);color:var(--ink,#fff);width:min(520px,100%);max-height:88vh;overflow:auto;border-radius:20px 20px 0 0;padding:16px 16px 20px}.op-t{font-size:19px}.op-s{margin:4px 0 8px;opacity:.8}'+
+  '.op-g{margin:10px 0}.op-g small{opacity:.7}.op-g div{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}.op-o{min-height:44px;padding:8px 14px;border-radius:12px;border:2px solid var(--line,#555);background:transparent;color:inherit;font:inherit;font-weight:700}'+
+  '.op-o.on{border-color:var(--acc,#a855f7);background:rgba(168,85,247,.25)}.op-m{color:#f87171;font-weight:700;min-height:18px;margin:6px 0}.op-a{display:flex;gap:8px;justify-content:flex-end}.op-a button{min-height:46px;padding:10px 16px;border-radius:12px;border:0;font:inherit;font-weight:800}.op-ok{background:var(--acc,#a855f7);color:#fff}.op-x{background:transparent;color:inherit;border:1px solid var(--line,#555)!important}';
+document.head.appendChild(opCss);
 function agregarTexto(txt){
   let n=0;
   String(txt).split(/[,;\n]+/).forEach(pz=>{
@@ -1345,7 +1387,7 @@ $('b').onclick=async()=>{
   if(c&&!dom&&(modo=='p'||modo=='c')){
     const id=(modo=='c'?'c':'p')+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
     if(modo=='p'){
-      const precioDe=n=>{const k=norm(n);const x=cat&&Array.isArray(cat.p)?cat.p.find(r=>norm(r[0])===k):null;return x?Math.round(+x[1]||0):0;};
+      const precioDe=n=>{const k=norm(n);const base=String(n).replace(/\s*\([^)]*\)\s*$/,''),kb=OPX[k]!=null?norm(base):k;const x=cat&&Array.isArray(cat.p)?cat.p.find(r=>norm(r[0])===kb):null;return x?Math.round(+x[1]||0)+(OPX[k]||0):0;};
       const items=env.map(l=>({n:l.n,q:l.q,p:precioDe(l.n)}));
       cuerpo=JSON.stringify({t:'pedido',v:2,id,mesa:+mesa,vm:v,items,total:items.reduce((a,x)=>a+x.q*x.p,0),at:Date.now(),txt:ultimo.slice(0,300)});
       misPedidosAgregar({id,txt:txt.slice(0,120),at:Date.now(),e:'enviado',body:cuerpo});
@@ -1630,8 +1672,27 @@ function pintarBadgesCat(){
 function abrirCarta(){pintarCat(true);$('carta').hidden=false;$('carta').scrollTop=0;document.body.style.overflow='hidden'}
 function cerrarCarta(){$('carta').hidden=true;document.body.style.overflow=''}
 $('catBtn').onclick=abrirCarta;$('catX').onclick=cerrarCarta;$('catBack').onclick=cerrarCarta;$('cq').oninput=()=>pintarCat(true);
+/* 1.72.6: al volver a la página (o con la carta en vivo) solo se vuelve a pintar si la carta o las fotos CAMBIARON, y sin
+   perder el punto donde iba el cliente. Antes se pintaba todo otra vez: la carta se devolvía arriba y las fotos se
+   cargaban de nuevo («cuando bajo vuelve a subir y se carga»). */
+let catPintada='';
+const firmaCat=()=>{try{return JSON.stringify(cat||null)+'|'+Object.keys(fotos||{}).length}catch(e){return String(Math.random())}};
+function conPosicion(fn){
+  const car=$('carta'),box=$('cat'),tb=box&&box.querySelector('.cat-tabs');
+  const st=car?car.scrollTop:0,wy=window.scrollY,tl=tb?tb.scrollLeft:0,alto=box?box.offsetHeight:0;
+  if(box&&alto)box.style.minHeight=alto+'px';           // mientras se dibujan las fotos, la página no se encoge
+  fn();
+  if(car&&car.scrollTop!==st)car.scrollTop=st;
+  if(Math.abs(window.scrollY-wy)>2)window.scrollTo(0,wy);
+  const tb2=box&&box.querySelector('.cat-tabs');if(tb2)tb2.scrollLeft=tl;
+  clearTimeout(conPosicion.t);conPosicion.t=setTimeout(()=>{if(box)box.style.minHeight=''},1500);
+}
+function repintarCat(){
+  const f=firmaCat();if(f===catPintada)return;            // nada cambió: no se toca
+  catPintada=f;conPosicion(()=>{pintarCat(!$('carta').hidden);pintarSug();});
+}
 async function cargarCat(){
-  pintarCat();if(!c){pintarCat(true);return}
+  if(!catPintada){pintarCat();if(!c){pintarCat(true);catPintada=firmaCat();return}}
   try{
     const ctrl=new AbortController(),tmo=setTimeout(()=>ctrl.abort(),6000);
     const r=await fetch('https://canal.vento.local/'+c+'k/json?poll=1&since=12h',{signal:ctrl.signal,cache:'no-store'});
@@ -1639,8 +1700,9 @@ async function cargarCat(){
     const ls=(await r.text()).trim().split('\n').filter(Boolean);
     for(let i=ls.length-1;i>=0;i--){const m=JSON.parse(ls[i]);if(m.event==='message'){cat=JSON.parse(m.message);jset('cat_'+c,cat);applyTh(cat.th);break}}
   }catch(e){}
-  await cargarFotos();
-  pintarCat(true);pintarSug();
+  if(!catPintada||Date.now()-(cargarCat.fotosT||0)>10*60000){cargarCat.fotosT=Date.now();await cargarFotos();}
+  if(!catPintada){pintarCat(true);pintarSug();catPintada=firmaCat();}
+  else repintarCat();
   catEnVivo();
 }
 /* La carta se actualiza sola mientras el cliente la tiene abierta: cuando el negocio cambia un
@@ -1649,7 +1711,7 @@ let catES=null;
 function catEnVivo(){
   if(!c||catES||!window.EventSource)return;
   try{catES=new EventSource('https://canal.vento.local/'+c+'k/sse?since='+Math.floor(Date.now()/1000));}catch(e){return}
-  catES.onmessage=ev=>{try{const m=JSON.parse(ev.data);if(m.event!=='message')return;cat=JSON.parse(m.message);jset('cat_'+c,cat);applyTh(cat.th);const abierta=!$('carta').hidden;pintarCat(abierta);pintarSug();}catch(e){}};
+  catES.onmessage=ev=>{try{const m=JSON.parse(ev.data);if(m.event!=='message')return;const nuevo=JSON.parse(m.message);if(JSON.stringify(nuevo)===JSON.stringify(cat))return;cat=nuevo;jset('cat_'+c,cat);applyTh(cat.th);repintarCat();}catch(e){}};
   catES.onerror=()=>{if(catES&&catES.readyState===2){catES=null;setTimeout(catEnVivo,5000);}};
 }
 document.addEventListener('visibilitychange',()=>{if(!document.hidden){cargarCat();}});

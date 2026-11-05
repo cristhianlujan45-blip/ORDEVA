@@ -1,5 +1,5 @@
 -- =====================================================================
--- ORDEVA 1.72.6 · El servidor de pagos siempre despierto («que todo sea inmediato»)
+-- ORDEVA 1.81.3 · El servidor de pagos siempre despierto («que todo sea inmediato»)
 --   El Servidor ORDEVA de pagos (Edge Function vento-pagos) se duerme si pasa un rato sin uso; el primer aviso de pago
 --   después de un rato quieto tenía que esperar a que arrancara (puede ser uno o dos segundos más). Antes solo lo
 --   despertaba el repaso de cobros cada 5 minutos. Ahora, cada minuto, una pregunta liviana a /vento-pagos/salud (no

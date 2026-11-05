@@ -69,6 +69,9 @@ public class MainActivity extends Activity {
         if (!VentoApp.tiene(Manifest.permission.RECORD_AUDIO)) f.add(Manifest.permission.RECORD_AUDIO);
         if (!VentoApp.tiene(Manifest.permission.CAMERA)) f.add(Manifest.permission.CAMERA);
         if (Build.VERSION.SDK_INT >= 33 && !VentoApp.tiene(Manifest.permission.POST_NOTIFICATIONS)) f.add(Manifest.permission.POST_NOTIFICATIONS);
+        // 1.72.6: con la lectura de pagos prendida, los SMS del banco directo (suenan aunque el celular esté bloqueado).
+        if (VentoApp.app != null && VentoApp.app.getSharedPreferences("vento", MODE_PRIVATE).getBoolean(VentoEscucha.PREF_ON, false)
+                && !VentoApp.tiene(Manifest.permission.RECEIVE_SMS)) f.add(Manifest.permission.RECEIVE_SMS);
         return f;
     }
 
@@ -87,7 +90,7 @@ public class MainActivity extends Activity {
         if (siempre && bloqueado) {
             try {
                 startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName())));
-                VentoApp.aviso("Toca «Permisos» y activa Micrófono, Cámara y Notificaciones para ORDEVA.");
+                VentoApp.aviso("Toca «Permisos» y activa Micrófono, Cámara, Notificaciones y SMS para ORDEVA.");
             } catch (Exception ignorado) { }
             return true;
         }

@@ -1,4 +1,4 @@
-// ⚡ ORDEVA 1.72.6 · Cobro con QR: la confirmación del banco llega rápido. Contra el «Supabase local» REAL.
+// ⚡ ORDEVA 1.81.3 · Cobro con QR: la confirmación del banco llega rápido. Contra el «Supabase local» REAL.
 // Mientras el cliente paga el QR frente a la caja, ORDEVA le pide al servidor que consulte al banco cada 2 s durante los
 // primeros 3 minutos (antes cada 10 s; el aviso del banco —webhook— sigue siendo lo primero). Después, cada 10 s.
 //  1. Cobro QR recién creado: en 10 s se consulta al banco al menos 4 veces (antes 1).

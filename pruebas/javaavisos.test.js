@@ -24,17 +24,18 @@ function contar(salida, nombre){
   else { mal++; console.log('❌ Servicio de fondo: la revisión de la lectura de avisos cambió (cada minuto, reinicio a los 2 min, barrido cada 10 s)'); } }
 if(correr('javac', ['-version']).status !== 0){ console.log('RESULTADO 0 bien 0 mal (sin Java: se omitió)'); process.exit(0); }
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'vento-java-'));
-let r = correr('javac', ['-encoding', 'UTF-8', '-d', path.join(tmp, 'a'), path.join(src, 'AvisoPago.java'), path.join(src, 'PlanVentana.java'), path.join(src, 'PlanVoz.java'), path.join(__dirname, 'java/AvisoPagoPrueba.java'), path.join(__dirname, 'java/PlanVentanaPrueba.java'), path.join(__dirname, 'java/PlanVozPrueba.java')]);
+let r = correr('javac', ['-encoding', 'UTF-8', '-d', path.join(tmp, 'a'), path.join(src, 'AvisoPago.java'), path.join(src, 'ReservaAviso.java'), path.join(__dirname, 'java/ReservaAvisoPrueba.java'), path.join(src, 'PlanVentana.java'), path.join(src, 'PlanVoz.java'), path.join(__dirname, 'java/AvisoPagoPrueba.java'), path.join(__dirname, 'java/PlanVentanaPrueba.java'), path.join(__dirname, 'java/PlanVozPrueba.java')]);
 if(r.status !== 0){ mal++; console.log('❌ No compila AvisoPago: ' + r.stderr.slice(0, 800)); }
 else {
   contar(correr('java', ['-Dstdout.encoding=UTF-8', '-cp', path.join(tmp, 'a'), 'co.vento.app.AvisoPagoPrueba']).stdout, 'Reglas de los avisos (AvisoPagoPrueba)');
   contar(correr('java', ['-Dstdout.encoding=UTF-8', '-cp', path.join(tmp, 'a'), 'co.vento.app.PlanVentanaPrueba']).stdout, 'Ventana del pago en todo tipo de celular (PlanVentanaPrueba)');
   contar(correr('java', ['-Dstdout.encoding=UTF-8', '-cp', path.join(tmp, 'a'), 'co.vento.app.PlanVozPrueba']).stdout, 'Voz del pago en todo tipo de celular y tablet (PlanVozPrueba)');
+  contar(correr('java', ['-Dstdout.encoding=UTF-8', '-cp', path.join(tmp, 'a'), 'co.vento.app.ReservaAvisoPrueba']).stdout, 'Avisos de las apps de reservas (ReservaAvisoPrueba)');
 }
 const jar = process.env.VENTO_ANDROID_ALL;   // ej.: android-all de Robolectric (org.robolectric:android-all 14), solo para compilar
 if(jar && fs.existsSync(jar)){
   const sim = path.join(__dirname, 'java/simulado');
-  r = correr('javac', ['-nowarn', '-encoding', 'UTF-8', '-cp', jar, '-d', path.join(tmp, 'b'), path.join(src, 'VentoEscucha.java'), path.join(src, 'AvisoPago.java'),
+  r = correr('javac', ['-nowarn', '-encoding', 'UTF-8', '-cp', jar, '-d', path.join(tmp, 'b'), path.join(src, 'VentoEscucha.java'), path.join(src, 'AvisoPago.java'), path.join(src, 'ReservaAviso.java'),
     ...fs.readdirSync(sim).map(f => path.join(sim, f)), path.join(__dirname, 'java/EscuchaPrueba.java')]);
   if(r.status !== 0){ mal++; console.log('❌ No compila VentoEscucha: ' + r.stderr.slice(0, 800)); }
   else contar(correr('java', ['-Dstdout.encoding=UTF-8', '-cp', path.join(tmp, 'b') + path.delimiter + jar, 'co.vento.app.EscuchaPrueba']).stdout, 'Lectura de avisos y SMS reales (EscuchaPrueba)');

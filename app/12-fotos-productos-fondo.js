@@ -427,7 +427,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-11-05 · v1.72.6';
+const MESORA_VERSION = '2026-11-04 · v1.81.2';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'ORDEVA · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 /* 🔄 La app Android se actualiza SOLA (Actualizador): revisa cada 3 h, baja la versión nueva y la instala cuando no se
@@ -519,7 +519,12 @@ function mesoraRevisarVersionNueva(){
    • Antes de recargar se guarda todo. Si después de recargar sigue la versión vieja (la página nueva todavía no llega a
      todos los servidores), no vuelve a intentarlo en 10 minutos: nunca se queda recargando en vueltas. */
 const MESORA_AUTO_KEY = 'vento-actualizando';
+// 1.72.6: la última vez que se tocó, deslizó o escribió en ORDEVA. La versión nueva NO recarga mientras se está usando
+// (antes podía recargar en medio de deslizar los pedidos): espera 2 minutos sin tocar nada, o a que ORDEVA quede de fondo.
+let mesoraUltimoUso = Date.now();
+['pointerdown', 'touchstart', 'wheel', 'scroll', 'keydown'].forEach(ev => window.addEventListener(ev, () => { mesoraUltimoUso = Date.now(); }, { passive: true, capture: true }));
 function mesoraOcupado(){
+  if(Date.now() - mesoraUltimoUso < 120000) return true;
   const a = document.activeElement;
   if(a && (/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) || a.isContentEditable) && a.offsetParent !== null) return true;
   return !!document.querySelector('.overlay.show, #pgVentana, #lcelOv, .vs-sheet.show');
@@ -553,7 +558,7 @@ function mesoraAvisoVersionNueva(nueva){
   let falta = 15;
   const t = setInterval(() => {
     if(document.hidden){ clearInterval(t); mesoraRecargarYa(nueva); return; }
-    if(mesoraOcupado()){ txt.textContent = 'Se actualiza sola cuando termines lo que estás haciendo.'; return; }
+    if(mesoraOcupado()){ falta = 15; txt.textContent = 'Se actualiza sola cuando dejes de usar ORDEVA un momento (o con «Actualizar ahora»).'; return; }
     txt.textContent = 'Se actualiza sola en ' + falta + ' s (no se pierde nada).';
     if(--falta < 0){ clearInterval(t); mesoraRecargarYa(nueva); }
   }, 1000);
@@ -1215,7 +1220,7 @@ function iniCast(){
       const pb = document.getElementById('apkPermisos'), pt = document.getElementById('apkPermisosTxt');
       if(pb && typeof A.permisos === 'function'){
         const pintarP = () => { try{ const e = JSON.parse(A.permisos() || '{}'); const f = (ok, n) => (ok ? '✅ ' : '⚠️ ') + n;
-          pt.textContent = [f(e.microfono, 'Micrófono'), f(e.camara, 'Cámara'), f(e.avisos, 'Avisos'), f(e.bateria, 'Sin ahorro de batería'), f(e.fondo, 'Trabajando de fondo')].join(' · ');
+          pt.textContent = [f(e.microfono, 'Micrófono'), f(e.camara, 'Cámara'), f(e.avisos, 'Avisos')].concat(e.sms === undefined ? [] : [f(e.sms, 'SMS del banco')]).concat([f(e.bateria, 'Sin ahorro de batería'), f(e.fondo, 'Trabajando de fondo')]).join(' · ');
           const todo = e.microfono && e.camara && e.avisos && e.bateria; pb.textContent = todo ? '🔐 Permisos del celular: todo listo' : '🔐 Dar los permisos que faltan'; pt.hidden = false; }catch(x){} };
         pb.hidden = false; pintarP();
         pb.onclick = () => { try{ A.pedirPermisos(); }catch(x){} setTimeout(pintarP, 4000); };
@@ -2777,7 +2782,9 @@ function iniLounge(){
    y otros ingresos (data.contab). Todo sale de los datos que ya tiene la app. */
 const CT_CATS = {
   gasto: [['proveedores', '📦 Proveedores / mercancía'], ['arriendo', '🏠 Arriendo'], ['servicios', '💡 Servicios (luz, agua, gas, internet)'], ['nomina', '👥 Nómina / sueldos'], ['impuestos', '🏛️ Impuestos'], ['mantenimiento', '🛠️ Mantenimiento'], ['transporte', '🚚 Transporte / domicilios'], ['publicidad', '📣 Publicidad'], ['seguridad_social', '🩺 Salud, pensión y ARL'], ['bancos', '🏦 Bancos (comisiones, intereses, cuotas)'], ['otros', '🗂️ Otros gastos']],
-  ingreso: [['otros_ingresos', '💰 Otros ingresos'], ['aporte', '🙋 Aporte del dueño'], ['prestamo', '🏦 Préstamo recibido']]
+  ingreso: [['otros_ingresos', '💰 Otros ingresos'], ['aporte', '🙋 Aporte del dueño'], ['prestamo', '🏦 Préstamo recibido']],
+  // 1.79.0: plata que cambia de lugar, sin ser gasto ni ingreso (retirar del banco, el dueño que saca para él).
+  traslado: [['banco_efectivo', '🏧 Retiro: de banco a efectivo'], ['retiro_dueno', '🙋 Retiro del dueño']]
 };
 // Además de las de siempre, cada tipo de negocio tiene sus propios gastos típicos.
 const CT_CATS_NEGOCIO = {
@@ -2805,7 +2812,7 @@ function ctCatsGasto(){
   const extra = CT_CATS_NEGOCIO[(typeof data !== 'undefined' && data && data.businessType) || ''] || [];
   return base.filter(c => c[0] !== 'otros').concat(extra.filter(e => !base.some(b => b[0] === e[0])), [otros]);
 }
-const CT_METODOS = { efectivo: '💵 Efectivo', transferencia: '🏦 Transferencia', nequi: '📱 Nequi / Daviplata', tarjeta: '💳 Tarjeta', debe: 'Fiado', otro: 'Otro' };
+const CT_METODOS = { efectivo: '💵 Efectivo', transferencia: '🏦 Transferencia', nequi: '📱 Nequi / Daviplata', tarjeta: '💳 Tarjeta', debe: 'Fiado', saldo: '💳 Saldo a favor', otro: 'Otro' };
 let ctPeriodo = 'mes', ctTipo = 'gasto', ctCsvData = null;
 const ctCatNombre = (t, c) => { const l = t === 'gasto' ? ctCatsGasto().concat(Object.values(CT_CATS_NEGOCIO).flat()) : (CT_CATS[t] || []); const x = l.find(y => y[0] === c); return x ? x[1] : (c || ''); };
 const ctDia = d => { const x = new Date(d); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
@@ -2852,11 +2859,11 @@ function ctMovimientos(r){
     const pagoTarde = h.paidLater ? new Date(h.paidLater).getTime() : 0;
     (h.payments || []).forEach(p => {
       if(p.method === 'debe' || !(Number(p.amount) > 0)) return;
-      const tarde = pagoTarde && /pagó después/.test(p.note || '');
-      const cuando = tarde ? pagoTarde : t;
+      const tarde = p.abono ? true : pagoTarde && /pagó después/.test(p.note || '');   // 📅 1.81.0: cada abono de un crédito cuenta el día que se pagó
+      const cuando = p.abono && p.at ? Number(p.at) : tarde ? pagoTarde : t;
       if(cuando >= r.ini && cuando < r.fin){
         const quien = h.tableName || (h.table ? i18nPut(espacioN()) + ' ' + h.table : 'Venta');
-        mov.push({ tipo: 'venta', monto: Number(p.amount), metodo: p.method || 'otro', fecha: cuando, desc: tarde ? 'Fiado cobrado · ' + quien : quien });
+        mov.push({ tipo: 'venta', monto: Number(p.amount), metodo: p.method || 'otro', fecha: cuando, desc: p.abono ? 'Abono de crédito · ' + quien : tarde ? 'Fiado cobrado · ' + quien : quien });
       }
     });
   });
@@ -2904,7 +2911,7 @@ function renderConta(){
   document.getElementById('ctAviso').textContent = (x.sinCosto ? '⚠️ Algunos productos vendidos no tienen costo: la ganancia de lo vendido sale más alta de lo real (ponlo en Productos → tocar el producto → Costo). ' : '') + 'Entradas = dinero cobrado (los fiados cuentan el día que los pagan). «Te quedó (caja)» es la plata que entró menos la que salió; «Resultado estimado» es lo que el negocio ganó: ganancia de lo vendido menos gastos operativos (las compras de mercancía no se restan dos veces). Las compras a proveedores entran solas al escanear sus facturas; los demás gastos regístralos aquí abajo.';
   const barras = (obj, cls, nombre) => { const ks = Object.keys(obj).sort((a, b) => obj[b] - obj[a]); const max = Math.max(1, ...ks.map(q => obj[q])); return ks.length ? ks.map(q => '<div class="ct-barra ' + cls + '"><span>' + invEsc(nombre(q)) + '</span><i style="width:' + Math.max(2, obj[q] / max * 100) + '%"></i><b>' + ctFmt(obj[q]) + '</b></div>').join('') : '<div class="empty-note">Nada en este periodo.</div>'; };
   const porMedio = {}, porCat = {};
-  x.mov.forEach(m => { if(m.tipo === 'gasto') porCat[m.cat || 'otros'] = (porCat[m.cat || 'otros'] || 0) + m.monto; else porMedio[m.metodo || 'otro'] = (porMedio[m.metodo || 'otro'] || 0) + m.monto; });
+  x.mov.forEach(m => { if(m.tipo === 'gasto') porCat[m.cat || 'otros'] = (porCat[m.cat || 'otros'] || 0) + m.monto; else if(m.tipo !== 'traslado') porMedio[m.metodo || 'otro'] = (porMedio[m.metodo || 'otro'] || 0) + m.monto; });
   document.getElementById('ctMedios').innerHTML = barras(porMedio, 'v', q => CT_METODOS[q] || q);
   document.getElementById('ctCats').innerHTML = barras(porCat, 'g', q => ctCatNombre('gasto', q));
   // 🗂️ 1.69.0: gastos por tipo y 📊 comparación con el período anterior.
@@ -2944,7 +2951,7 @@ function renderConta(){
   // Gráfica: por día (hasta ~2 meses) o por mes
   const porMes = (r.fin - r.ini) / 864e5 > 62, grupos = {}, llaves = [];
   const clave = t => { const d = new Date(t); return porMes ? d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') : ctDia(d); };
-  x.mov.forEach(m => { const g = grupos[clave(m.fecha)] || (grupos[clave(m.fecha)] = { in: 0, out: 0 }); if(m.tipo === 'gasto') g.out += m.monto; else g.in += m.monto; });
+  x.mov.forEach(m => { const g = grupos[clave(m.fecha)] || (grupos[clave(m.fecha)] = { in: 0, out: 0 }); if(m.tipo === 'gasto') g.out += m.monto; else if(m.tipo !== 'traslado') g.in += m.monto; });
   if(porMes){ const d = new Date(r.ini); while(d.getTime() < r.fin){ llaves.push(clave(d)); d.setMonth(d.getMonth() + 1); } }
   else { for(let t = r.ini; t < r.fin; t += 864e5) llaves.push(clave(t)); }
   const mx = Math.max(1, ...llaves.map(q => Math.max((grupos[q] || {}).in || 0, (grupos[q] || {}).out || 0)));
@@ -2960,10 +2967,10 @@ function renderConta(){
   lista.innerHTML = filas.length ? '' : '<div class="empty-note">Sin movimientos en este periodo.</div>';
   filas.slice(0, 300).forEach(m => {
     const d = document.createElement('div'); d.className = 'ct-mov';
-    const ic = m.tipo === 'venta' ? '🧾' : m.tipo === 'ingreso' ? '💰' : (ctCatNombre('gasto', m.cat).split(' ')[0] || '💸');
+    const ic = m.tipo === 'venta' ? '🧾' : m.tipo === 'ingreso' ? '💰' : m.tipo === 'traslado' ? '🏧' : (ctCatNombre('gasto', m.cat).split(' ')[0] || '💸');
     const med = m.metodo && m.metodo !== 'otro' && CT_METODOS[m.metodo] ? ' · ' + CT_METODOS[m.metodo].replace(/^\S+\s/, '') : '';
-    const sub = new Date(m.fecha).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }) + ' · ' + (m.sub || (ctCatNombre(m.tipo, m.cat).replace(/^\S+\s/, '') + med + (m.auto ? ' · automático' : '')));
-    d.innerHTML = '<span class="ic">' + ic + '</span><span class="tx"><b></b><small></small></span><span class="vl ' + (m.tipo === 'gasto' ? 'out' : 'in') + '">' + (m.tipo === 'gasto' ? '−' : '+') + ctFmt(m.monto) + '</span>';
+    const sub = new Date(m.fecha).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }) + ' · ' + (m.sub || (ctCatNombre(m.tipo, m.cat).replace(/^\S+\s/, '') + (m.tipo === 'traslado' ? ' (no es gasto)' : '') + med + (m.auto ? ' · automático' : '')));
+    d.innerHTML = '<span class="ic">' + ic + '</span><span class="tx"><b></b><small></small></span><span class="vl ' + (m.tipo === 'gasto' ? 'out' : m.tipo === 'traslado' ? 'tr' : 'in') + '">' + (m.tipo === 'gasto' ? '−' : m.tipo === 'traslado' ? '⇄ ' : '+') + ctFmt(m.monto) + '</span>';
     d.querySelector('b').textContent = m.desc; d.querySelector('small').textContent = sub;
     if(m.adj){
       const ver = document.createElement('button'); ver.type = 'button'; ver.className = 'btn-ghost'; ver.textContent = '📎'; ver.title = 'Ver el recibo';
@@ -3011,9 +3018,9 @@ function iniConta(){
     if(!ctCsvData || !ctCsvData.filas.length){ showToast('No hay movimientos para descargar.'); return; }
     const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
     const filas = [['Fecha', 'Tipo', 'Categoría', 'Detalle', 'Medio de pago', 'Entrada', 'Salida']].concat(ctCsvData.filas.slice().reverse().map(m => [
-      new Date(m.fecha).toLocaleString('es-CO'), m.tipo === 'venta' ? 'Venta' : m.tipo === 'ingreso' ? 'Otro ingreso' : 'Gasto',
+      new Date(m.fecha).toLocaleString('es-CO'), m.tipo === 'venta' ? 'Venta' : m.tipo === 'ingreso' ? 'Otro ingreso' : m.tipo === 'traslado' ? 'Traslado (retiro)' : 'Gasto',
       m.tipo === 'venta' ? 'Ventas' : ctCatNombre(m.tipo, m.cat).replace(/^\S+\s/, ''), m.desc, (CT_METODOS[m.metodo] || '').replace(/^\S+\s/, ''),
-      m.tipo === 'gasto' ? '' : Math.round(m.monto), m.tipo === 'gasto' ? Math.round(m.monto) : '']));
+      m.tipo === 'gasto' || m.tipo === 'traslado' ? '' : Math.round(m.monto), m.tipo === 'gasto' ? Math.round(m.monto) : '']));
     const csv = '﻿' + filas.map(f => f.map(q).join(';')).join('\r\n');
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
     a.download = 'contabilidad-' + String(data.businessName || 'negocio').replace(/[^\w]+/g, '-') + '-' + ctDia(Date.now()) + '.csv';

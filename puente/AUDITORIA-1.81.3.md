@@ -1,4 +1,4 @@
-# ORDEVA 1.72.6 · Auditoría completa y avisos de pago más rápidos
+# ORDEVA 1.81.3 · Auditoría y avisos de pago más rápidos (trabajo de la 1.72.6, puesto sobre la 1.81.2)
 
 **Pedido del dueño:** «hazme una auditoría otra vez y mejora los pagos por transferencia, QR y todo eso. Antes el aviso
 llegaba más rápido cuando pagaban por Nequi y DaviPlata; ahora se demora más. Todo tiene que ser inmediato».
@@ -35,7 +35,7 @@ banco lo mandó X s tarde» o si «ORDEVA lo leyó X s después». Los que pasan
 también a **ORDEVA Admin → 🐞 Errores** como «Pago avisado tarde», con el modelo del celular.
 
 ## 2. Lo que se mejoró
-- **Servidor de pagos siempre despierto** (migración `20261125000000_pagos_despierto.sql`):
+- **Servidor de pagos siempre despierto** (migración `20261128000000_pagos_despierto.sql`):
   - **Por qué:** el Servidor ORDEVA de pagos se «duerme» si pasa un rato sin uso, y el primer pago después de un rato
     quieto esperaba a que arrancara (uno o dos segundos más). Antes solo lo despertaba el repaso de cobros cada 5 minutos.
   - **Qué cambió:** cada minuto una pregunta liviana (`/vento-pagos/salud`, sin consultar bancos ni tocar datos) lo
@@ -99,7 +99,7 @@ también a **ORDEVA Admin → 🐞 Errores** como «Pago avisado tarde», con el
   cantidad de arriba; ya arreglado, pasa 23 de 23.
 - **Las pruebas cambiadas o nuevas, repetidas:** `codigoproducto` 23/23, `qrimpresos` 8/8, `qrrapido` 6/6,
   `qrprivado` 9/9, `seguridadqr` 6/6, `canalseguro` 16/16, `canalvivo` 17/17, `pagostodos` 17/17.
-- **Las 25 del servidor:** pasan. La revisión de migraciones dice que `20261125000000_pagos_despierto.sql` «se puede
+- **Las 25 del servidor:** pasan. La revisión de migraciones dice que `20261128000000_pagos_despierto.sql` «se puede
   desplegar».
 
 ### Pendientes conocidos (sin cambio)
