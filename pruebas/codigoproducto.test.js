@@ -111,6 +111,17 @@ const COD = '7702004003300', COD2 = '7709999999999', COD3 = '7701234567897', OTR
     v = await p.evaluate(async () => { const r = window.ventoRoles, antes = r.puede; r.puede = () => false;
       try{ const x = await window.ventoProductoCodigo.ficha('7703333333333', {}); return { x, abierta: document.getElementById('pcFichaOv').classList.contains('show') }; } finally { r.puede = antes; } });
     chk('7. Sin permiso de crear productos: no se abre la ficha ni se crea nada', v.x === null && !v.abierta && await p.evaluate(() => !data.products.some(x => (x.barcodes || []).includes('7703333333333'))), v);
+    // 9. (1.72.6) Equipo lento: se abre «¿Cuántas llegaron?», la persona toca el COSTO enseguida y escribe. El cursor ya no
+    //    salta a la cantidad en medio de lo que escribe (antes el costo 1.800 quedaba como 1.800 unidades).
+    v = await p.evaluate(async () => {
+      const prom = window.ventoProductoCodigo.llego({ name: 'Gaseosa', stock: 6, cost: 1700 }, 1);
+      const c = document.getElementById('pcC'); c.focus(); c.value = '1';
+      await new Promise(r => setTimeout(r, 120));                 // pasa el momento en que antes se robaba el cursor
+      const foco = document.activeElement && document.activeElement.id; c.value = '1800';
+      document.querySelector('#pcLlegoOv [data-ok]').click(); const r = await prom;
+      return { foco, r };
+    });
+    chk('9. Equipo lento: tocar el costo enseguida y escribir no se va a la cantidad (cantidad 1, costo 1.800)', v.foco === 'pcC' && v.r && v.r.n === 1 && v.r.costo === 1800, v);
     chk('Las bases libres solo se consultan por el código', pedidos.every(x => /\/api\/v2\/product\/\d+\.json$/.test(x)), pedidos);
     await ctx.close();
     chk('Sin errores de página', !errs.length, errs);

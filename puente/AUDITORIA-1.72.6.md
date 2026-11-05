@@ -47,6 +47,17 @@ también a **ORDEVA Admin → 🐞 Errores** como «Pago avisado tarde», con el
   - **Después de 3 minutos:** vuelve a cada 10 s. Con la pantalla escondida no consulta.
   - **Prueba nueva:** `qrrapido`. Con la versión anterior, 1 consulta en 10 s; ahora, 5.
 
+- **Error encontrado en la auditoría: la cantidad que llegó podía quedar con el costo** (`lib/vento-producto-codigo.js`).
+  - **Qué pasaba:** al escanear un producto que llegó, la ventana «📥 ¿Cuántas llegaron?» ponía el cursor en la cantidad
+    50 ms después de abrir. En un equipo lento ese salto llegaba tarde: si la persona ya había tocado el **costo** y estaba
+    escribiendo, lo que escribía terminaba en la cantidad. Un costo de $1.800 quedaba como **1.800 unidades** en la
+    entrada de mercancía, y el costo sin cambiar.
+  - **Cómo se encontró:** la prueba `codigoproducto` lo mostró con la máquina cargada (cantidad 6 + 1.800).
+  - **Arreglo:** el cursor solo va a la cantidad si la persona no tocó ya otro campo. Igual en la ficha de producto nuevo,
+    que saltaba al precio cuando terminaba de buscar el producto por su código (puede tardar segundos).
+  - **Prueba:** `codigoproducto` tiene la revisión nueva 9. Con la versión anterior falla (el cursor se va a la cantidad);
+    ahora pasa 23 de 23.
+
 ## 3. Auditoría de todo
 ### Seguridad
 - **Archivos públicos** (página, Android y programa de PC): solo está la clave **pública** (anon). No hay `service_role`,
@@ -76,7 +87,8 @@ también a **ORDEVA Admin → 🐞 Errores** como «Pago avisado tarde», con el
 - **Las 25 del servidor:** pasan.
 
 ### Pendientes conocidos (sin cambio)
-- **`codigoproducto` y `equipoactividad`:** fallan de vez en cuando con la máquina muy cargada; al repetirlas pasan.
+- **`equipoactividad`:** falla de vez en cuando con la máquina muy cargada; al repetirla pasa. (`codigoproducto`, que también
+  fallaba así, tenía detrás el error de la cantidad de arriba, ya arreglado.)
 - **Un toque perdido** en `sincmesas` con mucha carga: no se pudo repetir en más de 44 corridas.
 - **Equipos de verdad:** no hay pruebas con celulares, TVs, lectores ni impresoras reales. Todo se prueba con simuladores
   y con el servidor de pruebas.
