@@ -1733,6 +1733,7 @@ function wireAccountUI(){
     invoiceNextNoInput.value = data.invoiceNextNo || 1;
     dianResolucionInput.value = data.dianResolucionText || '';
     bizNitInput.addEventListener('blur', () => { data.nit = bizNitInput.value.trim().slice(0, 40); bizNitInput.value = data.nit; saveData(); });
+    { const ri = document.getElementById('bizRntInput'); if(ri){ ri.value = data.rnt || ''; ri.addEventListener('blur', () => { data.rnt = ri.value.trim().slice(0, 30); ri.value = data.rnt; saveData(); }); } }   // ✈️ 1.82.0
     bizAddressInput.addEventListener('blur', () => { data.bizAddress = bizAddressInput.value.trim().slice(0, 120); bizAddressInput.value = data.bizAddress; saveData(); });
     // 🍽️ 1.82.0: IVA o INC 8 % (restaurantes y bares), no los dos a la vez
     const incT = document.getElementById('incOnToggle');

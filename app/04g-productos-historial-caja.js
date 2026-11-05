@@ -1209,6 +1209,7 @@ function buildReceiptText({businessName, tableLabel, dateStr, items, payments, t
   const lines = [];
   lines.push(`*${businessName}*`);
   if(nit) lines.push(`NIT/CC: ${nit}`);
+  if(typeof data !== 'undefined' && data && data.rnt) lines.push(`RNT: ${data.rnt}`);   // ✈️ 1.82.0
   if(bizAddress) lines.push(bizAddress);
   lines.push(tableLabel);
   lines.push(dateStr);
@@ -1252,7 +1253,7 @@ function buildReceiptHTML({businessName, tableLabel, dateStr, items, payments, t
   const itemsHtml = (items||[]).map(it=>`<div class="r-line"><span>${it.qty} x ${it.name}${it.size ? ' (' + it.size + ')' : ''}${it.person ? ' — ' + it.person : ''}</span><span>${fmt(it.price*it.qty)}</span></div>`).join('') || '<div class="r-line"><span>Sin productos</span><span></span></div>';
   const paymentsHtml = (payments||[]).map(p=>`<div class="r-line"><span>${p.note || 'Pago'} (${methodLabelShort(p.method)})</span><span>${fmt(p.amount)}</span></div>`).join('') || '<div class="r-line"><span>Sin pagos registrados</span><span></span></div>';
   const debtHtml = debt > 0 ? `<div class="r-line r-debt"><span>Queda debiendo</span><span>${fmt(debt)}</span></div>` : '';
-  const bizLineHtml = [nit ? 'NIT/CC: ' + invEsc(nit) : '', bizAddress ? invEsc(bizAddress) : ''].filter(Boolean).join(' · ');
+  const bizLineHtml = [nit ? 'NIT/CC: ' + invEsc(nit) : '', (typeof data !== 'undefined' && data && data.rnt) ? 'RNT: ' + invEsc(data.rnt) : '', bizAddress ? invEsc(bizAddress) : ''].filter(Boolean).join(' · ');
   const invoiceLineHtml = [invoiceNo ? 'Factura de venta N.º ' + invEsc(invoiceNo) : '', dianResolucionText ? invEsc(dianResolucionText) : ''].filter(Boolean).join(' · ');
   const ivaHtml = (ivaResponsable || inc > 0)
     ? ivaLineas(items, total, ivaRate, inc).map(r => `<div class="r-line"><span>${r[0]}</span><span>${fmt(r[1])}</span></div>`).join('')
@@ -1339,7 +1340,7 @@ function printReceipt(receiptData){
   f.style.cssText = 'position:fixed;width:0;height:0;border:0';
   document.body.appendChild(f);
   const d = f.contentDocument; d.open();
-  const bizLine = [receiptData.nit ? 'NIT/CC: ' + invEsc(receiptData.nit) : '', receiptData.bizAddress ? invEsc(receiptData.bizAddress) : ''].filter(Boolean).join(' · ');
+  const bizLine = [receiptData.nit ? 'NIT/CC: ' + invEsc(receiptData.nit) : '', (typeof data !== 'undefined' && data && data.rnt) ? 'RNT: ' + invEsc(data.rnt) : '', receiptData.bizAddress ? invEsc(receiptData.bizAddress) : ''].filter(Boolean).join(' · ');
   const invoiceLine = [receiptData.invoiceNo ? 'Factura de venta N.º ' + invEsc(receiptData.invoiceNo) : '', receiptData.dianResolucionText ? invEsc(receiptData.dianResolucionText) : ''].filter(Boolean).join('<br>');
   const ivaLine = (receiptData.ivaResponsable || receiptData.inc > 0)
     ? ivaLineas(receiptData.items, receiptData.total, receiptData.ivaRate, receiptData.inc).map(r => '<div style="display:flex;justify-content:space-between"><span>' + r[0] + '</span><span>' + fmt(r[1]) + '</span></div>').join('')
