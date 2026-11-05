@@ -95,8 +95,12 @@ también a **ORDEVA Admin → 🐞 Errores** como «Pago avisado tarde», con el
   sin proteger (1.72.4).
 
 ### Pruebas
-- **La lista completa de CI (72):** ver el resultado al final.
-- **Las 25 del servidor:** pasan.
+- **La lista completa de CI (72):** 71 de 72 a la primera. La única que falló fue `codigoproducto`, por el error de la
+  cantidad de arriba; ya arreglado, pasa 23 de 23.
+- **Las pruebas cambiadas o nuevas, repetidas:** `codigoproducto` 23/23, `qrimpresos` 8/8, `qrrapido` 6/6,
+  `qrprivado` 9/9, `seguridadqr` 6/6, `canalseguro` 16/16, `canalvivo` 17/17, `pagostodos` 17/17.
+- **Las 25 del servidor:** pasan. La revisión de migraciones dice que `20261125000000_pagos_despierto.sql` «se puede
+  desplegar».
 
 ### Pendientes conocidos (sin cambio)
 - **`equipoactividad`:** falla de vez en cuando con la máquina muy cargada; al repetirla pasa. (`codigoproducto`, que también
