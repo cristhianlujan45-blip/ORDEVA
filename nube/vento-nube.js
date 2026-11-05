@@ -417,6 +417,11 @@
     var txt = JSON.stringify(d), n0 = cambiosN;
     if(txt === enNubeTxt && enNubeDe === negId() && version === (st.version || 0)){ traza('igual', d); if(cambiosN === n0){ st.sucio = false; guardarSt(); } return Promise.resolve('igual'); }
     var foto = JSON.parse(txt);
+    // 📱 1.81.4: los ajustes de ESTE equipo (modo fácil, animación de fondo, vista de las mesas) no se suben: en la nube queda lo
+    // que ya había y los otros equipos siguen con los suyos. Sin copia de la nube (negocio nuevo), van tal cual.
+    if(baseMem && baseMemDe === negId()) (window.ventoCamposEquipo || []).forEach(function(k){
+      if(Object.prototype.hasOwnProperty.call(baseMem, k)) foto[k] = baseMem[k]; else delete foto[k];
+    });
     // 1.72.0: red de seguridad. Si lo que se va a subir perdió más de la mitad de las ventas de la copia de referencia
     // (el celular borró sus datos por falta de espacio, se limpió el almacenamiento con la sesión abierta…), NO se sube:
     // borraría las ventas y las cuentas de todos. Se vuelven a bajar los datos de la nube (con punto de restauración).

@@ -318,6 +318,7 @@ async function loadData(txtNube){
   if(data.orderOpenTime === undefined) data.orderOpenTime = '';
   if(data.orderCloseTime === undefined) data.orderCloseTime = '';
   if(data.orderHoursNote === undefined) data.orderHoursNote = '';
+  equipoAplicar();   // 1.81.4: modo fácil, animación de fondo y vista de las mesas son de ESTE equipo (no de los demás)
   applyPalette(data.theme);
   applyCustomBackground();
   applyEasyMode();
@@ -331,6 +332,28 @@ async function loadData(txtNube){
   });
   renderAll();
 }
+
+// 📱 1.81.4 · Ajustes de ESTE equipo. Pedido del dueño: «una configuración que yo haga en un celular, si lo pongo en modo
+// fácil, no afecte al otro dispositivo». Estos ajustes viajaban con los datos del negocio y se pasaban a todos los equipos
+// de la cuenta. Ahora cada equipo guarda los suyos (aparte, por negocio) y la nube no los sube (nube/vento-nube.js).
+// Los volúmenes y las voces ya eran de cada equipo (Ajustes → Pagos, Voz, Sonidos y la campana de pedidos).
+// El diseño (colores, tema, decoración) sigue siendo del negocio: también es el de la carta del QR de los clientes.
+const EQUIPO_CAMPOS = ['easyMode', 'rainOff', 'tableViewMode'];
+window.ventoCamposEquipo = EQUIPO_CAMPOS;
+const equipoKey = () => 'vento_equipo_cfg:' + STORAGE_KEY;
+function equipoLeer(){ try{ const v = JSON.parse(localStorage.getItem(equipoKey())); return v && typeof v === 'object' ? v : null; }catch(e){ return null; } }
+function equipoGuardar(){
+  if(typeof data === 'undefined' || !data) return;
+  const o = {}; EQUIPO_CAMPOS.forEach(k => { if(data[k] !== undefined) o[k] = data[k]; });
+  try{ const txt = JSON.stringify(o); if(localStorage.getItem(equipoKey()) !== txt) localStorage.setItem(equipoKey(), txt); }catch(e){}
+}
+// Al abrir y cada vez que llegan los datos de otro equipo: se ponen los de este equipo encima.
+// La primera vez (equipo que se actualiza) se queda con lo que ya tenía.
+function equipoAplicar(){
+  const c = equipoLeer(); if(!c){ equipoGuardar(); return; }
+  EQUIPO_CAMPOS.forEach(k => { if(k in c) data[k] = c[k]; else delete data[k]; });
+}
+window.ventoEquipoCfg = { leer: equipoLeer, guardar: equipoGuardar, aplicar: equipoAplicar };
 
 // ORDEVA Nube (nube/vento-nube.js): la nube lee los datos actuales y, cuando otro celular cambió algo,
 // los reemplaza aquí sin volver a subirlos (evita el eco).
@@ -384,6 +407,7 @@ function saveData(){
   let listo; const p = new Promise(r => { listo = r; });
   const g = guardadoPend = { key, obj, p, listo };
   // 1.69.1: se avisa a la nube YA (sube en ~25 ms lo que hay en memoria), sin esperar a que termine de guardarse aquí.
+  if(key === STORAGE_KEY && !window.__nubeAplicando) equipoGuardar();   // 1.81.4: lo que se cambió aquí queda como ajuste de este equipo
   if(key === STORAGE_KEY){
     if(window.__nubeAplicando) window.__nubeCambioEnAplicar = true;   // se avisa apenas terminen de ponerse los datos del otro equipo
     else { try{ window.ventoNube && window.ventoNube.cambio(); }catch(e){} }
