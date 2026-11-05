@@ -465,8 +465,16 @@ if(scanCodeAddBtnEl){
    reconocido". Ahora se pregunta qué producto es, se guarda ese código en el
    producto y desde ahí se reconoce solo. */
 let lcCode = null, lcOnPick = null, lcCanCreate = false, lcSuggestName = '';
+// 🔳 1.81.5: si el código nuevo salió escaneando con la cámara, al terminar (lo creó, lo eligió o canceló) la cámara vuelve
+// sola con lo mismo que se estaba escaneando. Antes había que tocar «Escanear» otra vez por cada producto nuevo.
+let lcVolver = null;
+function lcSeguirEscaneando(){
+  const v = lcVolver; lcVolver = null;
+  if(v && v.fn) setTimeout(() => { try{ if(!document.querySelector('.overlay.show:not(#scanOverlay):not(#overlay):not(#personOverlay):not(#quickSaleOverlay):not(#pzCajaOv)')) openScanOverlay(v.fn, { hint: v.hint }); }catch(e){} }, 250);
+}
 async function handleUnknownScannedCode(raw, onPick, opts){
   opts = opts || {};
+  { const so = document.getElementById('scanOverlay'); lcVolver = so && so.classList.contains('show') && scanOnResult ? { fn: scanOnResult, hint: (document.getElementById('scanStatus') || {}).textContent || '' } : null; }
   closeScanOverlay();
   lcCode = String(raw).trim(); lcOnPick = onPick; lcCanCreate = !!opts.canCreate; lcSuggestName = '';
   const ov = document.getElementById('linkCodeOverlay');
@@ -509,14 +517,16 @@ function lcRenderList(query){
     saveData();
     try{ window.ventoProductoCodigo && window.ventoProductoCodigo.aportar(lcCode, prod); }catch(e){}   // 1.65.9: ORDEVA aprende el código
     const cb = lcOnPick;
-    closeLinkCodeOverlay();
+    closeLinkCodeOverlay(false);
     showToast('🔗 Listo: ese código ahora es "' + prod.name + '".');
-    if(cb) cb(prod);
+    try{ if(cb) cb(prod); }finally{ lcSeguirEscaneando(); }
   }));
 }
-function closeLinkCodeOverlay(){
+function closeLinkCodeOverlay(seguir){
   document.getElementById('linkCodeOverlay').classList.remove('show');
   lcOnPick = null;
+  if(seguir === false) return;
+  lcSeguirEscaneando();   // «Cancelar» o ✕: se sigue escaneando lo demás
 }
 document.getElementById('lcSearch').addEventListener('input', e => lcRenderList(e.target.value));
 document.getElementById('lcCloseBtn').addEventListener('click', closeLinkCodeOverlay);
@@ -524,13 +534,14 @@ document.getElementById('lcCancelBtn').addEventListener('click', closeLinkCodeOv
 document.getElementById('linkCodeOverlay').addEventListener('click', e => { if(e.target.id === 'linkCodeOverlay') closeLinkCodeOverlay(); });
 document.getElementById('lcCreateBtn').addEventListener('click', () => {
   const code = lcCode, name = document.getElementById('lcSearch').value.trim() || lcSuggestName, cb = lcOnPick;
-  closeLinkCodeOverlay();
+  closeLinkCodeOverlay(false);
   // 🆕 1.65.9: la ficha sale llena sola (catálogo de ORDEVA, bases libres, IA); solo falta el precio. Al guardar, el
   // producto sigue a la venta o a la cuenta, como cuando se elige uno de la lista.
   if(window.ventoProductoCodigo && window.ventoProductoCodigo.ficha){
-    window.ventoProductoCodigo.ficha(code, { nombre: name }).then(r => { if(r && r.p && cb) cb(r.p); }).catch(() => {});
+    window.ventoProductoCodigo.ficha(code, { nombre: name }).then(r => { if(r && r.p && cb) cb(r.p); }).catch(() => {}).then(lcSeguirEscaneando);
     return;
   }
+  lcVolver = null;
   openQuickProductOverlay(name, { barcode: code });
 });
 
