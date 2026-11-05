@@ -393,7 +393,8 @@ function qrFijoDialogo(){
     ov=document.createElement('div');ov.id='qrFijoOverlay';ov.className='overlay';
     ov.innerHTML='<div class="modal" style="max-width:460px"><h2>📌 Fijar mis QR impresos</h2>'+
       '<div class="modal-sub">Sube una foto de un QR que ya tengas pegado en una mesa (o de varias, una por una), o un PDF o Word con esos QR, y ORDEVA lo lee solo — o pega aquí abajo los links, si los tienes copiados. En todos los casos se usa exactamente ese mismo link, sin generar uno nuevo: los QR que ya pegaste en las mesas siguen sirviendo tal cual.</div>'+
-      '<button type="button" class="btn-camera" id="qrFijoFotoBtn" style="width:100%;margin-top:8px">📷 Subir foto, PDF o Word del QR de una mesa</button>'+
+      '<button type="button" class="btn-camera" id="qrFijoCamBtn" style="width:100%;margin-top:8px">📷 Escanear con la cámara el QR pegado en la mesa</button>'+
+      '<button type="button" class="btn-camera" id="qrFijoFotoBtn" style="width:100%;margin-top:8px">🖼️ Subir foto, PDF o Word del QR de una mesa</button>'+
       '<input type="file" id="qrFijoFoto" accept="image/*,application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" multiple hidden>'+
       '<div class="modal-sub" id="qrFijoFotoMsg" style="margin-top:4px"></div>'+
       '<textarea id="qrFijoTxt" class="mz-in" style="width:100%;min-height:120px;box-sizing:border-box;font-size:12.5px;margin-top:8px" placeholder="https://…/?mesa=1&w=…&c=…&v=…"></textarea>'+
@@ -402,6 +403,21 @@ function qrFijoDialogo(){
     document.body.appendChild(ov);
     $('qrFijoNo').onclick=()=>ov.classList.remove('show');
     $('qrFijoFotoBtn').onclick=()=>$('qrFijoFoto').click();
+    // 1.72.6: con la cámara, uno tras otro (mesa por mesa); cada QR leído queda abajo, sin repetir.
+    $('qrFijoCamBtn').onclick=()=>{
+      if(typeof openScanOverlay!=='function'){$('qrFijoFotoMsg').textContent='⚠️ Este equipo no deja usar la cámara aquí: sube la foto del QR.';return;}
+      const ta=$('qrFijoTxt');let n=0;
+      try{const so=document.getElementById('scanOverlay');if(so)document.body.appendChild(so);}catch(e){}   // la cámara, encima de esta ventana
+      openScanOverlay(raw=>{
+        const t=String(raw||'').trim();
+        if(!/^https?:\/\//.test(t)){showToast('⚠️ Ese QR no es un link de ORDEVA.');return;}
+        if(ta.value.split(/\s+/).includes(t)){showToast('Ese QR ya está en la lista.');return;}
+        ta.value=(ta.value.trim()?ta.value.trim()+'\n':'')+t;n++;
+        const r=qrFijoDesdeLinks(ta.value);
+        $('qrFijoFotoMsg').textContent='✅ '+r.n+(r.n===1?' mesa leída':' mesas leídas')+'. Sigue con la siguiente mesa o cierra la cámara y toca «Fijar».';
+        showToast('✅ QR leído'+(r.n?' (mesa '+Object.keys(r.v).slice(-1)[0]+')':'')+'.');
+      },{hint:'Apunta la cámara al QR pegado en la mesa. Puedes leer varias mesas seguidas.'});
+    };
     $('qrFijoFoto').onchange=async e=>{
       const files=Array.from(e.target.files||[]);e.target.value='';
       if(!files.length)return;

@@ -58,6 +58,18 @@ también a **ORDEVA Admin → 🐞 Errores** como «Pago avisado tarde», con el
   - **Prueba:** `codigoproducto` tiene la revisión nueva 9. Con la versión anterior falla (el cursor se va a la cantidad);
     ahora pasa 23 de 23.
 
+- **«Fijar mis QR impresos» ya no dejaba subir los QR** (`app/16-pago-dueno-sube.js`, `app/09-cuentas-mesa-modulo.js`).
+  - **Qué pasaba:** para leer la foto del QR se usaba el lector del navegador, que **no existe en Chrome de Windows ni en
+    el programa de PC**. Después se usaba uno que se baja de internet. Si no cargaba, salía «⚠️ No pude leer ningún código
+    QR en esos archivos» y no había cómo subir los QR que ya están impresos en las mesas.
+  - **Arreglo:** ahora usa el lector propio de ORDEVA, el mismo de la cámara de la caja, que funciona en todos los equipos
+    y sin internet.
+  - **Nuevo, «📷 Escanear con la cámara el QR pegado en la mesa»:** se apunta el celular a cada QR, mesa por mesa, y se van
+    agregando sin repetirse.
+  - **Los QR impresos no cambian:** se usa exactamente su mismo link, el canal y el código de cada mesa.
+  - **Prueba nueva `qrimpresos`** (8 revisiones, sin internet): con la versión anterior falla con ese mismo mensaje; ahora
+    lee la foto del QR de un link viejo `…/cuentas/`, lo agrega con la cámara sin repetir y lo fija.
+
 ## 3. Auditoría de todo
 ### Seguridad
 - **Archivos públicos** (página, Android y programa de PC): solo está la clave **pública** (anon). No hay `service_role`,

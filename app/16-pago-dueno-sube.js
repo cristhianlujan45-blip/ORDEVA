@@ -26,6 +26,18 @@
   }
   async function leerTexto(img){
     if('BarcodeDetector' in window){ try{ const r = await new BarcodeDetector({ formats: ['qr_code'] }).detect(img); if(r && r[0] && r[0].rawValue) return r[0].rawValue; }catch(e){} }
+    // 1.72.6: el lector propio de ORDEVA (ZXing, lib/vento-codigos.js): el del navegador NO existe en Chrome de Windows ni
+    // en el programa de PC, y el de internet (jsQR) no carga sin internet. Antes ahí salía «No pude leer ningún código QR»
+    // y no se podían subir los QR que ya están impresos en las mesas.
+    if(window.ventoCodigos){
+      try{
+        const d = await window.ventoCodigos.detector(['qr_code']);
+        for(const lado of [0, 1400, 900]){
+          const fuente = lado ? canvasDe(img, lado) : img;
+          const r = await d.detect(fuente); if(r && r[0] && r[0].rawValue) return r[0].rawValue;
+        }
+      }catch(e){}
+    }
     const lib = await cargarJsQR(); if(!lib) return null;
     for(const lado of [1000, 700, 1400]){
       try{ const c = canvasDe(img, lado), d = c.getContext('2d').getImageData(0, 0, c.width, c.height), r = lib(d.data, c.width, c.height); if(r && r.data) return r.data; }catch(e){}
