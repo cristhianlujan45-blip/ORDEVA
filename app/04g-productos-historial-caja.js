@@ -1505,6 +1505,17 @@ function renderHistorial(masPagina){
   renderClosures();
 }
 
+/* 🤝 1.82.0 · La propina NO es venta: es de los empleados (Ley 1935 de 2018). Va en la cuenta como «🙏 Propina» y la
+   paga el cliente con lo demás (por eso sigue en lo cobrado y en la caja), pero ya no suma a «Vendido», a las entradas
+   por ventas de Contabilidad ni al cierre: sale aparte, «🤝 Propinas (de los empleados)», con lo de cada quien. */
+function propinaDe(h){
+  if(!h) return 0;
+  if(h.propina != null) return Math.max(0, Number(h.propina) || 0);
+  return Math.max(0, (h.items || []).filter(it => it && !it.productId && /^🙏\s*Propina/i.test(String(it.name || ''))).reduce((s, it) => s + (Number(it.price) || 0) * (Number(it.qty) || 1), 0));
+}
+window.propinaDe = propinaDe;
+window.ventaSinPropina = h => (Number(h && h.total) || 0) - propinaDe(h);
+
 /* ---------- Cierre de caja del día ---------- */
 function computeClosureStats(fromISO, toISO, caja){
   const from = fromISO ? new Date(fromISO) : null;
@@ -1514,7 +1525,9 @@ function computeClosureStats(fromISO, toISO, caja){
     const d = new Date(h.date);
     return (!from || d > from) && d <= to && (caja == null || (h.caja || '') === caja);
   });
-  const totalSold = tickets.reduce((s,h)=> s + h.total, 0);
+  const totalSold = tickets.reduce((s,h)=> s + (Number(h.total) || 0) - propinaDe(h), 0);   // 🤝 sin las propinas
+  let totalPropinas = 0; const propinas = {};
+  tickets.forEach(h => { const pr = propinaDe(h); if(pr > 0){ totalPropinas += pr; const q = h.by || 'Sin usuario'; propinas[q] = (propinas[q] || 0) + pr; } });
   let totalEfectivo = 0, totalTransferencia = 0, totalDebe = 0, totalRecibido = 0, totalVueltas = 0, descuentos = 0, devoluciones = 0;
   const medios = {}, cajeros = {};
   tickets.forEach(h=>{
@@ -1527,7 +1540,7 @@ function computeClosureStats(fromISO, toISO, caja){
       else if(p.method === 'debe') totalDebe += p.amount;
       const k = medioDePago(p); medios[k] = (medios[k] || 0) + (Number(p.amount) || 0);   // 1.81.0: TODOS los medios (Nequi, tarjeta…)
     });
-    const c = h.by || 'Sin usuario', x = cajeros[c] || (cajeros[c] = { n: 0, total: 0 }); x.n++; x.total += Number(h.total) || 0;
+    const c = h.by || 'Sin usuario', x = cajeros[c] || (cajeros[c] = { n: 0, total: 0 }); x.n++; x.total += (Number(h.total) || 0) - propinaDe(h);
     if(h.descuento) descuentos += Number(h.descuento.valor) || 0;
     (h.devoluciones || []).forEach(d => { devoluciones += Number(d.total) || 0; });
   });
@@ -1535,10 +1548,10 @@ function computeClosureStats(fromISO, toISO, caja){
   tickets.forEach(h=>{
     const d = new Date(h.date);
     const hourKey = String(d.getHours()).padStart(2,'0') + ':00';
-    hourlyMap[hourKey] = (hourlyMap[hourKey]||0) + h.total;
+    hourlyMap[hourKey] = (hourlyMap[hourKey]||0) + (Number(h.total) || 0) - propinaDe(h);
   });
   const hourly = Object.keys(hourlyMap).sort().map(h=>({ hour: h, total: hourlyMap[h] }));
-  return { tickets, totalSold, totalEfectivo, totalTransferencia, totalDebe, totalRecibido, totalVueltas, hourly, medios, cajeros, descuentos, devoluciones };
+  return { tickets, totalSold, totalEfectivo, totalTransferencia, totalDebe, totalRecibido, totalVueltas, hourly, medios, cajeros, descuentos, devoluciones, totalPropinas, propinas };
 }
 // 🔒 1.81.0: cierre Z numerado y con todos los medios de pago. Nombre de cada medio para el informe.
 // La caja guarda Nequi, DaviPlata, tarjeta… como «transferencia» con el nombre en la nota: aquí se separan.
@@ -1626,6 +1639,7 @@ async function closeCashRegister(opts){
     // 1.81.0: número consecutivo (cierre Z), todos los medios de pago, por cajero, descuentos y devoluciones
     z: (data.closures || []).reduce((a, c) => Math.max(a, Number(c.z) || 0), 0) + 1,
     medios: stats.medios, cajeros: stats.cajeros, descuentos: Math.round(stats.descuentos), devoluciones: Math.round(stats.devoluciones),
+    totalPropinas: Math.round(stats.totalPropinas || 0), propinas: stats.propinas || {},   // 🤝 1.82.0: aparte de lo vendido
     by: (typeof authUser !== 'undefined' && authUser) || '',
     cajaNombre: cajaN || undefined   // 1.81.3: antes «caja», que pisaba el arqueo de arriba
   };
@@ -1664,6 +1678,10 @@ function buildClosureText(closure){
   lines.push('');
   lines.push('*Por método de pago:*');
   cierreMedios(closure).forEach(m => lines.push(`${m[0]}: ${fmt(m[1])}`));
+  if(closure.totalPropinas > 0){
+    lines.push('', `*🤝 Propinas (de los empleados, no son venta): ${fmt(closure.totalPropinas)}*`);
+    const pp = closure.propinas || {}; if(Object.keys(pp).length > 1 || !pp['Sin usuario']) Object.keys(pp).forEach(k => lines.push(`  ${k}: ${fmt(pp[k])}`));
+  }
   if(closure.descuentos > 0) lines.push(`🏷️ Descuentos: ${fmt(closure.descuentos)}`);
   if(closure.devoluciones > 0) lines.push(`↩️ Devoluciones: ${fmt(closure.devoluciones)}`);
   if(closure.cajeros && Object.keys(closure.cajeros).length > 1){ lines.push('', '*Por cajero:*'); Object.keys(closure.cajeros).forEach(k => lines.push(`${k}: ${closure.cajeros[k].n} · ${fmt(closure.cajeros[k].total)}`)); }
@@ -1741,6 +1759,7 @@ function openClosureReport(closure){
       <span class="amount">${closure.ticketCount}</span>
     </div>
     ${cierreMedios(closure).filter(m => m[2] !== 'debe').map(m => `<div class="total-row sub"><span class="label">${m[0]}</span><span class="amount paid">${fmt(m[1])}</span></div>`).join('')}
+    ${closure.totalPropinas > 0 ? `<div class="total-row sub" id="cierrePropinas"><span class="label">🤝 Propinas (de los empleados, no son venta)</span><span class="amount">${fmt(closure.totalPropinas)}</span></div>` + Object.keys(closure.propinas || {}).filter(k => Object.keys(closure.propinas).length > 1 || k !== 'Sin usuario').map(k => `<div class="hist-detail-line"><span>· ${invEsc(k)}</span><span>${fmt(closure.propinas[k])}</span></div>`).join('') : ''}
     ${closure.descuentos > 0 ? `<div class="total-row sub"><span class="label">🏷️ Descuentos</span><span class="amount">${fmt(closure.descuentos)}</span></div>` : ''}
     ${closure.devoluciones > 0 ? `<div class="total-row sub"><span class="label">↩️ Devoluciones</span><span class="amount">${fmt(closure.devoluciones)}</span></div>` : ''}
     ${closure.cajeros && Object.keys(closure.cajeros).length > 1 ? '<div class="hist-detail-title">👤 Por cajero</div>' + Object.keys(closure.cajeros).map(k => `<div class="hist-detail-line"><span>${k}</span><span>${closure.cajeros[k].n} · ${fmt(closure.cajeros[k].total)}</span></div>`).join('') : ''}

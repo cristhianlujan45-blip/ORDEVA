@@ -2852,18 +2852,24 @@ function ctMovimientos(r){
   (data.history || []).forEach(h => {
     const t = new Date(h.date).getTime();
     if(t >= r.ini && t < r.fin){
-      nVentas++; vendido += Number(h.total) || 0;
+      nVentas++; vendido += (Number(h.total) || 0) - (window.propinaDe ? window.propinaDe(h) : 0);   // 🤝 1.82.0: sin propinas
       (h.items || []).forEach(it => { const c = Number(it.cost); if(c > 0) costo += c * (Number(it.qty) || 0); else if(!/domicilio|propina/i.test(it.name || '')) sinCosto = true; });
       porCobrar += Number(h.debt) || 0;
     }
     const pagoTarde = h.paidLater ? new Date(h.paidLater).getTime() : 0;
+    // 🤝 1.82.0: la propina sale del primer pago que la cubre y va aparte («propina»: de los empleados, no es venta)
+    let prop = window.propinaDe ? window.propinaDe(h) : 0;
     (h.payments || []).forEach(p => {
       if(p.method === 'debe' || !(Number(p.amount) > 0)) return;
       const tarde = p.abono ? true : pagoTarde && /pagó después/.test(p.note || '');   // 📅 1.81.0: cada abono de un crédito cuenta el día que se pagó
       const cuando = p.abono && p.at ? Number(p.at) : tarde ? pagoTarde : t;
       if(cuando >= r.ini && cuando < r.fin){
         const quien = h.tableName || (h.table ? i18nPut(espacioN()) + ' ' + h.table : 'Venta');
-        mov.push({ tipo: 'venta', monto: Number(p.amount), metodo: p.method || 'otro', fecha: cuando, desc: p.abono ? 'Abono de crédito · ' + quien : tarde ? 'Fiado cobrado · ' + quien : quien });
+        let monto = Number(p.amount);
+        if(prop > 0 && !p.abono && !tarde){ const q = Math.min(prop, monto); prop -= q; monto -= q;
+          if(q > 0) mov.push({ tipo: 'propina', monto: q, metodo: p.method || 'otro', fecha: cuando, desc: '🤝 Propina · ' + (h.tableName || (h.table ? i18nPut(espacioN()) + ' ' + h.table : 'Venta')) }); }
+        if(!(monto > 0)) return;
+        mov.push({ tipo: 'venta', monto: monto, metodo: p.method || 'otro', fecha: cuando, desc: p.abono ? 'Abono de crédito · ' + quien : tarde ? 'Fiado cobrado · ' + quien : quien });
       }
     });
   });
@@ -2898,6 +2904,7 @@ function renderConta(){
     k('out', '💸 Gastos', ctFmt(gastos), 'Compras y gastos registrados') +
     k('res', resultado >= 0 ? '✅ Te quedó (caja)' : '⚠️ Faltó (caja)', ctFmt(Math.abs(resultado)), 'Flujo de caja: entradas − salidas') +
     k('', '🧾 Vendido', ctFmt(x.vendido), x.nVentas + (x.nVentas === 1 ? ' cuenta' : ' cuentas')) +
+    (suma(m => m.tipo === 'propina') > 0 ? k('', '🤝 Propinas', ctFmt(suma(m => m.tipo === 'propina')), 'De los empleados: no son venta ni ganancia') : '') +
     k('', '📈 Ganancia de lo vendido', ctFmt(x.vendido - x.costo), 'Vendido − costo de los productos' + (x.sinCosto ? ' (faltan costos)' : '')) +
     // 🧮 1.67.2: resultado estimado (motor financiero): ganancia de lo vendido − gastos operativos. Las compras de
     // mercancía no se restan otra vez (ya están en el costo de lo vendido).
@@ -2967,7 +2974,7 @@ function renderConta(){
   lista.innerHTML = filas.length ? '' : '<div class="empty-note">Sin movimientos en este periodo.</div>';
   filas.slice(0, 300).forEach(m => {
     const d = document.createElement('div'); d.className = 'ct-mov';
-    const ic = m.tipo === 'venta' ? '🧾' : m.tipo === 'ingreso' ? '💰' : m.tipo === 'traslado' ? '🏧' : (ctCatNombre('gasto', m.cat).split(' ')[0] || '💸');
+    const ic = m.tipo === 'venta' ? '🧾' : m.tipo === 'propina' ? '🤝' : m.tipo === 'ingreso' ? '💰' : m.tipo === 'traslado' ? '🏧' : (ctCatNombre('gasto', m.cat).split(' ')[0] || '💸');
     const med = m.metodo && m.metodo !== 'otro' && CT_METODOS[m.metodo] ? ' · ' + CT_METODOS[m.metodo].replace(/^\S+\s/, '') : '';
     const sub = new Date(m.fecha).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }) + ' · ' + (m.sub || (ctCatNombre(m.tipo, m.cat).replace(/^\S+\s/, '') + (m.tipo === 'traslado' ? ' (no es gasto)' : '') + med + (m.auto ? ' · automático' : '')));
     d.innerHTML = '<span class="ic">' + ic + '</span><span class="tx"><b></b><small></small></span><span class="vl ' + (m.tipo === 'gasto' ? 'out' : m.tipo === 'traslado' ? 'tr' : 'in') + '">' + (m.tipo === 'gasto' ? '−' : m.tipo === 'traslado' ? '⇄ ' : '+') + ctFmt(m.monto) + '</span>';
@@ -3018,8 +3025,8 @@ function iniConta(){
     if(!ctCsvData || !ctCsvData.filas.length){ showToast('No hay movimientos para descargar.'); return; }
     const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
     const filas = [['Fecha', 'Tipo', 'Categoría', 'Detalle', 'Medio de pago', 'Entrada', 'Salida']].concat(ctCsvData.filas.slice().reverse().map(m => [
-      new Date(m.fecha).toLocaleString('es-CO'), m.tipo === 'venta' ? 'Venta' : m.tipo === 'ingreso' ? 'Otro ingreso' : m.tipo === 'traslado' ? 'Traslado (retiro)' : 'Gasto',
-      m.tipo === 'venta' ? 'Ventas' : ctCatNombre(m.tipo, m.cat).replace(/^\S+\s/, ''), m.desc, (CT_METODOS[m.metodo] || '').replace(/^\S+\s/, ''),
+      new Date(m.fecha).toLocaleString('es-CO'), m.tipo === 'venta' ? 'Venta' : m.tipo === 'propina' ? 'Propina (de los empleados)' : m.tipo === 'ingreso' ? 'Otro ingreso' : m.tipo === 'traslado' ? 'Traslado (retiro)' : 'Gasto',
+      m.tipo === 'venta' ? 'Ventas' : m.tipo === 'propina' ? 'Propinas' : ctCatNombre(m.tipo, m.cat).replace(/^\S+\s/, ''), m.desc, (CT_METODOS[m.metodo] || '').replace(/^\S+\s/, ''),
       m.tipo === 'gasto' || m.tipo === 'traslado' ? '' : Math.round(m.monto), m.tipo === 'gasto' ? Math.round(m.monto) : '']));
     const csv = '﻿' + filas.map(f => f.map(q).join(';')).join('\r\n');
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
