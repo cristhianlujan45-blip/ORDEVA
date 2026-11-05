@@ -106,6 +106,7 @@ function qsRegistrarVenta(cart, opts){
     if(ef){ ef.recibido = Math.round(Number(opts.recibido)); ef.vueltas = Math.max(0, Math.round(Number(opts.vueltas) || 0)); }
     entry.efectivoRecibido = Math.round(Number(opts.recibido)); entry.vueltas = Math.max(0, Math.round(Number(opts.vueltas) || 0));
   }
+  if(entry.inc == null) entry.inc = (data.impuestoConsumo ? (Number(data.incRate) || 8) : 0);   // 🍽️ 1.82.0
   data.history.unshift(entry);
   entry._inv.forEach(it => { try{ invOnSale({ productId: it.productId }, it.qty); }catch(e){} });
   try{ window.ventoDian && window.ventoDian.alVender(entry); }catch(e){}   // 🧾 a la DIAN (si está prendida)

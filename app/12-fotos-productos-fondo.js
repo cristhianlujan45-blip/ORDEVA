@@ -2946,7 +2946,11 @@ function renderConta(){
     if(ivaEl && F && F.informeIva){
       const I = F.informeIva(data, { ini: r.ini, fin: r.fin }), V = I.ventas, C = I.compras;
       const l = (t, v, sub) => '<div class="vt-l"><span>' + t + '</span><b>' + v + '</b></div>' + (sub ? '<div class="empty-note" style="margin:-4px 0 6px">' + sub + '</div>' : '');
-      ivaEl.innerHTML = (V.porTarifa.length ? V.porTarifa.map(t => l('Ventas al ' + t.tarifa + ' %', ctFmt(t.iva), 'Ventas ' + ctFmt(t.ventas) + ' · base ' + ctFmt(t.base))).join('') : '') +
+      // 🍽️ 1.82.0: impuesto al consumo (INC) de las ventas que lo llevan (h.inc), sin las propinas.
+      let incV = 0, incT = 0, incR = 0;
+      (data.history || []).forEach(h => { const t = new Date(h.date).getTime(), q = Number(h.inc) || 0; if(!(q > 0) || t < r.ini || t >= r.fin) return; const v = (Number(h.total) || 0) - (window.propinaDe ? window.propinaDe(h) : 0); incV += v; incT += v - v / (1 + q / 100); incR = q; });
+      const incHtml = incV > 0 ? l('🍽️ INC ' + incR + ' % (impuesto al consumo) por pagar', ctFmt(Math.round(incT)), 'Ventas con INC ' + ctFmt(incV) + ' · base ' + ctFmt(Math.round(incV - incT)) + '. Se declara cada dos meses (formulario 310).') : '';
+      ivaEl.innerHTML = incHtml + (V.porTarifa.length ? V.porTarifa.map(t => l('Ventas al ' + t.tarifa + ' %', ctFmt(t.iva), 'Ventas ' + ctFmt(t.ventas) + ' · base ' + ctFmt(t.base))).join('') : '') +
         (V.exentas ? l('Ventas exentas (0 %)', ctFmt(V.exentas)) : '') + (V.excluidas ? l('Ventas excluidas (sin IVA)', ctFmt(V.excluidas)) : '') +
         (V.sinIva ? l('Ventas sin IVA', ctFmt(V.sinIva), data.ivaResponsable ? 'Productos con tarifa 0 %.' : 'El negocio no está marcado como responsable de IVA (Ajustes → Negocio).') : '') +
         l('IVA generado', ctFmt(V.generado)) + l('IVA descontable (compras)', ctFmt(C.descontable), C.facturas + (C.facturas === 1 ? ' factura' : ' facturas') + ' por ' + ctFmt(C.total)) +

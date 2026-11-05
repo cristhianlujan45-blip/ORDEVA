@@ -122,7 +122,13 @@ function ivaBreakdown(total, rate){
 // 🧾 1.80.0: IVA separado por tarifa en el recibo. Cada producto con su tarifa (p.iva, o la del negocio), exento o
 // excluido (p.ivaTipo). Si todo va a la misma tarifa del negocio sale igual que antes: «Subtotal» e «IVA (19%)».
 // Devuelve filas [texto, valor]. La propina no lleva IVA (es de los empleados).
-function ivaLineas(items, total, rate){
+function ivaLineas(items, total, rate, inc){
+  // 🍽️ 1.82.0: restaurantes y bares con impuesto al consumo (INC 8 %, ya incluido en el precio, sin IVA). La propina no lo lleva.
+  if(Number(inc) > 0){
+    const r = Number(inc), v = (items || []).reduce((s, it) => s + (/propina/i.test(it.name || '') ? 0 : (Number(it.qty) || 0) * (Number(it.price) || 0)), 0);
+    const base = Math.round(v / (1 + r / 100));
+    return [['Subtotal (sin INC)', base], ['INC ' + r + ' % (impuesto al consumo)', Math.round(v) - base]];
+  }
   rate = Number(rate) || 0;
   const prods = (typeof data !== 'undefined' && data && data.products) || [];
   const sinT = t => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
@@ -303,6 +309,7 @@ async function loadData(txtNube){
   if(data.nit === undefined) data.nit = '';
   if(data.bizAddress === undefined) data.bizAddress = '';
   if(data.ivaResponsable === undefined) data.ivaResponsable = false;
+  if(data.impuestoConsumo && data.ivaResponsable) data.ivaResponsable = false;   // 🍽️ 1.82.0: INC o IVA, no los dos
   if(data.ivaRate === undefined) data.ivaRate = 19;
   if(data.invoicePrefix === undefined) data.invoicePrefix = 'FV';
   if(data.invoiceNextNo === undefined) data.invoiceNextNo = 1;
@@ -982,6 +989,7 @@ function closeTableToHistory(tableId){
     bizAddress: data.bizAddress || '',
     ivaResponsable: !!data.ivaResponsable,
     ivaRate: data.ivaRate || 19,
+    inc: (data.impuestoConsumo ? (Number(data.incRate) || 8) : 0),   // 🍽️ 1.82.0
     dianResolucionText: data.dianResolucionText || '',
     total,
     payments: paymentsDetail,

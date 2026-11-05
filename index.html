@@ -3933,6 +3933,10 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
         <div class="settings-row-text"><strong>Responsable de IVA</strong><span>Si no la activas, el recibo dice "No responsable de IVA".</span></div>
         <label class="switch"><input type="checkbox" id="ivaOnToggle"><span class="switch-slider"></span></label>
       </div>
+      <div class="settings-row">
+        <div class="settings-row-text"><strong>🍽️ Impuesto al consumo (INC 8 %)</strong><span>Restaurantes, bares y cafeterías: la comida y la bebida llevan INC, no IVA. El recibo dice «INC 8 % incluido» y Contabilidad muestra el INC por pagar. La propina no lo lleva.</span></div>
+        <label class="switch"><input type="checkbox" id="incOnToggle"><span class="switch-slider"></span></label>
+      </div>
       <div class="settings-row" style="flex-direction:column;align-items:stretch">
         <div class="settings-row-text"><strong>Costo de lo que compras</strong><span>Cómo se calcula el costo de un producto cuando llega mercancía nueva. No cambia las ventas pasadas (cada venta guardó su costo).</span></div>
         <select id="costoMetodoSel" class="mz-in" style="width:100%"><option value="ultimo">Último costo (el de la última factura)</option><option value="promedio">Promedio ponderado (lo que había en bodega + lo que llega)</option></select>

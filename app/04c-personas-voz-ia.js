@@ -1074,6 +1074,7 @@ document.getElementById('personChargeBtn').addEventListener('click', async ()=>{
   const debt = paymentsDetail.filter(p=>p.method === 'debe').reduce((s,p)=>s+p.amount, 0);
   data.history.unshift({
     id: Date.now().toString(),
+    inc: (data.impuestoConsumo ? (Number(data.incRate) || 8) : 0),   // 🍽️ 1.82.0
     table: currentTable,
     businessName: data.businessName,
     person: person ? person.name : null,

@@ -1734,7 +1734,11 @@ function wireAccountUI(){
     dianResolucionInput.value = data.dianResolucionText || '';
     bizNitInput.addEventListener('blur', () => { data.nit = bizNitInput.value.trim().slice(0, 40); bizNitInput.value = data.nit; saveData(); });
     bizAddressInput.addEventListener('blur', () => { data.bizAddress = bizAddressInput.value.trim().slice(0, 120); bizAddressInput.value = data.bizAddress; saveData(); });
-    ivaOnToggle.onchange = () => { data.ivaResponsable = ivaOnToggle.checked; saveData(); };
+    // 🍽️ 1.82.0: IVA o INC 8 % (restaurantes y bares), no los dos a la vez
+    const incT = document.getElementById('incOnToggle');
+    if(incT) incT.checked = !!data.impuestoConsumo;
+    ivaOnToggle.onchange = () => { data.ivaResponsable = ivaOnToggle.checked; if(ivaOnToggle.checked && data.impuestoConsumo){ data.impuestoConsumo = false; if(incT) incT.checked = false; showToast('Listo: IVA. Se apagó el INC (van por separado).'); } saveData(); };
+    if(incT) incT.onchange = () => { data.impuestoConsumo = incT.checked; if(incT.checked){ data.incRate = 8; if(data.ivaResponsable){ data.ivaResponsable = false; ivaOnToggle.checked = false; } showToast('🍽️ Listo: INC 8 % en los recibos. El IVA de las ventas se apagó (no van juntos).', 6000); } saveData(); };
     // 📦 1.67.6: método de valoración del costo (último o promedio ponderado)
     const cmSel = document.getElementById('costoMetodoSel');
     if(cmSel){ cmSel.value = data.costoMetodo === 'promedio' ? 'promedio' : 'ultimo'; cmSel.onchange = () => { data.costoMetodo = cmSel.value === 'promedio' ? 'promedio' : 'ultimo'; saveData(); showToast(data.costoMetodo === 'promedio' ? '📦 El costo será el promedio ponderado desde la próxima compra.' : '📦 El costo será el de la última compra.'); }; }

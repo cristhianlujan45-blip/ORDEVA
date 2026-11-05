@@ -1205,7 +1205,7 @@ editProductOverlay.addEventListener('click', (e)=>{ if(e.target === editProductO
 /* ---------- Compartir por WhatsApp ---------- */
 function methodLabelShort(m){ return methodLabelHist[m] || m; }
 
-function buildReceiptText({businessName, tableLabel, dateStr, items, payments, total, debt, invoiceNo, nit, bizAddress, ivaResponsable, ivaRate, dianResolucionText, pendiente, dian}){
+function buildReceiptText({businessName, tableLabel, dateStr, items, payments, total, debt, invoiceNo, nit, bizAddress, ivaResponsable, ivaRate, dianResolucionText, pendiente, dian, inc}){
   const lines = [];
   lines.push(`*${businessName}*`);
   if(nit) lines.push(`NIT/CC: ${nit}`);
@@ -1218,8 +1218,8 @@ function buildReceiptText({businessName, tableLabel, dateStr, items, payments, t
   lines.push('*Productos:*');
   (items||[]).forEach(it=> lines.push(`${it.qty} x ${it.name}${it.size ? ' (' + it.size + ')' : ''}${it.person ? ' — ' + it.person : ''} - ${fmt(it.price*it.qty)}`));
   lines.push('');
-  if(ivaResponsable){
-    ivaLineas(items, total, ivaRate).forEach(r => lines.push(`${r[0]}: ${fmt(r[1])}`));
+  if(ivaResponsable || inc > 0){
+    ivaLineas(items, total, ivaRate, inc).forEach(r => lines.push(`${r[0]}: ${fmt(r[1])}`));
   } else {
     lines.push('No responsable de IVA');
   }
@@ -1247,15 +1247,15 @@ function receiptQrPago(pendiente){
   const q = data.qrPago; if(!q || !(pendiente > 0)) return null;
   return { src: q.orig || q.img, titulo: 'Paga ' + fmt(pendiente) + ' con este QR' + (q.tipo ? ' (' + q.tipo + ')' : ''), llave: q.llave || '' };
 }
-function buildReceiptHTML({businessName, tableLabel, dateStr, items, payments, total, debt, invoiceNo, nit, bizAddress, ivaResponsable, ivaRate, dianResolucionText, pendiente, dian}){
+function buildReceiptHTML({businessName, tableLabel, dateStr, items, payments, total, debt, invoiceNo, nit, bizAddress, ivaResponsable, ivaRate, dianResolucionText, pendiente, dian, inc}){
   const qp = receiptQrPago(pendiente);
   const itemsHtml = (items||[]).map(it=>`<div class="r-line"><span>${it.qty} x ${it.name}${it.size ? ' (' + it.size + ')' : ''}${it.person ? ' — ' + it.person : ''}</span><span>${fmt(it.price*it.qty)}</span></div>`).join('') || '<div class="r-line"><span>Sin productos</span><span></span></div>';
   const paymentsHtml = (payments||[]).map(p=>`<div class="r-line"><span>${p.note || 'Pago'} (${methodLabelShort(p.method)})</span><span>${fmt(p.amount)}</span></div>`).join('') || '<div class="r-line"><span>Sin pagos registrados</span><span></span></div>';
   const debtHtml = debt > 0 ? `<div class="r-line r-debt"><span>Queda debiendo</span><span>${fmt(debt)}</span></div>` : '';
   const bizLineHtml = [nit ? 'NIT/CC: ' + invEsc(nit) : '', bizAddress ? invEsc(bizAddress) : ''].filter(Boolean).join(' · ');
   const invoiceLineHtml = [invoiceNo ? 'Factura de venta N.º ' + invEsc(invoiceNo) : '', dianResolucionText ? invEsc(dianResolucionText) : ''].filter(Boolean).join(' · ');
-  const ivaHtml = ivaResponsable
-    ? ivaLineas(items, total, ivaRate).map(r => `<div class="r-line"><span>${r[0]}</span><span>${fmt(r[1])}</span></div>`).join('')
+  const ivaHtml = (ivaResponsable || inc > 0)
+    ? ivaLineas(items, total, ivaRate, inc).map(r => `<div class="r-line"><span>${r[0]}</span><span>${fmt(r[1])}</span></div>`).join('')
     : '<div class="r-line"><span>No responsable de IVA</span><span></span></div>';
   return `
     <h3>${businessName}</h3>
@@ -1321,6 +1321,7 @@ function currentTableReceiptData(){
     bizAddress: data.bizAddress || '',
     ivaResponsable: !!data.ivaResponsable,
     ivaRate: data.ivaRate || 19,
+    inc: (data.impuestoConsumo ? (Number(data.incRate) || 8) : 0),
     dianResolucionText: data.dianResolucionText || ''
   };
 }
@@ -1340,8 +1341,8 @@ function printReceipt(receiptData){
   const d = f.contentDocument; d.open();
   const bizLine = [receiptData.nit ? 'NIT/CC: ' + invEsc(receiptData.nit) : '', receiptData.bizAddress ? invEsc(receiptData.bizAddress) : ''].filter(Boolean).join(' · ');
   const invoiceLine = [receiptData.invoiceNo ? 'Factura de venta N.º ' + invEsc(receiptData.invoiceNo) : '', receiptData.dianResolucionText ? invEsc(receiptData.dianResolucionText) : ''].filter(Boolean).join('<br>');
-  const ivaLine = receiptData.ivaResponsable
-    ? ivaLineas(receiptData.items, receiptData.total, receiptData.ivaRate).map(r => '<div style="display:flex;justify-content:space-between"><span>' + r[0] + '</span><span>' + fmt(r[1]) + '</span></div>').join('')
+  const ivaLine = (receiptData.ivaResponsable || receiptData.inc > 0)
+    ? ivaLineas(receiptData.items, receiptData.total, receiptData.ivaRate, receiptData.inc).map(r => '<div style="display:flex;justify-content:space-between"><span>' + r[0] + '</span><span>' + fmt(r[1]) + '</span></div>').join('')
     : '<div style="display:flex;justify-content:space-between"><span>No responsable de IVA</span><span></span></div>';
   d.write('<title>Recibo</title><body style="font-family:monospace;max-width:320px;margin:16px auto;font-size:13px">' +
     '<h2 style="text-align:center;margin:0 0 4px">' + invEsc(receiptData.businessName) + '</h2>' +
@@ -1440,6 +1441,7 @@ function histReceiptData(h){
     bizAddress: h.bizAddress || '',
     ivaResponsable: !!h.ivaResponsable,
     ivaRate: h.ivaRate || 19,
+    inc: Number(h.inc) || 0,
     dianResolucionText: h.dianResolucionText || '',
     dian: h.dian || null
   };
