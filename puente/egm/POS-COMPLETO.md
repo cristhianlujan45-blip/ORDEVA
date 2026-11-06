@@ -1,138 +1,80 @@
-# ORDEVA: qué falta para ser un sistema POS completo (borrador del Elephant)
+# ORDEVA: qué falta para ser un sistema POS completo (versión 2, después de la revisión Goldfish)
 
-**Estado:** borrador para revisión Goldfish. **Versión revisada:** ORDEVA 1.82.2 (6 de noviembre de 2026).
-**Pedido del dueño:** «revisa todo el proyecto y mira qué podemos mejorar para que quede un sistema POS completo».
+**Estado:** para aprobación del dueño. **Revisión:** `puente/egm/REVISION-GOLDFISH.md`, de cuatro revisores con contexto
+nuevo. **Código revisado:** ORDEVA 1.82.2.
 
-## 1. Para qué es este documento
-Decide qué construir para que ORDEVA haga todo lo que un comerciante colombiano espera de un sistema de punto de venta.
-Los negocios son tiendas, restaurantes, bares, hoteles, agencias y servicios, con uno o varios equipos en la misma cuenta.
+## 1. Lo que cambió desde el borrador 1
+- **Tres cosas que el borrador daba por faltantes ya existen:**
+  - la DIAN con INC (el servidor manda el código 04);
+  - el estado de resultados en Excel (`ctExcel`, cinco hojas);
+  - las alertas de stock bajo y de productos por vencer en el inicio.
 
-No es un plan de cada pantalla: es la lista de lo que falta, por qué importa, en qué orden, y qué riesgo trae cada parte.
+  Bajan a ajustes pequeños.
+- **La revisión encontró cuatro errores reales del código actual** (sección 2). Van primero.
+- **Traslados entre sedes y «ventas fuera del documento»** salen de esta lista: cada uno es un proyecto con plan propio.
+- **Los apartados reutilizan la cotización,** en vez de crear algo nuevo.
+- **Las comisiones suben de riesgo** y van antes que los apartados. Las barberías, salones y lavaderos las tienen
+  prometidas.
 
-## 2. Cómo está hecho ORDEVA hoy (lo que condiciona cualquier cambio)
-- **Una página web** (`index.html` + `app/*.js` + `lib/*.js` + `nube/*.js`, unos 90 archivos sin empaquetar).
-  - Funciona en el navegador, como app Android (`android/`, WebView con lectura de avisos de pago) y como programa de PC.
-- **Todos los datos del negocio son UN documento JSON** (`data`).
-  - Se guarda en el equipo (IndexedDB y `localStorage`) y se sincroniza con Supabase (`nube/vento-nube.js`): cada equipo
-    sube los cambios y, si choca con otro, mezcla campo por campo (`fusionar`).
-  - Ventas (`data.history`), cierres (`data.closures`), productos, mesas, libreta y contabilidad son listas dentro de ese
-    documento.
-  - **Consecuencia:** toda función nueva que guarde datos tiene que resistir dos equipos cambiando lo mismo a la vez.
-    En la 1.82.0–1.82.2 se encontraron tres errores de este tipo: ventas con el mismo número, el stock que no sumaba y
-    los cierres repetidos.
-- **El servidor (Supabase)** tiene, además del documento:
-  - pagos;
-  - reservas;
-  - facturación DIAN;
-  - suscripciones;
-  - canales del QR;
-  - tablas que se llenan solas desde el documento para consultas (`20261031000000_proyeccion.sql`).
-- **Pruebas:** 105 pruebas de navegador con un Supabase local real (`pruebas/`), 27 del servidor y las de Java de
-  Android. Corren en GitHub en cada cambio.
+## 2. 1.83 · Errores primero (riesgo de plata o legal)
+- **B1 · Un solo ajuste de impuesto.**
+  - **Qué pasa:** el «INC 8 %» del recibo (`data.impuestoConsumo`) y el de la DIAN (`dian_config.impuesto`) van sueltos.
+  - **Arreglo:**
+    - con la DIAN conectada, cambiar uno cambia el otro;
+    - si no coinciden (negocios de antes), se avisa en Ajustes y en la factura;
+    - una prueba revisa que recibo y DIAN digan lo mismo.
+- **B2 · El número de factura no se repite.**
+  - **Qué pasa:** hoy `invoiceNextNo` es un número suelto; dos equipos dan el mismo número.
+  - **Arreglo:** cada equipo toma su número del servidor (como ya hace la DIAN con `srv_dian_reservar`). Sin internet, sale
+    un número provisional que se cambia al conectarse.
+  - **Alternativa más simple:** un prefijo por equipo (A-0001, B-0001). Decide el dueño (pregunta 1).
+- **B3 · Juntar cierres sin faltantes falsos.** Al juntar dos cierres de la misma caja, se recalculan lo que debía haber
+  y la diferencia con las ventas de los dos. Si contaron los dos, quedan los dos conteos. Arregla lo de la 1.82.2.
+- **B4 · Lotes que suman entre equipos.**
+  - Las unidades de cada lote se mezclan como el stock (contador).
+  - La toma de inventario y la entrada de mercancía también actualizan los lotes.
+- **Ajustes pequeños de lo que ya existe:**
+  - el Excel de Contabilidad con la columna del mes anterior y la fila del INC;
+  - un solo criterio de «stock bajo» (hoy hay tres: 5, 3 y solo con mínimo);
+  - «pedir al proveedor» a un toque desde la alerta.
 
-## 3. Lo que ya tiene (no hay que rehacerlo)
-| Área | Ya existe | Dónde |
-|---|---|---|
-| Vender | Caja POS con teclado, lector USB/Bluetooth, cámara del celular, celular como lector del PC | `lib/vento-pos.js`, `lib/vento-escaner-caja.js`, `lib/vento-lector-cel.js` |
-| Cobrar | Efectivo con vueltas, Nequi, DaviPlata, Bre-B, transferencia, tarjeta (datáfono), mixto, fiado, saldo a favor | `lib/vento-pos.js` (`elegirPago`) |
-| Precios | Descuentos, hora feliz, combos, variantes, precio por cliente, venta por peso con balanza | `lib/vento-caja-mas.js`, `lib/vento-equipos.js` |
-| Devolver | Devoluciones con saldo a favor, cotizaciones, recibos de cualquier día | `lib/vento-caja-mas.js` |
-| Caja | Abrir con base, entradas y salidas, corte X, cierre Z numerado, arqueo por billetes, varias cajas, Excel de cierres | `lib/vento-turno.js`, `app/04g-…` |
-| Impuestos | IVA por tarifa, INC 8 %, retenciones estimadas, documento POS electrónico y factura DIAN | `app/04a-…` (`ivaLineas`), `nube/vento-dian.js` |
-| Inventario | Stock, kárdex, entrada de mercancía con lector, toma de inventario, lotes y vencimientos, costo promedio, recetas e insumos, pedidos al proveedor | `lib/vento-inventario.js`, `lib/vento-recetas.js` |
-| Clientes | Clientes frecuentes, puntos, fiados, libreta, crédito con cuotas y recordatorio | `app/13-libreta-…`, `lib/vento-caja-mas.js` |
-| Restaurante | Mesas, plano, dividir cuenta, comanda impresa en cocina y barra, pantalla de cocina, QR en la mesa, app de meseros, reservas | `lib/vento-comanda.js`, `lib/vento-plano.js`, `app/09-…` |
-| Hotel y agencia | Llegada y noches, registro de huéspedes, ocupación/ADR/RevPAR, reservas con Booking/Airbnb (iCal), cupos, viajeros, voucher con RNT | `lib/vento-hotel*.js`, `lib/vento-reservas.js`, `lib/vento-agencia.js` |
-| Equipos | Impresora térmica, cajón, balanza, pantalla del cliente, etiquetas | `lib/vento-equipos.js` |
-| Personas | Roles y permisos, PIN, varios equipos, ajustes por equipo | `app/27-roles-…`, `app/04a-…` |
+## 3. 1.84 · Lo que el catálogo promete y no cumple
+- **Comisiones** (barberías, salones, lavaderos):
+  - al vender un servicio se elige quién lo hizo;
+  - la venta guarda en cada renglón la persona y su comisión de ese momento;
+  - el informe del período por persona, y lo pagado como lista de pagos.
+- **Arqueo ciego:**
+  - un ajuste del dueño: el cajero cuenta sin ver lo esperado en ninguna de las cinco pantallas donde aparece hoy;
+  - lo esperado y la diferencia se calculan al mostrar el cierre (con los datos ya juntados), no se guardan fijos;
+  - el jefe sí lo ve.
 
-## 4. Lo que falta, en orden
+## 4. 1.85 · Apartados (plan separe), sobre la cotización
+- **Base:** reutilizar `cotizar` / `pasarAVenta` / `abonar` (`lib/vento-caja-mas.js`).
+- **Reserva:** el apartado descuenta las unidades al crearse, con un movimiento de kárdex de id fijo.
+- **Abonos:** son una lista, cada uno con su id, y entran como efectivo del turno.
+- **Venta final:** al pagarse completo se vuelve venta con un id fijo («apt-<id>»), así no sale dos veces si dos equipos
+  la terminan.
+- **Vencimiento:** se vence a mano, nunca solo, para no devolver el stock dos veces.
 
-Cada punto dice qué problema le resuelve al comerciante, una propuesta y el riesgo principal.
+## 5. Después, según lo que pidan los clientes
+- **Domicilios con estados:**
+  - hoy se guardan en un solo equipo (`localStorage`, no se sincronizan);
+  - pasarlos a los datos del negocio y reutilizar los estados de los pedidos del QR.
+- **Bonos y tarjetas regalo:**
+  - el saldo en el servidor;
+  - redimir sin repetir (bono + venta);
+  - devolver el saldo al anular;
+  - fuera de las ventas hasta que se usan.
+- **Dólares para turismo, tarifas por temporada en hoteles, asistencia del personal y menú del día.**
 
-### Prioridad 1: le cuestan plata o problemas con la DIAN hoy
-**P1.1 · Factura electrónica DIAN con INC (restaurantes y bares).**
-- **Hoy:** el recibo ya dice «INC 8 %» (1.82.0), pero el documento electrónico que va a la DIAN sale con IVA. Un
-  restaurante que factura electrónicamente reporta el impuesto equivocado.
-- **Propuesta:** que `nube/vento-dian.js` y el servidor de facturación manden el código de tributo del INC (04) cuando la
-  venta tiene `inc`.
-- **Riesgo:** depende del proveedor tecnológico. Hay que probarlo en su ambiente de habilitación antes de prenderlo.
+## 6. Fuera de esta lista (cada uno con su propio plan)
+- **Traslados entre sedes.** Cada sede es otra cuenta. Primero hay que decidir si ORDEVA maneja grupos de sedes.
+- **Archivar las ventas viejas fuera del documento.** Hoy eso se tomaría como un borrado: hace falta «archivar» en el
+  servidor, con una fecha de corte.
+- **Empaquetar los archivos para 4G.** Antes hay que medir la carga real.
 
-**P1.2 · Estado de resultados del mes en Excel, para el contador.**
-- **Hoy:** el contador recibe ventas, gastos y cierres sueltos. Las ventas, el costo, los gastos y la utilidad del mes
-  solo los dice el asistente en texto.
-- **Propuesta:** un Excel con una hoja por concepto, comparado con el mes anterior, desde las mismas funciones de
-  Contabilidad (`ctMovimientos`, `F.resultado`). Sin las propinas (1.82.0) y con el INC aparte.
-- **Riesgo:** bajo. Es solo lectura de datos que ya existen.
-
-**P1.3 · Arqueo ciego (conteo sin ver lo esperado).**
-- **Hoy:** al cerrar, el cajero ve «debe haber $98.000» antes de contar. Puede contar «para que cuadre».
-- **Propuesta:** un ajuste del dueño «el cajero cuenta sin ver cuánto debe haber». El sistema compara después y el
-  faltante queda a nombre de quien cerró.
-- **Riesgo:** bajo. Es un cambio en `ventoTurno.arqueo`.
-
-### Prioridad 2: lo que un comerciante espera de un POS y hoy no está
-**P2.1 · Apartados (plan separe).**
-- **Hoy:** el catálogo de tipos de negocio (ropa, joyería) promete «apartados con abono», pero no existe. Se hace a mano
-  como fiado, sin reservar el producto.
-- **Propuesta:** un apartado que separa las unidades (no se pueden vender a otro), recibe abonos y, al pagarse completo,
-  se vuelve venta. Si vence, devuelve el stock.
-- **Riesgo:** medio. Toca stock y dinero a la vez, y debe resistir dos equipos (usar contadores e ids únicos, como
-  1.82.1).
-
-**P2.2 · Tarjetas regalo y bonos.**
-- **Propuesta:** vender un bono con código (QR o número) que después se usa como medio de pago, con su saldo.
-- **Riesgo:** medio. El saldo debe vivir en el servidor, no en el documento: si dos equipos cobran el mismo bono a la
-  vez, el documento no sabe impedir que se gaste dos veces.
-
-**P2.3 · Comisiones por vendedor o barbero.**
-- **Hoy:** solo existe como categoría de gasto. Nada calcula cuánto le toca a cada uno.
-- **Propuesta:** porcentaje o valor fijo por producto o servicio y por persona, con el informe del período.
-- **Riesgo:** bajo.
-
-**P2.4 · Traslados de inventario entre sedes.**
-- **Hoy:** cada sede tiene sus propios datos; no hay forma de mandar mercancía de una a otra.
-- **Propuesta:** «enviar a la sede X»: sale de una y entra a la otra cuando la reciben.
-- **Riesgo:** alto. Las sedes son documentos distintos: hace falta algo en el servidor que mueva entre dos documentos
-  sin perder ni duplicar.
-
-**P2.5 · Domicilios con estados y repartidor.** Recibido → en preparación → en camino → entregado, con aviso por WhatsApp.
-- **Riesgo:** bajo-medio.
-
-**P2.6 · Alertas en la caja.** Stock bajo con «pedir al proveedor» a un toque, y productos por vencer en el inicio con
-«poner en promoción».
-- **Riesgo:** bajo.
-
-### Prioridad 3: depende del tipo de negocio
-- **P3.1 · Dólares (turismo):** cobrar en dólares con la tasa del día y dar las vueltas en pesos.
-- **P3.2 · Hoteles:** tarifas por temporada; IVA exento para extranjeros no residentes y el cálculo de FONTUR.
-- **P3.3 · Comisión de Booking y Airbnb** descontada en cada reserva.
-- **P3.4 · Asistencia del personal:** marcar entrada y salida con el PIN.
-- **P3.5 · Menú del día** (sopa, principio, proteína) ofrecido por el QR.
-
-### Técnico: no lo ve el comerciante, pero sostiene todo lo anterior
-- **T1 · Ventas fuera del documento único.**
-  - **Problema:** con años de ventas, el documento crece. Cada equipo lo baja entero al entrar y lo mezcla en cada
-    cambio.
-  - **Propuesta:** guardar las ventas viejas (más de N meses) en las tablas del servidor (ya existe la proyección) y que el
-    documento lleve solo las recientes.
-  - **Riesgo:** alto. Toca la sincronización, que es donde más errores aparecieron.
-- **T2 · Primera carga en 4G:** juntar y comprimir los ~90 archivos.
-- **T3 · Pruebas con equipos de verdad:** celulares, lectores e impresoras.
-
-## 5. Lo que este documento NO propone
-- Rehacer la sincronización ni pasar a otra base de datos.
-- Integrarse con plataformas de domicilios (Rappi, iFood): sus APIs son cerradas y cambian.
-- Una tienda en línea completa (ya hay carta/QR y agente de pedidos).
-
-## 6. Orden propuesto
-1. **1.83:** P1.2 (estado de resultados), P1.3 (arqueo ciego), P2.6 (alertas en la caja). Son bajo riesgo y de valor
-   inmediato.
-2. **1.84:** P2.1 (apartados) y P2.3 (comisiones).
-3. **1.85:** P1.1 (DIAN con INC), cuando el proveedor lo habilite en pruebas.
-4. Después: P2.2 (bonos, con servidor), P2.5 (domicilios), P3 según qué negocios lo pidan. T1 solo con un plan propio.
-
-## 7. Preguntas abiertas
-- ¿Cuántas ventas tiene hoy el negocio más grande? Decide si T1 es urgente o puede esperar.
-- ¿Qué proveedor de factura electrónica usan los clientes que tienen INC? Decide si P1.1 es posible ya.
-- ¿Los apartados deben poder pagarse desde otro equipo o sede?
+## 7. Preguntas para el dueño
+1. **Número de factura entre equipos:** ¿del servidor (consecutivo único, necesita internet al vender) o con un prefijo
+   por equipo (A-0001 / B-0001, funciona sin internet)?
+2. **¿Qué tipos de negocio usan más ORDEVA hoy?** Decide si van primero las comisiones o los apartados.
+3. **Apartados:** ¿se pagan solo en la tienda donde se hicieron, o también desde otro equipo o sede?
