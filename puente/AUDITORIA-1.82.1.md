@@ -45,7 +45,12 @@ La prueba `sincstress` (10 revisiones) hace todo en dos equipos AL MISMO TIEMPO,
 `ventasfiados` (16), `sincroniza` (27) y `sincmesas` (24) también pasan.
 
 ## 2. Pruebas
-RESULTADOS_AQUI
+- **La lista completa (104 pruebas, todas las de GitHub + `facturascan`):** 2.527 revisiones bien, 0 mal.
+- **Las 27 del servidor:** pasan.
+- **Android (`javaavisos`, con `android-all`):** 328 de 328.
+- **`sincstress`:** con la versión anterior falla 2 (stock 16 en vez de 12, y deshacer no devuelve el inventario);
+  ahora pasa 10 de 10.
+- **No se probó con equipos de verdad.**
 
 ## 3. Lo que queda por mejorar (por orden de importancia)
 1. **El cierre de caja hecho a la vez en dos equipos** (sin «varias cajas»): no se probó. Puede quedar el cierre
