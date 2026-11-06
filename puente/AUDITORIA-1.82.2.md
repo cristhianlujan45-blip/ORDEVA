@@ -40,7 +40,11 @@
   - las pruebas también corren cuando cambia el código de Android (`android/app/src/main/java/**`).
 
 ## 3. Pruebas
-RESULTADOS_AQUI
+- **La lista completa (105 pruebas, todas las de GitHub + `facturascan`):** 2.536 revisiones bien, 0 mal. Incluye
+  `javaavisos` con la librería de Android: 328 de 328.
+- **Las 27 del servidor:** pasan.
+- **`doscierres`:** con la versión anterior falla 3; ahora pasa 7 de 7.
+- **No se probó con equipos de verdad** (celulares, impresoras).
 
 ## 4. Lo que queda por mejorar
 1. **Factura electrónica DIAN con INC** para restaurantes: hoy sale con IVA. Hay que cambiarlo en el servidor de
