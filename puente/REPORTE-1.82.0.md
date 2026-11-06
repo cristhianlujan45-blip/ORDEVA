@@ -57,7 +57,7 @@ así se sigue sabiendo la fecha) más 4 letras al azar.
 - una mesa cerrada debiendo llega como fiado.
 
 **Lo que no se puede recuperar:** las ventas que ya se juntaron con otra antes de esta versión. Cada equipo guarda puntos
-de restauración («antes de la nube») en Ajustes → Respaldos; si falta algo importante, se puede revisar ahí.
+de restauración («antes de la nube») en Ajustes → 💾 Respaldo → «🕒 Puntos de restauración automáticos»: si falta algo importante, se puede revisar ahí (hasta 7 días).
 
 ## 1b. 🔊 Un pago sonaba dos veces (app del banco + SMS)
 **El dueño:** «me avisa llegaron 200 pesos y después me dice llegaron otra vez 200 pesos por mensaje de texto».
