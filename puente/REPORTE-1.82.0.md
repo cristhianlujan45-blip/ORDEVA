@@ -157,7 +157,27 @@ Prueba nueva: `hoteldia` (11).
 Prueba nueva: `agencia` (13).
 
 ## 7. Pruebas
-RESULTADOS_AQUI
+- **La lista completa (103 pruebas, todas las de GitHub + `facturascan`):** 2.505 revisiones bien.
+  - La única que falló fue `comandaimpresa`, a veces: la prueba tocaba Ajustes antes de que apareciera «Balanza, impresora
+    y cajón». Se corrigió la prueba (ahora espera el botón) y pasó 4 de 4.
+- **Pruebas nuevas:**
+
+  | Prueba | Revisiones |
+  |---|---|
+  | `ventasfiados` | 16 |
+  | `codigobarras` | 25 |
+  | `propinas` | 12 |
+  | `impuestoconsumo` | 10 |
+  | `comandaimpresa` | 12 |
+  | `hoteldia` | 11 |
+  | `agencia` | 13 |
+  | `EscuchaPrueba` (Android) | 5 casos nuevos |
+
+  Las seis primeras están en la lista de GitHub; `EscuchaPrueba` corre solo aquí (falta el `android-all` en GitHub).
+- **Las 27 del servidor:** pasan. Las 56 migraciones se aplican sobre una base vacía y la revisión dice «se puede
+  desplegar» (esta versión no trae migraciones).
+- **Android (`javaavisos`, con `android-all`):** 328 de 328.
+- **No se probó con equipos de verdad** (celulares, lectores, impresoras).
 
 ## 8. Lo que mejoraría después
 Por orden de importancia:

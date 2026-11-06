@@ -35,7 +35,10 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     await p.waitForFunction(() => !!window.ventoComanda && !!window.vitoPedidos && !!window.ventoEquipos, null, { timeout: 10000 });
     // ===== 1 =====
     await p.evaluate(() => { const c = window.ventoEquipos.cfg(); c.impresora = Object.assign(c.impresora, { via: 'bt', ancho: 32 }); window.ventoEquipos.guardarCfg(c); });
-    await p.evaluate(() => { document.querySelector('nav button[data-view="ajustes"]').click(); const k = document.querySelector('.ajustes-cat[data-cat="equipos"]') || [...document.querySelectorAll('.ajustes-cat')].find(x => /impresora|equipos|balanza/i.test(x.textContent)); if(k) k.click(); });
+    await p.evaluate(() => document.querySelector('nav button[data-view="ajustes"]').click());
+    // La sección «🔌 Balanza, impresora y cajón» se agrega a Ajustes un momento después de abrir: se espera a que esté.
+    await p.waitForFunction(() => !!document.querySelector('.ajustes-cat[data-cat="equipos"]'), null, { timeout: 15000 }).catch(() => {});
+    await p.evaluate(() => { const k = document.querySelector('.ajustes-cat[data-cat="equipos"]'); if(k) k.click(); });
     await p.waitForFunction(() => !!document.getElementById('vqComOn'), null, { timeout: 10000 }).catch(() => {});
     let v = await p.evaluate(() => ({ sec: !!document.getElementById('vqComanda'), on: !!document.getElementById('vqComOn') }));
     chk('1. Ajustes: sale «🍳 Comanda impresa (cocina y barra)»', v.sec && v.on, v);
