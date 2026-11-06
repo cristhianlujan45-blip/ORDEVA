@@ -107,6 +107,36 @@ function ventoIdUnico(suf){
   return Date.now().toString() + (suf != null && suf !== '' ? '-' + suf : '') + '-' + r;
 }
 window.ventoIdUnico = ventoIdUnico;
+// 🧾 1.83.0 · Número de factura sin repetirse entre equipos. Antes era un solo contador del negocio (invoiceNextNo): dos
+// equipos que vendían a la vez daban el mismo «Factura de venta N.º». Ahora cada equipo lleva su propio contador en
+// data.facturaEquipos[código del equipo] (solo él lo escribe: no choca al sincronizar). El primer equipo sigue con la
+// numeración de siempre (FV-0005, FV-0006…); cada equipo nuevo tiene su letra (FV-B-0001, FV-C-0001…). Si dos equipos
+// nuevos toman la misma letra a la vez, el que la tomó después pasa a la siguiente libre. La DIAN numera aparte.
+const FACT_LETRAS = 'BCDEFGHJKLMNPQRSTUVWXYZ';
+function facturaEquipo(crear){
+  const yo = (typeof codigoEquipo === 'function' ? codigoEquipo() : '') || 'equipo';
+  const fe = data.facturaEquipos && typeof data.facturaEquipos === 'object' ? data.facturaEquipos : null;
+  let e = fe && fe[yo];
+  if(!e && !crear) return { l: (fe && Object.keys(fe).length) ? '?' : '', n: (fe && Object.keys(fe).length) ? 1 : (data.invoiceNextNo || 1) };
+  if(!e){
+    const f = data.facturaEquipos = fe || {};
+    const usadas = Object.keys(f).map(k => f[k] && f[k].l);
+    const l = !Object.keys(f).length ? '' : (FACT_LETRAS.split('').find(x => !usadas.includes(x)) || ('Z' + Object.keys(f).length));
+    e = f[yo] = { l, n: l === '' ? (data.invoiceNextNo || 1) : 1, at: Date.now() };
+  }
+  // Dos equipos con la misma letra (la tomaron a la vez): se queda el primero; este pasa a la siguiente libre.
+  const f = data.facturaEquipos, otros = Object.keys(f).filter(k => k !== yo && f[k]);
+  const choca = otros.find(k => f[k].l === e.l && ((f[k].at || 0) < (e.at || 0) || ((f[k].at || 0) === (e.at || 0) && k < yo)));
+  if(choca){ const usadas = Object.keys(f).map(k => f[k].l); e.l = FACT_LETRAS.split('').find(x => !usadas.includes(x)) || ('Z' + Object.keys(f).length); e.n = 1; e.at = Date.now(); }
+  return e;
+}
+function facturaTexto(e, n){ return (data.invoicePrefix || 'FV') + '-' + (e.l ? e.l + '-' : '') + numFactura(n); }
+window.ventoFactura = {
+  ver(){ const e = facturaEquipo(false); return facturaTexto(e, e.n || 1); },                     // la que saldría (sin gastarla)
+  tomar(){ const e = facturaEquipo(true), n = e.n || 1; e.n = n + 1; if(e.l === '') data.invoiceNextNo = e.n; return { no: facturaTexto(e, n), devolver(){ if(e.n === n + 1){ e.n = n; if(e.l === '') data.invoiceNextNo = n; } } }; },
+  equipo(){ return facturaEquipo(false); },
+  poner(n){ const e = facturaEquipo(true); e.n = Math.max(1, n | 0); if(e.l === '') data.invoiceNextNo = e.n; }
+};
 
 const fmtNumber = (n) => new Intl.NumberFormat('es-CO', {
   useGrouping: true,
@@ -339,6 +369,9 @@ async function loadData(txtNube){
   applyCustomBackground();
   applyEasyMode();
   data.products.forEach(p => { if(p.categoryId === undefined) p.categoryId = null; });
+  // ⏳ 1.83.0: cada lote con su id (igual en todos los equipos: la hora en que entró y su vencimiento), para que la mezcla de
+  // la nube sume las unidades de cada lote en vez de tomar uno de los dos.
+  data.products.forEach(p => { if(!Array.isArray(p.lotes)) return; const vistos = {}; p.lotes.forEach(l => { if(!l || l.id) return; let k = 'lt' + (l.t || 0) + '-' + String(l.vence || ''); if(vistos[k]) k += '-' + vistos[k]; vistos[k] = (vistos[k] || 0) + 1; l.id = k; }); });
   // Compatibilidad: las mejoras de voz usan VOICE_PRODUCT_ALIASES sin alterar
   // productos, precios ni pedidos existentes del usuario.
   Object.values(data.tables).forEach(t=>{
@@ -986,8 +1019,7 @@ function closeTableToHistory(tableId){
   // Número consecutivo de factura de venta: se asigna una sola vez, al cerrar
   // la cuenta, y queda fijo en el historial aunque luego cambien el prefijo
   // o el consecutivo en Ajustes.
-  const invoiceNo = (data.invoicePrefix || 'FV') + '-' + numFactura(data.invoiceNextNo || 1);
-  data.invoiceNextNo = (data.invoiceNextNo || 1) + 1;
+  const facturaT = window.ventoFactura.tomar(), invoiceNo = facturaT.no;   // 🧾 1.83.0: por equipo, sin repetirse
   const entry = {
     id: ventoIdUnico(tableId),
     table: tableId,
@@ -1007,6 +1039,7 @@ function closeTableToHistory(tableId){
     date: new Date().toISOString(),
     by: (typeof authUser !== 'undefined' && authUser) ? authUser : null   // quién cerró/cobró esta mesa, para el turno de caja
   };
+  try{ Object.defineProperty(entry, '_facturaDevolver', { value: facturaT.devolver, enumerable: false }); }catch(e){}
   data.history.unshift(entry);
   if(!(entry.debt > 0)) try{ window.mesoraCelebrar && window.mesoraCelebrar(['💰', '✨', '🎉']); }catch(e){}
   t.items = [];

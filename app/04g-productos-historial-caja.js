@@ -1317,7 +1317,7 @@ function currentTableReceiptData(){
     pendiente: tableBalance(currentTable),
     // Vista previa: éste es el número que se le asignaría si se cierra ahora
     // (no se consume hasta que la cuenta se cierra de verdad).
-    invoiceNo: (data.invoicePrefix || 'FV') + '-' + numFactura(data.invoiceNextNo || 1),
+    invoiceNo: window.ventoFactura ? window.ventoFactura.ver() : (data.invoicePrefix || 'FV') + '-' + numFactura(data.invoiceNextNo || 1),
     nit: data.nit || '',
     bizAddress: data.bizAddress || '',
     ivaResponsable: !!data.ivaResponsable,
@@ -1676,7 +1676,14 @@ function juntarCierresRepetidos(){
       ticketCount: st.tickets.length, totalSold: st.totalSold, totalEfectivo: st.totalEfectivo, totalTransferencia: st.totalTransferencia, totalDebe: st.totalDebe,
       totalRecibido: st.totalRecibido, totalVueltas: st.totalVueltas, hourly: st.hourly, medios: st.medios, cajeros: st.cajeros,
       descuentos: Math.round(st.descuentos), devoluciones: Math.round(st.devoluciones), totalPropinas: Math.round(st.totalPropinas || 0), propinas: st.propinas || {},
-      caja: arqueoCierre(conArqueo || ultimo) || arqueoCierre(porFecha.find(c => arqueoCierre(c))) || null,
+      caja: (() => {   // 🔒 1.83.0: lo que debía haber y la diferencia, otra vez con las ventas en efectivo de los DOS equipos
+        const a0 = arqueoCierre(conArqueo || ultimo) || arqueoCierre(porFecha.find(c => arqueoCierre(c))); if(!a0) return null;
+        const a = Object.assign({}, a0), ef = Math.round(st.totalEfectivo || 0);
+        a.ventas = ef; a.esperado = Math.round((Number(a.base) || 0) + ef + (Number(a.entradas) || 0) - (Number(a.salidas) || 0));
+        a.diferencia = a.contado != null ? Math.round(Number(a.contado) - a.esperado) : null;
+        const conteos = porFecha.map(c => arqueoCierre(c)).filter(x => x && x.contado != null).map(x => ({ contado: x.contado, por: x.por || '' }));
+        if(conteos.length > 1) a.conteos = conteos;   // contaron los dos: quedan los dos conteos
+        return a; })(),
       by: [...new Set(g.map(c => c.by).filter(Boolean))].join(' y ') || ultimo.by || '', juntados: g.length
     });
     if(!isFinite(junto.z)) junto.z = ultimo.z;

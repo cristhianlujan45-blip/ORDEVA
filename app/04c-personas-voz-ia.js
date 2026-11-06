@@ -2304,6 +2304,8 @@ function invStatus(p){
   const d = invDays(p);
   return (p.stock <= (p.minStock != null ? p.minStock : INV_DEF_MIN) || (d != null && d <= 2)) ? 'low' : 'ok';
 }
+// 📦 1.83.0: UN solo criterio de «stock bajo» en toda la app (antes la caja usaba 3, el inventario 5 y el inicio solo el mínimo).
+window.ventoStockBajo = p => { try{ return invStatus(p) === 'low'; }catch(e){ return false; } };
 function invChip(p){
   const s = invStatus(p);
   if(s === 'none') return '';

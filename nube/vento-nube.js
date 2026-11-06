@@ -284,7 +284,8 @@
   }
   // Contadores: si los dos celulares vendieron del mismo producto, se suman los dos movimientos
   // (stock 20 → aquí 18, allá 17 → queda 15), en vez de quedarse con uno solo.
-  var CONTADORES = { stock: 1, stockMin: 0 };
+  // 1.83.0: también las unidades de cada lote («q»), para que dos equipos que venden del mismo lote descuenten los dos.
+  var CONTADORES = { stock: 1, stockMin: 0, q: 1 };
   // 1.82.1: ¿cambió un contador (el stock) de la base a «l», en cualquier parte de lo de adentro? Si los dos celulares
   // vendieron LO MISMO del mismo producto (los dos dejaron el stock en 19 de 20), los dos productos quedan idénticos y
   // antes se tomaba «son iguales: es el mismo cambio» → quedaba 19 y una venta no se descontaba del inventario. Ahora,

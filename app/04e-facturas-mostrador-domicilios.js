@@ -1435,7 +1435,7 @@ document.getElementById('invoiceApplyBtn').addEventListener('click', async () =>
       p.cost = F ? F.costoTrasCompra(p.stock, p.cost, it.qty, it.cost, data.costoMetodo) : it.cost;
       p.costoUltimo = it.cost;
       p.stock = (p.stock || 0) + it.qty;
-      if(it.vence){ p.lotes = (p.lotes || []).concat([{ q: it.qty, vence: it.vence, t: Date.now(), costo: it.cost }]); }
+      if(it.vence){ p.lotes = (p.lotes || []).concat([{ id: 'lt' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), q: it.qty, vence: it.vence, t: Date.now(), costo: it.cost }]); }
       if(it.ivaPct > 0 && (p.iva == null || p.iva === '')) p.iva = Math.round(it.ivaPct * 100);
       p.costSinIva = Math.round(p.cost / (1 + (it.ivaPct || 0)) * 100) / 100;
       if(it.newPrice > 0){ p.price = it.newPrice; sincronizarProductoEnMesas(p); }
@@ -1448,7 +1448,7 @@ document.getElementById('invoiceApplyBtn').addEventListener('click', async () =>
         iva: it.ivaPct > 0 ? Math.round(it.ivaPct * 100) : undefined, costSinIva: Math.round(it.cost / (1 + (it.ivaPct || 0)) * 100) / 100 };
       if(it.presentation || it.unitsPerPackage) p.det = Object.assign({}, p.det, { presentacion: it.presentation || null, unidadesPorPaquete: it.unitsPerPackage || null });
       p.costoUltimo = it.cost;
-      if(it.vence) p.lotes = [{ q: it.qty, vence: it.vence, t: Date.now(), costo: it.cost }];   // ⏳ 1.67.6
+      if(it.vence) p.lotes = [{ id: 'lt' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), q: it.qty, vence: it.vence, t: Date.now(), costo: it.cost }];   // ⏳ 1.67.6
       data.products.push(p);
       created++;
     }

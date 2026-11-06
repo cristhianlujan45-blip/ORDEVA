@@ -69,8 +69,25 @@
     st.cfg = c; st.ambiente = j.ambiente; st.servidor = j.servidor; st.cargado = Date.now();
     lsSet(K_CFG + n.id, c);
     try{ pintarAjustes(forzar); }catch(e){}
+    try{ impuestoAlRecibo(c); }catch(e){}
     return c;
   }
+  // 🧾 1.83.0 · Un solo impuesto. Antes el recibo («INC 8 %», data.impuestoConsumo) y la DIAN (dian_config.impuesto) iban
+  // sueltos: el cliente veía «INC 8 %» y a la DIAN le llegaba IVA, o al revés. Con la facturación electrónica prendida,
+  // manda lo de la DIAN: el recibo dice lo mismo que el documento electrónico.
+  function impuestoAlRecibo(c){
+    var d = D(); if(!d || !c || !c.activo) return false;
+    var imp = c.impuesto === 'inc' ? 'inc' : c.impuesto === 'iva' ? 'iva' : 'ninguno', t = Number(c.tarifa) || 0, antes = JSON.stringify([d.impuestoConsumo, d.incRate, d.ivaResponsable, d.ivaRate]);
+    if(imp === 'inc'){ d.impuestoConsumo = true; d.incRate = t || 8; d.ivaResponsable = false; }
+    else if(imp === 'iva'){ d.impuestoConsumo = false; d.ivaResponsable = true; d.ivaRate = t || 19; }
+    else { d.impuestoConsumo = false; d.ivaResponsable = false; }
+    if(JSON.stringify([d.impuestoConsumo, d.incRate, d.ivaResponsable, d.ivaRate]) === antes) return false;
+    try{ saveData(); }catch(e){}
+    try{ var i = document.getElementById('incOnToggle'), v = document.getElementById('ivaOnToggle'); if(i) i.checked = !!d.impuestoConsumo; if(v) v.checked = !!d.ivaResponsable; }catch(e){}
+    return true;
+  }
+  // ¿Qué impuesto manda la DIAN? (null si la facturación electrónica está apagada)
+  function impuestoDian(){ var c = cfg(); return c && c.activo ? (c.impuesto === 'inc' ? 'inc' : c.impuesto === 'iva' ? 'iva' : 'ninguno') : null; }
 
   // ---------- De una venta de ORDEVA a lo que se manda ----------
   function prod(it){ var d = D(); if(!d || !d.products) return null; return d.products.find(function(p){ return (it.productId && p.id === it.productId) || p.name === it.name; }) || null; }
@@ -445,7 +462,7 @@
     setInterval(function(){ if(negocio()){ programar(0); if(Date.now() - st.cargado > 10 * 60e3) cargar(); } }, 60e3);
     document.addEventListener('click', function(e){ var c = e.target.closest && e.target.closest('.ajustes-cat[data-cat="negocio"]'); if(c) setTimeout(function(){ pintarAjustes(); cargar(); }, 50); });
   }
-  window.ventoDian = { activo: activo, cfg: cfg, cargar: cargar, alVender: alVender, alDeshacer: function(h){ return anularVenta(h, 'Cobro deshecho'); }, alBorrar: function(h){ return anularVenta(h, 'Venta borrada'); },
+  window.ventoDian = { impuestoDian: impuestoDian, impuestoAlRecibo: impuestoAlRecibo, activo: activo, cfg: cfg, cargar: cargar, alVender: alVender, alDeshacer: function(h){ return anularVenta(h, 'Cobro deshecho'); }, alBorrar: function(h){ return anularVenta(h, 'Venta borrada'); },
     alLiberar: function(h){ return anularVenta(h, 'Venta devuelta a la cuenta'); }, alCorregir: alCorregir, devolver: devolver, facturaA: facturaA, pedirCliente: pedirCliente, esperar: esperar,
     reciboHTML: reciboHTML, reciboTexto: reciboTexto, lineasRecibo: lineasRecibo, bloqueHistorial: bloqueHistorial, pintarAjustes: pintarAjustes, procesar: procesar, cola: cola, _ventaDe: ventaDe };
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar); else iniciar();

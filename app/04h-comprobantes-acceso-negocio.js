@@ -1730,7 +1730,7 @@ function wireAccountUI(){
     ivaOnToggle.checked = !!data.ivaResponsable;
     ivaRateInput.value = data.ivaRate || 19;
     invoicePrefixInput.value = data.invoicePrefix || 'FV';
-    invoiceNextNoInput.value = data.invoiceNextNo || 1;
+    invoiceNextNoInput.value = window.ventoFactura ? (window.ventoFactura.equipo().n || 1) : (data.invoiceNextNo || 1);   // 🧾 1.83.0: el de ESTE equipo
     dianResolucionInput.value = data.dianResolucionText || '';
     bizNitInput.addEventListener('blur', () => { data.nit = bizNitInput.value.trim().slice(0, 40); bizNitInput.value = data.nit; saveData(); });
     { const ri = document.getElementById('bizRntInput'); if(ri){ ri.value = data.rnt || ''; ri.addEventListener('blur', () => { data.rnt = ri.value.trim().slice(0, 30); ri.value = data.rnt; saveData(); }); } }   // ✈️ 1.82.0
@@ -1738,8 +1738,12 @@ function wireAccountUI(){
     // 🍽️ 1.82.0: IVA o INC 8 % (restaurantes y bares), no los dos a la vez
     const incT = document.getElementById('incOnToggle');
     if(incT) incT.checked = !!data.impuestoConsumo;
-    ivaOnToggle.onchange = () => { data.ivaResponsable = ivaOnToggle.checked; if(ivaOnToggle.checked && data.impuestoConsumo){ data.impuestoConsumo = false; if(incT) incT.checked = false; showToast('Listo: IVA. Se apagó el INC (van por separado).'); } saveData(); };
-    if(incT) incT.onchange = () => { data.impuestoConsumo = incT.checked; if(incT.checked){ data.incRate = 8; if(data.ivaResponsable){ data.ivaResponsable = false; ivaOnToggle.checked = false; } showToast('🍽️ Listo: INC 8 % en los recibos. El IVA de las ventas se apagó (no van juntos).', 6000); } saveData(); };
+    // 🧾 1.83.0: con la facturación electrónica prendida, el impuesto lo manda la DIAN (no se deja poner otro en el recibo).
+    const dianManda = (quiere) => { const im = window.ventoDian && window.ventoDian.impuestoDian ? window.ventoDian.impuestoDian() : null; if(!im || im === quiere) return false;
+      showToast('🧾 La facturación electrónica está con «' + (im === 'inc' ? 'INC 8 %' : im === 'iva' ? 'IVA' : 'sin impuesto') + '». Para cambiarlo, hazlo en Ajustes → Facturación electrónica: así el recibo y la DIAN dicen lo mismo.', 9000);
+      ivaOnToggle.checked = !!data.ivaResponsable; if(incT) incT.checked = !!data.impuestoConsumo; return true; };
+    ivaOnToggle.onchange = () => { if(dianManda(ivaOnToggle.checked ? 'iva' : (data.impuestoConsumo ? 'inc' : 'ninguno'))) return; data.ivaResponsable = ivaOnToggle.checked; if(ivaOnToggle.checked && data.impuestoConsumo){ data.impuestoConsumo = false; if(incT) incT.checked = false; showToast('Listo: IVA. Se apagó el INC (van por separado).'); } saveData(); };
+    if(incT) incT.onchange = () => { if(dianManda(incT.checked ? 'inc' : (data.ivaResponsable ? 'iva' : 'ninguno'))) return; data.impuestoConsumo = incT.checked; if(incT.checked){ data.incRate = 8; if(data.ivaResponsable){ data.ivaResponsable = false; ivaOnToggle.checked = false; } showToast('🍽️ Listo: INC 8 % en los recibos. El IVA de las ventas se apagó (no van juntos).', 6000); } saveData(); };
     // 📦 1.67.6: método de valoración del costo (último o promedio ponderado)
     const cmSel = document.getElementById('costoMetodoSel');
     if(cmSel){ cmSel.value = data.costoMetodo === 'promedio' ? 'promedio' : 'ultimo'; cmSel.onchange = () => { data.costoMetodo = cmSel.value === 'promedio' ? 'promedio' : 'ultimo'; saveData(); showToast(data.costoMetodo === 'promedio' ? '📦 El costo será el promedio ponderado desde la próxima compra.' : '📦 El costo será el de la última compra.'); }; }
@@ -1762,8 +1766,8 @@ function wireAccountUI(){
     });
     invoiceNextNoInput.addEventListener('blur', () => {
       const v = parseInt(invoiceNextNoInput.value, 10);
-      data.invoiceNextNo = (isFinite(v) && v >= 1) ? v : 1;
-      invoiceNextNoInput.value = data.invoiceNextNo;
+      if(window.ventoFactura) window.ventoFactura.poner((isFinite(v) && v >= 1) ? v : 1); else data.invoiceNextNo = (isFinite(v) && v >= 1) ? v : 1;
+      invoiceNextNoInput.value = window.ventoFactura ? window.ventoFactura.equipo().n : data.invoiceNextNo;
       saveData();
     });
     dianResolucionInput.addEventListener('blur', () => {

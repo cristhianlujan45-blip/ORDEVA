@@ -427,7 +427,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-11-06 · v1.82.2';
+const MESORA_VERSION = '2026-11-06 · v1.83.0';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'ORDEVA · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 /* 🔄 La app Android se actualiza SOLA (Actualizador): revisa cada 3 h, baja la versión nueva y la instala cuando no se
@@ -3050,10 +3050,23 @@ function ctExcel(){
   const iva = F.informeIva(d, R), rent = F.rentabilidad(d.history, d.products, d.categories, R);
   const gastosMov = x.mov.filter(m => m.tipo === 'gasto'), res = F.resultado(x.vendido, x.costo, gastosMov), pt = F.gastosPorTipo(gastosMov);
   const hojas = [
-    { nombre: 'Resumen', filas: [['Concepto', 'Valor'], ['Negocio', d.businessName || ''], ['Período', r.titulo], ['Cobrado (entradas)', num(suma(m => m.tipo === 'venta'))], ['Otros ingresos', num(suma(m => m.tipo === 'ingreso'))],
-      ['Gastos (salidas)', num(suma(m => m.tipo === 'gasto'))], ['Vendido', num(x.vendido)], ['Costo de lo vendido', num(x.costo)], ['Utilidad bruta', num(res.utilidadBruta)], ['Gastos operativos', num(res.gastosOperativos)],
-      ['Resultado estimado', num(res.resultadoNeto)], ['Gastos directos', pt.directo], ['Gastos operativos (tipo)', pt.operativo], ['Gastos administrativos', pt.administrativo], ['Gastos financieros', pt.financiero],
-      ['IVA generado (ventas)', iva.ventas.generado], ['IVA descontable (compras)', iva.compras.descontable], [iva.saldo >= 0 ? 'IVA por pagar (estimado)' : 'IVA a favor (estimado)', Math.abs(iva.saldo)]] },
+    { nombre: 'Resumen', filas: (() => {
+      // 📊 1.83.0: al lado, el período anterior (el mismo que compara la pantalla) y el cambio; y el INC y las propinas aparte.
+      const ra = ctRangoAnterior(r), xa = ctMovimientos(ra), sumaA = f => xa.mov.filter(f).reduce((a, m) => a + m.monto, 0);
+      const resA = F.resultado(xa.vendido, xa.costo, xa.mov.filter(m => m.tipo === 'gasto'));
+      const incDe = rr => (d.history || []).reduce((a, h) => { const t = new Date(h.date).getTime(), q = Number(h.inc) || 0; if(!(q > 0) || t < rr.ini || t >= rr.fin) return a; const v = (Number(h.total) || 0) - (window.propinaDe ? window.propinaDe(h) : 0); return a + v - v / (1 + q / 100); }, 0);
+      const cambio = (v, va) => va ? Math.round((v - va) / Math.abs(va) * 100) + ' %' : '';
+      const fila = (t, v, va) => [t, num(v), num(va), cambio(num(v), num(va))];
+      const L = [['Concepto', 'Valor', 'Período anterior (' + ra.titulo + ')', 'Cambio'], ['Negocio', d.businessName || '', '', ''], ['Período', r.titulo, '', ''],
+        fila('Cobrado (entradas)', suma(m => m.tipo === 'venta'), sumaA(m => m.tipo === 'venta')), fila('Otros ingresos', suma(m => m.tipo === 'ingreso'), sumaA(m => m.tipo === 'ingreso')),
+        fila('Gastos (salidas)', suma(m => m.tipo === 'gasto'), sumaA(m => m.tipo === 'gasto')), fila('Vendido', x.vendido, xa.vendido), fila('Costo de lo vendido', x.costo, xa.costo),
+        fila('Utilidad bruta', res.utilidadBruta, resA.utilidadBruta), fila('Gastos operativos', res.gastosOperativos, resA.gastosOperativos), fila('Resultado estimado', res.resultadoNeto, resA.resultadoNeto),
+        ['Gastos directos', pt.directo, '', ''], ['Gastos operativos (tipo)', pt.operativo, '', ''], ['Gastos administrativos', pt.administrativo, '', ''], ['Gastos financieros', pt.financiero, '', ''],
+        fila('Propinas (de los empleados, no son venta)', suma(m => m.tipo === 'propina'), sumaA(m => m.tipo === 'propina')),
+        ['IVA generado (ventas)', iva.ventas.generado, '', ''], ['IVA descontable (compras)', iva.compras.descontable, '', ''], [iva.saldo >= 0 ? 'IVA por pagar (estimado)' : 'IVA a favor (estimado)', Math.abs(iva.saldo), '', '']];
+      const inc = incDe(r), incA = incDe(ra);
+      if(inc > 0 || incA > 0) L.push(fila('INC (impuesto al consumo) por pagar', inc, incA));
+      return L; })() },
     { nombre: 'Ventas', filas: [['Fecha', 'Hora', 'Cuenta', 'Total', 'Pagado', 'Debe', 'Medios de pago', 'Descuento', 'Observación']].concat(ventasH.slice().reverse().map(h => {
       const pag = (h.payments || []).reduce((a, p) => a + (p.method === 'debe' ? 0 : num(p.amount)), 0);
       return [dia(h.date), new Date(h.date).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }), h.tableName || (h.table != null ? 'Mesa ' + h.table : 'Caja'), num(h.total), pag, num(h.debt),
