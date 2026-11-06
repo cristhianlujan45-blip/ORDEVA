@@ -999,6 +999,8 @@ document.getElementById('billSummaryCloseBtn').addEventListener('click', closeBi
 document.getElementById('generalBillBtn').addEventListener('click', () => openGeneralBill());
 billSummaryOverlay.addEventListener('click', (e)=>{ if(e.target === billSummaryOverlay) closeBillSummary(); });
 
+// ✂️ 1.84.0: el renglón vendido lleva la persona que lo hizo y su comisión de ese momento (lib/vento-comisiones.js).
+function comisionDe(src, out){ try{ return window.ventoComisiones ? window.ventoComisiones.marcar(src, out) : out; }catch(e){ return out; } }
 function closeTableToHistory(tableId){
   const t = data.tables[tableId];
   if(!t || !t.items || !t.items.length) return null;
@@ -1035,7 +1037,7 @@ function closeTableToHistory(tableId){
     total,
     payments: paymentsDetail,
     debt,
-    items: t.items.map(it=>({name:it.name, qty:it.qty, price:it.price, cost: (data.products.find(p=>p.id===it.productId)||{}).cost ?? null, person: personLookupName(t, it.personId)})),
+    items: t.items.map(it=>comisionDe(it, {name:it.name, qty:it.qty, price:it.price, cost: (data.products.find(p=>p.id===it.productId)||{}).cost ?? null, person: personLookupName(t, it.personId)})),   // ✂️ 1.84.0: quién lo hizo y su comisión
     date: new Date().toISOString(),
     by: (typeof authUser !== 'undefined' && authUser) ? authUser : null   // quién cerró/cobró esta mesa, para el turno de caja
   };

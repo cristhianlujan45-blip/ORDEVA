@@ -74,6 +74,7 @@ function qsRegistrarVenta(cart, opts){
   // El valor del domicilio se suma como una línea más (igual que la propina),
   // así el total del recibo y de las estadísticas ya lo incluyen sin tener
   // que tocar nada más en la app.
+  items.forEach((o, i) => comisionDe(cart[i], o));   // ✂️ 1.84.0: quién lo hizo y su comisión
   if(dom && envio > 0) items.push({ name: '🛵 Domicilio', qty: 1, price: envio, cost: null });
   const total = Math.round(items.reduce((s, it) => s + it.price * it.qty, 0));   // sin centavos (también con productos por peso)
   const entry = {

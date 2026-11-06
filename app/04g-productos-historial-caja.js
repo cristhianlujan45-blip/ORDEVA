@@ -1580,7 +1580,7 @@ const cierreZ = c => (c && c.z ? 'Cierre Z N.º ' + String(c.z).padStart(4, '0')
 function cierreResumenTexto(s, openIds, last){
   const L = [];
   const desde = last ? 'desde el último cierre (' + new Date(last.date).toLocaleString('es-CO', { weekday:'short', hour:'numeric', minute:'2-digit' }) + ')' : 'desde el comienzo';
-  L.push(s.tickets.length ? 'Ventas ' + desde + ': ' + s.tickets.length + (s.tickets.length === 1 ? ' cuenta' : ' cuentas') + ' por ' + fmt(s.totalSold) + ' (efectivo ' + fmt(s.totalEfectivo) + ').' : 'No hay ventas nuevas ' + desde + '.');
+  L.push(s.tickets.length ? 'Ventas ' + desde + ': ' + s.tickets.length + (s.tickets.length === 1 ? ' cuenta' : ' cuentas') + ' por ' + fmt(s.totalSold) + ((window.ventoTurno && window.ventoTurno.ciego && window.ventoTurno.ciego()) ? '.' : ' (efectivo ' + fmt(s.totalEfectivo) + ').') : 'No hay ventas nuevas ' + desde + '.');
   if(openIds.length){
     const tot = openIds.reduce((a, id) => a + tableTotal(id), 0);
     L.push('Hay ' + openIds.length + (openIds.length === 1 ? ' mesa abierta' : ' mesas abiertas') + ' (Mesa ' + openIds.join(', Mesa ') + ') por ' + fmt(tot) + (openIds.length === 1 ? ': se cierra' : ': se cierran') + ' y lo que no esté pagado queda como «Debe».');
