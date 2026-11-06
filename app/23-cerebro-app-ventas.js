@@ -75,7 +75,7 @@
   const pendientesProv = () => (data.pedidosProv || []).filter(x => !x.llego && !x.quitado);
   function anotarPedido(prov, xs){
     data.pedidosProv = (data.pedidosProv || []).filter(x => Date.now() - x.at < 90 * 864e5).slice(-60);
-    data.pedidosProv.push({ id: 'pp' + Date.now().toString(36), prov, at: Date.now(), items: xs.map(x => ({ id: x.p.id, n: x.p.name, q: x.pedir })), llego: null });
+    data.pedidosProv.push({ id: 'pp' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), prov, at: Date.now(), items: xs.map(x => ({ id: x.p.id, n: x.p.name, q: x.pedir })), llego: null });
     try{ saveData(); }catch(e){}
   }
   function llego(id){

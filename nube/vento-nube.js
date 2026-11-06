@@ -285,9 +285,27 @@
   // Contadores: si los dos celulares vendieron del mismo producto, se suman los dos movimientos
   // (stock 20 → aquí 18, allá 17 → queda 15), en vez de quedarse con uno solo.
   var CONTADORES = { stock: 1, stockMin: 0 };
+  // 1.82.1: ¿cambió un contador (el stock) de la base a «l», en cualquier parte de lo de adentro? Si los dos celulares
+  // vendieron LO MISMO del mismo producto (los dos dejaron el stock en 19 de 20), los dos productos quedan idénticos y
+  // antes se tomaba «son iguales: es el mismo cambio» → quedaba 19 y una venta no se descontaba del inventario. Ahora,
+  // si cambió un contador, se mezcla campo por campo y se suman los dos movimientos (queda 18).
+  function cambioContador(b, l){
+    if(Array.isArray(l)){
+      var bl = Array.isArray(b) ? b : [];
+      for(var i = 0; i < l.length; i++){ var x = l[i]; if(!x || typeof x !== 'object' || x.id == null) continue;
+        var y = null; for(var j = 0; j < bl.length; j++) if(bl[j] && bl[j].id === x.id){ y = bl[j]; break; }
+        if(y && cambioContador(y, x)) return true; }
+      return false;
+    }
+    if(!l || typeof l !== 'object' || !b || typeof b !== 'object') return false;
+    for(var k in l){ if(!Object.prototype.hasOwnProperty.call(l, k)) continue;
+      if(CONTADORES[k] && typeof l[k] === 'number' && typeof b[k] === 'number' && l[k] !== b[k]) return true;
+      if(l[k] && typeof l[k] === 'object' && (k === 'products' || Array.isArray(l[k]) === false) && cambioContador(b[k], l[k])) return true; }
+    return false;
+  }
   function fusionar(b, l, r, k){
     if(CONTADORES[k] && typeof l === 'number' && typeof r === 'number' && typeof b === 'number' && l !== b && r !== b) return r + (l - b);
-    if(igual(l, r)) return clonar(r);
+    if(igual(l, r) && !(l && typeof l === 'object' && cambioContador(b, l))) return clonar(r);
     if(igual(r, b)) return clonar(l);
     if(igual(l, b)) return clonar(r);
     if(Array.isArray(l) && Array.isArray(r)) return unirListas(b, l, r);

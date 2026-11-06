@@ -117,8 +117,11 @@ function qsRegistrarVenta(cart, opts){
 function qsDeshacerVenta(entry){
   const i = entry ? data.history.findIndex(h => h === entry || h.id === entry.id) : -1;
   if(i < 0) return false;
-  data.history.splice(i, 1);
-  (entry._inv || []).forEach(it => { try{ invOnSale({ productId: it.productId }, -it.qty); }catch(e){} });
+  const quitada = data.history.splice(i, 1)[0];
+  // 1.82.1: «_inv» no se guarda (no viaja a la nube ni sobrevive a recargar). Si no está (la venta llegó de la nube o se
+  // recargó ORDEVA), se devuelve el inventario con los productos de la venta. Antes no devolvía nada.
+  const inv = entry._inv || (quitada && quitada._inv) || (entry.items || []).filter(it => it && it.productId).map(it => ({ productId: it.productId, qty: Number(it.qty) || 0 }));
+  inv.forEach(it => { try{ invOnSale({ productId: it.productId }, -it.qty); }catch(e){} });
   try{ window.ventoDian && window.ventoDian.alDeshacer(entry); }catch(e){}   // 🧾 si ya salió a la DIAN: nota crédito
   saveData();
   return true;

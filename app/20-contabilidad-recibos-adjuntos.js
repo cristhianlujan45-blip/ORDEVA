@@ -117,7 +117,7 @@
     $s('srvOk').onclick = () => {
       const nombre = $s('srvNom').value.trim(), fecha = $s('srvFec').value;
       if(!nombre || !fecha){ showToast('⚠️ Escribe el nombre y la fecha de pago.'); return; }
-      const x = s || { id: 'srv' + Date.now().toString(36), tipo: t[0], icono: t[1], cat: t[3] };
+      const x = s || { id: 'srv' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), tipo: t[0], icono: t[1], cat: t[3] };
       Object.assign(x, { nombre, empresa: $s('srvEmp').value.trim(), valor: Math.round(Number($s('srvVal').value) || 0) || null, proximo: fecha, cada: Number($s('srvCada').value) || 1, aviso: Number($s('srvAviso').value) || 3 });
       if(!s) SRV().push(x);
       saveData(); ov.classList.remove('show'); pintar(); revisar(true);

@@ -75,7 +75,7 @@
     g.querySelector('#vitAdd').disabled = (v.promos || []).length >= 6;
   }
   function editar(x){
-    const v = V(), nuevo = !x; x = x || { id: 'pr' + Date.now().toString(36), e: '🔥', t: '', d: '', p: '', prod: '', hasta: '' };
+    const v = V(), nuevo = !x; x = x || { id: 'pr' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), e: '🔥', t: '', d: '', p: '', prod: '', hasta: '' };
     let ov = document.getElementById('vitEdOv'); if(!ov){ ov = document.createElement('div'); ov.id = 'vitEdOv'; ov.className = 'overlay'; document.body.appendChild(ov); }
     const prods = data.products.filter(p => !p.oculto).slice().sort((a, b) => a.name.localeCompare(b.name));
     const EMO = ['🔥', '🎁', '🍻', '🍺', '🍹', '🍔', '🍕', '🌮', '🍰', '☕', '🎉', '⭐', '💥', '🆕', '❤️', '⚽'];

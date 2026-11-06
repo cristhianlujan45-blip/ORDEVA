@@ -167,7 +167,7 @@ function cierreAuto(c){
   const last=data.closures.length?data.closures[0]:null,fromISO=last?last.date:null,toISO=new Date().toISOString();
   const s=computeClosureStats(fromISO,toISO);
   if(!s.tickets.length){showToast('Cierre automático: no había cuentas nuevas.');return;}
-  data.closures.unshift({id:Date.now().toString(),date:toISO,from:fromISO,businessName:data.businessName,ticketCount:s.tickets.length,totalSold:s.totalSold,totalEfectivo:s.totalEfectivo,totalTransferencia:s.totalTransferencia,totalDebe:s.totalDebe,hourly:s.hourly,auto:true});
+  data.closures.unshift({id:(window.ventoIdUnico?window.ventoIdUnico():Date.now().toString()+Math.random().toString(36).slice(2,6)),date:toISO,from:fromISO,businessName:data.businessName,ticketCount:s.tickets.length,totalSold:s.totalSold,totalEfectivo:s.totalEfectivo,totalTransferencia:s.totalTransferencia,totalDebe:s.totalDebe,hourly:s.hourly,auto:true});
   saveData();renderMesas();renderHistorial();showToast('🔒 Cierre automático de caja hecho.');
 }
 function acTick(){

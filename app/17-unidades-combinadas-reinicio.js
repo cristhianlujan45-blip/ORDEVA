@@ -42,7 +42,7 @@
     let g = previos[0];
     const todos = [...new Set(ids.concat(...previos.map(x => x.miembros)))];
     if(g){ data.grupos = grupos().filter(x => !previos.includes(x) || x === g); g.miembros = todos; }
-    else { g = { id: 'g' + Date.now().toString(36), principal: principal || ids[0], miembros: todos, at: Date.now(), usuario: (typeof authUser !== 'undefined' && authUser) || '' }; grupos().push(g); }
+    else { g = { id: 'g' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), principal: principal || ids[0], miembros: todos, at: Date.now(), usuario: (typeof authUser !== 'undefined' && authUser) || '' }; grupos().push(g); }
     if(principal && todos.includes(+principal)) g.principal = +principal;
     auditar('combinar', 'Se combinaron: ' + etiqueta(g) + ' (total ' + fmt(totalGrupo(g)) + ')', g.miembros);
     saveData(); try{ renderMesas(); renderCocina(); window.prepPublicar && window.prepPublicar(true); }catch(e){}
