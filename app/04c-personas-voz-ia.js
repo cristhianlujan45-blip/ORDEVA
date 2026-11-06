@@ -689,7 +689,7 @@ document.getElementById('chargeBtn').addEventListener('click', async ()=>{
     });
     if(!ok) return;
   }
-  if(window.ventoComisiones && !(await window.ventoComisiones.preguntar(t.items || []))) return;   // ✂️ 1.84.0: ¿quién atendió?
+  if(window.ventoComisiones){ const qa = window.ventoComisiones.preguntar(t.items || []); if(qa !== true && !(await qa)) return; }   // ✂️ 1.84.0: ¿quién atendió?
   const loyaltyPhone = data.loyaltyOn ? document.getElementById('loyaltyPhone').value : '';
   const loyaltyName = data.loyaltyOn ? document.getElementById('loyaltyName').value : '';
   const entry = closeTableToHistory(currentTable);
@@ -1057,7 +1057,7 @@ document.getElementById('personChargeBtn').addEventListener('click', async ()=>{
     icon: '🔒'
   });
   if(!ok) return;
-  if(window.ventoComisiones && !(await window.ventoComisiones.preguntar(items))) return;   // ✂️ 1.84.0: ¿quién atendió?
+  if(window.ventoComisiones){ const qa = window.ventoComisiones.preguntar(items); if(qa !== true && !(await qa)) return; }   // ✂️ 1.84.0: ¿quién atendió?
   const total = personTotalAmt(currentPersonId);
   const balance = personBalanceAmt(currentPersonId);
   const geC = mesaEstado(currentTable).grupos.find(x => x.id === currentPersonId);
