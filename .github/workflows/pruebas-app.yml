@@ -24,6 +24,8 @@ on:
       - "lib/**"
       - "nube/**"
       - "pruebas/*.test.js"
+      - "pruebas/java/**"
+      - "android/app/src/main/java/**"
       - ".github/workflows/pruebas-app.yml"
 
 permissions:
@@ -56,6 +58,23 @@ jobs:
           npx --prefix pruebas playwright install --with-deps chromium webkit >/dev/null
           # ivaexcel abre el .xlsx con openpyxl; si no se puede instalar, la prueba lo lee con lo que trae Python.
           python3 -m pip install --quiet --break-system-packages openpyxl==3.1.5 || echo 'openpyxl no se pudo instalar: ivaexcel usa zipfile'
+      # 1.82.2: la librería de Android 14 (Robolectric android-all, solo para COMPILAR) para que javaavisos corra también
+      # aquí la lectura completa de los avisos y SMS de Android (EscuchaPrueba) y los pagos entre equipos (CrucePrueba).
+      # Antes solo corrían en el equipo del desarrollador.
+      - name: Librería de Android para las pruebas de Java (caché)
+        id: aall
+        uses: actions/cache@v4
+        with:
+          path: ~/android-all
+          key: android-all-14-robolectric-10818077
+      - name: Bajar la librería de Android (si no está en caché)
+        if: steps.aall.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/android-all
+          curl -fsSL --retry 4 -o ~/android-all/android-all.jar https://repo1.maven.org/maven2/org/robolectric/android-all/14-robolectric-10818077/android-all-14-robolectric-10818077.jar
+          echo "94b1490a891e9be559aa35c87cd8a0c163f32d83  $HOME/android-all/android-all.jar" | sha1sum -c -
+      - name: Usar la librería de Android en las pruebas
+        run: echo "VENTO_ANDROID_ALL=$HOME/android-all/android-all.jar" >> "$GITHUB_ENV"
       - name: Pruebas
         env:
           VENTO_PG_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres
@@ -65,5 +84,5 @@ jobs:
           if [ "$TODAS" = "true" ]; then
             bash pruebas/correr.sh
           else
-            bash pruebas/correr.sh canalseguro canalvivo qrprivado seguridadqr flujocompleto pagosaviso confirmapago alertaspagos cerrarcaja mejoras recetas practica facil cajapos entrar recuperacion clavelocal tactorapido comprobantepantallazo iphone erroresreal safari modulos cuentacliente usuariosequipo abririnstante pinempleado pagossuenan vistasencilla modulosnegocio mesarepetida lectorcel codigoproducto nubetrabada ordeva2 ordeva2pantallas salidas vueltas cajaextra inventario5 cajavoz cajapro loginotro contraste mesacomoda musicafacil cajateclado hotel comanda errorarranque clavevarios escanercaja adminmasdatos cobrosimple sincmesas cajagastos layafinanzas ivaexcel catalogoco finanzas facturacategorias fondoapp javaenvivo pagostodos swpush equiposprobar apariencias autoactualiza escanear facturapdf libreta javaavisos pedidodesliza reservas agente mapa modos comandaanula pasos guia sonidos huespedes opciones cocinatiempo proveedores resumendia registrotipo reservasavisos plano inventariosimple cajalibre cajamas qrrapido qrimpresos ajustesequipo codigobarras propinas impuestoconsumo comandaimpresa hoteldia agencia ventasfiados sincstress
+            bash pruebas/correr.sh canalseguro canalvivo qrprivado seguridadqr flujocompleto pagosaviso confirmapago alertaspagos cerrarcaja mejoras recetas practica facil cajapos entrar recuperacion clavelocal tactorapido comprobantepantallazo iphone erroresreal safari modulos cuentacliente usuariosequipo abririnstante pinempleado pagossuenan vistasencilla modulosnegocio mesarepetida lectorcel codigoproducto nubetrabada ordeva2 ordeva2pantallas salidas vueltas cajaextra inventario5 cajavoz cajapro loginotro contraste mesacomoda musicafacil cajateclado hotel comanda errorarranque clavevarios escanercaja adminmasdatos cobrosimple sincmesas cajagastos layafinanzas ivaexcel catalogoco finanzas facturacategorias fondoapp javaenvivo pagostodos swpush equiposprobar apariencias autoactualiza escanear facturapdf libreta javaavisos pedidodesliza reservas agente mapa modos comandaanula pasos guia sonidos huespedes opciones cocinatiempo proveedores resumendia registrotipo reservasavisos plano inventariosimple cajalibre cajamas qrrapido qrimpresos ajustesequipo codigobarras propinas impuestoconsumo comandaimpresa hoteldia agencia ventasfiados sincstress doscierres
           fi

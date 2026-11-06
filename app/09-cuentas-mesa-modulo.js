@@ -832,6 +832,9 @@ function pedidoAplicar(p){
   // Pedidos del QR: no suenan aquí (ya tienen su timbre y su aviso; si llegan muchos no se llena de «tún»).
   if(its.length||conOp.length){const r=its.length?sinSonidoPos(()=>applyVoiceItems(p.mesa,its,'add')):{added:[]};p.agregados=r.added.map(a=>a.qty+' '+a.name).concat(conOp.map(([x,q])=>q+' '+x.product.name+(x.opc.txt?' ('+x.opc.txt+')':'')));}
   p.aplicado=true;
+  // 🖨️ 1.82.2: con la comanda impresa prendida, el pedido del QR sale solo en la cocina y en la barra (solo en el equipo que
+  // lo pone en la cuenta: no sale repetido en los demás).
+  try{const its0=(p.items||[]).filter(i=>i.ok!==false);if(its0.length&&window.ventoEquipos&&window.ventoEquipos.imprimirComanda)window.ventoEquipos.imprimirComanda({mesa:tableLabel(p.mesa),quien:'QR'+(p.nombre?' · '+p.nombre:''),items:its0.map(i=>({name:i.name,qty:i.qty})),nota:p.nota||''});}catch(e){}
   try{saveData();renderMesas();if(typeof refrescarTodoEnVivo==='function')refrescarTodoEnVivo();}catch(e){}
 }
 function pedidosGuardar(){

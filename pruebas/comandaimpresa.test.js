@@ -8,6 +8,8 @@
 //  4. Se quita algo ya mandado: sale «ANULAR - COCINA» con eso.
 //  5. Categoría cambiada a «No imprimir»: no sale en papel (sí llega a la pantalla de la cocina).
 //  6. Con la comanda impresa apagada (como antes) no se imprime nada.
+//  7. 1.82.2: un pedido del QR sale solo (cocina y barra), sin tocar «Enviar».
+//  8. 1.82.2: un pedido de la app de meseros sale solo, con el nombre del mesero.
 'use strict';
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
@@ -81,6 +83,18 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     await p.evaluate(() => window.ventoComanda.enviar(1)); await pausa(800);
     v = await p.evaluate(() => ({ imp: window.__impreso.length, cocina: window.vitoPedidos.lista().filter(x => x.mesa === 1).length }));
     chk('5. Categoría «No imprimir»: no sale en papel, pero sí llega a la pantalla de la cocina', v.imp === 0 && v.cocina >= 3, v);
+    // ===== 7 · Pedido del QR: sale solo, sin tocar «Enviar» =====
+    await p.evaluate(() => { data.categories.find(c => c.id === 'c-po').destino = 'cocina'; saveData(); window.__impreso = [];
+      window.vitoPedidos.lista().push({ id: 'qr-prueba-1', mesa: 3, items: [{ name: 'Bandeja paisa', qty: 1, ok: true }, { name: 'Limonada', qty: 2, ok: true }], estado: 'nuevo', aplicado: false, at: Date.now(), hist: [] });
+      window.vitoPedidos.cambiar('qr-prueba-1', 'recibido'); });
+    await pausa(900);
+    v = await p.evaluate(() => window.__impreso.map(x => x.t.replace(/\s+/g, ' ').trim()));
+    chk('7. Pedido del QR (mesa 3): sale solo en la cocina (1 Bandeja) y en la barra (2 Limonadas), sin tocar «Enviar»', v.length === 2 && v.some(t => /COCINA/.test(t) && /Mesa 3/.test(t) && /1 x Bandeja paisa/.test(t) && /QR/.test(t)) && v.some(t => /BARRA/.test(t) && /2 x Limonada/.test(t)), v);
+    // ===== 8 · Pedido de un mesero (app de meseros) =====
+    await p.evaluate(() => { window.__impreso = []; window.__pedidoOrigen = 'mesero:Juan'; try{ applyVoiceItems(2, [{ productText: 'Flan', qty: 2 }], 'add'); }finally{ window.__pedidoOrigen = null; } });
+    await pausa(900);
+    v = await p.evaluate(() => window.__impreso.map(x => x.t.replace(/\s+/g, ' ').trim()));
+    chk('8. Pedido del mesero Juan (mesa 2, 2 Flan): sale solo en la cocina con su nombre', v.length === 1 && /COCINA/.test(v[0]) && /Mesa 2/.test(v[0]) && /2 x Flan/.test(v[0]) && /Mesero Juan/.test(v[0]), v);
     // ===== 6 =====
     await p.evaluate(() => { const c = window.ventoEquipos.cfg(); c.comanda.on = false; window.ventoEquipos.guardarCfg(c); window.__impreso = []; addFavoriteToTable('bj'); });
     await pausa(500);

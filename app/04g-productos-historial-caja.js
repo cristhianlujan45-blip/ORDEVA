@@ -1654,6 +1654,44 @@ async function closeCashRegister(opts){
   renderHistorial();
   openClosureReport(closure);
 }
+// 🔒 1.82.2 · Dos equipos cerraron la MISMA caja casi a la vez (antes de ver el cierre del otro): quedaban dos cierres con
+// el mismo número Z y todas las ventas contadas dos veces. Dos cierres que empiezan en el mismo punto (el mismo cierre
+// anterior y la misma caja) son el mismo cierre: se juntan en uno, con los totales recalculados de las ventas de los dos
+// equipos, el número Z más bajo y el arqueo que sí se contó. Sale igual en los dos equipos (no pelean al sincronizar).
+function juntarCierresRepetidos(){
+  if(typeof data === 'undefined' || !data || !Array.isArray(data.closures) || data.closures.length < 2) return false;
+  const grupos = {};
+  data.closures.forEach(c => { if(!c || !c.date) return; const k = (c.from || '') + '|' + cajaNombreCierre(c); (grupos[k] = grupos[k] || []).push(c); });
+  let cambio = false;
+  Object.keys(grupos).forEach(k => {
+    const g = grupos[k]; if(g.length < 2) return;
+    const porFecha = g.slice().sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.id).localeCompare(String(b.id)));
+    const ultimo = porFecha[porFecha.length - 1], hasta = ultimo.date;
+    const conArqueo = porFecha.filter(c => arqueoCierre(c) && arqueoCierre(c).contado != null).pop();
+    const nombre = cajaNombreCierre(ultimo);
+    const st = computeClosureStats(ultimo.from || null, hasta, nombre ? nombre : (g.some(c => c.cajaNombre != null || typeof c.caja === 'string') ? '' : null));
+    const junto = Object.assign({}, ultimo, {
+      id: porFecha.map(c => String(c.id)).sort()[0], date: hasta,
+      z: Math.min(...g.map(c => Number(c.z) || Infinity).filter(isFinite)) || ultimo.z,
+      ticketCount: st.tickets.length, totalSold: st.totalSold, totalEfectivo: st.totalEfectivo, totalTransferencia: st.totalTransferencia, totalDebe: st.totalDebe,
+      totalRecibido: st.totalRecibido, totalVueltas: st.totalVueltas, hourly: st.hourly, medios: st.medios, cajeros: st.cajeros,
+      descuentos: Math.round(st.descuentos), devoluciones: Math.round(st.devoluciones), totalPropinas: Math.round(st.totalPropinas || 0), propinas: st.propinas || {},
+      caja: arqueoCierre(conArqueo || ultimo) || arqueoCierre(porFecha.find(c => arqueoCierre(c))) || null,
+      by: [...new Set(g.map(c => c.by).filter(Boolean))].join(' y ') || ultimo.by || '', juntados: g.length
+    });
+    if(!isFinite(junto.z)) junto.z = ultimo.z;
+    const fuera = new Set(g);
+    const i0 = data.closures.findIndex(c => fuera.has(c));
+    data.closures = data.closures.filter(c => !fuera.has(c));
+    data.closures.splice(Math.max(0, i0), 0, junto);
+    cambio = true;
+  });
+  return cambio;
+}
+window.juntarCierresRepetidos = juntarCierresRepetidos;
+// Al llegar datos de otro equipo y al abrir ORDEVA.
+window.addEventListener('vento-datos-remotos', () => { try{ if(juntarCierresRepetidos()){ saveData(); try{ renderClosures(); }catch(e){} } }catch(e){} });
+setTimeout(() => { try{ if(juntarCierresRepetidos()) saveData(); }catch(e){} }, 1500);
 document.getElementById('closeDayBtn').addEventListener('click', () => closeCashRegister());
 document.getElementById('closeDayTopBtn').addEventListener('click', () => closeCashRegister());
 

@@ -2077,6 +2077,8 @@ function aplicarItemsVoz(tableId, items, mode){
     if(!applyVoiceItems.repitiendo) guardarRonda(lastVoiceOrderInfo);
     // Pedido de un mesero (app de meseros): también va a la pantalla de preparación.
     if(window.__pedidoOrigen && mode === 'add') try{ window.vitoPedidos && window.vitoPedidos.registrarAplicado(tableId, added, window.__pedidoOrigen); }catch(e){}
+    // 🖨️ 1.82.2: y sale solo en la impresora de la cocina / barra (si la comanda impresa está prendida en este equipo).
+    if(window.__pedidoOrigen && mode === 'add') try{ window.ventoEquipos && window.ventoEquipos.imprimirComanda && window.ventoEquipos.imprimirComanda({ mesa: tableLabel(tableId), quien: String(window.__pedidoOrigen).replace(/^mesero:/, 'Mesero '), items: added.map(a => ({ name: a.name, qty: a.qty })) }); }catch(e){}
   } else if(voiceUndoStack.length && voiceUndoStack[voiceUndoStack.length - 1].tableId === tableId){
     // Nada cambió: descarta el snapshot vacío que se acaba de guardar
     voiceUndoStack.pop();
