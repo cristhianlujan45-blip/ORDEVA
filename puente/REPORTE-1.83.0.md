@@ -52,7 +52,9 @@
   - el Excel;
   - el stock bajo.
 - **`ordeva2`:** se ajustó para que toque «Ver» y no el botón nuevo «Pedir».
-- RESULTADOS_AQUI
+- **La lista completa (106 pruebas, todas las de GitHub + `facturascan`):** 2.488 revisiones bien, 0 mal.
+- **Las 27 del servidor:** pasan.
+- **Android (`javaavisos`, con la librería `android-all`):** 328 de 328.
 - **No se probó con equipos de verdad.**
 
 ## 4. Lo que sigue (plan, sección 3)
