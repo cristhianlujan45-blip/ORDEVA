@@ -74,7 +74,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     v = await p.evaluate(() => ({ ventas: document.querySelector('#o2KVentas strong').textContent, kv: document.querySelector('#o2KVentas').innerText, puntos: document.querySelectorAll('.o2-graf circle').length }));
     chk('4. «7 días»: suma también ayer y hace 3 días ($ 57.000, 4 ventas) y la gráfica tiene 7 días', num(v.ventas) === 57000 && /4 ventas/.test(v.kv) && v.puntos === 7, v);
     await p.click('[data-o2ir="inventario"]').catch(() => {});
-    await p.click('nav button[data-view="inicio"]'); await p.click('#o2Alertas button'); await p.waitForTimeout(200);
+    await p.click('nav button[data-view="inicio"]'); await p.click('#o2Alertas button:not([data-o2ir="pedir"])'); await p.waitForTimeout(200);
     chk('2. «Ver» en la alerta lleva a Productos / inventario', await p.evaluate(() => document.getElementById('view-inventario').classList.contains('active')));
 
     // ===== 8. Productos como tabla en el computador =====
