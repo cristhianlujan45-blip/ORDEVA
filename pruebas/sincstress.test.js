@@ -5,6 +5,7 @@
 //  3. Caja: entradas y salidas de efectivo del turno en los dos: quedan todas.
 //  4. Un equipo borra una venta (Deshacer) mientras el otro vende: la borrada no vuelve y la nueva no se pierde.
 //  5. Productos nuevos creados a la vez en los dos: quedan los dos.
+//  6. La misma mesa en los dos equipos a la vez: se suman los productos de los dos.
 'use strict';
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const fs = require('fs');
@@ -97,6 +98,15 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const o = 
     const prods = p => p.evaluate(() => data.products.map(x => x.name).sort().join(','));
     const okP = await esperar(CEL.p, () => data.products.length >= 3, null, 25000) && await esperar(PC.p, () => data.products.length >= 3, null, 25000);
     chk('5. Productos creados a la vez: Leche y Pan en los dos', okP && await prods(CEL.p) === 'Arroz,Leche,Pan' && await prods(PC.p) === 'Arroz,Leche,Pan', { c: await prods(CEL.p), q: await prods(PC.p) });
+    // ===== 6 · La MISMA mesa en los dos equipos a la vez (3 Arroz cada uno) =====
+    await Promise.all([CEL.p.evaluate(() => { data.tables[2] = data.tables[2] || { items: [], people: [] }; data.tables[2].items = []; saveData(); })]);
+    await esperar(PC.p, () => data.tables[2] && !(data.tables[2].items || []).length, null, 15000); await pausa(1500);
+    const sumar = p => p.evaluate(async () => { for(let i = 0; i < 3; i++){ openTableModal(2); addFavoriteToTable('a'); await new Promise(r => setTimeout(r, 120)); } document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')); });
+    await Promise.all([sumar(CEL.p), sumar(PC.p)]);
+    const mesa = p => p.evaluate(() => ((data.tables[2] || {}).items || []).reduce((a, i) => a + (Number(i.qty) || 0), 0));
+    const okM = await esperar(CEL.p, () => ((data.tables[2] || {}).items || []).reduce((a, i) => a + (Number(i.qty) || 0), 0) >= 6, null, 30000) && await esperar(PC.p, () => ((data.tables[2] || {}).items || []).reduce((a, i) => a + (Number(i.qty) || 0), 0) >= 6, null, 30000);
+    await pausa(4000);
+    chk('6. La misma mesa en los dos equipos a la vez (3 + 3): 6 en los dos', okM && await mesa(CEL.p) === 6 && await mesa(PC.p) === 6, { c: await mesa(CEL.p), q: await mesa(PC.p) });
     chk('Sin errores de página', !errs.length, errs);
   }catch(e){ mal++; console.log('❌ Excepción: ' + (e && e.stack || e)); }
   await b.close(); await sb.cerrar().catch(() => {});
