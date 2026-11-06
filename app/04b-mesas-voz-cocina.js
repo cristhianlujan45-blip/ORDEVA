@@ -534,7 +534,7 @@ function voiceExtras(raw){
     nombre = nombre.replace(/(^|\s)\p{L}/gu, c => c.toUpperCase());
     const tb = data.tables[mesaN]; tb.people = tb.people || [];
     if(tb.people.some(x => normVoiceText(x.name) === normVoiceText(nombre))){ voiceDecir('👤 ' + nombre + ' ya está en ' + tableLabel(mesaN) + '.'); return true; }
-    tb.people.push({ id: Date.now().toString(), name: nombre }); saveData();
+    tb.people.push({ id: ventoIdUnico(), name: nombre }); saveData();
     if(currentTable === mesaN){ try{ renderPeople(); }catch(e){} }
     renderMesas(); voiceDecir('👤 Agregué a ' + nombre + ' a ' + tableLabel(mesaN) + '.'); return true;
   }

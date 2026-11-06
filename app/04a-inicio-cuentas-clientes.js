@@ -98,6 +98,15 @@ function vocabTexto(t){
 let data = null;
 let currentTable = null;
 let STORAGE_KEY = 'bar-data';
+// 🔑 1.82.0 · Ids que no se repiten entre equipos. Antes una venta era «Date.now()» (el milisegundo): si el celular y el
+// computador cobraban en el mismo milisegundo, las dos ventas quedaban con el MISMO id y al juntar los datos en la nube
+// se volvían una sola (se perdía una venta en todos los equipos). Ahora: el mismo número de la hora (13 cifras, así se
+// sigue sabiendo la fecha) + lo que diga el sufijo + 4 letras al azar.
+function ventoIdUnico(suf){
+  let r = ''; try{ const b = new Uint8Array(4); crypto.getRandomValues(b); r = Array.from(b, x => (x % 36).toString(36)).join(''); }catch(e){ r = Math.random().toString(36).slice(2, 6); }
+  return Date.now().toString() + (suf != null && suf !== '' ? '-' + suf : '') + '-' + r;
+}
+window.ventoIdUnico = ventoIdUnico;
 
 const fmtNumber = (n) => new Intl.NumberFormat('es-CO', {
   useGrouping: true,
@@ -980,7 +989,7 @@ function closeTableToHistory(tableId){
   const invoiceNo = (data.invoicePrefix || 'FV') + '-' + numFactura(data.invoiceNextNo || 1);
   data.invoiceNextNo = (data.invoiceNextNo || 1) + 1;
   const entry = {
-    id: Date.now().toString() + '-' + tableId,
+    id: ventoIdUnico(tableId),
     table: tableId,
     tableName: (t.name && t.name.trim()) ? t.name.trim() : null,
     businessName: data.businessName,
@@ -1081,7 +1090,7 @@ function crearCaso({categoria, urgencia, telefono, asignadoA, descripcion}){
   const tel = (telefono || '').replace(/\D/g, '');
   const clienteExistente = tel ? (data.clientesFrecuentes || []).find(c => c.telefono === tel) : null;
   const caso = {
-    id: Date.now().toString(),
+    id: ventoIdUnico(),
     fecha: Date.now(),
     categoria, urgencia,
     telefono: tel,

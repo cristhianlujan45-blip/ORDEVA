@@ -1,4 +1,4 @@
-# ORDEVA 1.82.0 · Un pago suena una sola vez, lector de códigos en las mesas, propinas aparte, INC 8 %, comanda impresa, hoteles y agencias
+# ORDEVA 1.82.0 · No se pierden ventas entre equipos, un pago suena una sola vez, lector de códigos en las mesas, propinas aparte, INC 8 %, comanda impresa, hoteles y agencias
 
 **Pedidos del dueño:**
 - «escanear el código de barras con el celular… también en las mesas… productos que no estén inventariados… que funcione
@@ -28,6 +28,36 @@ computador. Prueba nueva `codigobarras`, 25 revisiones, sin internet.
 - El celular como lector del computador manda a la cuenta de la mesa que esté abierta.
 
 Con la versión anterior, la prueba falla en la mesa: la cámara no vuelve y el lector USB no suma.
+
+## 0. 🧾 Se perdían ventas (y fiados) cuando dos equipos cobraban al mismo tiempo
+**El dueño:** «no nos está quedando en el historial las ventas ni las personas que me deben… que queden guardados».
+
+**Qué pasaba:** el número de cada venta era solo la hora en milisegundos (`Date.now()`). Si el celular y el computador
+cobraban en el mismo milisegundo, las dos ventas quedaban con el MISMO número. Al juntar los datos en la nube se volvían
+una sola: una venta (o un fiado) desaparecía en TODOS los equipos y en la nube. Pasaba con:
+- la Caja POS y la venta rápida;
+- el cierre de una mesa;
+- el cierre por persona.
+
+Los productos, las categorías y las personas de una mesa tenían el mismo problema.
+
+**Cómo se encontró:** prueba nueva `ventasfiados`, contra el servidor de pruebas, con un celular y un computador vendiendo y
+fiando a la vez. Con la versión anterior, en una de tres corridas quedaron 12 ventas de 14: `cel-1` y `cel-4` se perdieron
+en los dos equipos y en la nube.
+
+**Arreglo:** cada venta (y lo demás) lleva ahora un número que no se repite (`ventoIdUnico`). Es la misma hora (13 cifras,
+así se sigue sabiendo la fecha) más 4 letras al azar.
+
+**Prueba `ventasfiados`** (16 revisiones, pasa en todas las corridas):
+- 14 ventas cobradas a la vez, con 2 fiados (Carlos y Marta), en los dos equipos y en la nube;
+- siguen al volver a abrir;
+- lo vendido sin internet (2 ventas y 1 fiado) llega al volver el internet, sin perder lo que vendió el otro equipo;
+- un abono llega al otro equipo;
+- la 📒 Libreta anotada a la vez en los dos equipos queda completa;
+- una mesa cerrada debiendo llega como fiado.
+
+**Lo que no se puede recuperar:** las ventas que ya se juntaron con otra antes de esta versión. Cada equipo guarda puntos
+de restauración («antes de la nube») en Ajustes → Respaldos; si falta algo importante, se puede revisar ahí.
 
 ## 1b. 🔊 Un pago sonaba dos veces (app del banco + SMS)
 **El dueño:** «me avisa llegaron 200 pesos y después me dice llegaron otra vez 200 pesos por mensaje de texto».

@@ -111,7 +111,7 @@ document.getElementById('addPersonBtn').addEventListener('click', ()=>{
   if(!name){ showToast('Escribe el nombre de la persona.'); return; }
   const t = data.tables[currentTable];
   if(!t.people) t.people = [];
-  t.people.push({ id: Date.now().toString(), name });
+  t.people.push({ id: ventoIdUnico(), name });
   input.value = '';
   saveData();
   renderPeople();
@@ -1073,7 +1073,7 @@ document.getElementById('personChargeBtn').addEventListener('click', async ()=>{
   }
   const debt = paymentsDetail.filter(p=>p.method === 'debe').reduce((s,p)=>s+p.amount, 0);
   data.history.unshift({
-    id: Date.now().toString(),
+    id: ventoIdUnico('p'),
     inc: (data.impuestoConsumo ? (Number(data.incRate) || 8) : 0),   // 🍽️ 1.82.0
     table: currentTable,
     businessName: data.businessName,

@@ -21,7 +21,7 @@ document.getElementById('prodAddBtn').addEventListener('click', async ()=>{  con
     return;
   }
   data.products.push({
-    id: Date.now().toString(),
+    id: ventoIdUnico(),
     name,
     price,
     categoryId: categorySelect.value || null,
@@ -682,7 +682,7 @@ document.getElementById('qpAddBtn').addEventListener('click', async () => {
     return;
   }
   const newProduct = {
-    id: Date.now().toString(),
+    id: ventoIdUnico(),
     name,
     price,
     categoryId: null,
@@ -1627,7 +1627,7 @@ async function closeCashRegister(opts){
     return;
   }
   const closure = {
-    id: Date.now().toString(),
+    id: ventoIdUnico(),
     date: toISO,
     from: fromISO,
     businessName: data.businessName,

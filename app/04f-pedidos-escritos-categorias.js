@@ -77,7 +77,7 @@ function qsRegistrarVenta(cart, opts){
   if(dom && envio > 0) items.push({ name: '🛵 Domicilio', qty: 1, price: envio, cost: null });
   const total = Math.round(items.reduce((s, it) => s + it.price * it.qty, 0));   // sin centavos (también con productos por peso)
   const entry = {
-    id: Date.now().toString() + '-qs',
+    id: ventoIdUnico('qs'),
     table: null,
     tableName: dom ? ('🛵 Domicilio' + (dom.cliente ? ': ' + dom.cliente : '')) : 'Mostrador',
     businessName: data.businessName,
@@ -223,7 +223,7 @@ document.getElementById('confirmCategoryBtn').addEventListener('click', ()=>{
   const input = document.getElementById('newCategoryName');
   const name = input.value.trim();
   if(!name){ showToast('Escribe un nombre para la categoría.'); return; }
-  data.categories.push({ id: Date.now().toString(), name });
+  data.categories.push({ id: ventoIdUnico(), name });
   input.value = '';
   document.getElementById('categoryAddRow').style.display = 'none';
   saveData();
