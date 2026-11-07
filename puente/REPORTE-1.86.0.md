@@ -36,7 +36,12 @@
 
 ## 3. Pruebas
 - **Prueba nueva `v186`:** 15 de 15.
-- RESULTADOS_AQUI
+- **Las 15 pruebas de lo que toca la 1.86:** 318 revisiones bien, 0 mal. Son `agente`, `ajustesorden`, `finanzas`, `modos`,
+  `parlante`, `qrprivado`, `recetas`, `seguridadqr`, `sincstress`, `tablero`, `v184`, `v185`, `ventasfiados`, `cajamas` y
+  `sincroniza`.
+- **La lista completa (109 pruebas, todas las de GitHub + `facturascan`):** 2.544 revisiones bien, 0 mal.
+- **Las 27 del servidor:** pasan.
+- **Android (`javaavisos`, con la librería `android-all`):** 328 de 328.
 - **No se probó con equipos de verdad** (dos celulares a la vez, WhatsApp real).
 
 ## 4. Lo que sigue
