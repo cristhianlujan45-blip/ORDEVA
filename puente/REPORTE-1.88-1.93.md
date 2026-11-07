@@ -92,11 +92,15 @@
   - `suscripciones` (160, +6 de «Dar prueba»).
 - **Arreglo de pruebas:** `cocinatiempo` y `cajamas` ya no fallan entre las 12 y la 1 de la madrugada (la página arranca
   a mediodía).
-- RESULTADOS_AQUI
+- **Resultados:**
+  - lista completa: 116 pruebas, 2.612 revisiones, 0 fallas;
+  - servidor: 29 de 29; Android (Java): 328 de 328;
+  - reenvío de la dirección vieja: `reenvio` (9).
 - **No se probó con equipos de verdad** (celulares con zoom, impresoras ni la APK nueva).
 
 ## Lo que queda
-- **El reenvío de la dirección vieja** (`…/cuentas/` → `…/ORDEVA/`). Necesita un repositorio aparte en GitHub; lo hago
-  si el dueño lo autoriza.
+- **El reenvío de la dirección vieja** (`…/cuentas/` → `…/ORDEVA/`): el dueño lo autorizó y las páginas están listas y
+  probadas (`puente/sitio-reenvio/`). GitHub no deja que la app de Claude cree el repositorio (403): el dueño crea
+  `cristhianlujan45-blip.github.io` (público, con README) y Claude sube las páginas y revisa que funcione.
 - **Apartados (plan separe):** quedan para después; los negocios actuales casi no los usan.
 - **Pruebas con equipos de verdad:** celulares, lectores e impresoras.

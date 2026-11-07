@@ -3,15 +3,30 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
 <title>ORDEVA</title>
 <!-- Reenvío de la dirección vieja de la app. El repositorio pasó de «cuentas» a «ORDEVA» y GitHub Pages no redirige solo:
      …github.io/cuentas/<lo que sea>?<datos>#<datos> → …github.io/ORDEVA/<lo mismo>, sin perder los datos del QR, de la mesa
-     ni del enlace de recuperación de contraseña. -->
+     ni del enlace de recuperación de contraseña. Si en este celular quedó instalada la app vieja (service worker de
+     /cuentas/), se quita primero para que no vuelva a abrir la copia vieja. No borra datos: ORDEVA guarda lo suyo en
+     el mismo sitio (…github.io) y lo sigue viendo en /ORDEVA/. -->
 <script>
   (function(){
     var p = location.pathname, n = p.replace(/^\/cuentas(\/|$)/i, '/ORDEVA/');
-    if(n === p && (p === '/' || p === '')) n = '/ORDEVA/';
-    if(n !== p) location.replace(n + location.search + location.hash);
+    if(n === p && (p === '/' || p === '' || /^\/index\.html$/i.test(p))) n = '/ORDEVA/';
+    if(n === p) return;
+    var destino = n + location.search + location.hash, ido = false;
+    function ir(){ if(ido) return; ido = true; location.replace(destino); }
+    try{
+      if(navigator.serviceWorker && navigator.serviceWorker.getRegistrations){
+        navigator.serviceWorker.getRegistrations().then(function(rs){
+          return Promise.all(rs.filter(function(r){ return /\/cuentas\//i.test(r.scope || ''); }).map(function(r){ return r.unregister(); }));
+        }).then(ir, ir);
+        setTimeout(ir, 800);
+        return;
+      }
+    }catch(e){}
+    ir();
   })();
 </script>
 <style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif;background:#fff;color:#111;text-align:center;padding:20px}a{color:#111;font-weight:700}</style>
