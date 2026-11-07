@@ -37,6 +37,26 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     chk('3. Todas las páginas: la letra del celular no las agranda y tienen el ajuste del zoom', !faltan.length, faltan);
     const java = fs.readFileSync(path.join(raiz, 'android/app/src/main/java/co/vento/app/VentoApp.java'), 'utf8');
     chk('3. La app de Android no sigue el tamaño de letra del celular (setTextZoom(100)) y da la escala de la pantalla', /setTextZoom\(100\)/.test(java) && /public double escalaPantalla\(\)/.test(java), null);
+    // ===== 4. 🎬 Modo demo =====
+    { const ctx = await b.newContext({ viewport: { width: 1280, height: 800 } });
+      await ctx.route('**/*', r => new URL(r.request().url()).hostname === 'localhost' ? r.continue() : r.abort());
+      await ctx.addInitScript(() => { try{ if(!localStorage.getItem('real-dato')) localStorage.setItem('real-dato', 'mi negocio de verdad'); }catch(x){} });
+      const p = await ctx.newPage(); p.on('pageerror', e => errs.push('demo: ' + e.message));
+      await p.goto(BASE + '/index.html?demo=restaurante');
+      await p.waitForFunction(() => !!document.getElementById('demoBanda'), null, { timeout: 20000 }).catch(() => {});
+      v = await p.evaluate(() => ({ banda: (document.getElementById('demoBanda') || {}).innerText || '', neg: ((typeof data !== 'undefined' && data) || {}).businessName, prods: (((typeof data !== 'undefined' && data) || {}).products || []).length,
+        ventas: (((typeof data !== 'undefined' && data) || {}).history || []).length, mesa: ((((typeof data !== 'undefined' && data) || {}).tables || {})[1] || {}).items, real: localStorage.getItem('real-dato'), tipo: ((typeof data !== 'undefined' && data) || {}).businessType }));
+      chk('4. Demo de restaurante: entra solo con «Restaurante La Sazón (demo)», 8 productos, las ventas de la semana y una mesa abierta', /Modo demo/.test(v.banda) && /demo/.test(v.neg || '') && v.prods === 8 && v.ventas >= 28 && v.mesa && v.mesa.length === 1 && v.tipo === 'restaurante', v);
+      chk('4. … el demo no ve los datos guardados del equipo (vive en la memoria)', v.real === null, v.real);
+      v = await p.evaluate(async () => { const e = window.qsRegistrarVenta([{ productId: 'dp5', name: 'Limonada', price: 6000, qty: 2 }], { method: 'efectivo' }); return { tot: e && e.total, n: data.history.length }; });
+      chk('4. En el demo se puede vender (la venta queda en el demo)', v.tot === 12000 && v.n >= 29, v);
+      await p.close();
+      const p2 = await ctx.newPage(); await p2.goto(BASE + '/404.html');
+      v = await p2.evaluate(() => ({ real: localStorage.getItem('real-dato'), usuarios: localStorage.getItem('cm-users'), claves: Object.keys(localStorage).filter(k => /demo|cm-users|vento_datos|data/i.test(k)) }));
+      chk('4. Al cerrar el demo, el equipo sigue igual: sus datos están y el demo no dejó nada guardado', v.real === 'mi negocio de verdad' && v.usuarios === null && !v.claves.length, v);
+      await ctx.close(); }
+    { const s = fs.readFileSync(path.join(__dirname, '..', 'admin.html'), 'utf8');
+      chk('4. ORDEVA Admin: «🎬 Links de demo» (copiar, WhatsApp, abrir) y «🎬 Dar prueba» en cada negocio', /id="demoLinks"/.test(s) && /index\.html\?demo=/.test(s) && (s.match(/data-sxa="prueba"/g) || []).length === 2, null); }
     chk('Sin errores de página', !errs.length, errs);
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.message)); }
   await b.close();

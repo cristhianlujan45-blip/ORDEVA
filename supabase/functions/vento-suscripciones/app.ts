@@ -317,6 +317,10 @@ async function admin(req: Request, env: Env, accion: string, b: Record<string, u
       return { ok: true, ...(await db.rpc<Record<string, unknown>>("srv_sub_cancelar", { p_negocio: negocioDe(b), p_admin: a, p_motivo: b.motivo ? String(b.motivo) : null })) };
     case "cambiar_plan":
       return { ok: true, ...(await db.rpc<Record<string, unknown>>("srv_sub_cambiar_plan", { p_negocio: negocioDe(b), p_plan: String(b.plan || ""), p_admin: a })) };
+    // 🎬 1.88.0: «Dar prueba» (modo demo): N días (1 a 90) con un plan completo, como la prueba gratis.
+    case "prueba":
+      log("info", "prueba_dada", { negocio: negocioDe(b), plan: String(b.plan || ""), dias: Number(b.dias) || 0, admin: a });
+      return { ok: true, ...(await db.rpc<Record<string, unknown>>("srv_sub_dar_prueba", { p_negocio: negocioDe(b), p_plan: String(b.plan || ""), p_dias: Math.round(Number(b.dias) || 0), p_admin: a })) };
     case "dar":
       return { ok: true, ...(await db.rpc<Record<string, unknown>>("srv_sub_dar", { p_negocio: negocioDe(b), p_plan: String(b.plan || ""), p_meses: Math.round(Number(b.meses) || 0), p_admin: a })) };
     // Activar desde el panel: por N meses (desde hoy, o sumados al final si ya tiene ese plan vigente) por el mismo

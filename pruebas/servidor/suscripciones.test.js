@@ -493,6 +493,26 @@ async function pruebas(sb) {
   r = await api('/estado', { negocio: 'no-es-un-id' }, dueno.token);
   chk('Negocio inválido → 400', r.st === 400 && r.j.error === 'falta_negocio', r);
 
+  // =========================== 🎬 1.88.0: «Dar prueba» (modo demo) desde el panel ===========================
+  const demo = await sb.usuario('demo@hotel.co');
+  const negD = (await rpc('crear_negocio', { p_nombre: 'Hotel Demo', p_datos: {} }, demo.token)).j;
+  r = await api('/admin/prueba', { negocio: negD, plan: 'premium', dias: 7 }, jefe.token);
+  const susP = await uno("select status, source, plan_id, expiry_date > now() + interval '6 days 23 hours' and expiry_date < now() + interval '7 days 1 hour' as siete from subscriptions where business_id = $1", [negD]);
+  e = (await api('/estado', { negocio: negD }, demo.token)).j;
+  chk('Dar 7 días de prueba Premium: activa, como prueba (source trial), vence en 7 días y el negocio la ve', r.st === 200 && susP.status === 'active' && susP.source === 'trial' && susP.plan_id === 'premium' && susP.siete &&
+    e.plan_efectivo === 'premium' && e.subscription.trial === true, { r: r.j, susP, e: e && e.plan_efectivo });
+  chk('… queda en la auditoría del negocio', await contar("select count(*) n from auditoria where negocio_id = $1 and accion = 'prueba_dada'", [negD]) === 1);
+  r = await api('/admin/prueba', { negocio: negD, plan: 'premium', dias: 0 }, jefe.token);
+  chk('Dar 0 días → dias_invalido', r.st === 400 && r.j.error === 'dias_invalido', r);
+  r = await api('/admin/prueba', { negocio: negD, plan: 'premium', dias: 91 }, jefe.token);
+  chk('Dar 91 días → dias_invalido', r.st === 400 && r.j.error === 'dias_invalido', r);
+  r = await api('/admin/prueba', { negocio: negD, plan: 'pro', dias: 3 }, curioso.token);
+  chk('Un no-admin no puede dar pruebas', r.st === 403, r);
+  await api('/admin/dar', { negocio: negD, plan: 'pro', meses: 1 }, jefe.token);
+  r = await api('/admin/prueba', { negocio: negD, plan: 'premium', dias: 5 }, jefe.token);
+  const susP2 = await uno('select plan_id, source from subscriptions where business_id = $1', [negD]);
+  chk('Con un plan pagado (o cortesía) vigente no se le pone prueba encima → ya_tiene_plan (sigue PRO)', r.st === 409 && r.j.error === 'ya_tiene_plan' && susP2.plan_id === 'pro' && susP2.source === 'admin', { r: r.j, susP2 });
+
   // =========================== supabase-js contra el arnés (lo que usarán las pruebas del navegador) ===========================
   const { createClient } = require('@supabase/supabase-js');
   const js = createClient(sb.url, sb.anonKey, { auth: { persistSession: false, autoRefreshToken: false } });

@@ -50,6 +50,8 @@ const MENSAJES: Record<string, [number, string]> = {
   estado_invalido: [409, "Ese pago ya no está en revisión."],
   motivo_invalido: [400, "Escribe el motivo del rechazo (máximo 200 caracteres)."],
   meses_invalido: [400, "Los meses deben estar entre 1 y 36."],
+  dias_invalido: [400, "Los días de prueba van de 1 a 90."],
+  ya_tiene_plan: [409, "Ese negocio ya tiene un plan pagado vigente: no se le pone prueba encima."],
   sin_periodo: [409, "A esta suscripción ya no le quedan días: actívala por meses."],
   precio_invalido: [400, "Revisa el precio: el plan Gratis vale $0 y los demás deben tener precio."],
   entitlement_invalido: [400, "Hay una función que no existe en el catálogo."],
