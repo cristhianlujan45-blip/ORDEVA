@@ -10,7 +10,11 @@ Este sitio de reenvío los arregla. GitHub sirve en `https://cristhianlujan45-bl
 **`cristhianlujan45-blip.github.io`**. Todo lo que no es de otro repositorio (como `/cuentas/…`) cae en su `404.html`,
 que reenvía a `/ORDEVA/…` con los mismos datos (`?mesa=…`, `#…`).
 
-## Cómo crearlo (una sola vez, 2 minutos)
+## Estado: publicado (1.93.0)
+El repositorio `cristhianlujan45-blip.github.io` ya existe y sirve estas páginas. Si se cambian aquí, hay que copiarlas
+allá también.
+
+## Cómo se creó (una sola vez, 2 minutos)
 1. En GitHub: **New repository** → nombre exacto **`cristhianlujan45-blip.github.io`** → **Public** → «Add a README
    file» → **Create**. (La app de Claude no puede crear repositorios en la cuenta: GitHub responde 403.)
 2. Claude sube `404.html`, `index.html`, `README.md` y `.nojekyll` de esta carpeta (o **Add file → Upload files**).

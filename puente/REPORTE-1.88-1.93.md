@@ -99,8 +99,8 @@
 - **No se probó con equipos de verdad** (celulares con zoom, impresoras ni la APK nueva).
 
 ## Lo que queda
-- **El reenvío de la dirección vieja** (`…/cuentas/` → `…/ORDEVA/`): el dueño lo autorizó y las páginas están listas y
-  probadas (`puente/sitio-reenvio/`). GitHub no deja que la app de Claude cree el repositorio (403): el dueño crea
-  `cristhianlujan45-blip.github.io` (público, con README) y Claude sube las páginas y revisa que funcione.
+- ~~El reenvío de la dirección vieja~~ **hecho:** el dueño creó `cristhianlujan45-blip.github.io` y Claude subió las
+  páginas. Probado en internet: `/cuentas/pedido.html?mesa=1`, `/cuentas/`, `/cuentas`, `/cuentas/index.html#…` y `/`
+  abren ORDEVA con los mismos datos, y `/ORDEVA/` sigue igual.
 - **Apartados (plan separe):** quedan para después; los negocios actuales casi no los usan.
 - **Pruebas con equipos de verdad:** celulares, lectores e impresoras.
