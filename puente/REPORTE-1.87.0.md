@@ -46,7 +46,11 @@
 - **`reservas`, la del servidor que ya existía:** 28 de 28.
 - **Prueba nueva `v187`:** 13 de 13. Revisa que la app calcule igual que el servidor, el editor, la plataforma, la
   comisión y el gasto, y que no se vuelva a envolver «cerrar cuenta».
-- RESULTADOS_AQUI
+- **Las 15 pruebas de lo que toca la 1.87:** 295 revisiones bien, 0 mal. Son `reservas`, `reservasavisos`, `agente`, `hotel`,
+  `hoteldia`, `huespedes`, `mapa`, `finanzas`, `ivaexcel`, `cajamas`, `v183`, `v185`, `v186`, `contraste` y `sincmesas`.
+- **La lista completa (110 pruebas, todas las de GitHub + `facturascan`):** 2.557 revisiones bien, 0 mal.
+- **Las 28 del servidor (con la nueva `tarifas`):** pasan.
+- **Android (`javaavisos`, con la librería `android-all`):** 328 de 328.
 - **No se probó con Booking ni con Airbnb de verdad.**
 
 ## 5. Lo que sigue
