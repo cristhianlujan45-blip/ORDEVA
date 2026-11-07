@@ -108,7 +108,7 @@ function rangos(){
 const MODELOS = ['gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-flash-latest', 'gemini-2.5-flash'];
 function contexto(){
   const i = st.info || {}, rg = reglas(), ahora = new Date();
-  const recs = (i.recursos || []).map(x => '- ' + x.nombre + (x.capacidad ? ' (hasta ' + x.capacidad + ' personas)' : '') + (x.precio ? ' · ' + plata(x.precio) + (esHotel() ? ' la noche' : '') : '') + (x.detalle ? ' · ' + x.detalle : '')).join('\n');
+  const recs = (i.recursos || []).map(x => '- ' + x.nombre + (x.capacidad ? ' (hasta ' + x.capacidad + ' personas)' : '') + (x.precio ? ' · ' + plata(x.precio) + (esHotel() ? ' la noche' + ((i.reglas && ((i.reglas.temporadas || []).length || i.reglas.finde)) ? ' (cambia por temporada o fin de semana: el total exacto lo da el sistema al elegir fechas)' : '') : '') : '') + (x.detalle ? ' · ' + x.detalle : '')).join('\n');
   const carta = st.cat.slice(0, 120).map(p => '- ' + p[0] + ' · ' + plata(p[1]) + (p[2] ? ' (' + p[2] + ')' : '') + (p[3] == 2 ? ' · AGOTADO' : '')).join('\n');
   return 'Eres el asistente virtual de «' + (i.nombre || 'el negocio') + '» en Colombia. Hablas en español colombiano, cálido, breve (1 a 3 frases) y claro.\n' +
     'Hoy es ' + ahora.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) + ', son las ' + hora(ahora) + ' (fecha ISO ' + local(ahora).slice(0, 10) + ').\n' +
@@ -202,7 +202,7 @@ function tarjetaReserva(){
   if(o && d && o.d.getTime() === d.getTime()){
     opc = o.l.length ? '<div class="ok">✅ Hay disponibilidad del ' + esc(fecha(d)) + (hotel ? ' al ' + esc(fecha(h)) + ' (' + noches + (noches === 1 ? ' noche' : ' noches') + ')' : ' a las ' + esc(hora(d))) + ':</div>' +
       o.l.map(x => '<div class="opc' + (x.id === st.elegida ? ' on' : '') + '" data-opc="' + esc(x.id) + '"><div><b>' + esc(x.nombre) + '</b><small>' + (x.capacidad ? 'Hasta ' + x.capacidad + ' personas' : '') + (x.detalle ? ' · ' + esc(x.detalle) : '') + '</small></div>' +
-        (x.precio ? '<b>' + plata(hotel ? x.precio * noches : x.precio) + '</b>' : '') + '</div>').join('')
+        (x.precio ? '<b>' + plata(hotel ? (x.total != null ? Number(x.total) : x.precio * noches) : x.precio) + '</b>' : '')   /* 🏨 1.87.0: el total lo da el servidor (temporada y fin de semana) */ + '</div>').join('')
       : '<div class="mal">😕 No hay ' + (hotel ? 'habitaciones' : 'mesas') + ' libres para ' + (r.personas || 1) + ' personas en esas fechas. Prueba otras fechas' + (st.info.reglas.wa ? ' o escríbenos' : '') + '.</div>';
   }
   const c = tarjeta('<h3>' + (hotel ? '🛏️ Reserva de habitación' : '🍽️ Reserva de mesa') + '</h3>' +
