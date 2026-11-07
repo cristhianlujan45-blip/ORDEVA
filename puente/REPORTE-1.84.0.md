@@ -62,7 +62,15 @@ Para barberías, salones de belleza, uñas, lavaderos y todo negocio donde cada 
 
 ## 3. Pruebas
 - **Prueba nueva `v184`:** 24 de 24 (comisiones y arqueo ciego).
-- RESULTADOS_AQUI
+- **`contraste`:** con la 1.84 tardaba en salir la ventana de cobro, porque el cobro esperaba aunque no hubiera nada que
+  preguntar. Se arregló: sin nada que preguntar, el cobro sigue al tiro, como antes.
+- **La lista completa (107 pruebas, todas las de GitHub + `facturascan`):** 105 pasan. Van 2.510 revisiones bien y 2 mal.
+  - Las 2 que fallaron son `cajamas` (la hora feliz) y `cocinatiempo`. Corrieron entre las 00:00 y la 1:00 de la
+    madrugada, y las dos arman datos de «una hora antes»: a esa hora eso cae en el día anterior.
+  - Corridas otra vez a la 1:06: `cajamas` 45 de 45 y `cocinatiempo` 8 de 8.
+  - **Pendiente aparte:** esas dos pruebas no deberían depender de la hora a la que corren.
+- **Las 27 del servidor:** pasan.
+- **Android (`javaavisos`, con la librería `android-all`):** 328 de 328.
 - **No se probó con equipos de verdad.**
 
 ## 4. Lo que sigue
