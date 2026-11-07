@@ -55,7 +55,10 @@
   - `v194` (26): la app de la agencia con su cuenta en la nube y el agente de verdad, contra el servidor de pruebas. La IA
     se simula; la carta, los cupos y el canal son reales.
   - `reenvio` (9): ahora también corre en GitHub.
-- RESULTADOS_AQUI
+- **Resultados:**
+  - lista completa: 118 pruebas, 2.647 revisiones, 0 fallas;
+  - servidor: 29 de 29; las 60 migraciones se aplican sobre una base vacía;
+  - Android (Java): 328 de 328.
 - **No se probó con celulares ni con clientes de verdad.**
 
 ## Lo que queda
