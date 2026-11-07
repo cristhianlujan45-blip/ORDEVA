@@ -27,6 +27,9 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
   const pausa = ms => new Promise(r => setTimeout(r, ms));
   try{
     const ctx = await b.newContext({ viewport: { width: 1366, height: 820 } });
+    // 1.88.0: la página arranca a las 12 del día (el tiempo sigue corriendo): la prueba arma datos de «hace una hora» y,
+    // corrida entre las 12 y la 1 de la madrugada, esos caían en el día anterior y fallaba sin que nada estuviera mal.
+    { const m = new Date(); m.setHours(12, 0, 0, 0); await ctx.clock.setSystemTime(m); }
     await ctx.route('**/*', r => new URL(r.request().url()).hostname === 'localhost' ? r.continue() : r.abort());
     await ctx.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '' })); }catch(e){} });
     const p = await ctx.newPage(); p.on('pageerror', e => errs.push(e.message));
