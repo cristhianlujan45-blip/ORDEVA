@@ -62,7 +62,7 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&a
 const plata = n => '$' + Math.round(Number(n) || 0).toLocaleString('es-CO');
 const nrm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9ñ ]/g, ' ').replace(/\s+/g, ' ').trim();
 const DIA = 864e5;
-const st = { info: null, cat: [], hist: [], reserva: {}, dom: { items: [] }, opciones: null, elegida: null, ocupado: false };
+const st = { info: null, cat: [], ag: {}, hist: [], reserva: {}, dom: { items: [] }, opciones: null, elegida: null, ocupado: false };
 
 async function rpc(fn, args){
   const r = await fetch(URL0 + '/rest/v1/rpc/' + fn, { method: 'POST', headers: { apikey: KEY, Authorization: 'Bearer ' + KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(args || {}) });
@@ -84,6 +84,8 @@ const reglas = () => Object.assign({ entrada: '15:00', salida: '12:00', duracion
 const esHotel = () => st.info && st.info.tipo === 'habitacion';
 const hayReservas = () => st.info && (st.info.tipo === 'habitacion' || st.info.tipo === 'mesa') && (st.info.recursos || []).length;
 const hayDom = () => st.info && st.info.reglas && st.info.reglas.domicilios && st.info.reglas.c;
+// ✈️ 1.94.0: agencias de viajes — los planes (con destino, salida, duración y cupos) llegan con la carta del negocio.
+const hayPlanes = () => !!(st.info && st.info.reglas && st.info.reglas.planes && st.info.reglas.c);
 const local = t => { const d = new Date(t); return new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 16); };
 const fecha = t => new Date(t).toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' });
 const hora = t => new Date(t).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' });
@@ -115,14 +117,16 @@ function contexto(){
     'Hoy es ' + ahora.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) + ', son las ' + hora(ahora) + ' (fecha ISO ' + local(ahora).slice(0, 10) + ').\n' +
     (hayReservas() ? (esHotel() ? 'Reservas de HABITACIONES. Entrada ' + rg.entrada + ', salida ' + rg.salida + '.\nHabitaciones:\n' + recs : 'Reservas de MESAS. Horario ' + rg.abre + ' a ' + rg.cierra + '. Cada reserva dura ' + rg.duracion_min + ' minutos.\nMesas:\n' + recs) + '\n' : 'No recibe reservas.\n') +
     (hayDom() ? 'Domicilios con esta carta (precios en pesos):\n' + (carta || '(la carta no cargó)') + '\n' : 'No recibe domicilios por aquí.\n') +
+    (hayPlanes() ? 'Es una AGENCIA DE VIAJES. Planes (precios en pesos; «quedan» son los cupos de hoy):\n' + (planesTexto() || '(los planes no cargaron)') + '\nPara apartar un plan: cuál, cuántas personas, nombre y celular. La agencia le escribe para confirmar y el abono.\n' : '') +
     (rg.info ? 'Información del negocio: ' + rg.info + '\n' : '') +
     'REGLAS: 1) NUNCA digas que hay o no hay disponibilidad ni confirmes una reserva o pedido: eso lo hace el sistema cuando el cliente toca «Confirmar». 2) No inventes precios, habitaciones, platos ni datos del negocio que no estén arriba. 3) Pide lo que falte, de a poco: ' +
     (hayReservas() ? 'para reservar: fechas' + (esHotel() ? ' (llegada y salida o noches)' : ' y hora') + ', cuántas personas, nombre y celular; ' : '') + (hayDom() ? 'para domicilio: qué quiere y cuánto, nombre, celular y dirección; ' : '') +
     '4) Si pide algo que no se puede, ofrece hablar con una persona.\n' +
-    'Responde SOLO con JSON: {"respuesta":"texto para el cliente","intencion":"reserva|domicilio|pregunta|humano|consulta|otro",' +
+    'Responde SOLO con JSON: {"respuesta":"texto para el cliente","intencion":"reserva|domicilio|plan|pregunta|humano|consulta|otro",' +
     '"reserva":{"desde":"AAAA-MM-DD o AAAA-MM-DDTHH:MM","hasta":"AAAA-MM-DD o null","noches":n|null,"personas":n|null,"nombre":"","telefono":"","nota":""},' +
-    '"domicilio":{"items":[{"nombre":"tal cual está en la carta","cantidad":n}],"nombre":"","telefono":"","direccion":"","nota":""}}. ' +
-    'En reserva y domicilio pon SOLO lo que el cliente ya dijo en toda la conversación (lo demás vacío o null). Las fechas sin año son de este año o el próximo (nunca en el pasado).';
+    '"domicilio":{"items":[{"nombre":"tal cual está en la carta","cantidad":n}],"nombre":"","telefono":"","direccion":"","nota":""},' +
+    '"plan":{"plan":"el nombre del plan tal cual está arriba o vacío","personas":n|null,"nombre":"","telefono":"","fecha":"","nota":""}}. ' +
+    'En reserva, domicilio y plan pon SOLO lo que el cliente ya dijo en toda la conversación (lo demás vacío o null). Las fechas sin año son de este año o el próximo (nunca en el pasado).';
 }
 async function preguntarIA(){
   const contents = [{ role: 'user', parts: [{ text: contexto() }] }, { role: 'model', parts: [{ text: '{"respuesta":"Entendido.","intencion":"otro"}' }] }]
@@ -169,11 +173,17 @@ async function decir(txt){
     ['nombre', 'telefono', 'direccion', 'nota'].forEach(k => { if(x[k]) st.dom[k] = x[k]; });
     if(st.dom.items.length) return tarjetaDomicilio();
   }
+  if(hayPlanes() && (r.intencion === 'plan' || (r.plan && r.plan.plan))){
+    const x = r.plan || {}, pl = buscarPlan(x.plan);
+    if(pl) return tarjetaSolicitud(pl, x);
+    return tarjetaPlanes();
+  }
 }
 function menu(){
   const l = [];
   if(hayReservas()) l.push([esHotel() ? '🛏️ Reservar habitación' : '🍽️ Reservar mesa', () => { st.reserva = {}; tarjetaReserva(); }]);
   if(hayDom()) l.push(['🛵 Pedir domicilio', () => tarjetaDomicilio()]);
+  if(hayPlanes()) l.push(['✈️ Ver planes', () => tarjetaPlanes()]);
   if(hayReservas()) l.push(['🔎 Mi reserva', consulta]);
   if(st.info && st.info.reglas && st.info.reglas.wa) l.push(['💬 Hablar con una persona', humano]);
   chips(l);
@@ -266,7 +276,7 @@ async function cargarCarta(){
   try{
     const r = await fetch('https://canal.vento.local/' + c + 'k/json?poll=1&since=12h', { cache: 'no-store' });
     const ls = (await r.text()).trim().split('\n').filter(Boolean);
-    for(let i = ls.length - 1; i >= 0; i--){ const m = JSON.parse(ls[i]); if(m.event === 'message'){ const cat = JSON.parse(m.message); st.cat = Array.isArray(cat.p) ? cat.p : []; break; } }
+    for(let i = ls.length - 1; i >= 0; i--){ const m = JSON.parse(ls[i]); if(m.event === 'message'){ const cat = JSON.parse(m.message); st.cat = Array.isArray(cat.p) ? cat.p : []; st.ag = cat.ag && typeof cat.ag === 'object' ? cat.ag : {}; break; } }
   }catch(e){}
 }
 function buscarProducto(n){
@@ -279,6 +289,60 @@ function buscarProducto(n){
     if(n2 > punt){ punt = n2; mejor = p; }
   });
   return punt > 0 ? mejor : null;
+}
+// ---------- ✈️ Planes (agencias de viajes) ----------
+// Cada plan: nombre y precio de la carta; destino, salida, duración, cupos que quedan (-1 = sin tope), incluye y por cuántas personas.
+function planes(){
+  return Object.keys(st.ag || {}).map(n => { const a = st.ag[n] || [], p = st.cat.find(x => x[0] === n);
+    return { n, v: p ? Number(p[1]) || 0 : 0, destino: a[0] || '', salida: a[1] || '', dias: a[2] || '', quedan: Number.isFinite(+a[3]) ? +a[3] : -1, incluye: a[4] || '', por: Math.max(1, +a[5] || 1) }; });
+}
+function planesTexto(){ return planes().map(x => '- ' + x.n + (x.destino ? ' · ' + x.destino : '') + (x.salida ? ' · salida ' + x.salida : '') + (x.dias ? ' · ' + x.dias : '') + ' · ' + plata(x.v) + (x.por > 1 ? ' por ' + x.por + ' personas' : ' por persona') + (x.quedan >= 0 ? ' · quedan ' + x.quedan + ' cupos' : '') + (x.incluye ? ' · incluye ' + x.incluye : '')).join('\n'); }
+function buscarPlan(n){
+  const q = nrm(n); if(!q) return null;
+  const l = planes(); return l.find(x => nrm(x.n) === q) || l.find(x => nrm(x.n).includes(q) || q.includes(nrm(x.n))) || l.find(x => x.destino && (q.includes(nrm(x.destino)) || nrm(x.destino).includes(q))) || null;
+}
+const cuposPara = (x, personas) => Math.ceil(personas / x.por);
+function tarjetaPlanes(){
+  const l = planes();
+  if(!l.length) return burbuja('Ahora mismo no tengo planes publicados.' + (st.info.reglas.wa ? ' Escríbenos por WhatsApp y te contamos.' : ''));
+  const c = tarjeta('<h3>✈️ Nuestros planes</h3>' + l.map((x, i) => '<div class="plan" style="border-top:1px solid var(--line,#e5e5e5);padding:8px 0"><b>' + esc(x.n) + '</b>' +
+      (x.destino ? '<div>📍 ' + esc(x.destino) + '</div>' : '') + (x.salida ? '<div>📅 Salida: ' + esc(x.salida) + '</div>' : '') + (x.dias ? '<div>🕒 ' + esc(x.dias) + '</div>' : '') +
+      (x.incluye ? '<div>✅ Incluye: ' + esc(x.incluye) + '</div>' : '') +
+      '<div class="fila"><span>' + (x.por > 1 ? 'Precio por ' + x.por + ' personas' : 'Precio por persona') + '</span><b>' + plata(x.v) + '</b></div>' +
+      (x.quedan === 0 ? '<div class="mal">😕 Sin cupos</div>' : (x.quedan > 0 ? '<small>Quedan ' + x.quedan + (x.quedan === 1 ? ' cupo' : ' cupos') + '</small>' : '') + '<button type="button" class="pri" data-plan="' + i + '">Quiero este plan</button>') + '</div>').join(''));
+  c.addEventListener('click', e => { const b = e.target.closest('[data-plan]'); if(!b) return; c.remove(); tarjetaSolicitud(l[+b.dataset.plan], {}); });
+}
+function tarjetaSolicitud(x, pre){
+  pre = pre || {};
+  if(x.quedan === 0) return burbuja('😕 «' + x.n + '» ya no tiene cupos. Mira los otros planes 👇'), tarjetaPlanes();
+  const f = Object.assign({ personas: 2 }, st.sol && st.sol.n === x.n ? st.sol : {}, Object.fromEntries(Object.entries(pre).filter(([k, v]) => v != null && v !== '' && k !== 'plan')));
+  const c = tarjeta('<h3>✈️ ' + esc(x.n) + '</h3>' + (x.salida ? '<div>📅 Salida: ' + esc(x.salida) + '</div>' : '') +
+    '<div class="dos"><label>Personas<input type="number" min="1" max="' + (x.quedan > 0 ? x.quedan * x.por : 99) + '" data-k="personas" value="' + esc(f.personas) + '"></label>' +
+    (x.salida ? '' : '<label>Fecha que te sirve<input data-k="fecha" value="' + esc(f.fecha || '') + '" placeholder="Ej. puente de junio"></label>') + '</div>' +
+    '<div class="dos"><label>Nombre<input data-k="nombre" value="' + esc(f.nombre || '') + '" autocomplete="name"></label><label>Celular<input data-k="telefono" inputmode="tel" value="' + esc(f.telefono || '') + '" autocomplete="tel"></label></div>' +
+    '<label>Nota (opcional)<input data-k="nota" value="' + esc(f.nota || '') + '" placeholder="Ej. viajamos con un niño"></label>' +
+    '<div class="fila tot"><span>Valor aproximado</span><span data-tot></span></div><small>El valor final, el abono y tu cupo los confirma la agencia.</small>' +
+    '<button type="button" class="pri" data-a="solicitar">✅ Enviar solicitud</button>');
+  const leerSol = () => { const o = { n: x.n }; c.querySelectorAll('[data-k]').forEach(i => { o[i.dataset.k] = i.value.trim(); }); o.personas = Math.min(99, Math.max(1, parseInt(o.personas, 10) || 1)); st.sol = o; return o; };
+  const total = () => { const o = leerSol(); c.querySelector('[data-tot]').textContent = plata(x.v * cuposPara(x, o.personas)); };
+  c.addEventListener('input', total); total();
+  c.addEventListener('click', async e => {
+    const a = e.target.closest('[data-a="solicitar"]'); if(!a) return;
+    const o = leerSol();
+    if(x.quedan > 0 && cuposPara(x, o.personas) > x.quedan) return burbuja('Para ' + o.personas + ' personas no alcanzan los cupos: quedan ' + x.quedan + '.');
+    if(String(o.nombre || '').length < 2) return burbuja('Me falta tu nombre 🙂');
+    if(String(o.telefono || '').replace(/\D/g, '').length < 7) return burbuja('Escribe tu celular para que la agencia te contacte 🙂');
+    a.disabled = true; a.textContent = 'Enviando…';
+    const limpio = s => String(s || '').replace(/[|\n]/g, ' ').replace(/\s+/g, ' ').trim();
+    const cuerpo = 'PLAN: ' + limpio(o.nombre).slice(0, 40) + ' | ' + String(o.telefono).replace(/[^\d+ ]/g, '').slice(0, 15) + ' | ' + limpio(x.n).slice(0, 40) + ' | ' + o.personas + ' | ' + limpio(o.fecha).slice(0, 40) + ' | ' + limpio(o.nota).slice(0, 120) + ' · 🤖 agente';
+    let ok = false;
+    for(const w of [0, 1500, 4000]){ if(w) await new Promise(r => setTimeout(r, w)); try{ const r = await fetch('https://canal.vento.local/' + st.info.reglas.c, { method: 'POST', body: cuerpo }); if(r.ok){ ok = true; break; } }catch(err){} }
+    if(!ok){ a.disabled = false; a.textContent = '✅ Enviar solicitud'; return burbuja('No pude enviar la solicitud (¿sin internet?). Intenta otra vez' + (st.info.reglas.wa ? ' o escríbenos por WhatsApp' : '') + '.'); }
+    c.remove();
+    tarjeta('<h3>🎉 ¡Solicitud enviada!</h3><div>' + esc(x.n) + ' · ' + o.personas + (o.personas === 1 ? ' persona' : ' personas') + '</div><div>Ya le llegó a ' + esc(st.info.nombre) + '. Te escriben al ' + esc(o.telefono) + ' para confirmar el valor y el abono. Tu cupo queda apartado cuando la agencia lo confirme.</div>');
+    st.hist.push({ yo: false, t: 'Solicitud del plan ' + x.n + ' enviada.' });
+    st.sol = null;
+  });
 }
 function tarjetaDomicilio(){
   const x = st.dom, tot = x.items.reduce((a, it) => a + it.q * it.v, 0);
@@ -317,8 +381,8 @@ $('f').addEventListener('submit', e => { e.preventDefault(); const t = $('txt').
   try{ st.info = await rpc('reservas_publico_info', { p_publico: PUB }); }catch(e){ st.info = null; }
   if(!st.info){ $('nom').textContent = 'No disponible'; burbuja('Este negocio no está recibiendo reservas ni pedidos por aquí en este momento.'); return; }
   $('nom').textContent = st.info.nombre || 'Reservas y pedidos'; document.title = (st.info.nombre || 'Reservas') + ' · Asistente';
-  if(hayDom()) await cargarCarta();
-  const que = [hayReservas() ? (esHotel() ? 'reservar tu habitación' : 'reservar tu mesa') : null, hayDom() ? 'pedir un domicilio' : null].filter(Boolean).join(' o ');
+  if(hayDom() || hayPlanes()) await cargarCarta();
+  const que = [hayReservas() ? (esHotel() ? 'reservar tu habitación' : 'reservar tu mesa') : null, hayDom() ? 'pedir un domicilio' : null, hayPlanes() ? 'ver nuestros planes y apartar tu cupo' : null].filter(Boolean).join(' o ');
   $('sub').textContent = 'Asistente · ' + (que ? que.charAt(0).toUpperCase() + que.slice(1) : 'Información');
   burbuja('¡Hola! 👋 Soy el asistente de ' + st.info.nombre + '.' + (que ? ' Te ayudo a ' + que + '. Escríbeme como le escribirías a una persona, o toca una opción:' : ''));
   st.hist.push({ yo: false, t: 'Hola, soy el asistente de ' + st.info.nombre + '.' });

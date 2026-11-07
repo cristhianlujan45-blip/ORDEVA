@@ -745,6 +745,9 @@ function procesar(txt){
     if(o&&o.t==='estado')return;                                   // eco de nuestros propios avisos
     if(o&&o.t==='prueba'){if(o.id&&window.__qPrueba&&window.__qPrueba[o.id])window.__qPrueba[o.id](window.__canalTopic);return;}
   }
+  // ✈️ 1.94.0: solicitud de un plan desde el agente de la agencia (agente.html).
+  const pl=/^PLAN\s*:\s*([\s\S]*)$/i.exec(txt.trim());
+  if(pl){ try{ window.ventoAgencia && window.ventoAgencia.activo() && window.ventoAgencia.recibir(pl[1]); }catch(e){} return; }
   const dm=/^DOMICILIO\s*:?\s*([\s\S]*)$/i.exec(txt.trim());
   if(dm){ domRecibir(dm[1]); if(navigator.vibrate)navigator.vibrate(200); return; }
   const m=/^(PEDIDO|CANCION|CUENTA)\s+MESA\s*(\d+)\s*:?\s*([\s\S]*)$/i.exec(txt.trim());if(!m)return;
@@ -2366,6 +2369,8 @@ async function publicarCatalogo(force){
     y: bt, t: cartaTerm(), ic: cartaIcon(), ip: (tipoNegocio() || {}).icono || '', th: data.theme || '', n: (data.businessName || '').slice(0, 40), p: list,
     // 🧩 1.76.0: opciones de cada producto (término, sin…, adiciones) para elegirlas desde el QR.
     ...(window.ventoOpciones && window.ventoOpciones.paraCarta() ? { op: window.ventoOpciones.paraCarta() } : {}),
+    // ✈️ 1.94.0: agencias — destino, salida, duración, cupos que quedan e incluye de cada plan, para el agente.
+    ...(window.ventoAgencia && window.ventoAgencia.paraCarta && window.ventoAgencia.paraCarta() ? { ag: window.ventoAgencia.paraCarta() } : {}),
     // Personalización de pedido.html: mensaje, info extra y horario (para el
     // reloj + aviso de abierto/cerrado). Todo opcional, se manda tal cual.
     msg: (data.orderMessage || '').slice(0, 200),
@@ -2379,8 +2384,11 @@ async function publicarCatalogo(force){
   const tam = () => new Blob([JSON.stringify(m)]).size;
   if(m.op){ const orden = list.map(r => r[0]); let ks = Object.keys(m.op).sort((a, b) => orden.indexOf(b) - orden.indexOf(a));
     while(ks.length && tam() > 3800){ delete m.op[ks.shift()]; } if(!Object.keys(m.op).length) delete m.op; }
+  if(m.ag){ const orden = list.map(r => r[0]); let ks = Object.keys(m.ag).sort((a, b) => orden.indexOf(b) - orden.indexOf(a));   // ✈️ 1.94.0: igual con los planes
+    while(ks.length && tam() > 3800){ delete m.ag[ks.shift()]; } if(!Object.keys(m.ag).length) delete m.ag; }
   while(list.length && tam() > 3800) list.pop();   // tope del canal de ORDEVA (~4 KB)
   if(m.op){ const quedan = new Set(list.map(r => r[0])); Object.keys(m.op).forEach(k => { if(!quedan.has(k)) delete m.op[k]; }); }
+  if(m.ag){ const quedan = new Set(list.map(r => r[0])); Object.keys(m.ag).forEach(k => { if(!quedan.has(k)) delete m.ag[k]; }); }
   const s = JSON.stringify(m);
   if(!force && s === catHash && Date.now() - catT < 3 * 36e5) return;           // se reenvía cada 3 h para que no caduque
   // 1.72.6: lo que cambia solo (el orden de «lo más vendido», un agotado) sale como mucho una vez por minuto. Antes salía con
