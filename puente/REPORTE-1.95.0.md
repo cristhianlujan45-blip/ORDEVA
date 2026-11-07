@@ -37,7 +37,9 @@ no lo manejaba: el mesero tenía que acordarse y sumar la diferencia a mano.
 - **Nueva:** `v195` (22). Cubre Ajustes, la cuenta, los tres botones al cobrar y la diferencia de un cobro cancelado. Revisa
   que el mínimo de la cuenta se vaya y el de la mesa quede, que un mesero no lo pueda cambiar y que el botón «Cobrar»
   pregunte una sola vez.
-- RESULTADOS_AQUI
+- **Resultados:**
+  - lista completa: 119 pruebas, 2.669 revisiones, 0 fallas;
+  - no cambia el servidor ni Android: valen los de la 1.94.0 (servidor 29 de 29, Android 328 de 328).
 - **No se probó en un bar de verdad.**
 
 ## Lo que queda
