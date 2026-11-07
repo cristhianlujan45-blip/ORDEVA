@@ -73,8 +73,25 @@ nuevo. **Código revisado:** ORDEVA 1.82.2.
   servidor, con una fecha de corte.
 - **Empaquetar los archivos para 4G.** Antes hay que medir la carga real.
 
+## 6b. Orden nuevo (respuesta del dueño, después de la 1.84)
+- **Los negocios que usan ORDEVA hoy:** tienda de barrio, bar, restaurante, agencia de viajes, hotel y motel.
+- **Ya hecho:**
+  - **1.83:** los errores B1–B4;
+  - **1.84:** comisiones y arqueo ciego.
+- **1.85:** motel por horas: tiempo de la habitación, aviso y horas adicionales al cobrar. Además, un arreglo de
+  estabilidad que salió al hacerlo (sección 2 de `puente/REPORTE-1.85.0.md`).
+- **1.86:** domicilios con estados para la tienda, el restaurante y el bar.
+  - **Hoy:** se guardan solo en un equipo.
+  - **Propuesta:** que se vean en todos los equipos, con estados recibido → en camino → entregado y aviso por WhatsApp.
+- **1.87:** hoteles:
+  - tarifas por temporada y fin de semana;
+  - la comisión de Booking o Airbnb en la ganancia de cada reserva.
+- **Apartados (antes 1.85):** quedan para después; estos negocios casi no los usan. Para las agencias (planes con abonos)
+  primero se revisa si los «📅 Créditos» de la caja ya sirven.
+
 ## 7. Preguntas para el dueño
 1. **Número de factura entre equipos:** ¿del servidor (consecutivo único, necesita internet al vender) o con un prefijo
    por equipo (A-0001 / B-0001, funciona sin internet)?
-2. **¿Qué tipos de negocio usan más ORDEVA hoy?** Decide si van primero las comisiones o los apartados.
+2. ~~¿Qué tipos de negocio usan más ORDEVA hoy?~~ **Respondida:** tienda de barrio, bar, restaurante, agencia de viajes, hotel
+   y motel (sección 6b).
 3. **Apartados:** ¿se pagan solo en la tienda donde se hicieron, o también desde otro equipo o sede?
