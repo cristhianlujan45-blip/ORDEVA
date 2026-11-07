@@ -49,7 +49,7 @@ function domRecibirDeIa(info){
   const d = { id: Date.now() + '' + Math.random().toString(36).slice(2, 5), ts: Date.now(),
               nombre: String(info.cliente || '').slice(0, 40), tel: String(info.telefono || '').replace(/[^\d+ ]/g, '').slice(0, 15),
               dir: String(info.direccion || '').slice(0, 90), texto: items.join(', ') };
-  const l = domisPend(); l.push(d); domisGuardar(l);
+  d.origen = 'ia'; d.estado = 'pendiente'; domisGuardar([d]);
   domAbrir(d.id);
   const envio = parseFloat(info.envio);
   if(isFinite(envio) && envio > 0){ document.getElementById('qsEnvio').value = Math.round(envio); qsRenderCart(); }
@@ -90,7 +90,7 @@ function qsRegistrarVenta(cart, opts){
     debt: method === 'debe' ? total : 0,
     person: method === 'debe' ? deudor : null,
     items,
-    delivery: dom ? { cliente: dom.cliente || '', telefono: dom.telefono || '', direccion: dom.direccion || '', envio } : null,
+    delivery: dom ? { cliente: dom.cliente || '', telefono: dom.telefono || '', direccion: dom.direccion || '', envio, estado: 'preparando', hist: [{ e: 'preparando', at: Date.now(), por: (typeof authUser !== 'undefined' && authUser) || '' }] } : null,   // 🛵 1.86.0: estados del domicilio
     date: new Date().toISOString(),
     by: (typeof authUser !== 'undefined' && authUser) ? authUser : null
   };
@@ -124,6 +124,7 @@ function qsDeshacerVenta(entry){
   const inv = entry._inv || (quitada && quitada._inv) || (entry.items || []).filter(it => it && it.productId).map(it => ({ productId: it.productId, qty: Number(it.qty) || 0 }));
   inv.forEach(it => { try{ invOnSale({ productId: it.productId }, -it.qty); }catch(e){} });
   try{ window.ventoDian && window.ventoDian.alDeshacer(entry); }catch(e){}   // 🧾 si ya salió a la DIAN: nota crédito
+  try{ window.ventoDomicilios && window.ventoDomicilios.alDeshacer(entry); }catch(e){}   // 🛵 1.86.0: el domicilio vuelve a «por facturar»
   saveData();
   return true;
 }
@@ -147,9 +148,12 @@ document.getElementById('qsChargeBtn').addEventListener('click', async ()=>{
   const method = document.getElementById('qsMethod').value;
   const deudor = (document.getElementById('qsDebeName').value || '').trim() || (isDom && cliente ? cliente : '');
   if(method === 'debe' && !deudor){ showToast('⚠️ Escribe quién queda debiendo.'); return; }
-  qsRegistrarVenta(quickSaleCart, { method, deudor, domicilio: isDom ? { cliente, telefono, direccion, envio } : null });
+  // 🛵 1.86.0: si otro equipo ya facturó este domicilio (llegó a todos), no se factura dos veces.
+  if(isDom && domActual){ const yaD = (data.domicilios || []).find(x => x.id === domActual); if(yaD && yaD.estado && yaD.estado !== 'pendiente'){ domActual = null; showToast('⚠️ Ese domicilio ya lo facturó otro equipo. Revisa en «🛵 Domicilios».', 7000); return; } }
+  const enDom = qsRegistrarVenta(quickSaleCart, { method, deudor, domicilio: isDom ? { cliente, telefono, direccion, envio } : null });
   quickSaleCart = [];
-  if(isDom && domActual){ domQuitar(domActual); domActual = null; }
+  if(isDom && domActual){ domQuitar(domActual, enDom && enDom.id); domActual = null; }
+  try{ domisBadge(); }catch(e){}
   document.getElementById('quickSaleOverlay').classList.remove('show');
   if(method !== 'debe') sonidoPos('success');
   if(method !== 'debe') try{ window.mesoraCelebrar && window.mesoraCelebrar(isDom ? ['🛵', '💰', '✨'] : ['💰', '✨', '🎉']); }catch(e){}

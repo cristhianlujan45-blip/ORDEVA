@@ -2104,7 +2104,7 @@ async function qsClose(){
 }
 document.getElementById('quickSaleBtn').addEventListener('click', () => qsOpen('mostrador'));
 document.getElementById('fiadosBtn').addEventListener('click', () => { if(window.libretaAbrir) window.libretaAbrir(); });
-document.getElementById('domicilioBtn').addEventListener('click', () => { domActual = null; if(domisPend().length) domAbrir(null); else qsOpen('domicilio'); });
+document.getElementById('domicilioBtn').addEventListener('click', () => { domActual = null; if(window.ventoDomicilios && (domisPend().length || window.ventoDomicilios.activos().length)) return window.ventoDomicilios.panel(); if(domisPend().length) domAbrir(null); else qsOpen('domicilio'); });   // 🛵 1.86.0: el tablero de domicilios
 document.getElementById('qsCancelBtn').addEventListener('click', qsClose);
 document.getElementById('quickSaleOverlay').addEventListener('click', e => { if(e.target.id === 'quickSaleOverlay') qsClose(); });
 document.getElementById('qsEnvio').addEventListener('input', qsRenderCart);
@@ -2117,12 +2117,23 @@ document.getElementById('qsEnvio').addEventListener('input', qsRenderCart);
    Queda guardado como pendiente (no se pierde aunque se cierre la app) y abre la
    factura de domicilio ya llena, con los productos emparejados con el inventario. */
 const DOM_KEY = 'vito_domis';
-const domisPend = () => LS(DOM_KEY, []);
+/* 🛵 1.86.0: los domicilios por facturar viven en los datos del negocio (data.domicilios), no en un solo celular: los ven
+   todos los equipos y, cuando uno lo factura, desaparece en los demás. El que llegó por el link tiene el id del mensaje
+   del canal (el mismo en todos los equipos): no se repite. Los que estaban guardados en este celular se pasan solos. */
+function domLista(){
+  if(typeof data === 'undefined' || !data) return [];
+  if(!Array.isArray(data.domicilios)) data.domicilios = [];
+  try{ const viejos = LS(DOM_KEY, null); if(Array.isArray(viejos)){ viejos.forEach(d => { if(d && d.id && !data.domicilios.some(x => x.id === d.id)) data.domicilios.push(Object.assign({ estado: 'pendiente' }, d)); }); localStorage.removeItem(window.ventoClave(DOM_KEY)); if(viejos.length) saveData(); } }catch(e){}
+  return data.domicilios;
+}
+const domisPend = () => domLista().filter(d => d && (d.estado || 'pendiente') === 'pendiente');
 let domActual = null;
-function domisGuardar(l){ SS(DOM_KEY, l); domisBadge(); }
+// Agrega los que no estén (ya no reemplaza la lista: así no se pisa lo que llegó a otro equipo).
+function domisGuardar(l){ const L = domLista(); (l || []).forEach(d => { if(d && d.id && !L.some(x => x.id === d.id)) L.push(Object.assign({ estado: 'pendiente' }, d)); }); try{ saveData(); }catch(e){} domisBadge(); }
 function domisBadge(){
   const b = document.getElementById('domicilioBtn'); if(!b) return;
-  const n = domisPend().length;
+  let act = 0; try{ act = window.ventoDomicilios ? window.ventoDomicilios.activos().length : 0; }catch(e){}
+  const n = domisPend().length + act;
   b.textContent = n ? '🛵 Domicilio (' + n + ')' : '🛵 Domicilio';
   b.classList.toggle('btn-warn', n > 0);
 }
@@ -2137,9 +2148,12 @@ function ventoAvisoCel(titulo, texto, canal){
 window.ventoAvisoCel = ventoAvisoCel;
 function domRecibir(cuerpo){
   const p = String(cuerpo).split('|').map(x => x.trim());
-  const d = { id: Date.now() + '' + Math.random().toString(36).slice(2, 5), ts: Date.now(),
+  // 🛵 1.86.0: el id es el del mensaje del canal (el mismo en todos los equipos): el domicilio no queda repetido.
+  const idc = window.__canalMsgId ? 'dm' + String(window.__canalMsgId).replace(/[^\w-]/g, '').slice(0, 40) : '';
+  if(idc && domLista().some(x => x.id === idc)) return;
+  const d = { id: idc || (Date.now() + '' + Math.random().toString(36).slice(2, 5)), ts: Date.now(), origen: 'link', estado: 'pendiente',
               nombre: p[0] || '', tel: p[1] || '', dir: p[2] || '', texto: p.slice(3).join(', ').trim() };
-  const l = domisPend(); l.push(d); domisGuardar(l);
+  domisGuardar([d]);
   if(!window.ventoAvisoOn || window.ventoAvisoOn('domicilios')){
     showToast('🛵 Domicilio nuevo' + (d.nombre ? ' de ' + d.nombre : '') + (d.texto ? ': ' + d.texto : '') + (d.dir ? ' · ' + d.dir : ''), 10000);
     ventoAvisoCel('🛵 Domicilio nuevo' + (d.nombre ? ' de ' + d.nombre : ''), (d.texto || '') + (d.dir ? ' · ' + d.dir : ''), 'pedidos');
@@ -2172,7 +2186,9 @@ function domAbrir(id){
     (d.nombre ? ' (' + d.nombre + ')' : '') + '. Revisa los productos, ponle el valor del envío y factúralo.';
   if(noReconocidos.length) showToast('⚠️ Esto no lo reconocí, agrégalo a mano: ' + noReconocidos.join(', '), 9000);
 }
-function domQuitar(id){ domisGuardar(domisPend().filter(x => x.id !== id)); }
+// Ya facturado: queda marcado con su venta (si la venta se deshace, vuelve a «por facturar»). Los viejos se limpian solos
+// (la venta ya tiene el cliente, el teléfono y la dirección).
+function domQuitar(id, ventaId){ const d = domLista().find(x => x.id === id); if(d){ d.estado = 'facturado'; d.ventaId = ventaId || ''; d.at = Date.now(); } try{ saveData(); }catch(e){} domisBadge(); }
 // La sección de domicilios por web/WhatsApp solo tiene sentido si el negocio hace domicilios.
 function aplicarDomicilios(){
   const g = document.getElementById('domGrupoWeb');
