@@ -1539,6 +1539,7 @@ function computeClosureStats(fromISO, toISO, caja){
       // el pago en efectivo ya es lo cobrado, sin las vueltas).
       if(p.method === 'efectivo' && Number(p.recibido) > 0){ totalRecibido += Number(p.recibido); totalVueltas += Math.max(0, Number(p.vueltas) || 0); }
       if(p.method === 'efectivo') totalEfectivo += p.amount;
+      else if(p.method === 'usd') totalEfectivo -= Math.max(0, Number(p.vueltasCop) || 0);   // 💵 1.90.0: vueltas en pesos de un pago en dólares
       else if(p.method === 'transferencia') totalTransferencia += p.amount;
       else if(p.method === 'debe') totalDebe += p.amount;
       const k = medioDePago(p); medios[k] = (medios[k] || 0) + (Number(p.amount) || 0);   // 1.81.0: TODOS los medios (Nequi, tarjeta…)
@@ -1564,7 +1565,7 @@ function medioDePago(p){
   return /nequi/.test(n) ? 'nequi' : /daviplata/.test(n) ? 'daviplata' : /tarjeta|dat[aá]fono|bold|redeban|cr[eé]dito|d[eé]bito/.test(n) ? 'tarjeta' : /bre-?b|llave/.test(n) ? 'breb' : /\bqr\b/.test(n) ? 'qr' : 'transferencia';
 }
 window.medioDePago = medioDePago;
-const CIERRE_MEDIOS = { efectivo: '💵 Efectivo', transferencia: '🏦 Transferencia', nequi: '📱 Nequi', daviplata: '📱 DaviPlata', tarjeta: '💳 Tarjeta', saldo: '💳 Saldo a favor', breb: '🔑 Bre-B', qr: '📲 QR', debe: '📝 Fiado (quedó debiendo)', otro: 'Otro' };
+const CIERRE_MEDIOS = { usd: '💵 Dólares (en pesos)', efectivo: '💵 Efectivo', transferencia: '🏦 Transferencia', nequi: '📱 Nequi', daviplata: '📱 DaviPlata', tarjeta: '💳 Tarjeta', saldo: '💳 Saldo a favor', breb: '🔑 Bre-B', qr: '📲 QR', debe: '📝 Fiado (quedó debiendo)', otro: 'Otro' };
 function cierreMedios(closure){
   if(closure.medios && Object.keys(closure.medios).length) return Object.keys(closure.medios).filter(k => closure.medios[k]).sort((a, b) => (a === 'debe') - (b === 'debe') || closure.medios[b] - closure.medios[a]).map(k => [CIERRE_MEDIOS[k] || k, closure.medios[k], k]);
   return [['💵 Efectivo', closure.totalEfectivo, 'efectivo'], ['🏦 Transferencia', closure.totalTransferencia, 'transferencia']].concat(closure.totalDebe > 0 ? [['📝 Fiado (quedó debiendo)', closure.totalDebe, 'debe']] : []);
