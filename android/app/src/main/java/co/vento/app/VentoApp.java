@@ -162,6 +162,9 @@ public class VentoApp extends Application {
         s.setJavaScriptCanOpenWindowsAutomatically(true);
         s.setLoadWithOverviewMode(true);
         s.setUseWideViewPort(true);
+        // 1.88.0: ORDEVA se ve igual en todos los celulares. Sin esto, la letra seguía el «tamaño de fuente» del celular
+        // (en los que lo tienen grande se veía todo enorme y se descuadraban las pantallas).
+        s.setTextZoom(100);
         s.setAllowFileAccess(false);
         s.setOffscreenPreRaster(true);          // sigue trabajando aunque no se esté mostrando
         s.setUserAgentString(s.getUserAgentString() + " VentoAndroid/" + BuildConfig.VERSION_NAME);
@@ -869,6 +872,18 @@ public class VentoApp extends Application {
     class Puente {
         private Thread escucha;
         private java.net.HttpURLConnection escuchaCon;
+
+        /** 1.88.0: cuánto agrandó la pantalla el «tamaño de pantalla» (zoom) del celular: 1 = normal, 1.2 = 20 % más grande.
+         *  La página lo usa para verse igual que con el tamaño normal (ver lib/vento-igual.js). */
+        @JavascriptInterface
+        public double escalaPantalla() {
+            try {
+                int estable = android.util.DisplayMetrics.DENSITY_DEVICE_STABLE;
+                int ahora = getResources().getDisplayMetrics().densityDpi;
+                if (estable <= 0 || ahora <= 0) return 1;
+                return (double) ahora / (double) estable;
+            } catch (Exception e) { return 1; }
+        }
 
         /** Los errores de la app (cierres, página muerta por memoria) desde la última vez; se borran al leerlos. */
         @JavascriptInterface
