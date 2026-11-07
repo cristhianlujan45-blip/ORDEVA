@@ -658,6 +658,7 @@ document.getElementById('chargeBtn').addEventListener('click', async ()=>{
     }
   }
   if(window.ventoMotel){ const qm = window.ventoMotel.antesDeCobrar(currentTable); if(qm !== true && !(await qm)) return; }   // ⏱️ 1.85.0: ¿se pasó del tiempo? (motel)
+  if(window.ventoMinimo){ const qn = window.ventoMinimo.antesDeCobrar(currentTable); if(qn !== true && !(await qn)) return; }   // 🍾 1.95.0: ¿llegó al consumo mínimo?
   const saldo = tableBalance(currentTable);
   // 1.72.5: un solo cobro, el MISMO de la Caja POS (¿con cuánto paga? con el vuelto en grande, Nequi, DaviPlata, tarjeta,
   // mixto, fiado con el nombre, teclado). Cobra el saldo, libera la mesa y deja «Deshacer» (ventoPOS.cobrarMesa).
@@ -665,7 +666,7 @@ document.getElementById('chargeBtn').addEventListener('click', async ()=>{
     const mesa = currentTable;
     const loyaltyPhone0 = data.loyaltyOn ? document.getElementById('loyaltyPhone').value : '';
     const loyaltyName0 = data.loyaltyOn ? document.getElementById('loyaltyName').value : '';
-    const entry = await window.ventoPOS.cobrarMesa(mesa, { desdeCuenta: true, motelVisto: true });
+    const entry = await window.ventoPOS.cobrarMesa(mesa, { desdeCuenta: true, motelVisto: true, minimoVisto: true });
     if(!entry) return;                                   // canceló el cobro: la mesa sigue igual
     if(loyaltyPhone0) registrarVisitaCliente(loyaltyPhone0, loyaltyName0, entry.total);
     saveData(); renderLoyaltyClientsList();
