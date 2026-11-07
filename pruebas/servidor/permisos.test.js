@@ -73,6 +73,12 @@ async function pruebas(sb) {
   r = await rpc('unirse_con_codigo', { p_codigo: 'MALO0001' }, intruso.token);
   chk('… y el que nadie usó queda vencido', r.st >= 400 && /codigo_vencido/.test(JSON.stringify(r.j)) && (await rolDe(NEG, intruso.id)) === null, r);
   chk('Los códigos buenos del dueño y del administrador no se tocan', Number((await uno("select count(*) n from invitaciones where negocio_id = $1 and vence > now() and usada_por is null and codigo not like 'MALO%'", [NEG])).n) === 1);
+  // 1.87.0: el código salía a veces de 7 letras (al quitar las que se confunden quedaban menos de 8). Se vuelve a poner la
+  // versión de hoy (arriba se corrió la migración vieja otra vez) y se piden 60 seguidos: todos de 8.
+  const nueva = path.join(__dirname, '../../supabase/migrations/20261129100000_codigo_invitacion.sql');
+  if (fs.existsSync(nueva)) await sb.sql(fs.readFileSync(nueva, 'utf8'));
+  { const cods = []; for (let i = 0; i < 60; i++) { const x = await rpc('crear_invitacion', { p_negocio: NEG, p_rol: 'empleado' }, admin.token); cods.push(x.j); }
+    chk('60 códigos de invitación seguidos: todos de 8 letras y números', cods.every(c => /^[A-Z0-9a-z]{8}$/.test(c)), cods.filter(c => !/^[A-Z0-9a-z]{8}$/.test(c))); }
 }
 
 (async () => {

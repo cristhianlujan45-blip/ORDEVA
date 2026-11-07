@@ -37,9 +37,17 @@
     disponibilidad y crean la reserva en línea.
   - **No toca tablas ni borra nada.** Las reglas van en la misma configuración de reservas que ya guarda el dueño.
   - **La función de la tarifa** no se puede llamar desde afuera.
-- **La revisión de migraciones:** las 57 se aplican sobre una base vacía, cada una tiene su propia versión y todas las
+- **La revisión de migraciones:** las 58 se aplican sobre una base vacía, cada una tiene su propia versión y todas las
   tablas tienen RLS.
 - **Al publicar,** GitHub la aplica sola, con el flujo «Servidor ORDEVA».
+
+- **Arreglo que salió al publicar:**
+  - **Qué pasó:** la revisión del servidor en GitHub, que corre antes de aplicar las migraciones, falló en `permisos`: un
+    código de invitación de empleado salió con 7 letras en vez de 8. Por eso la migración de las tarifas no se aplicó.
+  - **La causa:** se sacaban 12 letras al azar y se quitaban las que se confunden (0, O, 1, I, l); 1 o 2 de cada 100
+    veces quedaban menos de 8. El error ya estaba antes de la 1.87.
+  - **El arreglo:** la migración `20261129100000_codigo_invitacion.sql` saca 24 y vuelve a sacar si no alcanzan.
+  - **La prueba nueva:** pide 60 códigos seguidos. Con la versión anterior falló 3 de 3 veces; ahora pasa 3 de 3.
 
 ## 4. Pruebas
 - **Prueba nueva del servidor `tarifas`:** 9 de 9, contra PostgreSQL de verdad.
@@ -49,7 +57,7 @@
 - **Las 15 pruebas de lo que toca la 1.87:** 295 revisiones bien, 0 mal. Son `reservas`, `reservasavisos`, `agente`, `hotel`,
   `hoteldia`, `huespedes`, `mapa`, `finanzas`, `ivaexcel`, `cajamas`, `v183`, `v185`, `v186`, `contraste` y `sincmesas`.
 - **La lista completa (110 pruebas, todas las de GitHub + `facturascan`):** 2.557 revisiones bien, 0 mal.
-- **Las 28 del servidor (con la nueva `tarifas`):** pasan.
+- **Las 28 del servidor (con la nueva `tarifas`, y `permisos` con los 60 códigos):** pasan.
 - **Android (`javaavisos`, con la librería `android-all`):** 328 de 328.
 - **No se probó con Booking ni con Airbnb de verdad.**
 
