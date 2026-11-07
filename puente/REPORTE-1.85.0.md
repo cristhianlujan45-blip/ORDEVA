@@ -49,11 +49,18 @@ barrio, el bar, el restaurante, la agencia de viajes, el hotel y el motel. El pl
   - cada capa lleva las marcas de las demás, así nadie se vuelve a poner;
   - ahora queda fijo en 12 niveles, también después de un minuto;
   - lo revisa la prueba `v185`.
-- **La prueba larga (ORDEVA abierto 50 minutos):** RESULTADO_LARGO
+- **Confirmado en vivo con la 1.84.0 publicada,** con ORDEVA abierto sin recargar:
+  - **minutos 5, 10 y 15:** cerrar cuenta, bien;
+  - **minuto 20:** cerrar cuenta da «Maximum call stack size exceeded».
+- **Por eso el arreglo salió antes, solo, como 1.84.1** (`puente/REPORTE-1.84.1.md`). La 1.85 lo trae también.
 
 ## 3. Pruebas
 - **Prueba nueva `v185`:** 17 de 17 (motel, y que las capas ya no crecen).
-- RESULTADOS_AQUI
+- **Las 15 pruebas de lo que toca la 1.85:** pasan. Son `agencia`, `hotel`, `hoteldia`, `huespedes`, `mapa`, `mesa`,
+  `mesapersonas`, `opciones`, `reservas`, `sincmesas`, `v183`, `v184`, `cajamas`, `contraste` y `doscierres`.
+- **La lista completa (108 pruebas, todas las de GitHub + `facturascan`):** 2.529 revisiones bien, 0 mal.
+- **Las 27 del servidor:** pasan.
+- **Android (`javaavisos`, con la librería `android-all`):** 328 de 328.
 - **No se probó con equipos de verdad.**
 
 ## 4. Lo que sigue
