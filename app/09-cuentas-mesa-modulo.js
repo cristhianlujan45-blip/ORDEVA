@@ -738,6 +738,7 @@ function procesar(txt){
   // Formato nuevo (pedido.html 1.8+): JSON con ID único → sin duplicados, mesa y productos exactos.
   if(/^\s*\{/.test(txt)){
     let o=null;try{o=JSON.parse(txt);}catch(e){}
+    if(o&&o.t==='hola'){qrHola(o);return;}                          // 🔄 1.95.1: un cliente abrió el QR de su mesa
     if(o&&o.t==='pedido'){pedidoEntrante(o,'qr');return;}
     if(o&&o.t==='cancion'){const id=parseInt(o.mesa,10);if(!id)return;const r=agregarCancion(id,String(o.s||'').slice(0,120),String(o.id||'').slice(0,40));
       // Mesa sin cupo: se le avisa al celular que la pidió (por el canal de estados) en vez de dejarla esperando.
@@ -808,7 +809,7 @@ function qCodigosCompartir(){
     const qc=data.qrCodigos&&typeof data.qrCodigos==='object'?data.qrCodigos:{};
     Object.keys(v).forEach(id=>{ const k=String(v[id]||'');if(!/^\w{6,40}$/.test(k))return;
       const a=Array.isArray(qc[id])?qc[id]:(qc[id]?[qc[id]]:[]);
-      if(a.indexOf(k)<0){a.push(k);qc[id]=a.slice(-4);cambio=true;} });
+      if(a.indexOf(k)<0){a.push(k);qc[id]=a.slice(-8);cambio=true;} });   // 1.95.1: hasta 8 (antes 4: se podía perder el del QR impreso)
     if(cambio)data.qrCodigos=qc;
     if(cambio)saveData();
   }catch(e){}
@@ -2840,19 +2841,46 @@ function ypMiniPintar(){
 document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-yp-abrir]');if(b){e.preventDefault();ypAbrir();}});
 window.vitoPanel={abrir:ypAbrir,cerrar:ypCerrar,agregar:ypAgregar,abierto:()=>ypAbierto};
 window.vitoMod = { republicarMesas: () => { Object.keys(pubHash).forEach(k => { if(pubHash[k] !== undefined) pubHash[k] = '-'; }); try{ publicarCuentas(); }catch(e){} }, mzMax, yRenovarServidor, linkMesa, mCfg, mUrl, prepUrl: () => { try{ return prepUrl(); }catch(e){ return ''; } }, prepPublicar: f => { try{ prepPublicar(f); }catch(e){} }, mVistos, mPublicar, reconectarPedidos: () => { try{conectar();}catch(e){} }, qCanales, qProbarPedidos, tvOn, tvUrl, LS, SS, qCfg, yCfg, yTok, yConectar, cola, ordenJusto, mzEmpezo, mzTermino, mzProgreso, yLista, ytAgregar, ySearch, yGet, AUTO, renderMusica, esperarYT: () => cadena, yFuente: () => yFuente, ytDur, ytPosicionSiguiente, ytTanda: () => ytTanda, procesar, notifPedidos, notifMusica };
+// 🔄 1.95.1: la cuenta en vivo sale a TODOS los códigos conocidos de la mesa (los de este equipo, los QR fijados y los que
+// compartieron los demás equipos en data.qrCodigos). Antes salía solo al código de este equipo: si el QR pegado en la mesa
+// lo imprimió otro celular, el cliente nunca veía su cuenta.
+function publicarMesaVivo(id){
+  const sn=snapMesa(id),h=JSON.stringify(Object.assign({},sn,{t:0}));
+  if(pubHash[id]===h)return false;
+  if(pubHash[id]===undefined&&!mesaQRActiva(id))return false;      // nadie la está viendo por QR
+  const primera=pubHash[id]===undefined;pubHash[id]=h;
+  if(primera&&!sn.i.length&&!sn.cs)return false;
+  const cods=qMesaCodigos(id),dest=(cods.length?cods:[vTopic(id)]).filter(qCanalOk).slice(0,8),body=JSON.stringify(sn);
+  dest.forEach(t=>fetch('https://canal.vento.local/'+t,{method:'POST',body}).catch(()=>{delete pubHash[id];}));
+  return dest.length>0;
+}
 function publicarCuentas(){
   if(typeof data==='undefined'||!data)return;
   try{publicarCatalogo();}catch(e){}             // la carta se publica siempre (aunque "en vivo" esté apagado)
   if(!qCfg().live)return;
-  Object.keys(data.tables).forEach(k=>{
-    const id=+k,sn=snapMesa(id),h=JSON.stringify(Object.assign({},sn,{t:0}));
-    if(pubHash[id]===h)return;
-    if(pubHash[id]===undefined&&!mesaQRActiva(id))return;      // nadie la está viendo por QR
-    const primera=pubHash[id]===undefined;pubHash[id]=h;
-    if(primera&&!sn.i.length&&!sn.cs)return;
-    fetch('https://canal.vento.local/'+vTopic(id),{method:'POST',body:JSON.stringify(sn)}).catch(()=>{delete pubHash[id];});
-  });
+  Object.keys(data.tables).forEach(k=>{ try{ publicarMesaVivo(+k); }catch(e){} });
 }
+// 🔄 1.95.1: el cliente abrió el QR de su mesa («hola», con el código de su QR). Si el código es de esa mesa, su cuenta se
+// publica al instante (antes solo después de su primer pedido o canción: si solo miraba «Mi cuenta», no le salía nada).
+// Si el código no es de ninguna mesa conocida, se avisa al dueño: ese QR no ve su cuenta y sus pedidos quedan por aceptar.
+const qHolaAvisado={};
+function qrHola(o){
+  const mesa=parseInt(o&&o.mesa,10),vm=String((o&&o.vm)||'').replace(/[^\w]/g,'');if(!mesa||mesa<1||mesa>500||!vm)return;
+  if(qMesaCodigos(mesa).indexOf(vm)>=0){
+    mesaQRActiva(mesa,true);
+    if(!qCfg().live||!data.tables[mesa])return;
+    delete pubHash[mesa];try{publicarMesaVivo(mesa);}catch(e){}
+    return;
+  }
+  const k=mesa+'|'+vm;if(qHolaAvisado[k])return;qHolaAvisado[k]=1;
+  let jefe=true;try{jefe=!window.ventoRoles||window.ventoRoles.esJefe();}catch(e){}
+  try{window.ventoAuditar&&window.ventoAuditar('QR de mesa no reconocido','El QR de '+tableLabel(mesa)+' trae un código que este equipo no conoce: el cliente no ve su cuenta y sus pedidos quedan por aceptar.');}catch(e){}
+  if(jefe)setTimeout(()=>{try{showToast('⚠️ El QR de '+tableLabel(mesa)+' tiene un código que este equipo no conoce: el cliente no ve su cuenta y sus pedidos quedan «por aceptar». Abre ORDEVA en el equipo que imprimió esos QR (así comparte sus códigos) o, en Ajustes → QR, usa «Fijar mis QR impresos».',12000);}catch(e){}},400);
+}
+// 🔄 1.95.1: cada equipo comparte SUS códigos de mesa al abrir y al llegar datos de otro (antes solo al crear uno nuevo:
+// los QR impresos antes de la 1.56 no se reconocían en los demás equipos).
+setTimeout(()=>{try{qrFijoSync();qCodigosCompartir();}catch(e){}},4000);
+window.addEventListener('vento-datos-remotos',()=>{clearTimeout(qCodigosCompartir._t);qCodigosCompartir._t=setTimeout(()=>{try{qCodigosCompartir();}catch(e){}},3000);});
 const _saveData=saveData;
 saveData=async function(){const r=await _saveData.apply(this,arguments);clearTimeout(pubT);pubT=setTimeout(()=>{publicarCuentas();try{mPublicar();}catch(e){}},2500);return r;};
 setInterval(publicarCuentas,60000);

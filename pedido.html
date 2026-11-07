@@ -1863,6 +1863,16 @@ $('cs').textContent=v?t('cargandoCuenta'):t('cuentaSinVivo');
 applyTh(cat && cat.th);
 conectar();
 actualizarTasas();
+// 🔄 1.95.1: «estoy viendo la cuenta de esta mesa» (con el código de su QR): los equipos del negocio publican la cuenta en
+// vivo al instante, aunque el cliente todavía no haya pedido nada desde el QR. Una vez cada 2 minutos como mucho.
+function holaMesa(){
+  if(!mesa||!c||!v||dom)return;
+  try{const k='ordeva-hola-'+c+'-'+mesa,u=+sessionStorage.getItem(k)||0;if(Date.now()-u<12e4)return;sessionStorage.setItem(k,String(Date.now()));}catch(e){}
+  const body=JSON.stringify({t:'hola',v:2,id:'h'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),mesa:+mesa,vm:v,at:Date.now()});
+  fetch('https://canal.vento.local/'+c,{method:'POST',body}).catch(()=>{});
+}
+holaMesa();
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&!snap)holaMesa();});
 </script>
 <script>
 /* ---------- 🎉 Vitrina: ocasión, mensaje del local y promociones ----------
