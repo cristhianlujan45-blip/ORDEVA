@@ -26,7 +26,11 @@ versión publicada (1.84.0) y el error se confirmó en vivo.
 
 ## 3. Pruebas
 - **La medición:** a los 10 y a los 60 segundos, 11 niveles. En la 1.84.0 eran 111 y 511.
-- RESULTADOS_AQUI
+- **16 pruebas de lo que toca el arreglo:** `agencia`, `hotel`, `hoteldia`, `huespedes`, `mapa`, `mesa`, `mesapersonas`,
+  `opciones`, `reservas`, `cajamas`, `contraste`, `v183`, `v184`, `ventasfiados`, `cerrarcaja` y `sincmesas`. Dan 364 revisiones
+  bien y 0 mal.
+- **No se corrió la lista completa** con la 1.84.1, para no dejar producción con el error una hora más. La lista completa
+  corre con la 1.85, que trae el mismo arreglo.
 - **La prueba que lo revisa de ahora en adelante** (que «cerrar cuenta» y «agregar producto» no se vuelvan a envolver)
   está en `v185`, con la 1.85.
 - **No se probó con equipos de verdad.**
