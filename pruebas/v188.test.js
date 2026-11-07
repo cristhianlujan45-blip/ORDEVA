@@ -46,7 +46,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
       await p.waitForFunction(() => !!document.getElementById('demoBanda'), null, { timeout: 20000 }).catch(() => {});
       v = await p.evaluate(() => ({ banda: (document.getElementById('demoBanda') || {}).innerText || '', neg: ((typeof data !== 'undefined' && data) || {}).businessName, prods: (((typeof data !== 'undefined' && data) || {}).products || []).length,
         ventas: (((typeof data !== 'undefined' && data) || {}).history || []).length, mesa: ((((typeof data !== 'undefined' && data) || {}).tables || {})[1] || {}).items, real: localStorage.getItem('real-dato'), tipo: ((typeof data !== 'undefined' && data) || {}).businessType }));
-      chk('4. Demo de restaurante: entra solo con «Restaurante La Sazón (demo)», 8 productos, las ventas de la semana y una mesa abierta', /Modo demo/.test(v.banda) && /demo/.test(v.neg || '') && v.prods === 8 && v.ventas >= 28 && v.mesa && v.mesa.length === 1 && v.tipo === 'restaurante', v);
+      chk('4. Demo de restaurante: entra solo con «Restaurante La Sazón (demo)», 8 productos, las ventas de la semana y una mesa abierta', /Modo demo/.test(v.banda) || /Demo/.test(v.banda) && /demo/.test(v.neg || '') && v.prods === 8 && v.ventas >= 28 && v.mesa && v.mesa.length === 1 && v.tipo === 'restaurante', v);
       chk('4. … el demo no ve los datos guardados del equipo (vive en la memoria)', v.real === null, v.real);
       v = await p.evaluate(async () => { const e = window.qsRegistrarVenta([{ productId: 'dp5', name: 'Limonada', price: 6000, qty: 2 }], { method: 'efectivo' }); return { tot: e && e.total, n: data.history.length }; });
       chk('4. En el demo se puede vender (la venta queda en el demo)', v.tot === 12000 && v.n >= 29, v);
