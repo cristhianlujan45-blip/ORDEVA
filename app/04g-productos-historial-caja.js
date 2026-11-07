@@ -1565,7 +1565,7 @@ function medioDePago(p){
   return /nequi/.test(n) ? 'nequi' : /daviplata/.test(n) ? 'daviplata' : /tarjeta|dat[aá]fono|bold|redeban|cr[eé]dito|d[eé]bito/.test(n) ? 'tarjeta' : /bre-?b|llave/.test(n) ? 'breb' : /\bqr\b/.test(n) ? 'qr' : 'transferencia';
 }
 window.medioDePago = medioDePago;
-const CIERRE_MEDIOS = { usd: '💵 Dólares (en pesos)', efectivo: '💵 Efectivo', transferencia: '🏦 Transferencia', nequi: '📱 Nequi', daviplata: '📱 DaviPlata', tarjeta: '💳 Tarjeta', saldo: '💳 Saldo a favor', breb: '🔑 Bre-B', qr: '📲 QR', debe: '📝 Fiado (quedó debiendo)', otro: 'Otro' };
+const CIERRE_MEDIOS = { bono: '🎁 Bonos de regalo', usd: '💵 Dólares (en pesos)', efectivo: '💵 Efectivo', transferencia: '🏦 Transferencia', nequi: '📱 Nequi', daviplata: '📱 DaviPlata', tarjeta: '💳 Tarjeta', saldo: '💳 Saldo a favor', breb: '🔑 Bre-B', qr: '📲 QR', debe: '📝 Fiado (quedó debiendo)', otro: 'Otro' };
 function cierreMedios(closure){
   if(closure.medios && Object.keys(closure.medios).length) return Object.keys(closure.medios).filter(k => closure.medios[k]).sort((a, b) => (a === 'debe') - (b === 'debe') || closure.medios[b] - closure.medios[a]).map(k => [CIERRE_MEDIOS[k] || k, closure.medios[k], k]);
   return [['💵 Efectivo', closure.totalEfectivo, 'efectivo'], ['🏦 Transferencia', closure.totalTransferencia, 'transferencia']].concat(closure.totalDebe > 0 ? [['📝 Fiado (quedó debiendo)', closure.totalDebe, 'debe']] : []);

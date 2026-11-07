@@ -1013,6 +1013,7 @@ function closeTableToHistory(tableId){
     items: p.items || null,
     receiptId: p.receiptId || null,
     ...(p.usd ? { usd: p.usd, tasa: p.tasa, vueltasCop: p.vueltasCop || 0 } : {}),   // 💵 1.90.0
+    ...(p.bonoRef ? { bonoRef: p.bonoRef, bonoCod: p.bonoCod || '' } : {}),   // 🎁 1.93.0
     ...(p.recibido ? { recibido: p.recibido, vueltas: p.vueltas || 0 } : {})   // 💵 1.67.0: efectivo entregado y cambio (no son ingreso)
   }));
   if(balance > 0){

@@ -124,7 +124,8 @@ function qsDeshacerVenta(entry){
   const inv = entry._inv || (quitada && quitada._inv) || (entry.items || []).filter(it => it && it.productId).map(it => ({ productId: it.productId, qty: Number(it.qty) || 0 }));
   inv.forEach(it => { try{ invOnSale({ productId: it.productId }, -it.qty); }catch(e){} });
   try{ window.ventoDian && window.ventoDian.alDeshacer(entry); }catch(e){}   // 🧾 si ya salió a la DIAN: nota crédito
-  try{ window.ventoDomicilios && window.ventoDomicilios.alDeshacer(entry); }catch(e){}   // 🛵 1.86.0: el domicilio vuelve a «por facturar»
+  try{ window.ventoDomicilios && window.ventoDomicilios.alDeshacer(entry); }catch(e){}
+  try{ window.ventoBonos && window.ventoBonos.alDeshacer(entry); }catch(e){}   // 🎁 1.93.0: el saldo vuelve al bono   // 🛵 1.86.0: el domicilio vuelve a «por facturar»
   saveData();
   return true;
 }
