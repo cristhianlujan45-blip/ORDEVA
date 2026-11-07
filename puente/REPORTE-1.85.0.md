@@ -42,9 +42,10 @@ barrio, el bar, el restaurante, la agencia de viajes, el hotel y el motel. El pl
   - **Medido en la 1.84 (la que estaba publicada):** «cerrar cuenta» ganaba unas 4 capas por segundo y «agregar
     producto», unas 2. En un minuto la llamada ya tenía 511 niveles. El navegador aguanta unas 11.000 capas antes de dar
     «Maximum call stack size exceeded».
-  - **La cuenta:** a esa velocidad, con ORDEVA abierto unos 35–40 minutos sin recargar, cerrar una cuenta fallaría. Lo
-    mismo pasaría con agregar productos a la cuenta, al cabo de una hora y media. Puede ser una de las causas de «Error en
-    la aplicación, se recargará».
+  - **La cuenta:** a esa velocidad, se calculaba que cerrar una cuenta fallaría a los 35–40 minutos con ORDEVA abierto sin
+    recargar. En la prueba en vivo falló antes, a los 20 minutos (abajo). Agregar productos a la cuenta iba por el mismo
+    camino: se calcula que fallaría a la hora y media. Puede ser una de las causas de «Error en la aplicación, se
+    recargará».
 - **Arreglo:**
   - cada capa lleva las marcas de las demás, así nadie se vuelve a poner;
   - ahora queda fijo en 12 niveles, también después de un minuto;
