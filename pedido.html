@@ -604,6 +604,10 @@ const DICT_SRC={
   cancionLimiteMesa:["Esta mesa ya pidió {max} canciones. Podrán pedir otra en {min} min.","This table has already requested {max} songs. You can request another in {min} min.","Esta mesa já pediu {max} músicas. Poderão pedir outra em {min} min.","Cette table a déjà demandé {max} chansons. Vous pourrez en redemander une dans {min} min.","本桌已点了{max}首歌。{min}分钟后可再点一首。","इस टेबल ने पहले ही {max} गाने माँगे हैं। {min} मिनट में और माँग सकते हैं।"],
   cancionLimite:["Ya pediste {max} canciones. Podrás pedir otra en {min} min.","You’ve already requested {max} songs. You can request another in {min} min.","Você já pediu {max} músicas. Poderá pedir outra em {min} min.","Vous avez déjà demandé {max} chansons. Vous pourrez en redemander une dans {min} min.","您已点了{max}首歌。{min}分钟后可再点一首。","आपने पहले ही {max} गाने माँगे हैं। {min} मिनट में और माँग सकते हैं।"],
   pedidoLargo:["Tu pedido es muy largo. Envíalo en dos rondas.","Your order is too long. Send it in two rounds.","Seu pedido é muito longo. Envie em duas rodadas.","Votre commande est trop longue. Envoyez-la en deux fois.","您的订单太长，请分两次发送。","आपका ऑर्डर बहुत लंबा है। इसे दो राउंड में भेजें।"],
+  ytMuchas:["Hay muchas búsquedas en este momento. Espera un minuto y vuelve a buscar.","Too many searches right now. Wait a minute and search again.","Muitas buscas agora. Espere um minuto e busque de novo.","Trop de recherches en ce moment. Attendez une minute et réessayez.","当前搜索太多，请等一分钟再搜索。","अभी बहुत सारी खोजें हो रही हैं। एक मिनट रुककर फिर खोजें।"],
+  musicaApagada:["El local tiene la música apagada en este momento: tu canción no se puso.","Music is turned off right now: your song was not added.","A música está desligada agora: sua música não foi colocada.","La musique est coupée en ce moment : votre chanson n’a pas été ajoutée.","商家现在关闭了音乐，您的歌曲未加入。","अभी संगीत बंद है: आपका गाना नहीं जोड़ा गया।"],
+  cancionRepetida:["Esa canción ya está en la cola: no se pidió otra vez.","That song is already in the queue.","Essa música já está na fila.","Cette chanson est déjà dans la file.","这首歌已在队列中。","यह गाना पहले से कतार में है।"],
+  cancionVieja:["Tu canción llegó muy tarde al local (sin conexión mucho rato) y no se puso. Pídela otra vez si todavía la quieres.","Your song reached the place too late (offline for a long time) and was not added. Request it again if you still want it.","Sua música chegou tarde demais e não foi colocada. Peça de novo se ainda quiser.","Votre chanson est arrivée trop tard et n’a pas été ajoutée. Redemandez-la si vous la voulez encore.","您的歌曲太晚才送达，未加入。如仍想听请再点一次。","आपका गाना बहुत देर से पहुँचा और नहीं जोड़ा गया। चाहें तो फिर से माँगें।"],
   enviadoOk:["✅ Enviado, ya lo recibió el local.","✅ Sent, the place received it.","✅ Enviado, o local já recebeu.","✅ Envoyé, l’établissement l’a reçu.","✅ 已发送，商家已收到。","✅ भेजा गया, दुकान को मिल गया।"],
   cancionesLlevas:[" Llevas {u} de {max} canciones."," You’ve used {u} of {max} songs."," Você já pediu {u} de {max} músicas."," Vous avez utilisé {u} chansons sur {max}."," 您已点{u}/{max}首歌。"," आपने {max} में से {u} गाने माँगे हैं।"],
   noEnviadoWa:["No se pudo enviar. Usa el botón de WhatsApp.","Couldn’t send. Use the WhatsApp button.","Não foi possível enviar. Use o botão do WhatsApp.","Échec de l’envoi. Utilisez le bouton WhatsApp.","发送失败，请使用WhatsApp按钮。","भेजा नहीं जा सका। WhatsApp बटन का उपयोग करें।"],
@@ -942,10 +946,10 @@ async function ytSrvBuscar(q,tipo){
   const ctrl=new AbortController(), tm=setTimeout(()=>ctrl.abort(),7000);
   // 1.51.0: «no hay resultados» también es una respuesta (devuelve la lista vacía). Solo si el servidor NO responde se
   // devuelve null y se usa la API de YouTube de respaldo: cada búsqueda de la API gasta 100 del cupo diario.
-  try{ const r=await fetch(b+'?tipo='+tipo+'&q='+encodeURIComponent(q),{signal:ctrl.signal}); if(!r.ok) return null; const j=await r.json(); return j&&Array.isArray(j.items)?j:null; }
+  try{ const r=await fetch(b+'?tipo='+tipo+'&q='+encodeURIComponent(q),{signal:ctrl.signal}); if(r.status===429) ytMuchas=Date.now(); if(!r.ok) return null; const j=await r.json(); return j&&Array.isArray(j.items)?j:null; }
   catch(e){ return null; } finally{ clearTimeout(tm); }
 }
-let ytTimer=null, ytSeq=0, ytSelArtist=null;
+let ytTimer=null, ytSeq=0, ytSelArtist=null, ytMuchas=0;   // ytMuchas: el servidor dijo «muchas búsquedas» (429), no «no hay nada»
 const ytArtistCache={};
 function ytPintarMsg(msg){
   const box=$('ytPrev'); if(!box) return;
@@ -955,7 +959,11 @@ function ytPintarMsg(msg){
 }
 function ytUnesc(s){ return String(s||'').replace(/&amp;/g,'&').replace(/&#39;/g,"'").replace(/&quot;/g,'"'); }
 function ytThumb(sn){ return (sn&&sn.thumbnails&&(sn.thumbnails.default||sn.thumbnails.medium)||{}).url||''; }
-function ytSongRow(box,q,title,channelTitle,thumb){
+/* 🎵 1.95.4: el video que el cliente tocó viaja con la canción (vid). Antes el local buscaba otra vez y podía sonar otra
+   versión (un cover o una con letra). Solo se manda si el texto sigue siendo el de ese video. */
+let ytElegido=null;
+const ytVidOk=v=>/^[\w-]{11}$/.test(String(v||''));
+function ytSongRow(box,q,title,channelTitle,thumb,vid){
   const b=h('button','ytrow');b.type='button';
   if(thumb){ const im=document.createElement('img'); im.src=thumb; im.alt=''; b.appendChild(im); }
   const info=h('span','ytnm');
@@ -965,7 +973,7 @@ function ytSongRow(box,q,title,channelTitle,thumb){
   b.appendChild(info);
   b.onmousedown=e=>e.preventDefault();
   b.onclick=()=>{
-    $('s').value=ytUnesc(title||q);
+    $('s').value=ytUnesc(title||q);ytElegido=ytVidOk(vid)?{t:$('s').value.replace(/\s+/g,' ').trim(),v:vid}:null;
     $('ytPrev').hidden=true;
     if($('sugC'))$('sugC').hidden=true;
     $('s').focus();
@@ -976,7 +984,7 @@ function ytSongRow(box,q,title,channelTitle,thumb){
   pd.onmousedown=e=>e.preventDefault();
   pd.onclick=async()=>{
     if(pd.disabled)return; pd.disabled=true;
-    $('s').value=ytUnesc(title||q);
+    $('s').value=ytUnesc(title||q);ytElegido=ytVidOk(vid)?{t:$('s').value.replace(/\s+/g,' ').trim(),v:vid}:null;
     if($('sugC'))$('sugC').hidden=true;
     try{ await $('b').onclick(); }catch(e){}
     if(!$('s').value){ pd.textContent=t('pedida'); pd.classList.add('ok'); setTimeout(()=>{ if($('ytPrev'))$('ytPrev').hidden=true; },900); }
@@ -989,7 +997,7 @@ function ytPintarCanciones(wrap,q,songs,titulo){
   wrap.textContent='';
   if(titulo) wrap.appendChild(h('div','ytsec',titulo));
   if(!songs.length){ wrap.appendChild(h('div','ytmsg','No encontré canciones.')); return; }
-  songs.forEach(s=>wrap.appendChild(ytSongRow(wrap,q,s.title,s.channelTitle,s.thumb)));
+  songs.forEach(s=>wrap.appendChild(ytSongRow(wrap,q,s.title,s.channelTitle,s.thumb,s.vid)));
 }
 // Canales cuyo nombre coincide o se parece a lo escrito.
 async function ytBuscarArtistas(q){
@@ -1015,7 +1023,7 @@ async function ytBuscarArtistas(q){
 async function ytCancionesDeArtista(channelId,nombre){
   if(ytArtistCache[channelId]) return ytArtistCache[channelId];
   // Si la API no responde (sin cupo), las canciones del artista salen de la búsqueda sin cupo con su nombre.
-  const porNombre=async()=>{ const sj=nombre?await ytSrvBuscar(nombre,'video'):null; return sj?sj.items.filter(it=>it.id&&it.id.videoId).slice(0,8).map(it=>({title:it.snippet.title,channelTitle:it.snippet.channelTitle,thumb:ytThumb(it.snippet),views:0})):[]; };
+  const porNombre=async()=>{ const sj=nombre?await ytSrvBuscar(nombre,'video'):null; return sj?sj.items.filter(it=>it.id&&it.id.videoId).slice(0,8).map(it=>({title:it.snippet.title,channelTitle:it.snippet.channelTitle,thumb:ytThumb(it.snippet),views:0,vid:it.id.videoId})):[]; };
   // Primero por el Servidor ORDEVA (sin el cupo de Google); la API de YouTube (con cupo) solo si el servidor no trae nada.
   const r=await porNombre();
   if(r.length) return ytArtistCache[channelId]=r;
@@ -1034,7 +1042,7 @@ async function ytCancionesDeArtistaApi(channelId){
     if(!ids.length) return [];
     const vJ=await fetch('https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id='+ids.join(',')+'&key='+YT_KEY).then(r=>r.json());
     const songs=(vJ.items||[]).map(it=>({
-      title:it.snippet.title, channelTitle:it.snippet.channelTitle, thumb:ytThumb(it.snippet),
+      title:it.snippet.title, channelTitle:it.snippet.channelTitle, thumb:ytThumb(it.snippet), vid:it.id,
       views:+(it.statistics&&it.statistics.viewCount)||0
     })).sort((a,b)=>b.views-a.views).slice(0,8);
     return songs;
@@ -1066,9 +1074,9 @@ async function ytBuscar(q,genero){
   }catch(err){}
   if(myId!==ytSeq) return;
   const canciones=((cancionesJson&&cancionesJson.items)||[]).filter(it=>it.id&&it.id.videoId).map(it=>({
-    title:it.snippet.title, channelTitle:it.snippet.channelTitle, thumb:ytThumb(it.snippet)
+    title:it.snippet.title, channelTitle:it.snippet.channelTitle, thumb:ytThumb(it.snippet), vid:it.id.videoId
   }));
-  if(!artistas.length&&!canciones.length){ ytPintarMsg('No encontramos nada en YouTube para "'+q+'".'); return; }
+  if(!artistas.length&&!canciones.length){ ytPintarMsg(Date.now()-ytMuchas<60000?t('ytMuchas'):'No encontramos nada en YouTube para "'+q+'".'); return; }
   box.textContent='';
   if(artistas.length){
     const row=h('div','ytartists');
@@ -1300,7 +1308,7 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)vaciarOutb
 setTimeout(vaciarOutbox,2000);
 const misPedidos=()=>jget(MISK,[]).filter(x=>Date.now()-x.at<12*36e5);
 function misPedidosAgregar(o){const l=misPedidos();l.push(o);jset(MISK,l.slice(-15));pintarEstados();}
-const EST_TXT={enviado:'⏳',nuevo:'🆕',recibido:'✅',preparacion:'👩‍🍳',listo:'🔔',entregado:'🍽️',cancelado:'❌'};
+const EST_TXT={enviado:'⏳',nuevo:'🆕',recibido:'✅',preparacion:'👩‍🍳',listo:'🔔',entregado:'🍽️',cancelado:'❌',cola:'🎵',sonando:'🔊',sono:'✅',quitada:'🚫',novid:'⚠️',limite:'⏳',apagada:'🔇',repetida:'🎵',vieja:'⌛'};
 function pintarEstados(){
   const box=$('estPed');if(!box)return;const l=misPedidos();
   if(!l.length){box.hidden=true;return}
@@ -1314,11 +1322,12 @@ function escucharEstados(forzar){
   try{esEst=new EventSource('https://canal.vento.local/'+c+'e/sse?since=12h')}catch(e){return}
   esEst.onmessage=ev=>{try{const m=JSON.parse(ev.data);if(m.event!=='message')return;const o=JSON.parse(m.message);if(!o||o.t!=='estado')return;
     // La app del local rechazó una canción porque la MESA ya llegó a su cupo (la pidieron desde otros celulares).
-    if(o.e==='limite'){const mc=jget(MISC,[]);if(!mc.includes(o.id))return;jset(MISC,mc.filter(x=>x!==o.id));
+    // 🎵 1.95.4: también si la música está apagada, si ya estaba en la cola o si llegó muy tarde: no cuenta en el cupo.
+    if(['limite','apagada','repetida','vieja'].includes(o.e)){const mc=jget(MISC,[]);if(mc.includes(o.id)){jset(MISC,mc.filter(x=>x!==o.id));
       const a=jget(K,[]);a.pop();jset(K,a);if(modo=='c')pintarCupos();
-      setMsg(()=>t('cancionLimiteMesa',{max:o.max||MAXC()||10,min:o.min||1}),'err');return}
+      setMsg(()=>o.e==='limite'?t('cancionLimiteMesa',{max:o.max||MAXC()||10,min:o.min||1}):t({apagada:'musicaApagada',repetida:'cancionRepetida',vieja:'cancionVieja'}[o.e]),'err');}}
     const l=jget(MISK,[]),x=l.find(y=>y.id===o.id);if(!x)return;x.e=o.e;x.n=o.n||'';if(o.i)x.i=String(o.i).slice(0,4);else delete x.i;delete x.body;jset(MISK,l);pintarEstados();
-    if(['recibido','preparacion','listo'].includes(o.e)&&$('m').className!=='err')setMsg(()=>t('enviadoOk'),'ok');}catch(e){}};
+    if(['recibido','preparacion','listo','cola'].includes(o.e)&&$('m').className!=='err')setMsg(()=>t('enviadoOk'),'ok');}catch(e){}};
 }
 // Si el local no confirma: se reenvía el MISMO pedido (mismo ID, no se duplica) y luego se avisa.
 setInterval(()=>{
@@ -1391,7 +1400,11 @@ $('b').onclick=async()=>{
       const items=env.map(l=>({n:l.n,q:l.q,p:precioDe(l.n)}));
       cuerpo=JSON.stringify({t:'pedido',v:2,id,mesa:+mesa,vm:v,items,total:items.reduce((a,x)=>a+x.q*x.p,0),at:Date.now(),txt:ultimo.slice(0,300)});
       misPedidosAgregar({id,txt:txt.slice(0,120),at:Date.now(),e:'enviado',body:cuerpo});
-    } else{cuerpo=JSON.stringify({t:'cancion',v:2,id,mesa:+mesa,vm:v,s:txt.slice(0,120),at:Date.now()});jset(MISC,jget(MISC,[]).concat(id).slice(-12));escucharEstados(true)}
+    } else{const vid=ytElegido&&ytElegido.t===txt?ytElegido.v:null;ytElegido=null;
+      cuerpo=JSON.stringify(Object.assign({t:'cancion',v:2,id,mesa:+mesa,vm:v,s:txt.slice(0,120),at:Date.now()},vid?{vid}:{}));jset(MISC,jget(MISC,[]).concat(id).slice(-12));
+      // 🎵 1.95.4: la canción también sale en «Tus pedidos» con su estado (en cola, sonando, ya sonó) y se reenvía si el
+      // local no la confirma, igual que un pedido.
+      misPedidosAgregar({id,txt:'🎵 '+txt.slice(0,110),at:Date.now(),e:'enviado',body:cuerpo});escucharEstados(true)}
   }
   if(c){
     if(cuerpo.length>3800||ultimo.length>(dom?500:2000))return setMsg(()=>t('pedidoLargo'),'err');

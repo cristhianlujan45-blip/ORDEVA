@@ -2151,6 +2151,10 @@ function domRecibir(cuerpo){
   // 🛵 1.86.0: el id es el del mensaje del canal (el mismo en todos los equipos): el domicilio no queda repetido.
   const idc = window.__canalMsgId ? 'dm' + String(window.__canalMsgId).replace(/[^\w-]/g, '').slice(0, 40) : '';
   if(idc && domLista().some(x => x.id === idc)) return;
+  // 1.95.4 (auditoría S4): el link de domicilios es público. Si el negocio no tiene domicilios prendidos no entra nada, y
+  // como mucho 40 por facturar del link en 24 h (alguien que conoce el canal podía llenar los datos del negocio).
+  if(!data.domiciliosOn) return;
+  if(domisPend().filter(x => x.origen === 'link' && Date.now() - (x.ts || 0) < 864e5).length >= 40){ try{ window.ventoAuditar && window.ventoAuditar('domicilios', 'Llegaron demasiados domicilios por el link: no se guardó uno más (tope 40 por facturar en 24 h).'); }catch(e){} return; }
   const d = { id: idc || (Date.now() + '' + Math.random().toString(36).slice(2, 5)), ts: Date.now(), origen: 'link', estado: 'pendiente',
               nombre: p[0] || '', tel: p[1] || '', dir: p[2] || '', texto: p.slice(3).join(', ').trim() };
   domisGuardar([d]);

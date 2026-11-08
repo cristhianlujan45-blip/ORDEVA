@@ -1607,11 +1607,11 @@ async function closeCashRegister(opts){
     const ok = await showConfirm({ icon: '🔒', title: '¿Cerrar la caja del día?', message: cierreResumenTexto(pre, openIds, lastClosure), confirmText: '🔒 Sí, cerrar caja', cancelText: 'No, todavía no' });
     if(!ok) return;
     if(window.ventoCierreClave && !(await window.ventoCierreClave.pedir())) return;   // 🔑 si el dueño puso clave para cerrar
-    openIds.forEach(id => closeTableToHistory(id));
+    cerrarAbiertasConRespaldo(openIds);
   } else if(openIds.length){
     const ok = confirm('Hay ' + openIds.length + ' mesa(s) con cuentas abiertas (Mesa ' + openIds.join(', Mesa ') + '). Para cerrar el día hay que cerrarlas: lo que no esté abonado quedará registrado como "Debe". ¿Cerrarlas y continuar?');
     if(!ok) return;
-    openIds.forEach(id => closeTableToHistory(id));
+    cerrarAbiertasConRespaldo(openIds);
   }
   const toISO = new Date().toISOString();
   const stats = computeClosureStats(fromISO, toISO, cajaN);
@@ -1619,7 +1619,7 @@ async function closeCashRegister(opts){
   let caja = null;
   if(window.ventoTurno && (stats.tickets.length || window.ventoTurno.turno())){
     caja = auto ? window.ventoTurno.sinContar(stats.totalEfectivo) : await window.ventoTurno.arqueo(stats.totalEfectivo, { recibido: stats.totalRecibido, vueltas: stats.totalVueltas });
-    if(!caja){ saveData(); renderMesas(); return; }
+    if(!caja){ deshacerCierreAbiertas(); saveData(); renderMesas(); return; }   // 🔒 1.95.4: cancelar el conteo deja las mesas como estaban
   }
   if(stats.tickets.length === 0 && !caja){
     saveData();
@@ -1659,6 +1659,28 @@ async function closeCashRegister(opts){
 // el mismo número Z y todas las ventas contadas dos veces. Dos cierres que empiezan en el mismo punto (el mismo cierre
 // anterior y la misma caja) son el mismo cierre: se juntan en uno, con los totales recalculados de las ventas de los dos
 // equipos, el número Z más bajo y el arqueo que sí se contó. Sale igual en los dos equipos (no pelean al sincronizar).
+// 🔒 1.95.4 (auditoría): al cerrar la caja, las cuentas abiertas se cierran ANTES del conteo (sus abonos cuentan en el
+// efectivo). Si después se cancela el conteo, antes quedaban cerradas como «Debe» sin ningún cierre. Ahora se guardan como
+// estaban y se devuelven: las ventas que se crearon se quitan del historial y las cuentas vuelven abiertas.
+let cierreRespaldo = null;
+function cerrarAbiertasConRespaldo(ids){
+  cierreRespaldo = { mesas: {}, ventas: [] };
+  (ids || []).forEach(id => {
+    try{ cierreRespaldo.mesas[id] = JSON.parse(JSON.stringify(data.tables[id] || null)); }catch(e){}
+    const e = closeTableToHistory(id);
+    if(e && e.id) cierreRespaldo.ventas.push(String(e.id));
+  });
+}
+function deshacerCierreAbiertas(){
+  const r = cierreRespaldo; cierreRespaldo = null; if(!r) return;
+  const fuera = new Set(r.ventas);
+  if(fuera.size){
+    data.history = (data.history || []).filter(h => !fuera.has(String(h.id)));
+    try{ if(Array.isArray(data.contab)) data.contab = data.contab.filter(g => !(g && /^ctpf/.test(String(g.id || '')) && fuera.has(String(g.id).slice(4)))); }catch(e){}   // gasto de plataforma (hoteles)
+  }
+  Object.keys(r.mesas).forEach(id => { if(r.mesas[id]) data.tables[id] = r.mesas[id]; });
+  try{ showToast('Se canceló el cierre: las cuentas abiertas siguen abiertas como estaban.', 6000); }catch(e){}
+}
 function juntarCierresRepetidos(){
   if(typeof data === 'undefined' || !data || !Array.isArray(data.closures) || data.closures.length < 2) return false;
   const grupos = {};

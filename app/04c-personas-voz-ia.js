@@ -572,6 +572,13 @@ document.getElementById('addItemBtn').addEventListener('click', ()=>{
   productId = product.id;
   const qty = Math.max(0, parseInt(qtyInput.value,10) || 0);
   if(qty <= 0){ showToast('Indica una cantidad mayor que 0.'); return; }
+  // ✈️ 1.95.4 (auditoría M7): «Agregar» con cantidad también respeta los cupos del plan (antes se los saltaba).
+  try{
+    if(window.ventoAgencia && window.ventoAgencia.activo()){
+      const c = window.ventoAgencia.cupos(product);
+      if(c && c.quedan < qty){ showToast('🚫 «' + product.name + '» ' + (c.quedan > 0 ? 'solo tiene ' + c.quedan + (c.quedan === 1 ? ' cupo' : ' cupos') + ': no caben ' + qty + '.' : 'ya no tiene cupos.'), 8000); return; }
+    }
+  }catch(e){}
   const t = data.tables[currentTable];
   const existing = t.items.find(it=> it.productId === productId && !it.personId);
   if(existing){
@@ -648,17 +655,30 @@ function askTip(baseTotal){
 document.getElementById('chargeBtn').addEventListener('click', async ()=>{
   const t = data.tables[currentTable];
   if(!t.items || !t.items.length) return;
+  /* 1.95.4 (M4): la propina se agrega antes de cobrar. Si después se cancela cualquier paso, se quita: antes quedaba en la
+     cuenta y al volver a cobrar se sumaba otra vez. */
+  let lineaPropina = null, pagoCierre = null;
+  const quitarPropina = () => {
+    if(!lineaPropina) return;
+    const tt = data.tables[mesaCobro];
+    if(tt && Array.isArray(tt.items)){ const i = tt.items.indexOf(lineaPropina); if(i >= 0) tt.items.splice(i, 1); }
+    lineaPropina = null;
+    saveData();
+    try{ if(currentTable === mesaCobro) renderModalItems(); }catch(e){}
+  };
+  const mesaCobro = currentTable;
   if(data.tipsOn){
     const tip = await askTip(tableBalance(currentTable));
     if(tip === null) return;                       // canceló el paso de la propina, no cierra la mesa
     if(tip > 0){
-      t.items.push({ productId: null, name: '🙏 Propina', price: tip, size: '', qty: 1, personId: null, history: [] });
+      lineaPropina = { productId: null, name: '🙏 Propina', price: tip, size: '', qty: 1, personId: null, history: [] };
+      t.items.push(lineaPropina);
       saveData();
       renderModalItems();
     }
   }
-  if(window.ventoMotel){ const qm = window.ventoMotel.antesDeCobrar(currentTable); if(qm !== true && !(await qm)) return; }   // ⏱️ 1.85.0: ¿se pasó del tiempo? (motel)
-  if(window.ventoMinimo){ const qn = window.ventoMinimo.antesDeCobrar(currentTable); if(qn !== true && !(await qn)) return; }   // 🍾 1.95.0: ¿llegó al consumo mínimo?
+  if(window.ventoMotel){ const qm = window.ventoMotel.antesDeCobrar(currentTable); if(qm !== true && !(await qm)){ quitarPropina(); return; } }   // ⏱️ 1.85.0: ¿se pasó del tiempo? (motel)
+  if(window.ventoMinimo){ const qn = window.ventoMinimo.antesDeCobrar(currentTable); if(qn !== true && !(await qn)){ quitarPropina(); return; } }   // 🍾 1.95.0: ¿llegó al consumo mínimo?
   const saldo = tableBalance(currentTable);
   // 1.72.5: un solo cobro, el MISMO de la Caja POS (¿con cuánto paga? con el vuelto en grande, Nequi, DaviPlata, tarjeta,
   // mixto, fiado con el nombre, teclado). Cobra el saldo, libera la mesa y deja «Deshacer» (ventoPOS.cobrarMesa).
@@ -667,7 +687,7 @@ document.getElementById('chargeBtn').addEventListener('click', async ()=>{
     const loyaltyPhone0 = data.loyaltyOn ? document.getElementById('loyaltyPhone').value : '';
     const loyaltyName0 = data.loyaltyOn ? document.getElementById('loyaltyName').value : '';
     const entry = await window.ventoPOS.cobrarMesa(mesa, { desdeCuenta: true, motelVisto: true, minimoVisto: true });
-    if(!entry) return;                                   // canceló el cobro: la mesa sigue igual
+    if(!entry){ quitarPropina(); return; }               // canceló el cobro: la mesa sigue igual (sin la propina)
     if(loyaltyPhone0) registrarVisitaCliente(loyaltyPhone0, loyaltyName0, entry.total);
     saveData(); renderLoyaltyClientsList();
     if(currentTable === mesa){ overlay.classList.remove('show'); currentTable = null; }
@@ -677,10 +697,11 @@ document.getElementById('chargeBtn').addEventListener('click', async ()=>{
   if(saldo > 0){
     // Un solo paso: cómo pagaron todo el saldo. Se registra ese pago y la mesa se libera sin deuda.
     const metodo = await askPagoCierre(saldo, tableLabel(currentTable));
-    if(!metodo) return;
+    if(!metodo){ quitarPropina(); return; }
     if(metodo !== 'debe'){
       if(!t.payments) t.payments = [];
-      t.payments.push({ note: metodo === 'transferencia' ? 'Pagó todo (transferencia)' : 'Pagó todo (efectivo)', amount: saldo, method: metodo, at: Date.now() });
+      pagoCierre = { note: metodo === 'transferencia' ? 'Pagó todo (transferencia)' : 'Pagó todo (efectivo)', amount: saldo, method: metodo, at: Date.now() };
+      t.payments.push(pagoCierre);
     }
   } else {
     const ok = await showConfirm({
@@ -689,9 +710,9 @@ document.getElementById('chargeBtn').addEventListener('click', async ()=>{
       confirmText: 'Sí, liberar mesa',
       icon: '🔒'
     });
-    if(!ok) return;
+    if(!ok){ quitarPropina(); return; }
   }
-  if(window.ventoComisiones){ const qa = window.ventoComisiones.preguntar(t.items || []); if(qa !== true && !(await qa)) return; }   // ✂️ 1.84.0: ¿quién atendió?
+  if(window.ventoComisiones){ const qa = window.ventoComisiones.preguntar(t.items || []); if(qa !== true && !(await qa)){ if(pagoCierre && Array.isArray(t.payments)){ const i = t.payments.indexOf(pagoCierre); if(i >= 0) t.payments.splice(i, 1); } quitarPropina(); saveData(); return; } }   // ✂️ 1.84.0: ¿quién atendió?
   const loyaltyPhone = data.loyaltyOn ? document.getElementById('loyaltyPhone').value : '';
   const loyaltyName = data.loyaltyOn ? document.getElementById('loyaltyName').value : '';
   const entry = closeTableToHistory(currentTable);

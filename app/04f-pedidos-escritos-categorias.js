@@ -150,6 +150,11 @@ document.getElementById('qsChargeBtn').addEventListener('click', async ()=>{
   const deudor = (document.getElementById('qsDebeName').value || '').trim() || (isDom && cliente ? cliente : '');
   if(method === 'debe' && !deudor){ showToast('⚠️ Escribe quién queda debiendo.'); return; }
   // 🛵 1.86.0: si otro equipo ya facturó este domicilio (llegó a todos), no se factura dos veces.
+  // 1.95.4 (auditoría Y3): antes de mirar, se traen los datos de la nube (máximo 4 s; sin internet sigue con lo que hay):
+  // si dos equipos lo facturaban casi a la vez, los dos lo veían «pendiente».
+  if(isDom && domActual && window.ventoNube && typeof window.ventoNube.bajar === 'function' && navigator.onLine !== false){
+    try{ await Promise.race([window.ventoNube.bajar(), new Promise(r => setTimeout(r, 4000))]); }catch(e){}
+  }
   if(isDom && domActual){ const yaD = (data.domicilios || []).find(x => x.id === domActual); if(yaD && yaD.estado && yaD.estado !== 'pendiente'){ domActual = null; showToast('⚠️ Ese domicilio ya lo facturó otro equipo. Revisa en «🛵 Domicilios».', 7000); return; } }
   const enDom = qsRegistrarVenta(quickSaleCart, { method, deudor, domicilio: isDom ? { cliente, telefono, direccion, envio } : null });
   quickSaleCart = [];

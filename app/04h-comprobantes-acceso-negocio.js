@@ -293,6 +293,9 @@ function accUsuariosPintar(){
       const bRol = document.createElement('button'); bRol.type = 'button'; bRol.className = 'btn-ghost'; bRol.textContent = esAdmin ? 'Hacer mesero' : 'Hacer admin';
       bRol.onclick = () => {
         if(esAdmin && nAdmins <= 1){ showToast('⚠️ Debe quedar al menos un administrador.'); return; }
+        // 1.95.4 (auditoría P1): quitarse uno mismo el administrador escondía Productos, Inventario y Ajustes, y la regla de
+        // arriba solo cuenta los administradores de este equipo. Para dejar de ser administrador, que lo haga otro.
+        if(esAdmin && u.user === authUser){ showToast('⚠️ No puedes quitarte tu propio administrador desde aquí: perderías Productos, Inventario y Ajustes. Si de verdad hace falta, que lo haga otro administrador.', 9000); return; }
         const l = authUsers(), x = l.find(y => y.user === u.user); if(!x) return;
         x.role = esAdmin ? 'staff' : 'admin'; localStorage.setItem(AUTH_USERS_KEY, JSON.stringify(l));
         showToast('✅ ' + u.user + ' ahora es ' + (x.role === 'admin' ? 'Administrador' : 'Mesero') + '.');

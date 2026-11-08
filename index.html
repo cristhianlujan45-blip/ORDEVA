@@ -382,6 +382,14 @@ body.neg-tienda #quickSaleBtn, body:not(.neg-tienda) #fiadosBtn, body:not(.neg-t
     border: 1px solid var(--line);
   }
   nav{ display:flex; flex:1; gap:4px; min-width:0; }
+  /* 1.95.4 (auditoría P2): «display:flex» de abajo le ganaba a «hidden»: el mesero sin permiso veía «Caja POS». */
+  nav button[hidden], .nav-more[hidden]{ display:none !important; }
+  /* 1.95.4 (auditoría P3): celular acostado, plegables y tabletas (761 a 1023 px): la barra también queda fija abajo
+     (antes quedaba arriba, en medio de la página, y al bajar se perdía). */
+  @media (min-width: 761px) and (max-width: 1023px){
+    .tabbar{ position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; border-radius: 18px 18px 0 0; border-width: 1px 0 0; padding: 5px 8px calc(5px + env(safe-area-inset-bottom)); box-shadow: 0 -6px 24px rgba(0,0,0,.18); }
+    .wrap{ padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
+  }
   nav button, .nav-more{
     position: relative;
     flex: 1 1 0;
@@ -4312,6 +4320,8 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
     <div class="more-title">Más secciones</div>
     <div class="more-grid">
       <button type="button" class="more-tile" data-go="inicio" id="o2InicioMas"><span class="more-ic">🏠</span><strong>Inicio</strong><small>Resumen del negocio de hoy</small></button>
+      <button type="button" class="more-tile" data-go="productos"><span class="more-ic">🏷️</span><strong>Productos</strong><small>Precios, fotos y categorías</small></button>
+      <button type="button" class="more-tile" data-go="inventario"><span class="more-ic">📦</span><strong>Inventario</strong><small>Existencias, entradas y conteos</small></button>
       <button type="button" class="more-tile" data-go="historial"><span class="more-ic">🧾</span><strong>Historial</strong><small>Cuentas cerradas y fiados</small></button>
       <button type="button" class="more-tile" data-go="estadisticas"><span class="more-ic">📊</span><strong>Estadísticas</strong><small>Ventas y ganancias</small></button>
       <button type="button" class="more-tile" data-go="contabilidad"><span class="more-ic">💰</span><strong>Contabilidad</strong><small>Entradas, gastos y ganancia</small></button>

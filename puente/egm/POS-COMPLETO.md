@@ -113,6 +113,19 @@ nuevo. **Código revisado:** ORDEVA 1.82.2.
   - 1.95.2 · los pedidos del QR en tiendas, con la revisión goldfish antes de publicar.
 
 ### Lo que sigue, en este orden
+0. **Primero, los arreglos de la auditoría** (`puente/egm/AUDITORIA-1.95.3.md`), pedidos por el dueño el 08/11:
+   - **1.95.4, en la app:**
+     - la caja: cierre cancelado, deshacer, voz, propina y comisión;
+     - los bonos;
+     - los cupos;
+     - los mensajes falsos;
+     - varios equipos: menú del día, domicilios y códigos de mesa;
+     - el celular: menú y rol;
+     - **la música por QR, que «funcione perfectamente»:** auditoría de un revisor goldfish y las 12 pruebas de música.
+
+     Se revisa con goldfish antes de publicar porque toca la plata.
+   - **1.96, en el servidor:** el QR de pago solo lo escribe el negocio, Nequi solo para el administrador, y los bonos solo
+     para dueño, administrador o cajero. Lleva revisión goldfish del plan y del cambio.
 1. **Pruebas con equipos de verdad:** un celular con zoom, la impresora, un QR impreso y dos celulares con el mismo pedido.
 2. **Agencias:** revisar si los «📅 Créditos» de la caja sirven para los planes con abonos, antes de pensar en apartados.
 3. **Hoteles:** IVA exento para extranjeros no residentes. Solo después de que el contador del dueño lo confirme.
