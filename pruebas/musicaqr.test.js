@@ -19,10 +19,10 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
   const { iniciar, enrutar } = require('./servidor/supabase-local');
   const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
   let ok = 0, mal = 0; const errs = [];
-  const chk = (n, c, x) => { if(c){ ok++; console.log('✅ ' + n); } else { mal++; console.log('✗ ' + n + (x !== undefined ? ' → ' + (typeof x === 'string' ? x : JSON.stringify(x)).slice(0, 700) : '')); } };
+  const chk = (n, c, x) => { if(c){ ok++; console.log('✅ ' + n); } else { mal++; console.log('❌ ' + n + (x !== undefined ? ' → ' + (typeof x === 'string' ? x : JSON.stringify(x)).slice(0, 700) : '')); } };
   const sb = await iniciar(); const b = await chromium.launch();
   const esperar = (p, fn, arg, ms) => p.waitForFunction(fn, arg, { timeout: ms || 15000, polling: 250 }).then(() => true, () => false);
-  try{ await pruebas(); } catch(e){ mal++; console.log('✗ La prueba se cayó: ' + (e && e.stack || e)); }
+  try{ await pruebas(); } catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.stack || e)); }
   chk('Sin errores de página', !errs.length, errs.join(' | '));
   await b.close().catch(() => {}); await sb.cerrar().catch(() => {});
   console.log('RESULTADO', ok, 'bien', mal, 'mal'); process.exit(mal ? 1 : 0);
@@ -36,7 +36,13 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     await p.goto(url); return { ctx, p };
   }
   async function pruebas(){
-    const { p: A } = await pagina('negocio', BASE + '/index.html', { width: 1280, height: 800 });
+    const { p: A, ctx: actx } = await pagina('negocio', BASE + '/index.html', { width: 1280, height: 800 });
+    // La búsqueda de YouTube del local (Servidor ORDEVA): para «Mi Cancion Oficial» trae dos versiones; la primera es otra.
+    await actx.route(/\/yt\/buscar/, r => { const q = decodeURIComponent(new URL(r.request().url()).searchParams.get('q') || '');
+      if(!/Mi Cancion Oficial/i.test(q)) return r.fulfill({ status: 503, body: '{}' });
+      return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ items: [
+        { id: { videoId: 'otroVideo01' }, snippet: { title: 'Mi Cancion Oficial (letra)', channelTitle: 'Letras' } },
+        { id: { videoId: 'abcDEF12345' }, snippet: { title: 'Mi Cancion Oficial', channelTitle: 'Artista' } }] }) }); });
     await A.waitForSelector('#authOverlay:not([hidden])');
     await A.fill('#authBiz', 'Bar Musica QR'); await A.fill('#authUser', 'ana'); await A.fill('#authPass', 'clave123'); await A.click('#authBtn');
     await A.waitForFunction(() => document.getElementById('authOverlay').hidden, null, { timeout: 15000 });
@@ -70,31 +76,34 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     chk('1. Termina: el cliente ve «✅ Ya sonó»', await esperar(C.p, () => /Ya sonó/.test(document.getElementById('estPed').innerText), null, 20000), await estPed());
 
     // ===== 2 =====
-    await A.evaluate(() => { data.cancionesMesa = 2; saveData(); });
-    await A.evaluate(() => { window.vitoMod.cola().filter(x => x.mesa === 1).forEach(x => window.vitoMusica.cancelar(x.id)); });
+    // La que ya sonó sigue contando en el cupo de la mesa (1 de 3).
+    await A.evaluate(() => { data.cancionesMesa = 3; saveData(); try{ window.vitoMod.republicarMesas(); }catch(e){} });
+    await esperar(C.p, () => MAXC() === 3, null, 20000);
     await pedir('Cancion dos A'); await pedir('Cancion dos B');
-    chk('2. Con 2 por mesa, entran 2 canciones', await esperar(A, () => window.vitoMod.cola().filter(x => x.mesa === 1 && /^Cancion dos/.test(x.song) && x.status !== 'cancelled').length === 2, null, 20000));
+    chk('2. Con 3 por mesa (una ya sonó), entran 2 más', await esperar(A, () => window.vitoMod.cola().filter(x => x.mesa === 1 && /^Cancion dos/.test(x.song) && x.status !== 'cancelled').length === 2, null, 20000));
     const idB = (await colaDe('Cancion dos B')).id;
     await A.evaluate(id => window.vitoMusica.cancelar(id), idB);
     chk('2. La quitan: el cliente ve «🚫 La quitaron de la cola»', await esperar(C.p, () => /La quitaron de la cola/.test(document.getElementById('estPed').innerText), null, 20000), await estPed());
-    await C.p.evaluate(() => { localStorage.clear(); });   // el cupo lo manda el negocio (la mesa), no el celular
-    await C.p.reload(); await C.p.waitForTimeout(1500);
+    chk('2. … y en el celular del cliente tampoco gasta cupo (usa 2 de 3)', await esperar(C.p, () => usadas() === 2, null, 15000), await C.p.evaluate(() => usadas()));
     await pedir('Cancion dos C');
     chk('2. … y la quitada ya no gasta cupo: entra otra', await esperar(A, () => window.vitoMod.cola().some(x => x.song === 'Cancion dos C' && x.status !== 'cancelled'), null, 20000),
       await A.evaluate(() => window.vitoMod.cola().filter(x => x.mesa === 1).map(x => [x.song, x.status])));
-    await A.evaluate(() => { data.cancionesMesa = 10; saveData(); });
+    await A.evaluate(() => { data.cancionesMesa = 10; saveData(); try{ window.vitoMod.republicarMesas(); }catch(e){} });
+    await esperar(C.p, () => MAXC() === 10, null, 20000);
 
     // ===== 3 =====
+    const post = (cuerpo, canal) => C.p.evaluate(([c, body]) => fetch('https://canal.vento.local/' + c, { method: 'POST', body }).then(r => r.ok), [canal || topic, typeof cuerpo === 'string' ? cuerpo : JSON.stringify(cuerpo)]);
     await C.p.evaluate(() => { const w = document.createElement('div'); w.id = 'pruebaYt'; document.body.appendChild(w);
       ytPintarCanciones(w, 'mi cancion', [{ title: 'Mi Cancion Oficial', channelTitle: 'Artista', thumb: '', vid: 'abcDEF12345' }]); });
     await C.p.click('#tc');
     await C.p.click('#pruebaYt .ytpedir');
     chk('3. El video que tocó el cliente llega con la canción (vid0)', await esperar(A, () => window.vitoMod.cola().some(x => x.song === 'Mi Cancion Oficial' && x.vid0 === 'abcDEF12345'), null, 20000),
       await colaDe('Mi Cancion Oficial'));
-    chk('3. … y es el que se pone (no se busca otra versión)', await esperar(A, () => { const x = window.vitoMod.cola().find(y => y.song === 'Mi Cancion Oficial'); return !!x && x.vid === 'abcDEF12345'; }, null, 20000), await colaDe('Mi Cancion Oficial'));
+    chk('3. … y como sale en la búsqueda de esa canción, es el que se pone (no la primera versión que aparece)', await esperar(A, () => { const x = window.vitoMod.cola().concat(window.vitoMod.hist ? [] : []).find(y => y.song === 'Mi Cancion Oficial'); return !!x && x.vid === 'abcDEF12345'; }, null, 20000), await colaDe('Mi Cancion Oficial'));
+    await post({ t: 'cancion', v: 2, id: 'cvidfalso' + Date.now().toString(36), mesa: 2, vm: new URL(await link(2)).searchParams.get('v'), s: 'Mi Cancion Oficial remix', vid: 'zzzzzzzzzzz', at: Date.now() });
+    chk('3. Un video que NO sale en la búsqueda de esa canción no se pone (se busca como siempre)', await esperar(A, () => { const x = window.vitoMod.cola().find(y => y.song === 'Mi Cancion Oficial remix'); return !!x && x.vid0 === 'zzzzzzzzzzz' && x.vid && x.vid !== 'zzzzzzzzzzz'; }, null, 20000), await colaDe('Mi Cancion Oficial remix'));
 
     // ===== 4 =====
-    const post = (cuerpo, canal) => C.p.evaluate(([c, body]) => fetch('https://canal.vento.local/' + c, { method: 'POST', body }).then(r => r.ok), [canal || topic, typeof cuerpo === 'string' ? cuerpo : JSON.stringify(cuerpo)]);
     await post({ t: 'cancion', v: 2, id: 'cfalsa1' + Date.now().toString(36), mesa: 99, vm: 'nadielosabe', s: 'Cancion mesa inventada', at: Date.now() });
     await post('CANCION MESA 77: Cancion texto viejo');
     await A.waitForTimeout(3500);
@@ -112,15 +121,26 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     await A.evaluate(() => { data.cancionesMesa = 10; saveData(); });
 
     // ===== 5 =====
-    await A.evaluate(() => { data.musicOn = false; saveData(); });
-    await pedir('Cancion con musica apagada');
+    await A.evaluate(() => { data.musicOn = false; saveData(); try{ window.vitoPublicarCatalogo && window.vitoPublicarCatalogo(true); }catch(e){} });
+    chk('5. Con la música apagada, la página del cliente esconde «Pedir canción»', await esperar(C.p, () => { try{ info(); }catch(e){} return document.getElementById('tc').hidden; }, null, 25000));
+    // Una página vieja que sigue abierta (no se enteró): manda la canción igual.
+    await C.p.evaluate(() => { const id = 'capag' + Date.now().toString(36), body = JSON.stringify({ t: 'cancion', v: 2, id, mesa: +mesa, vm: v, s: 'Cancion con musica apagada', at: Date.now() });
+      jset(MISC, jget(MISC, []).concat(id)); misPedidosAgregar({ id, txt: '🎵 Cancion con musica apagada', at: Date.now(), e: 'enviado', body }); escucharEstados(true); return canalPost(body); });
+    await A.waitForTimeout(2500);
     chk('5. Con la música apagada no entra', !(await A.evaluate(() => window.vitoMod.cola().some(x => x.song === 'Cancion con musica apagada'))));
     chk('5. … y el cliente lo sabe: «El local tiene la música apagada»', await esperar(C.p, () => /música apagada/i.test(document.getElementById('m').textContent), null, 20000), await C.p.evaluate(() => document.getElementById('m').textContent));
-    await A.evaluate(() => { data.musicOn = true; saveData(); });
+    await A.evaluate(() => { data.musicOn = true; saveData(); try{ window.vitoPublicarCatalogo && window.vitoPublicarCatalogo(true); }catch(e){} });
+    chk('5. Se vuelve a prender: «Pedir canción» aparece otra vez', await esperar(C.p, () => { try{ info(); }catch(e){} return !document.getElementById('tc').hidden; }, null, 25000));
     const vm1 = new URL(await link(1)).searchParams.get('v');
-    await post({ t: 'cancion', v: 2, id: 'cvieja' + Date.now().toString(36), mesa: 1, vm: vm1, s: 'Cancion de hace media hora', at: Date.now() - 30 * 60000 });
+    await post({ t: 'cancion', v: 2, id: 'cvieja' + Date.now().toString(36), mesa: 1, vm: vm1, s: 'Cancion de hace media hora', at: Date.now() - 90 * 60000 });
     await A.waitForTimeout(3000);
-    chk('5. Una canción que llega 30 min tarde (estuvo sin conexión) no entra', !(await A.evaluate(() => window.vitoMod.cola().some(x => x.song === 'Cancion de hace media hora'))));
+    chk('5. Una canción que el celular guardó hora y media sin conexión no entra', !(await A.evaluate(() => window.vitoMod.cola().some(x => x.song === 'Cancion de hace media hora'))));
+
+    await C.p.evaluate(() => { localStorage.setItem(OUTK, JSON.stringify([{ body: JSON.stringify({ t: 'cancion', v: 2, id: 'cout' + Date.now().toString(36), mesa: +mesa, vm: v, s: 'Cancion guardada sin conexion', at: Date.now() - 25 * 60000 }), at: Date.now() - 25 * 60000 }])); vaciarOutbox(); });
+    await A.waitForTimeout(3000);
+    chk('5. El celular ya no manda una canción que guardó sin conexión hace 25 min', !(await A.evaluate(() => window.vitoMod.cola().some(x => x.song === 'Cancion guardada sin conexion'))) && (await C.p.evaluate(() => JSON.parse(localStorage.getItem(OUTK) || '[]').length)) === 0);
+    await post({ t: 'cancion', v: 2, id: 'cnomesa' + Date.now().toString(36), mesa: 88, vm: 'falso', s: 'Cancion de una mesa que no hay', at: Date.now() });
+    chk('5. Sin código y a una mesa que no hay: no entra (y se le responde «esa mesa no está»)', await (async () => { await A.waitForTimeout(2500); return !(await A.evaluate(() => window.vitoMod.cola().some(x => x.song === 'Cancion de una mesa que no hay'))); })());
 
     // ===== 6 =====
     await pedir('Cancion repetida');

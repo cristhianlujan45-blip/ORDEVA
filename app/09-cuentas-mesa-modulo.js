@@ -511,7 +511,7 @@ function recibir(m){
   if(m.topic&&m.topic===mTopic()){try{procesarMesero(String(m.message||'').slice(0,1500));}catch(e){console.error(e);}return;}
   if(m.topic&&m.topic===pTopic()+'r'){try{procesarPrep(String(m.message||'').slice(0,1500));}catch(e){console.error(e);}return;}
   // 600: un domicilio (nombre + teléfono + dirección + productos) es más largo que un pedido de mesa.
-  window.__canalMsgId=m.id;window.__canalTopic=m.topic||'';
+  window.__canalMsgId=m.id;window.__canalTopic=m.topic||'';window.__canalMsgTime=+m.time||0;   // 🎵 1.95.4: la hora del servidor (segundos)
   try{procesar(String(m.message||'').slice(0,4000));}catch(e){console.error(e);}
 }
 /* ---------- App de meseros (mesero.html) ----------
@@ -747,13 +747,19 @@ function procesar(txt){
            inventando mesas);
          • con la música apagada no entra, y una que llega más de 20 min tarde (sin conexión) tampoco;
          • el celular del cliente recibe la respuesta: en cola, repetida, sin cupo, música apagada o muy tarde. */
+      // La hora del servidor (no la de este equipo ni la del celular del cliente, que pueden estar mal): un mensaje viejo que
+      // se vuelve a leer (equipo recién abierto, que lee las últimas 12 h) no entra; uno que el celular guardó más de una
+      // hora sin conexión, tampoco (el celular ya no manda los de más de 20 min, con su propio reloj).
+      const tSrv=(+window.__canalMsgTime||0)*1000;
+      if(tSrv&&Date.now()-tSrv>20*6e4)return;
       const sc=!(o.vm&&qMesaCodigos(id).indexOf(String(o.vm))>=0);
-      if(sc&&!data.tables[id])return;
+      if(sc&&!data.tables[id]){mzResponder(rid,'nomesa',id,{n:'Esa mesa no está en el local'});return;}
       if(typeof musicaOn==='function'&&!musicaOn()){mzResponder(rid,'apagada',id,{n:'Música apagada'});return;}
-      if(Number(o.at)>0&&Date.now()-Number(o.at)>20*6e4){mzResponder(rid,'vieja',id,{n:'Llegó muy tarde'});return;}
-      const r=agregarCancion(id,String(o.s||'').slice(0,120),rid,{sc,vid:o.vid});
+      if(tSrv&&Number(o.at)>0&&tSrv-Number(o.at)>60*6e4){mzResponder(rid,'vieja',id,{n:'Llegó muy tarde'});return;}
+      const cn0=qCanalOk(window.__canalTopic)?window.__canalTopic:qCfg().topic;
+      const r=agregarCancion(id,String(o.s||'').slice(0,120),rid,{sc,vid:o.vid,canal:cn0});
       // Mesa sin cupo: se le avisa al celular que la pidió (por el canal de estados) en vez de dejarla esperando.
-      if(r.limite){mzResponder(rid,'limite',id,{min:r.min,max:r.max||mzMax(),n:'Sin cupo: otra en '+r.min+' min'});return;}
+      if(r.limite){mzResponder(rid,'limite',id,{min:r.min,max:r.max||mzMax(),n:'Sin cupo: otra en '+r.min+' min'},cn0);return;}
       if(r.nuevo===true&&notifMusica()){showToast(r.msg+(mzSinReproductor()?' · Para que suene: Música → «🎶 Activar música automática».':''),mzSinReproductor()?8000:0);ventoAvisoCel('🎵 Canción · '+tableLabel(id),String(o.s||'').slice(0,120),'musica');}renderMusica();return;}
     if(o&&o.t==='estado')return;                                   // eco de nuestros propios avisos
     if(o&&o.t==='prueba'){if(o.id&&window.__qPrueba&&window.__qPrueba[o.id])window.__qPrueba[o.id](window.__canalTopic);return;}
@@ -896,7 +902,7 @@ function pedidoEntrante(o,origen){
   const verificado=origen!=='qr'||(!!o.vm&&cods.indexOf(String(o.vm))>=0);
   if(!mesa||(verificado?!asegurarMesa(mesa):(mesa<1||mesa>500)))return null;
   // 1.95.4 (auditoría S4): sin el código de la mesa, como mucho 30 esperando a que los acepten (no se llenan los datos).
-  if(!verificado&&pedidosLista().filter(x=>x.sinCodigo&&x.estado==='nuevo').length>=30)return null;
+  if(!verificado&&pedidosLista().filter(x=>x.sinCodigo&&x.estado==='nuevo'&&Date.now()-(x.recibidoEn||x.at||0)<864e5).length>=30){try{window.ventoAuditar&&window.ventoAuditar('pedido sin código de mesa','Llegaron demasiados pedidos sin el código de su QR: no se guardó uno más (tope 30 por aceptar en 24 h).');}catch(e){}return null;}
   const items=(Array.isArray(o.items)?o.items:[]).slice(0,40).map(x=>{
     const n=String(x.n||x.name||'').slice(0,160),q=Math.max(1,Math.min(99,Math.round(Number(x.q||x.qty)||1)));
     // 🧩 1.76.0: «Hamburguesa (Término medio · +Queso extra)»: el producto con lo elegido y el precio del negocio.
@@ -1068,15 +1074,16 @@ function mzEmpezo(id,fuente){
 // Progreso real que manda el reproductor (segundos sonados y duración del video)
 function mzProgreso(id,t,d){
   const it=mzCambiar(id,Object.assign({playedSeconds:Math.max(0,Math.round(t||0)),progresoAt:Date.now()},d>0?{dur:Math.round(d)}:{}));
-  if(it&&it.status!=='playing'&&!['played','skipped','cancelled'].includes(it.status))mzCambiar(id,{status:'playing',done:true,startedAt:it.startedAt||Date.now()-1000*(t||0)});
+  if(it&&it.status!=='playing'&&!['played','skipped','cancelled'].includes(it.status)){mzCambiar(id,{status:'playing',done:true,startedAt:it.startedAt||Date.now()-1000*(t||0)});mzAvisarCliente(it,'sonando');}
   mzPintarSonando();
 }
 function mzTermino(id,estado,t){
   const l=cola(),it=l.find(y=>y.id===id);if(!it||['played','skipped','cancelled'].includes(it.status)&&estado!=='cancelled')return;
+  const antes=it.status;
   it.done=true;it.status=estado||'played';it.endedAt=Date.now();
   if(t!=null)it.playedSeconds=Math.round(t);else if(it.startedAt&&!it.playedSeconds)it.playedSeconds=Math.round((it.endedAt-it.startedAt)/1000);
   SS('vito_cola',l);mzAlHistorial(it);mzPintarSonando();
-  mzAvisarCliente(it,it.status==='cancelled'?'quitada':it.status==='error'?'novid':'sono');
+  if(!['played','skipped','cancelled'].includes(antes))mzAvisarCliente(it,it.status==='cancelled'?'quitada':it.status==='error'?'novid':'sono');
 }
 const mzActual=()=>cola().find(y=>y.status==='playing')||null;
 const mmss=s=>{s=Math.max(0,Math.round(s||0));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
@@ -1105,17 +1112,28 @@ function mzRecuperar(){return new Promise(res=>{try{const r=indexedDB.open('vent
 // 🎵 1.95.4: la respuesta al celular del cliente que pidió la canción (por el canal de estados, como los pedidos): en cola,
 // sonando, ya sonó, quitada, sin versión, sin cupo, repetida, música apagada o muy tarde. Solo a pedidos del QR (id «c…»).
 const MZ_EST={cola:['🎵','En la cola'],sonando:['🔊','Sonando ahora'],sono:['✅','Ya sonó'],quitada:['🚫','La quitaron de la cola'],novid:['⚠️','No se pudo poner: pide otra versión'],repetida:['🎵','Ya estaba en la cola']};
-function mzResponder(rid,e,mesa,extra){
+function mzResponder(rid,e,mesa,extra,canal){
   rid=String(rid||'');if(!/^c[\w-]{4,40}$/.test(rid))return;
-  try{const cn=qCanalOk(window.__canalTopic)?window.__canalTopic:qCfg().topic,x=MZ_EST[e]||[];
+  // El canal de ESE cliente (puede haber varios canales del QR): el que trajo la canción; si no se sabe, el último que habló.
+  try{const cn=qCanalOk(canal)?canal:qCanalOk(window.__canalTopic)?window.__canalTopic:qCfg().topic,x=MZ_EST[e]||[];
     fetch('https://canal.vento.local/'+cn+'e',{method:'POST',body:JSON.stringify(Object.assign({t:'estado',id:rid,e,m:mesa,i:x[0],n:x[1]||'',at:Date.now()},extra||{}))}).catch(()=>{});}catch(err){}
 }
-const mzAvisarCliente=(it,e)=>{try{if(it&&it.reqId&&!it.fondo)mzResponder(it.reqId,e,it.mesa);}catch(err){}};
+// Solo el equipo de la música le contesta al cliente cómo va su canción (un solo dueño de la cola: sin estados cruzados).
+const mzAvisarCliente=(it,e)=>{try{if(it&&it.reqId&&!it.fondo&&!mqOtro())mzResponder(it.reqId,e,it.mesa,null,it.canal);}catch(err){}};
 function agregarCancion(mesa,song,reqId,op){
   op=op||{};
   if(!song)return{msg:'⚠️ Canción vacía',nuevo:false};
   const pedidoOriginal=String(song).slice(0,120),lim=mzLimpiarPedido(song);
   song=lim.query||song;
+  // 1.72.0: «la gente pone música por el QR y no sale en la lista». Si OTRO equipo pone la música, antes este equipo
+  // dejaba la canción en su cola sin mandarla («la pone el equipo de la música»), y si ese equipo no recibía los pedidos
+  // del QR (cada equipo decide si los recibe), la canción se perdía. Ahora se le manda; si ese equipo no responde,
+  // este equipo toma la música para que no quede en silencio.
+  if(mqOtro()&&Date.now()-mqDesde>15e3&&Date.now()-mqVisto>9e4){const era=mqNombre();try{mqElegir(true);}catch(e){}
+    try{showToast('🎶 «'+era+'» no respondía: ahora la música suena en este equipo.',8000);}catch(e){}}
+  // 1.95.4 (revisión goldfish): si otro equipo pone la música, este solo se la manda. El cupo y las respuestas al cliente
+  // los decide el equipo de la música (este equipo solo ve una copia de su cola y contaba mal).
+  const reenviar=mqOtro();
   const now=Date.now(),l=cola().filter(x=>now-x.ts<36*36e5);
   // Sin duplicados: el mismo pedido (mismo ID, o la misma canción de la misma mesa en 3 minutos por
   // doble toque, recarga o reintento) no se vuelve a encolar.
@@ -1123,8 +1141,8 @@ function agregarCancion(mesa,song,reqId,op){
   const dup=l.concat(mzHist()).find(x=>(reqId&&x.reqId===reqId)||(x.mesa===mesa&&normVoiceText(x.song||'')===nk&&now-(x.ts||x.requestedAt||0)<3*6e4&&x.status!=='cancelled'));
   if(dup){
     // El mismo pedido otra vez (el celular lo reenvió porque no vio la respuesta): se le confirma; otra igual: «repetida».
-    if(reqId&&dup.reqId===reqId)mzAvisarCliente(dup,dup.status==='playing'?'sonando':['played','skipped'].includes(dup.status)?'sono':'cola');
-    else mzResponder(reqId,'repetida',mesa);
+    if(reqId&&dup.reqId===reqId)mzAvisarCliente(dup,dup.status==='playing'?'sonando':['played','skipped'].includes(dup.status)?'sono':dup.status==='cancelled'?'quitada':dup.status==='error'?'novid':'cola');
+    else if(!reenviar)mzResponder(reqId,'repetida',mesa,null,op.canal);
     return{msg:'🎵 Esa canción ya está en la cola.',nuevo:false};
   }
   // El límite es POR MESA (sumando todos los celulares de esa mesa), no por dispositivo. 1.95.4: las quitadas y las que no
@@ -1132,18 +1150,15 @@ function agregarCancion(mesa,song,reqId,op){
   const cuenta=x=>now-x.ts<VENT&&!['cancelled','error'].includes(x.status)&&(op.sc?!!x.sc:x.mesa===mesa&&!x.sc);
   const rec=l.filter(cuenta).sort((x,y)=>x.ts-y.ts);
   const MAX=op.sc?(mzMax()||10):mzMax();
-  if(mesa!==0&&MAX&&rec.length>=MAX){const min=Math.ceil((rec[0].ts+VENT-now)/6e4);return{msg:'🎵 '+(op.sc?'Las canciones sin el código de su QR':tableLabel(mesa))+' ya '+(op.sc?'son ':'pidió ')+MAX+' canciones; podrá pedir otra en '+min+' min.',limite:true,min,max:MAX};}
+  if(!reenviar&&mesa!==0&&MAX&&rec.length>=MAX){const min=Math.ceil((rec[0].ts+VENT-now)/6e4);return{msg:'🎵 '+(op.sc?'Las canciones sin el código de su QR':tableLabel(mesa))+' ya '+(op.sc?'son ':'pidió ')+MAX+' canciones; podrá pedir otra en '+min+' min.',limite:true,min,max:MAX};}
   const it={id:now+'-'+Math.random().toString(36).slice(2,6),reqId:reqId||null,mesa,mesaNombre:tableLabel(mesa),song:song.slice(0,120),pedido:pedidoOriginal,title:lim.title.slice(0,80),artist:lim.artist.slice(0,60),ts:now,done:false,status:'pending'};
   if(op.sc)it.sc=true;
-  if(/^[\w-]{11}$/.test(String(op.vid||''))&&!ytBad().includes(String(op.vid)))it.vid0=String(op.vid);   // el video que tocó el cliente
-  // 1.72.0: «la gente pone música por el QR y no sale en la lista». Si OTRO equipo pone la música, antes este equipo
-  // dejaba la canción en su cola sin mandarla («la pone el equipo de la música»), y si ese equipo no recibía los pedidos
-  // del QR (cada equipo decide si los recibe), la canción se perdía. Ahora se le manda; si ese equipo no responde,
-  // este equipo toma la música para que no quede en silencio.
-  if(mqOtro()&&Date.now()-mqDesde>15e3&&Date.now()-mqVisto>9e4){const era=mqNombre();try{mqElegir(true);}catch(e){}
-    try{showToast('🎶 «'+era+'» no respondía: ahora la música suena en este equipo.',8000);}catch(e){}}
+  if(qCanalOk(op.canal))it.canal=op.canal;
+  // El video que tocó el cliente: solo con el código de su mesa, y solo se usa si sale en la búsqueda de ESA canción (ytUno),
+  // con las mismas revisiones de siempre. Así nadie pone en el TV un video cualquiera con un nombre inocente.
+  if(!op.sc&&/^[\w-]{11}$/.test(String(op.vid||''))&&!ytBad().includes(String(op.vid)))it.vid0=String(op.vid);
   l.push(it);SS('vito_cola',l);mzRespaldo();
-  if(mqOtro()){it.enviada=now;SS('vito_cola',l);mqPub(Object.assign({t:'cmd',a:'cancion',id:it.id,mesa,s:it.song,p:pedidoOriginal,rid:reqId||it.id},it.sc?{sc:1}:{},it.vid0?{v0:it.vid0}:{}));}
+  if(reenviar){it.enviada=now;SS('vito_cola',l);mqPub(Object.assign({t:'cmd',a:'cancion',id:it.id,mesa,s:it.song,p:pedidoOriginal,rid:reqId||it.id},it.sc?{sc:1}:{},it.vid0?{v0:it.vid0}:{},it.canal?{cn:it.canal}:{}));}
   mzAvisarCliente(it,'cola');
   // Busca el video y la agrega sola a la lista/reproductor apenas llega el pedido,
   // sin esperar a que alguien toque "Cargar en mi lista" (antes solo pasaba con
@@ -1612,7 +1627,7 @@ function ytPosicionSiguiente(durSeg){
   ytTanda.libreDesde+=(durSeg||YT_DUR_DEFECTO)*1000;
   return ytTanda.n;
 }
-async function ySearch(q,excluir){
+async function ySearch(q,excluir,preferir){
   const j=await yGet('search?part=snippet&type=video&videoCategoryId=10&videoEmbeddable=true&videoSyndicated=true&maxResults=10&q='+encodeURIComponent(q));
   if(j===undefined)return undefined;
   const no=new Set([...(excluir||[]),...ytBad()]);
@@ -1634,6 +1649,7 @@ async function ySearch(q,excluir){
   }catch(e){}
   cands.sort((a,b)=>SELLO_RE.test(a.canal)-SELLO_RE.test(b.canal));
   if(cands.length)window.ytFallo=null;   // la canción sí se encontró (aunque el chequeo extra haya fallado)
+  if(preferir&&cands.some(x=>x.v===preferir))return preferir;   // 🎵 1.95.4: el video que tocó el cliente, si es de esta canción
   return cands.length?cands[0].v:null;
 }
 async function ytUno(id){
@@ -1644,8 +1660,10 @@ async function ytUno(id){
       // 🎵 1.95.4: primero el video que tocó el cliente (si no está en la lista de los que no se dejan poner); si no sirve,
       // la prueba del reproductor lo descarta y se busca otra versión como siempre.
       const v0=it.vid0&&!(it.probados||[]).includes(it.vid0)&&!ytBad().includes(it.vid0)?it.vid0:null;
-      const v=v0||await ySearch(it.song,it.probados);
-      l=cola();it=l.find(x=>x.id===id);if(!it||v===undefined)return;
+      const v=await ySearch(it.song,it.probados,v0);
+      l=cola();it=l.find(x=>x.id===id);if(!it)return;
+      // Sin respuesta (servidor o internet caídos): se reintenta cada minuto, hasta 10 veces; luego se avisa que no se pudo.
+      if(v===undefined){it.busq=(it.busq||0)+1;if(it.busq>=10){it.novid=true;it.yt='no';it.status='error';it.done=true;it.endedAt=Date.now();try{mzAlHistorial(it);}catch(e){}mzAvisarCliente(it,'novid');}SS('vito_cola',l);return;}
       if(v){it.vid=v;it.ok=false;if(ytDurCache[v])it.dur=ytDurCache[v];}else{it.novid=true;it.yt='no';it.status='error';it.done=true;it.endedAt=Date.now();try{mzAlHistorial(it);}catch(e){}mzAvisarCliente(it,'novid');showToast('⚠️ No encontré una versión de «'+it.song+'» que se pueda reproducir aquí.');try{window.ventoError&&window.ventoError('musica','No se encontró ninguna versión que se pueda reproducir',{cancion:String(it.song).slice(0,80),fuente:yFuente||''},'musica|sin-version');}catch(e){}}
       SS('vito_cola',l);
       tvPublicar();
@@ -1899,7 +1917,7 @@ function iniYT(){
     if(c.key||yTok())ordenJusto(cola().filter(x=>!x.yt&&!x.novid)).forEach(x=>ytAgregar(x.id));
     // 🎵 1.95.4: una canción cuya búsqueda falló (servidor o internet caídos) se vuelve a buscar sola cada minuto; antes se
     // quedaba en la cola sin video y nunca sonaba.
-    else ordenJusto(cola().filter(x=>!x.vid&&!x.novid&&!x.done)).slice(0,3).forEach(x=>ytAgregar(x.id));
+    else ordenJusto(cola().filter(x=>!x.vid&&!x.novid&&!x.done&&(x.busq||0)<10)).slice(0,3).forEach(x=>ytAgregar(x.id));
     if(ySrv()&&c.srv){ if(Date.now()-yFalloSrv>60000) yRenovarServidor(false); }   // se renueva sola antes de vencer
     else if(c.cid&&c.on&&!yTok()&&Date.now()-yUltimoSilencioso>5*60000){yUltimoSilencioso=Date.now();yConectar(true);}
   },60000);
@@ -2006,8 +2024,9 @@ function mqComando(m){
     else if(m.a==='cancion'&&m.s){   // 1.72.0: canción del QR que recibió otro equipo: entra a la cola de aquí (sin repetir)
       const rid=String(m.rid||m.id||'').slice(0,40)||null,mesa=parseInt(m.mesa,10)||0;
       // 1.95.4: el equipo de la música también respeta la música apagada y el cupo, y se lo dice al cliente.
-      const r=typeof musicaOn==='function'&&!musicaOn()?(mzResponder(rid,'apagada',mesa,{n:'Música apagada'}),null):agregarCancion(mesa,String(m.s).slice(0,120),rid,{sc:!!m.sc,vid:m.v0});
-      if(r&&r.limite)mzResponder(rid,'limite',mesa,{min:r.min,max:r.max||mzMax(),n:'Sin cupo: otra en '+r.min+' min'});
+      const cn=qCanalOk(m.cn)?m.cn:null;
+      const r=typeof musicaOn==='function'&&!musicaOn()?(mzResponder(rid,'apagada',mesa,{n:'Música apagada'},cn),null):agregarCancion(mesa,String(m.s).slice(0,120),rid,{sc:!!m.sc,vid:m.v0,canal:cn});
+      if(r&&r.limite)mzResponder(rid,'limite',mesa,{min:r.min,max:r.max||mzMax(),n:'Sin cupo: otra en '+r.min+' min'},cn);
       if(r&&r.nuevo===true){try{renderMusica();}catch(e){}try{if(notifMusica())showToast(r.msg);}catch(e){}}
     }
     else if(m.a==='sig')mzSaltar();

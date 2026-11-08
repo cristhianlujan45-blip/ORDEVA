@@ -1627,6 +1627,7 @@ async function closeCashRegister(opts){
     showToast('No hay cuentas nuevas para cerrar. La caja ya está al día.');
     return;
   }
+  cierreRespaldo = null;   // ya no hay vuelta atrás: el cierre sigue
   const closure = {
     id: ventoIdUnico(),
     date: toISO,
@@ -1664,21 +1665,25 @@ async function closeCashRegister(opts){
 // estaban y se devuelven: las ventas que se crearon se quitan del historial y las cuentas vuelven abiertas.
 let cierreRespaldo = null;
 function cerrarAbiertasConRespaldo(ids){
-  cierreRespaldo = { mesas: {}, ventas: [] };
+  cierreRespaldo = { mesas: {}, ventas: [], entradas: [] };
   (ids || []).forEach(id => {
     try{ cierreRespaldo.mesas[id] = JSON.parse(JSON.stringify(data.tables[id] || null)); }catch(e){}
     const e = closeTableToHistory(id);
-    if(e && e.id) cierreRespaldo.ventas.push(String(e.id));
+    if(e && e.id){ cierreRespaldo.ventas.push(String(e.id)); cierreRespaldo.entradas.push(e); }
   });
 }
 function deshacerCierreAbiertas(){
   const r = cierreRespaldo; cierreRespaldo = null; if(!r) return;
+  // Los números de factura que tomaron esas cuentas vuelven (al revés: el último primero), sin huecos en el consecutivo.
+  (r.entradas || []).slice().reverse().forEach(e => { try{ if(e && e._facturaDevolver) e._facturaDevolver(); }catch(x){} });
   const fuera = new Set(r.ventas);
   if(fuera.size){
     data.history = (data.history || []).filter(h => !fuera.has(String(h.id)));
     try{ if(Array.isArray(data.contab)) data.contab = data.contab.filter(g => !(g && /^ctpf/.test(String(g.id || '')) && fuera.has(String(g.id).slice(4)))); }catch(e){}   // gasto de plataforma (hoteles)
   }
-  Object.keys(r.mesas).forEach(id => { if(r.mesas[id]) data.tables[id] = r.mesas[id]; });
+  // Lo de antes vuelve SIN borrar lo que entró mientras se contaba (un pedido del QR, algo de otro equipo).
+  Object.keys(r.mesas).forEach(id => { const a = r.mesas[id]; if(!a) return; const c = data.tables[id] || {};
+    data.tables[id] = Object.assign({}, c, a, { items: (a.items || []).concat(c.items || []), payments: (a.payments || []).concat(c.payments || []), people: (a.people || []).concat((c.people || []).filter(p => !(a.people || []).some(q => q && p && q.id === p.id))) }); });
   try{ showToast('Se canceló el cierre: las cuentas abiertas siguen abiertas como estaban.', 6000); }catch(e){}
 }
 function juntarCierresRepetidos(){

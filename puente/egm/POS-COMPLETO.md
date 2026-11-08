@@ -89,7 +89,7 @@ nuevo. **Código revisado:** ORDEVA 1.82.2.
 - **Apartados (antes 1.85):** quedan para después; estos negocios casi no los usan. Para las agencias (planes con abonos)
   primero se revisa si los «📅 Créditos» de la caja ya sirven.
 
-## 6c. Estado después de la 1.95.2 (el plan, otra vez al día)
+## 6c. Estado después de la 1.95.4 (el plan, otra vez al día)
 **Por qué esta sección:**
 - De la 1.88 a la 1.95.2 se trabajó directo desde el chat, sin actualizar este plan ni pasar por revisión goldfish.
 - El dueño pidió revisar que se trabaje con el modelo Elephant Goldfish. La revisión de Zoom Out comparó lo hecho con
@@ -110,22 +110,44 @@ nuevo. **Código revisado:** ORDEVA 1.82.2.
   - 1.95.0 · consumo mínimo por mesa. Lo eligió el asistente ante un «continuemos».
 - **Arreglos que el dueño pidió:**
   - 1.95.1 · el QR sincronizado con la cuenta;
-  - 1.95.2 · los pedidos del QR en tiendas, con la revisión goldfish antes de publicar.
+  - 1.95.2 · los pedidos del QR en tiendas, con la revisión goldfish antes de publicar;
+  - 1.95.3 · la auditoría completa (`puente/egm/AUDITORIA-1.95.3.md`);
+  - 1.95.4 · los arreglos de la auditoría en la app y la música por QR, con revisión goldfish antes de publicar
+    (`puente/egm/REVISION-GOLDFISH-1.95.4.md`).
 
 ### Lo que sigue, en este orden
-0. **Primero, los arreglos de la auditoría** (`puente/egm/AUDITORIA-1.95.3.md`), pedidos por el dueño el 08/11:
-   - **1.95.4, en la app:**
-     - la caja: cierre cancelado, deshacer, voz, propina y comisión;
-     - los bonos;
-     - los cupos;
-     - los mensajes falsos;
-     - varios equipos: menú del día, domicilios y códigos de mesa;
-     - el celular: menú y rol;
-     - **la música por QR, que «funcione perfectamente»:** auditoría de un revisor goldfish y las 12 pruebas de música.
+0. **1.96, en el servidor** (lo que queda de la auditoría). Lleva revisión goldfish del plan y del cambio:
+   - el QR de pago y los canales del negocio (`f`, `k`, `e`) solo los escribe el negocio (S1);
+   - Nequi solo para el administrador (S10);
+   - los bonos solo los crean el dueño, el administrador o el cajero (S6);
+   - **el límite de búsquedas de YouTube:** hoy es por IP, y todo el Wi-Fi de un bar comparte una. Debe ser por código de
+     mesa (de la revisión de la música);
+   - **«una sola vez» en el servidor para lo que hacen varios equipos:** facturar un domicilio, como ya hace
+     `bono_redimir` con su referencia. Hoy la 1.95.4 solo achica la ventana (revisión de diseño, M4);
+   - **bonos con «apartar y confirmar»** y un tiempo límite para lo que nunca se confirma.
+0b. **Lo que dejó la 1.95.4 para después** (`puente/egm/REVISION-GOLDFISH-1.95.4.md`):
+   - **Música, primero lo que puede dejar el bar en silencio:**
+     - un televisor emparejado con un equipo que no es el de la música no recibe nada;
+     - el cambio de equipo de la música depende de un latido por minuto: si se pierde uno, otro equipo toma la música;
+     - los mensajes del televisor («sonando», «terminó») no se reintentan;
+     - al recargar se pierde la canción que sonaba.
+   - **Seguridad del QR:**
+     - el código de la mesa (`vm`) viaja a la vista en el canal público, así que quien escuche el canal puede recogerlo;
+     - las canciones sin código comparten un solo cupo (10 cada 15 min), y alguien las puede gastar todas.
 
-     Se revisa con goldfish antes de publicar porque toca la plata.
-   - **1.96, en el servidor:** el QR de pago solo lo escribe el negocio, Nequi solo para el administrador, y los bonos solo
-     para dueño, administrador o cajero. Lleva revisión goldfish del plan y del cambio.
+     Van con S1, S2 y S3.
+   - **Inventario «poner» en vez de «sumar»:** las porciones del menú del día y las existencias se mezclan entre equipos
+     como sumas. Poner un valor (el menú de hoy, o 0 al empezar el día) necesita un valor base por fecha más los cambios.
+   - **El cierre de caja sin deshacer:** contar el efectivo ANTES de cerrar las cuentas abiertas, para no tener que
+     deshacer nada. Hoy, si se cancela, la 1.95.4 devuelve las cuentas, los números de factura y lo que entró mientras
+     tanto. Pero un pedido de tienda ya marcado «Entregado» no vuelve, y el cierre pudo alcanzar a llegar a otros equipos.
+   - **Cupos de los planes (M7)** también en la voz, en la caja POS y en los pedidos del QR (hoy en «Agregar» y en los
+     favoritos).
+   - **Y5:** lo que se está escribiendo de los viajeros se pierde si llegan datos de otro equipo.
+   - **De la auditoría, cada uno con su diseño:**
+     - S2: códigos de mesa por cuenta abierta;
+     - S3: límites del canal por conexión en el servidor;
+     - S5: reservas públicas pendientes o con código.
 1. **Pruebas con equipos de verdad:** un celular con zoom, la impresora, un QR impreso y dos celulares con el mismo pedido.
 2. **Agencias:** revisar si los «📅 Créditos» de la caja sirven para los planes con abonos, antes de pensar en apartados.
 3. **Hoteles:** IVA exento para extranjeros no residentes. Solo después de que el contador del dueño lo confirme.

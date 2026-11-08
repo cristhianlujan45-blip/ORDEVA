@@ -153,7 +153,11 @@ document.getElementById('qsChargeBtn').addEventListener('click', async ()=>{
   // 1.95.4 (auditoría Y3): antes de mirar, se traen los datos de la nube (máximo 4 s; sin internet sigue con lo que hay):
   // si dos equipos lo facturaban casi a la vez, los dos lo veían «pendiente».
   if(isDom && domActual && window.ventoNube && typeof window.ventoNube.bajar === 'function' && navigator.onLine !== false){
+    const bt = document.getElementById('qsChargeBtn'); if(bt.dataset.ocupado) return;   // un segundo toque mientras espera
+    bt.dataset.ocupado = '1'; bt.disabled = true;
     try{ await Promise.race([window.ventoNube.bajar(), new Promise(r => setTimeout(r, 4000))]); }catch(e){}
+    finally{ delete bt.dataset.ocupado; bt.disabled = false; }
+    if(!quickSaleCart.length || qsTotal() !== total){ showToast('⚠️ La venta cambió mientras se revisaba el domicilio. Revisa y vuelve a facturar.', 7000); return; }
   }
   if(isDom && domActual){ const yaD = (data.domicilios || []).find(x => x.id === domActual); if(yaD && yaD.estado && yaD.estado !== 'pendiente'){ domActual = null; showToast('⚠️ Ese domicilio ya lo facturó otro equipo. Revisa en «🛵 Domicilios».', 7000); return; } }
   const enDom = qsRegistrarVenta(quickSaleCart, { method, deudor, domicilio: isDom ? { cliente, telefono, direccion, envio } : null });

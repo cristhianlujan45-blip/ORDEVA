@@ -13,7 +13,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 (async () => {
   const b = await chromium.launch(); let ok = 0, mal = 0; const errs = [];
-  const chk = (n, c, x) => { if(c){ ok++; console.log('✅ ' + n); } else { mal++; console.log('✗ ' + n + (x !== undefined ? ' → ' + JSON.stringify(x).slice(0, 700) : '')); } };
+  const chk = (n, c, x) => { if(c){ ok++; console.log('✅ ' + n); } else { mal++; console.log('❌ ' + n + (x !== undefined ? ' → ' + JSON.stringify(x).slice(0, 700) : '')); } };
   const pausa = ms => new Promise(r => setTimeout(r, ms));
   try{
     const ctx = await b.newContext({ viewport: { width: 1280, height: 800 } });
@@ -39,9 +39,10 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     await p.waitForSelector('.pz-pago-ov .pz-cancel', { timeout: 5000 }); await pausa(700);
     let v = await p.evaluate(() => data.tables[1].items.map(i => i.name));
     chk('M4. Al escoger la propina queda en la cuenta mientras se cobra', v.includes('🙏 Propina'), v);
+    await p.evaluate(() => { data.tables[1] = JSON.parse(JSON.stringify(data.tables[1])); });   // llegan datos de la nube: objetos nuevos
     await p.click('.pz-pago-ov .pz-cancel'); await pausa(400);
     v = await p.evaluate(() => ({ its: data.tables[1].items.map(i => i.name), saldo: tableBalance(1) }));
-    chk('M4. Se cancela el cobro: la propina sale de la cuenta (no se suma otra vez)', !v.its.includes('🙏 Propina') && v.saldo === 10000, v);
+    chk('M4. Se cancela el cobro (aunque mientras tanto llegaron datos de la nube): la propina sale de la cuenta', !v.its.includes('🙏 Propina') && v.saldo === 10000, v);
     await p.evaluate(() => { data.tipsOn = false; document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')); currentTable = null; });
 
     // ===== M5 =====
@@ -50,13 +51,14 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
       data.history.push({ id: 'h0', date: new Date().toISOString(), items: [{ name: 'Cerveza', qty: 1, price: 5000 }], total: 5000, payments: [{ method: 'efectivo', amount: 5000 }], debt: 0 }); saveData();
       const sc = window.showConfirm; window.showConfirm = async () => true;
       const T = window.ventoTurno, aq = T && T.arqueo; if(T) T.arqueo = async () => null;
-      const h0 = data.history.length, c0 = (data.closures || []).length;
+      const h0 = data.history.length, c0 = (data.closures || []).length, f0 = window.ventoFactura.ver();
       await closeCashRegister();
       window.showConfirm = sc; if(T) T.arqueo = aq;
-      return { conTurno: !!T, h: data.history.length - h0, c: (data.closures || []).length - c0, t2: (data.tables[2].items || []).map(i => i.name), t3: (data.tables[3].items || []).length, pag3: (data.tables[3].payments || []).length };
+      return { conTurno: !!T, h: data.history.length - h0, c: (data.closures || []).length - c0, t2: (data.tables[2].items || []).map(i => i.name), t3: (data.tables[3].items || []).length, pag3: (data.tables[3].payments || []).length, f0, f1: window.ventoFactura.ver() };
     });
     chk('M5. Cancelar el conteo del cierre: no queda cierre ni ventas «debe» nuevas', v.conTurno && v.h === 0 && v.c === 0, v);
     chk('M5. … y las cuentas abiertas siguen como estaban (con su abono)', v.t2.includes('Picada') && v.t3 === 1 && v.pag3 === 1, v);
+    chk('M5. … y no se gastan números de factura (el consecutivo sigue igual)', v.f0 && v.f0 === v.f1, v);
 
     // ===== M1 =====
     v = await p.evaluate(async () => {
@@ -82,6 +84,15 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
       return { cobro: !!e, abierta: (data.tables[5].items || []).length, h: data.history.filter(h => h.table === 5 || h.tableId === 5).length };
     });
     chk('M2. El total cambió mientras se elegía cómo pagan: no se cobra con el total viejo y la cuenta sigue abierta', !v.cobro && v.abierta === 2, v);
+    v = await p.evaluate(async () => {
+      mk(8, [['cv', 2]]);
+      const pr = window.ventoPOS.cobrarMesa(8, { desdeCuenta: true, motelVisto: true, minimoVisto: true });
+      const ov = await esperaOv('.pz-pago-ov'); await new Promise(r => setTimeout(r, 700));
+      data.tables[8].items.push({ productId: 'cv', name: 'Cerveza', price: 5000, qty: 1, personId: null, history: [] });
+      ov.querySelector('.pz-met[data-m="nequi"]').click();
+      const e = await pr; const r = { cobro: !!e, abierta: (data.tables[8].items || []).length }; data.tables[8] = { items: [], payments: [], people: [] }; saveData(); return r;
+    });
+    chk('M2. … también por Nequi (el cliente pagó lo que se le mostró)', !v.cobro && v.abierta === 2, v);
     await p.evaluate(() => { data.tables[5] = { items: [], payments: [], people: [] }; saveData(); });
 
     // ===== M3 =====
@@ -113,6 +124,27 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     chk('M3. «Cancelar» mientras se usa el bono: la ventana espera (no se pierde el descuento)', v.sigue, v);
     chk('M3. La venta no quedó (la mesa ya no estaba): el saldo vuelve al bono con la misma referencia', !v.cobro && v.devuelto, v);
     await p.evaluate(() => document.querySelectorAll('.pz-pago-ov').forEach(o => o.remove()));
+    v = await p.evaluate(async () => {
+      const llamadas = [], nb = window.ventoNube, orig = { neg: nb.negocio, cli: nb.cliente };
+      nb.negocio = () => ({ id: 'n1', nombre: 'x', rol: 'dueno' });
+      nb.cliente = async () => ({ rpc: async (fn, a) => { llamadas.push([fn, a && a.p_ref]);
+        if(fn === 'bono_ver') return { data: { ok: true, bono: { codigo: 'ABC123', saldo: 100000, estado: 'activo' } } };
+        if(fn === 'bono_redimir') throw new Error('se cortó');   // el servidor sí lo descontó, pero la respuesta se perdió
+        if(fn === 'bono_devolver') return { data: { ok: true, devueltos: 1 } };
+        return { data: null }; } });
+      mk(9, [['cv', 2]]);
+      const pr = window.ventoPOS.cobrarMesa(9, { desdeCuenta: true, motelVisto: true, minimoVisto: true });
+      const ov = await esperaOv('.pz-pago-ov'); await new Promise(r => setTimeout(r, 700));
+      ov.querySelector('.pz-bono-btn').click(); await new Promise(r => setTimeout(r, 100));
+      ov.querySelector('.pz-bono-cod').value = 'ABC123'; ov.querySelector('.pz-bono-ver').click(); await new Promise(r => setTimeout(r, 200));
+      ov.querySelector('.pz-bono-ok').click(); await new Promise(r => setTimeout(r, 200));
+      ov.querySelector('.pz-cancel').click();
+      const e = await pr; await new Promise(r => setTimeout(r, 300));
+      nb.negocio = orig.neg; nb.cliente = orig.cli; data.tables[9] = { items: [], payments: [], people: [] }; saveData();
+      const ref = (llamadas.find(x => x[0] === 'bono_redimir') || [])[1];
+      return { cobro: !!e, devuelto: !!ref && llamadas.some(x => x[0] === 'bono_devolver' && x[1] === ref) };
+    });
+    chk('M3. Se cortó la respuesta del bono y luego «Cancelar»: igual se devuelve (por si el servidor sí lo descontó)', !v.cobro && v.devuelto, v);
 
     // ===== M6 =====
     v = await p.evaluate(() => { const C = window.ventoComisiones, M = window.ventoMinimo;
@@ -150,7 +182,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
       document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show'));
       return { apagado, prendido, sinCod, planes };
     });
-    chk('S4. Con domicilios apagados, el link no guarda nada', v.apagado === 0, v);
+    chk('S4. Un domicilio del agente entra aunque Ajustes → Domicilios esté apagado (el agente tiene su propio interruptor)', v.apagado === 1, v);
     chk('S4. Como mucho 40 domicilios del link por facturar', v.prendido === 40, v);
     chk('S4. Como mucho 30 pedidos sin código esperando', v.sinCod === 30, v);
     chk('S4. Como mucho 50 solicitudes de planes sin atender', v.planes === 50, v);
@@ -164,9 +196,9 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 
     // ===== P2, P4 =====
     v = await p.evaluate(() => { const bt = document.querySelector('nav button[data-view="historial"]'); bt.hidden = true; const vis = getComputedStyle(bt).display; bt.hidden = false;
-      return { vis, prod: !!document.querySelector('.more-tile[data-go="productos"]'), inv: !!document.querySelector('.more-tile[data-go="inventario"]') }; });
+      return { vis, inv: /Productos e inventario/.test((document.querySelector('.more-tile[data-go="inventario"]') || {}).textContent || '') }; });
     chk('P2. Un botón del menú con «hidden» no se ve', v.vis === 'none', v);
-    chk('P4. «Más» trae Productos e Inventario', v.prod && v.inv, v);
+    chk('P4. «Más» trae «Productos e inventario»', v.inv, v);
 
     // ===== P5 =====
     v = await p.evaluate(() => (window.ventoDiagnostico() || {}).pantalla);
@@ -184,7 +216,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
       return { boton: !!bt, rol: (authUsers().find(u => u.user === authUser) || {}).role, aviso: window.__t.join(' | ') };
     });
     chk('P1. «Hacer mesero» sobre uno mismo no se deja (con dos administradores en el equipo)', v.boton && v.rol === 'admin' && /propio administrador/.test(v.aviso), v);
-  }catch(e){ mal++; console.log('✗ La prueba se cayó: ' + (e && e.stack || e)); }
+  }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.stack || e)); }
   chk('Sin errores de página', !errs.length, errs.join(' | '));
   await b.close();
   console.log('RESULTADO', ok, 'bien', mal, 'mal'); process.exit(mal ? 1 : 0);

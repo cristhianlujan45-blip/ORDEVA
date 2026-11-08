@@ -37,32 +37,35 @@
 ## Hallazgos (verificado = revisado contra el código o con una prueba)
 | # | Área | Hallazgo | Gravedad | Estado |
 |---|---|---|---|---|
-| M5 | Caja | Cancelar el conteo del cierre igual cierra las mesas abiertas como «debe», sin dejar cierre. | 🔴 | Verificado (`app/04g` 1610-1622) |
-| M1 | Caja | «Deshacer» un cobro pierde datos de la cuenta: el consumo mínimo propio, la plataforma, el huésped, la hora de entrada y los viajeros. | 🔴 | Por arreglar |
-| M2 | Caja | El cobro por voz confirma un total, y después el mínimo o el motel lo cambian: el efectivo y las vueltas quedan mal. | 🔴 | Por arreglar |
-| M3 | Bonos | Un reintento o un «Cancelar» mientras se redime puede descontar el bono sin que haya venta. | 🔴 | Por arreglar |
-| M4 | Caja | Si se cancela el cobro, la propina queda en la cuenta y se vuelve a sumar. | 🟠 | Por arreglar |
-| M6 | Comisiones | La diferencia del consumo mínimo da comisión al mesero. | 🟠 | Por arreglar |
-| M7 | Agencias | «Agregar» con cantidad se salta los cupos. | 🟠 | Por arreglar |
+| M5 | Caja | Cancelar el conteo del cierre igual cierra las mesas abiertas como «debe», sin dejar cierre. | 🔴 | Arreglado en la 1.95.4 |
+| M1 | Caja | «Deshacer» un cobro pierde datos de la cuenta: el consumo mínimo propio, la plataforma, el huésped, la hora de entrada y los viajeros. | 🔴 | Arreglado en la 1.95.4 |
+| M2 | Caja | El cobro por voz confirma un total, y después el mínimo o el motel lo cambian: el efectivo y las vueltas quedan mal. | 🔴 | Arreglado en la 1.95.4 |
+| M3 | Bonos | Un reintento o un «Cancelar» mientras se redime puede descontar el bono sin que haya venta. | 🔴 | Arreglado en la 1.95.4 |
+| M4 | Caja | Si se cancela el cobro, la propina queda en la cuenta y se vuelve a sumar. | 🟠 | Arreglado en la 1.95.4 |
+| M6 | Comisiones | La diferencia del consumo mínimo da comisión al mesero. | 🟠 | Arreglado en la 1.95.4 |
+| M7 | Agencias | «Agregar» con cantidad se salta los cupos. | 🟠 | Arreglado en la 1.95.4 en «Agregar»; la voz y la caja POS, al plan |
 | S1 | Seguridad | Cualquiera que conozca el canal del negocio puede cambiar el **QR de pago y la llave Bre-B** que ven los clientes (canal `c+'f'` sin protección). | 🔴 | Verificado. Necesita un cambio en el servidor con revisión goldfish. |
 | S10 | Seguridad | `pagos_estado` les muestra a todos los miembros (también al mesero) el código de Nequi. La regla del dueño es que solo lo vea el administrador. | 🟠 | Por arreglar (servidor) |
 | S6 | Seguridad | Cualquier miembro (un mesero) puede crear bonos con valor. | 🟠 | Por arreglar (servidor) |
-| S4 | Seguridad | Los mensajes falsos de domicilios o de pedidos sin código se guardan sin tope en los datos del negocio. | 🟠 | Por arreglar |
+| S4 | Seguridad | Los mensajes falsos de domicilios o de pedidos sin código se guardan sin tope en los datos del negocio. | 🟠 | Arreglado en la 1.95.4 |
 | S2 | Seguridad | Los códigos de las mesas nunca cambian: una foto vieja del QR sigue sirviendo. | 🟠 | Al plan: necesita su propio diseño |
 | S3 | Seguridad | El límite por conexión del canal se puede saltar por la ruta del servidor. | 🟠 | Al plan (servidor) |
 | S5 | Seguridad | Las reservas públicas se pueden usar para bloquear habitaciones (con el celular que quieran). | 🟠 | Al plan |
 | Y1 | Sincronización | «Un pedido del QR se suma en cada equipo». | — | **No se confirmó:** con dos equipos de verdad la mesa queda con 2 y el inventario baja 2. La prueba `dosequiposqr` lo vigila. |
-| Y2 | Sincronización | El menú del día pone las porciones en 0 como valor fijo, pero la mezcla trata el inventario como suma: se pueden perder porciones. | 🟠 | Por arreglar |
-| Y3 | Sincronización | Un domicilio se puede facturar dos veces desde dos equipos. | 🟠 | Por arreglar (rechazar si ya no está pendiente) |
-| Y7 | Sincronización | Con más de 8 códigos por mesa entre equipos, los equipos se los quitan entre sí sin parar (de la 1.95.1). | 🟡 | Por arreglar |
-| P1 | Celular | **La causa más probable de que no salgan Productos, Inventario ni Ajustes:** el celular entra con un usuario de **empleado** (mesero, cajero) y no del dueño. `app/27` esconde justo eso, y también el botón IA. Se puede llegar por «Hacer mesero» sobre el propio usuario (la regla «debe quedar un administrador» solo cuenta los de ese equipo) o al entrar con el PIN de un empleado. | 🔴 para el dueño | Verificado (`app/27` 33-56, `app/04h` 293-299). Falta confirmarlo en su celular (chip «🧑‍🍳 … · Mesero» arriba). |
-| P2 | Celular | `hidden` no esconde los botones del menú (`nav button{display:flex}`): el mesero sin permiso igual ve «Caja POS». | 🟠 | Por arreglar |
-| P3 | Celular | Entre 761 y 1023 px (celular acostado, plegables) el menú de abajo no queda fijo. | 🟠 | Por arreglar |
-| P4 | Celular | «Más» no tiene la tarjeta de Productos/Inventario. | 🟡 | Por arreglar |
-| P5 | Celular | El diagnóstico de «Reportar un problema» no manda el rol, el ancho ni la escala, que es lo que haría falta para confirmar P1 desde lejos. | 🟡 | Por arreglar |
-| Y5 | Sincronización | Lo que se está escribiendo (viajeros) se pierde si llegan datos de otro equipo. | 🟡 | Por arreglar |
+| Y2 | Sincronización | El menú del día pone las porciones en 0 como valor fijo, pero la mezcla trata el inventario como suma: se pueden perder porciones. | 🟠 | Achicado en la 1.95.4; el arreglo completo («poner» en vez de «sumar» en el inventario) va al plan |
+| Y3 | Sincronización | Un domicilio se puede facturar dos veces desde dos equipos. | 🟠 | Achicado en la 1.95.4; el arreglo completo necesita el servidor (plan) |
+| Y7 | Sincronización | Con más de 8 códigos por mesa entre equipos, los equipos se los quitan entre sí sin parar (de la 1.95.1). | 🟡 | Arreglado en la 1.95.4 |
+| P1 | Celular | **La causa más probable de que no salgan Productos, Inventario ni Ajustes:** el celular entra con un usuario de **empleado** (mesero, cajero) y no del dueño. `app/27` esconde justo eso, y también el botón IA. Se puede llegar por «Hacer mesero» sobre el propio usuario (la regla «debe quedar un administrador» solo cuenta los de ese equipo) o al entrar con el PIN de un empleado. | 🔴 para el dueño | 1.95.4: ya no se puede quitar uno mismo el administrador; falta confirmarlo en su celular |
+| P2 | Celular | `hidden` no esconde los botones del menú (`nav button{display:flex}`): el mesero sin permiso igual ve «Caja POS». | 🟠 | Arreglado en la 1.95.4 |
+| P3 | Celular | Entre 761 y 1023 px (celular acostado, plegables) el menú de abajo no queda fijo. | 🟠 | Arreglado en la 1.95.4 |
+| P4 | Celular | «Más» no tiene la tarjeta de Productos/Inventario. | 🟡 | Arreglado en la 1.95.4 |
+| P5 | Celular | El diagnóstico de «Reportar un problema» no manda el rol, el ancho ni la escala, que es lo que haría falta para confirmar P1 desde lejos. | 🟡 | Arreglado en la 1.95.4 |
+| Y5 | Sincronización | Lo que se está escribiendo (viajeros) se pierde si llegan datos de otro equipo. | 🟡 | Al plan (POS-COMPLETO 6c, 0b) |
 
 ## Orden de los arreglos
+**Estado al 08/11:** la 1.95.4 hizo el punto 1 (`puente/REPORTE-1.95.4.md`, revisión goldfish en
+`puente/egm/REVISION-GOLDFISH-1.95.4.md`). Sigue la 1.96 (servidor).
+
 1. **1.95.4, en la app,** con pruebas:
    - M5, M1, M2, M4 y M6;
    - M3 (bonos), M7 y S4;
