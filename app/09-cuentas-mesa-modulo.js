@@ -865,8 +865,21 @@ function pedidoProducto(nombre){
   const k=normVoiceText(nombre);
   return data.products.find(p=>!p.oculto&&normVoiceText(p.name)===k)||data.products.find(p=>normVoiceText(p.name+' '+(p.size||''))===k)||matchProductVoice(nombre)||null;
 }
+/* 1.96: los estados de pedidos y canciones se reintentan (3 veces: a los 4, 12 y 30 s) si no salieron. Antes, si el envío
+   fallaba (sin señal, o la sesión todavía no estaba lista), el cliente se quedaba sin saber cómo iba su pedido. Si el
+   servidor dice que no hay permiso no se reintenta: sale el aviso de abajo. */
+function canalPostEstado(url,body,intento){
+  intento=intento||0;
+  try{fetch(url,{method:'POST',body}).then(r=>{if(r.ok||r.status===401||r.status===403||intento>=3)return;setTimeout(()=>canalPostEstado(url,body,intento+1),[4000,12000,30000][intento]);},
+    ()=>{if(intento<3)setTimeout(()=>canalPostEstado(url,body,intento+1),[4000,12000,30000][intento]);});}catch(e){}
+}
+// El servidor no dejó publicar en un canal del negocio (sesión de otra cuenta o vencida): el dueño lo sabe (una vez cada 10 min).
+let sinPermisoAvisado=0;
+window.addEventListener('vento-canal-sin-permiso',()=>{if(Date.now()-sinPermisoAvisado<6e5)return;sinPermisoAvisado=Date.now();
+  try{showToast('⚠️ No se pudo publicar en el QR (estados, carta o QR de pago): este equipo no tiene la sesión de ORDEVA del negocio. Cierra sesión y entra otra vez con la cuenta del negocio.',12000);}catch(e){}
+  try{window.ventoError&&window.ventoError('canal','No se pudo publicar en un canal del negocio (sin permiso)',{},'canal|sin-permiso');}catch(e){}});
 function pedidoPublicar(p){
-  try{fetch('https://canal.vento.local/'+(p.canal&&qCanalOk(p.canal)?p.canal:qCfg().topic)+'e',{method:'POST',body:JSON.stringify(Object.assign({t:'estado',id:p.id,e:p.estado,m:p.mesa,n:pedidoEstNombre(p.estado),at:Date.now()},pedidosSimple()?{i:PEDIDO_IC_TIENDA[p.estado]}:{}))}).catch(()=>{});}catch(e){}
+  try{canalPostEstado('https://canal.vento.local/'+(p.canal&&qCanalOk(p.canal)?p.canal:qCfg().topic)+'e',JSON.stringify(Object.assign({t:'estado',id:p.id,e:p.estado,m:p.mesa,n:pedidoEstNombre(p.estado),at:Date.now()},pedidosSimple()?{i:PEDIDO_IC_TIENDA[p.estado]}:{})));}catch(e){}
 }
 function pedidoAplicar(p){
   if(p.aplicado)return;
@@ -1116,7 +1129,7 @@ function mzResponder(rid,e,mesa,extra,canal){
   rid=String(rid||'');if(!/^c[\w-]{4,40}$/.test(rid))return;
   // El canal de ESE cliente (puede haber varios canales del QR): el que trajo la canción; si no se sabe, el último que habló.
   try{const cn=qCanalOk(canal)?canal:qCanalOk(window.__canalTopic)?window.__canalTopic:qCfg().topic,x=MZ_EST[e]||[];
-    fetch('https://canal.vento.local/'+cn+'e',{method:'POST',body:JSON.stringify(Object.assign({t:'estado',id:rid,e,m:mesa,i:x[0],n:x[1]||'',at:Date.now()},extra||{}))}).catch(()=>{});}catch(err){}
+    canalPostEstado('https://canal.vento.local/'+cn+'e',JSON.stringify(Object.assign({t:'estado',id:rid,e,m:mesa,i:x[0],n:x[1]||'',at:Date.now()},extra||{})));}catch(err){}
 }
 // Solo el equipo de la música le contesta al cliente cómo va su canción (un solo dueño de la cola: sin estados cruzados).
 const mzAvisarCliente=(it,e)=>{try{if(it&&it.reqId&&!it.fondo&&!mqOtro())mzResponder(it.reqId,e,it.mesa,null,it.canal);}catch(err){}};

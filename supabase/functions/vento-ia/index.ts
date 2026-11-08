@@ -63,11 +63,24 @@ async function sinCupo(ip: string): Promise<string | null> {
   return null;
 }
 
-function demasiados(ip: string): boolean {
+function demasiados(ip: string, tope = POR_MINUTO): boolean {
   const ahora = Date.now(), l = (visitas.get(ip) || []).filter((t) => ahora - t < 60000);
   l.push(ahora); visitas.set(ip, l);
   if (visitas.size > 5000) visitas.clear();
-  return l.length > POR_MINUTO;
+  return l.length > tope;
+}
+// 1.96: las búsquedas de música tienen su propio número. Todo el Wi-Fi de un bar sale por una sola IP (los clientes y el
+// equipo del negocio), y cada búsqueda del cliente son 2 llamadas: con 40 por minuto, un bar lleno veía «muchas búsquedas».
+const YT_POR_MINUTO = 150;
+// Y un caché de 10 minutos en el servidor por búsqueda (la misma canción la buscan muchos): menos llamadas a YouTube.
+const ytCache = new Map<string, { t: number; v: unknown }>();
+async function ytConCache(clave: string, hacer: () => Promise<unknown>): Promise<unknown> {
+  const ahora = Date.now(), c = ytCache.get(clave);
+  if (c && ahora - c.t < 600000) return c.v;
+  const v = await hacer();
+  const vacio = !v || (typeof v === "object" && Array.isArray((v as { items?: unknown[] }).items) && !(v as { items: unknown[] }).items.length);
+  if (!vacio) { if (ytCache.size > 800) ytCache.clear(); ytCache.set(clave, { t: ahora, v }); }   // los vacíos no se guardan
+  return v;
 }
 
 Deno.serve(async (req: Request) => {
@@ -86,9 +99,9 @@ Deno.serve(async (req: Request) => {
     const tipo = t0 === "canal" ? "canal" : t0 === "lista" ? "lista" : "video";
     if (q.length < 2) return json({ items: [] }, 200, h);
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "?";
-    if (demasiados("yt:" + ip)) return json({ error: { code: 429, message: "Demasiadas búsquedas seguidas. Espera un momento." } }, 429, h);
+    if (demasiados("yt:" + ip, YT_POR_MINUTO)) return json({ error: { code: 429, message: "Demasiadas búsquedas seguidas. Espera un momento." } }, 429, h);
     try {
-      return json(await YT.buscar(q, tipo), 200, { ...h, "cache-control": "public, max-age=600" });
+      return json(await ytConCache(tipo + ":" + q.toLowerCase(), () => YT.buscar(q, tipo)), 200, { ...h, "cache-control": "public, max-age=600" });
     } catch (e) {
       return json({ error: { code: 502, message: "No se pudo buscar en YouTube: " + (e instanceof Error ? e.message : String(e)) } }, 502, h);
     }
@@ -98,9 +111,9 @@ Deno.serve(async (req: Request) => {
     const id = String(u.searchParams.get("id") || "").replace(/[^\w-]/g, "").slice(0, 60);
     if (id.length < 10) return json({ error: { code: 400, message: "Esa no es una playlist de YouTube." } }, 400, h);
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "?";
-    if (demasiados("yt:" + ip)) return json({ error: { code: 429, message: "Demasiadas búsquedas seguidas. Espera un momento." } }, 429, h);
+    if (demasiados("yt:" + ip, YT_POR_MINUTO)) return json({ error: { code: 429, message: "Demasiadas búsquedas seguidas. Espera un momento." } }, 429, h);
     try {
-      return json(await YT.lista(id), 200, { ...h, "cache-control": "public, max-age=600" });
+      return json(await ytConCache("lista:" + id, () => YT.lista(id)), 200, { ...h, "cache-control": "public, max-age=600" });
     } catch (e) {
       return json({ error: { code: 502, message: "No se pudo leer la playlist: " + (e instanceof Error ? e.message : String(e)) } }, 502, h);
     }

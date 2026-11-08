@@ -72,7 +72,8 @@
   async function qpPublicar(forzar){
     const q = QP(), cfg = window.vitoQCfg ? window.vitoQCfg() : null;
     if(!cfg || !cfg.topic || !navigator.onLine) return;
-    const k = q ? (q.mz ? q.mz.m.length : q.img.length) + '|' + q.tipo + '|' + q.llave : 'nada';
+    // 1.96: «v196» hace que el QR se vuelva a publicar una vez, ya firmado con la sesión (los falsos sin firmar se dejan de ver).
+    const k = 'v196|' + (q ? (q.mz ? q.mz.m.length : q.img.length) + '|' + q.tipo + '|' + q.llave : 'nada');
     const ult = (() => { try{ return JSON.parse(localStorage.getItem('mesora_qp_pub') || '{}'); }catch(e){ return {}; } })();
     if(!forzar && ult.k === k && Date.now() - ult.t < 10 * 36e5) return;
     const msg = q ? Object.assign({ n: '__qrpago__', q: q.tipo || '', l: (q.llave || '').slice(0, 60) }, q.mz ? { s: q.mz.s, m: q.mz.m } : { i: q.img }) : { n: '__qrpago__', i: '' };
