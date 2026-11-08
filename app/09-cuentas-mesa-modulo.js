@@ -2493,6 +2493,7 @@ async function publicarCatalogo(force){
     info: (data.orderExtraInfo || '').slice(0, 200),
     oh: data.orderOpenTime || '', ch: data.orderCloseTime || '', hn: (data.orderHoursNote || '').slice(0, 100),
     mz: musicaOn() ? 1 : 0,
+    pl: data.playOn ? 1 : 0,   // 🎮 1.97.0: ORDEVA PLAY activo (la pestaña «Play» del QR)
     cl: mzMax(),                                                         // canciones por mesa cada 15 min (0 = sin límite)
     mo: (data.motivo || '')
   };

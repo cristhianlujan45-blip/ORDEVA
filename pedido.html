@@ -422,6 +422,10 @@ img,video,iframe{max-width:100%}
   <button class="t" id="tq" role="tab" aria-selected="false">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3z"/><path d="M9 8h6M9 12h6"/></svg><span id="tqTxt">Mi cuenta</span>
   </button>
+  <!-- 🎮 ORDEVA PLAY (1.97.0): solo si el local lo activó; su código se carga al tocarla (el menú no se vuelve más lento). -->
+  <button class="t" id="tg" role="tab" aria-selected="false" hidden>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="7" width="19" height="11" rx="5.5"/><path d="M7.5 10.5v4M5.5 12.5h4"/><circle cx="15.5" cy="11.5" r="1"/><circle cx="18" cy="13.5" r="1"/></svg><span>Play</span>
+  </button>
 </nav>
 
 <main>
@@ -490,6 +494,9 @@ img,video,iframe{max-width:100%}
     <div class="generos" id="generos" aria-label="Géneros"></div>
     <div class="cupos" id="cupos" aria-hidden="true"></div>
   </section>
+
+  <!-- ORDEVA PLAY -->
+  <section id="vg" class="panel" hidden><div id="playRoot"><p class="hint">Cargando ORDEVA PLAY…</p></div></section>
 
   <!-- CUENTA -->
   <section id="vq" class="panel" hidden>
@@ -1237,6 +1244,7 @@ function pintarCupos(){
 }
 function set(x){
   modo=x;colocarEnvio();
+  if($('vg')){$('vg').hidden=true;$('tg').className='t';$('tg').setAttribute('aria-selected','false');}
   ['p','c','q'].forEach(k=>{
     const on=k==x;
     $('v'+k).hidden=!on;
@@ -1247,6 +1255,22 @@ function set(x){
   clearMsg();rotulo();info();
 }
 $('tp').onclick=()=>set('p');$('tc').onclick=()=>set('c');$('tq').onclick=()=>set('q');
+/* 🎮 ORDEVA PLAY: la pestaña muestra su panel sin tocar Pedir, Canción ni Mi cuenta. play/ordeva-play.js y play/play.css se
+   cargan la primera vez que se toca (si falla, el menú y los pedidos siguen igual). */
+let playCargado=null;
+function cargarPlay(){
+  if(playCargado)return playCargado;
+  playCargado=new Promise((res,rej)=>{
+    const l=document.createElement('link');l.rel='stylesheet';l.href='play/play.css?v=1.97.0';document.head.appendChild(l);
+    const sc=document.createElement('script');sc.src='play/ordeva-play.js?v=1.97.0';sc.onload=()=>res(window.ordevaPlay);sc.onerror=()=>{playCargado=null;rej(new Error('play'))};document.head.appendChild(sc);
+  });
+  return playCargado;
+}
+$('tg').onclick=()=>{
+  ['p','c','q'].forEach(k=>{$('v'+k).hidden=true;$('t'+k).className='t';$('t'+k).setAttribute('aria-selected','false');});
+  $('vg').hidden=false;$('tg').className='t on';$('tg').setAttribute('aria-selected','true');clearMsg();
+  cargarPlay().then(P=>{try{P.abrir($('playRoot'),{c,mesa,v})}catch(e){}}).catch(()=>{$('playRoot').innerHTML='<p class="hint">No se pudo abrir ORDEVA PLAY. Revisa tu conexión y vuelve a tocar «Play».</p>'});
+};
 /* En modo domicilio solo existe la pestaña de pedido: no hay mesa que cobrar ni música que pedir. */
 if(dom){
   $('tc').hidden=true;$('tq').hidden=true;
@@ -1656,6 +1680,8 @@ tickOrderClock();
 setInterval(tickOrderClock,1000);
 /* Locales sin música: el catálogo trae mz:0 y se esconde la pestaña de pedir canción.
    Si el catálogo todavía no llegó (o es viejo, sin mz), se deja visible como siempre. */
+// 🎮 La pestaña Play solo si el local la activó (la carta trae pl:1) y hay mesa (no en domicilio).
+function aplicarPlayCliente(){const t=$('tg');if(!t)return;t.hidden=!(!dom&&mesa&&v&&cat&&cat.pl===1);}
 function aplicarMusicaCliente(){
   const on=!dom&&!(cat&&cat.mz===0),tab=$('tc');
   if(!tab)return;
@@ -1666,6 +1692,7 @@ function pintarCat(fin){
   pintarBizName();
   pintarInfoBar();
   aplicarMusicaCliente();
+  try{aplicarPlayCliente()}catch(e){}
   const box=$('cat');box.textContent='';
   const ps=cat&&Array.isArray(cat.p)?cat.p:[],esMenu=catT()==='Menú';
   // El título usa la palabra del negocio cuando la manda (Vuelos y planes, Tarifas, Servicios…)

@@ -232,7 +232,7 @@ begin
   select * into s from play_salas where id = p_sala; v := play_vivos(p_sala);
   if array_length(v, 1) is null or array_length(v, 1) <= 1 or s.ronda >= 5 then perform play_terminar(p_sala); return; end if;
   -- La explosión es secreta: entre 20 y 45 s (el celular no la recibe).
-  perform play_fase(p_sala, 'bomba', 20 + floor(random() * 26), '{}'::jsonb, '{}'::jsonb, s.ronda + 1);
+  perform play_fase(p_sala, 'bomba', (20 + floor(random() * 26))::numeric, '{}'::jsonb, '{}'::jsonb, s.ronda + 1);
   perform play_bomba_pregunta(p_sala, play_azar(v), 0);
 end $$;
 create or replace function public.play_bomba_explota(p_sala uuid) returns void
@@ -316,7 +316,7 @@ begin
   select * into s from play_salas where id = p_sala; v := play_vivos(p_sala);
   if array_length(v, 1) is null or array_length(v, 1) <= 1 or s.ronda >= 12 then perform play_terminar(p_sala); return; end if;
   m := play_mate(s.ronda + 1);
-  perform play_fase(p_sala, 'reto', greatest(6, 14 - s.ronda), jsonb_build_object('q', m->'q', 'opciones', m->'opciones', 'vivos', array_length(v, 1)),
+  perform play_fase(p_sala, 'reto', greatest(6, 14 - s.ronda)::numeric, jsonb_build_object('q', m->'q', 'opciones', m->'opciones', 'vivos', array_length(v, 1)),
     jsonb_build_object('correcta', m->'correcta'), s.ronda + 1);
 end $$;
 create or replace function public.play_sobre_resolver(p_sala uuid) returns void
@@ -471,14 +471,15 @@ end $$;
 
 create or replace function public.play_empezar(p_token text, p_sala uuid) returns jsonb
 language plpgsql security definer set search_path = public, extensions as $$
-declare j play_jugadores := play_yo(p_token); s play_salas; n int;
+declare j play_jugadores := play_yo(p_token); s play_salas; n int; minimo int;
 begin
   select * into s from play_salas where id = p_sala and negocio_id = j.negocio_id for update;
   if not found then raise exception 'play_sala'; end if;
   if s.anfitrion is distinct from j.id then raise exception 'play_anfitrion'; end if;
   if s.estado <> 'espera' then return play_vista(s.id, j.id); end if;
   select count(*) into n from play_miembros where sala_id = s.id;
-  if n < case when s.juego = 'impostor' then 3 else 2 end then raise exception 'play_pocos'; end if;
+  minimo := 2; if s.juego = 'impostor' then minimo := 3; end if;
+  if n < minimo then raise exception 'play_pocos'; end if;
   update play_salas set estado = 'jugando', ronda = 0, version = version + 1, actualizado = now() where id = s.id;
   case s.juego
     when 'show' then perform play_show_ronda(s.id);
@@ -684,11 +685,11 @@ insert into public.play_preguntas(categoria, q, opciones, correcta) values
 ('Colombia','¿Qué ciudad es conocida como «la Sucursal del Cielo»?','{Bogotá,Popayán,Cali,Pereira}',2),
 ('Colombia','¿Qué ritmo musical nació en la costa Caribe colombiana con el acordeón?','{El tango,El vallenato,La bachata,El merengue}',1),
 ('Colombia','¿Qué cantante colombiana canta «Hips Don''t Lie»?','{Karol G,Shakira,Fanny Lú,Totó la Momposina}',1),
-('Colombia','¿En qué eje está la zona cafetera?','{Caldas, Risaralda y Quindío,Nariño y Cauca,Meta y Casanare,Sucre y Córdoba}',0),
+('Colombia','¿En qué eje está la zona cafetera?','{"Caldas, Risaralda y Quindío","Nariño y Cauca","Meta y Casanare","Sucre y Córdoba"}',0),
 ('Colombia','¿Cómo se llama el sombrero típico de la costa colombiana?','{Sombrero vueltiao,Panamá,Sombrero aguadeño,Chupalla}',0),
 ('Colombia','¿Qué plato es típico de Antioquia?','{Ajiaco,Bandeja paisa,Sancocho de pescado,Mote de queso}',1),
 ('Colombia','¿Qué sopa típica de Bogotá lleva tres tipos de papa?','{Mondongo,Ajiaco,Cuchuco,Sancocho}',1),
-('Colombia','¿En qué océanos tiene costa Colombia?','{Solo el Pacífico,Solo el Atlántico,Pacífico y Atlántico (Caribe),Índico y Pacífico}',2),
+('Colombia','¿En qué océanos tiene costa Colombia?','{"Solo el Pacífico","Solo el Atlántico","Pacífico y Atlántico (Caribe)","Índico y Pacífico"}',2),
 ('Geografía','¿Cuál es el río más largo del mundo según la mayoría de fuentes?','{El Nilo,El Amazonas,El Misisipi,El Yangtsé}',1),
 ('Geografía','¿Cuál es el país más grande del mundo?','{Canadá,China,Rusia,Estados Unidos}',2),
 ('Geografía','¿Cuál es la capital de Perú?','{Quito,Lima,La Paz,Santiago}',1),
