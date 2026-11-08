@@ -262,7 +262,7 @@ function iniFotosProductos(){
 // La carta del cliente (pedido.html) recibe una miniatura de cada foto por un canal
 // aparte del canal de ORDEVA (topic + 'f'), una por mensaje (el canal de ORDEVA admite ~4 KB por mensaje).
 // Se reenvían cada 10 h porque el canal de ORDEVA guarda los mensajes 12 h.
-const FOTO_PUB_KEY = 'vito_fotos_pub';
+const FOTO_PUB_KEY = 'vito_fotos_pub_v196';   // 1.96: las fotos se vuelven a publicar una vez, firmadas con la sesión del negocio
 let fotoPubCorriendo = false;
 function fotoMiniatura(url){
   return new Promise(res => {
@@ -427,7 +427,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-11-08 · v1.95.5';
+const MESORA_VERSION = '2026-11-08 · v1.96.0';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'ORDEVA · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
 /* 🔄 La app Android se actualiza SOLA (Actualizador): revisa cada 3 h, baja la versión nueva y la instala cuando no se

@@ -74,6 +74,11 @@ function demasiados(ip: string, tope = POR_MINUTO): boolean {
 const YT_POR_MINUTO = 150;
 // Y un caché de 10 minutos en el servidor por búsqueda (la misma canción la buscan muchos): menos llamadas a YouTube.
 const ytCache = new Map<string, { t: number; v: unknown }>();
+function ytEnCache(clave: string): unknown {
+  const c = ytCache.get(clave);
+  return c && Date.now() - c.t < 600000 ? c.v : undefined;
+}
+const ytVacio = (v: unknown) => !v || (typeof v === "object" && Array.isArray((v as { items?: unknown[] }).items) && !(v as { items: unknown[] }).items.length);
 async function ytConCache(clave: string, hacer: () => Promise<unknown>): Promise<unknown> {
   const ahora = Date.now(), c = ytCache.get(clave);
   if (c && ahora - c.t < 600000) return c.v;
@@ -99,9 +104,13 @@ Deno.serve(async (req: Request) => {
     const tipo = t0 === "canal" ? "canal" : t0 === "lista" ? "lista" : "video";
     if (q.length < 2) return json({ items: [] }, 200, h);
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "?";
+    // Lo que ya está en el caché no gasta del límite.
+    const ya = ytEnCache(tipo + ":" + q.toLowerCase());
+    if (ya !== undefined) return json(ya, 200, { ...h, "cache-control": "public, max-age=600" });
     if (demasiados("yt:" + ip, YT_POR_MINUTO)) return json({ error: { code: 429, message: "Demasiadas búsquedas seguidas. Espera un momento." } }, 429, h);
     try {
-      return json(await ytConCache(tipo + ":" + q.toLowerCase(), () => YT.buscar(q, tipo)), 200, { ...h, "cache-control": "public, max-age=600" });
+      const res = await ytConCache(tipo + ":" + q.toLowerCase(), () => YT.buscar(q, tipo));
+      return json(res, 200, ytVacio(res) ? { ...h, "cache-control": "no-store" } : { ...h, "cache-control": "public, max-age=600" });
     } catch (e) {
       return json({ error: { code: 502, message: "No se pudo buscar en YouTube: " + (e instanceof Error ? e.message : String(e)) } }, 502, h);
     }

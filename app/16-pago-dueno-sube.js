@@ -72,12 +72,17 @@
   async function qpPublicar(forzar){
     const q = QP(), cfg = window.vitoQCfg ? window.vitoQCfg() : null;
     if(!cfg || !cfg.topic || !navigator.onLine) return;
+    // 1.96: el QR de pago solo lo publican el dueño o el administrador (el servidor no deja a los demás).
+    let rol = null; try{ rol = window.ventoNube && window.ventoNube.rolActivo ? window.ventoNube.rolActivo() : null; }catch(e){}
+    if(rol && rol !== 'dueno' && rol !== 'admin') return;
     // 1.96: «v196» hace que el QR se vuelva a publicar una vez, ya firmado con la sesión (los falsos sin firmar se dejan de ver).
     const k = 'v196|' + (q ? (q.mz ? q.mz.m.length : q.img.length) + '|' + q.tipo + '|' + q.llave : 'nada');
     const ult = (() => { try{ return JSON.parse(localStorage.getItem('mesora_qp_pub') || '{}'); }catch(e){ return {}; } })();
     if(!forzar && ult.k === k && Date.now() - ult.t < 10 * 36e5) return;
     const msg = q ? Object.assign({ n: '__qrpago__', q: q.tipo || '', l: (q.llave || '').slice(0, 60) }, q.mz ? { s: q.mz.s, m: q.mz.m } : { i: q.img }) : { n: '__qrpago__', i: '' };
-    try{ const r = await fetch('https://canal.vento.local/' + cfg.topic + 'f', { method: 'POST', body: JSON.stringify(msg) }); if(r.ok) localStorage.setItem('mesora_qp_pub', JSON.stringify({ k, t: Date.now() })); }catch(e){}
+    try{ const r = await fetch('https://canal.vento.local/' + cfg.topic + 'f', { method: 'POST', body: JSON.stringify(msg) }); const j = r.ok ? await r.json().catch(() => ({})) : null; let nube = false; try{ nube = !!(window.ventoNube && window.ventoNube.negocio && window.ventoNube.negocio()); }catch(e){}
+      // Solo cuenta como hecho si salió firmado (con la sesión del negocio) o si el negocio no usa la nube.
+      if(r.ok && (!nube || (j && j.firmado))) localStorage.setItem('mesora_qp_pub', JSON.stringify({ k, t: Date.now() })); }catch(e){}
   }
   function qpPintar(){
     if(!$q('qpSubir') || !data) return;

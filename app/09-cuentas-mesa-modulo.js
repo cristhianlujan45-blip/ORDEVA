@@ -876,7 +876,7 @@ function canalPostEstado(url,body,intento){
 // El servidor no dejó publicar en un canal del negocio (sesión de otra cuenta o vencida): el dueño lo sabe (una vez cada 10 min).
 let sinPermisoAvisado=0;
 window.addEventListener('vento-canal-sin-permiso',()=>{if(Date.now()-sinPermisoAvisado<6e5)return;sinPermisoAvisado=Date.now();
-  try{showToast('⚠️ No se pudo publicar en el QR (estados, carta o QR de pago): este equipo no tiene la sesión de ORDEVA del negocio. Cierra sesión y entra otra vez con la cuenta del negocio.',12000);}catch(e){}
+  try{showToast('⚠️ No se pudo publicar en el QR (estados, carta o QR de pago): el servidor no reconoce a este equipo como del negocio dueño de ese QR. Si este equipo entró con otra cuenta, entra con la del negocio; si tus QR son de otro negocio o de un respaldo, genera QR nuevos (Ajustes → QR) o escríbenos en «Reportar un problema».',14000);}catch(e){}
   try{window.ventoError&&window.ventoError('canal','No se pudo publicar en un canal del negocio (sin permiso)',{},'canal|sin-permiso');}catch(e){}});
 function pedidoPublicar(p){
   try{canalPostEstado('https://canal.vento.local/'+(p.canal&&qCanalOk(p.canal)?p.canal:qCfg().topic)+'e',JSON.stringify(Object.assign({t:'estado',id:p.id,e:p.estado,m:p.mesa,n:pedidoEstNombre(p.estado),at:Date.now()},pedidosSimple()?{i:PEDIDO_IC_TIENDA[p.estado]}:{})));}catch(e){}

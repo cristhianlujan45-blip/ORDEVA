@@ -116,7 +116,8 @@ nuevo. **Código revisado:** ORDEVA 1.82.2.
     (`puente/egm/REVISION-GOLDFISH-1.95.4.md`).
 
 ### Lo que sigue, en este orden
-0. **1.96, en el servidor** (lo que queda de la auditoría). Lleva revisión goldfish del plan y del cambio:
+0. ~~**1.96, en el servidor**~~ **Hecho en la 1.96.0** (`puente/REPORTE-1.96.0.md`, revisión en `REVISION-GOLDFISH-1.96.md`).
+   Lo que queda va abajo, en 0b, y en «Lo que queda» del reporte. Lo que era:
    - el QR de pago y los canales del negocio (`f`, `k`, `e`) solo los escribe el negocio (S1);
    - Nequi solo para el administrador (S10);
    - los bonos solo los crean el dueño, el administrador o el cajero (S6);
@@ -125,6 +126,9 @@ nuevo. **Código revisado:** ORDEVA 1.82.2.
    - **«una sola vez» en el servidor para lo que hacen varios equipos:** facturar un domicilio, como ya hace
      `bono_redimir` con su referencia. Hoy la 1.95.4 solo achica la ventana (revisión de diseño, M4);
    - **bonos con «apartar y confirmar»** y un tiempo límite para lo que nunca se confirma.
+0a. **ORDEVA PLAY** (pedido del dueño el 08/11: «continúa como creas mejor; los premios son opcionales»). Fase 0 hecha
+    (auditoría). Fase 1 en la rama `play/fase1`: el motor y LA BOMBA, EL IMPOSTOR, RULETA DEL CAOS, ÚLTIMO SOBREVIVIENTE y
+    EL SHOW DE LA MESA. Los premios son opcionales para cada negocio, y los premios con alcohol están apagados.
 0b. **Lo que dejó la 1.95.4 para después** (`puente/egm/REVISION-GOLDFISH-1.95.4.md`):
    - **Música, primero lo que puede dejar el bar en silencio:**
      - un televisor emparejado con un equipo que no es el de la música no recibe nada;

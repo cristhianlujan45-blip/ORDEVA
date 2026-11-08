@@ -25,28 +25,38 @@ alter table public.canal_mensajes add column if not exists firmado boolean not n
 insert into public.servidor_config(clave, valor) values ('canal_escribir_desde', jsonb_build_object('t', now() + interval '72 hours'))
 on conflict (clave) do nothing;
 
--- ¿Ya se cerraron los canales del negocio? (sin la fila: no)
+-- ¿Ya se cerraron los canales del negocio? (sin la fila, o con una fecha mala: no)
 create or replace function public.canal_escribir_activo() returns boolean
-language sql stable security definer set search_path = public, extensions as $$
-  select coalesce((select now() >= (valor->>'t')::timestamptz from servidor_config where clave = 'canal_escribir_desde'), false)
-$$;
+language plpgsql stable security definer set search_path = public, extensions as $$
+begin
+  return coalesce((select now() >= (valor->>'t')::timestamptz from servidor_config where clave = 'canal_escribir_desde'), false);
+exception when others then return false;
+end $$;
 
 -- El negocio dueño de un canal derivado (Y + e|k|f|a, con Y registrado). null si no es un canal del negocio.
+-- Revisión goldfish (bloqueante del cambio): si el canal mismo es un canal de pedidos registrado ANTES que Y por otro negocio,
+-- no es un derivado (es el canal de pedidos de ese negocio y sigue abierto para sus clientes). Así nadie le quita el canal
+-- de pedidos a otro registrando su nombre sin la última letra.
 create or replace function public.canal_dueno_derivado(p_canal text) returns uuid
 language sql stable security definer set search_path = public, extensions as $$
-  select p.negocio_id from canal_privado p
-   where char_length(p_canal) >= 5 and right(p_canal, 1) in ('e', 'k', 'f', 'a') and p.canal = left(p_canal, char_length(p_canal) - 1)
+  select b.negocio_id from canal_privado b
+   where char_length(p_canal) >= 5 and right(p_canal, 1) in ('e', 'k', 'f', 'a') and b.canal = left(p_canal, char_length(p_canal) - 1)
+     and not exists (select 1 from canal_privado s where s.canal = p_canal and s.negocio_id <> b.negocio_id and s.creado_en <= b.creado_en)
 $$;
 
--- Registrar los canales de pedidos del negocio: igual que antes (20261104000000), pero no se registra el derivado de otro
--- negocio (Y+letra con Y de otro): así nadie le quita el QR de pago ni la carta a otro.
+-- Registrar los canales de pedidos del negocio: igual que antes (20261104000000), pero sin choques con otro negocio en
+-- ninguna dirección: ni el derivado de un canal ajeno (Y+letra con Y de otro), ni la «raíz» de un canal ajeno (Y cuando
+-- Y+e|k|f|a ya es de otro). Así nadie le quita a otro el QR de pago, la carta ni el canal de pedidos.
 create or replace function public.canal_privado_anotar(p_negocio uuid, p_datos jsonb) returns void
 language sql security definer set search_path = public, extensions as $$
   insert into canal_privado(canal, negocio_id, cerrar_desde)
     select c, p_negocio, canal_privado_inicio() from unnest(canales_pedidos_de(p_datos)) c
-     where coalesce(public.canal_dueno_derivado(c), p_negocio) = p_negocio
+     where not exists (select 1 from canal_privado o where o.negocio_id <> p_negocio
+                         and ((right(c, 1) in ('e', 'k', 'f', 'a') and o.canal = left(c, char_length(c) - 1))
+                           or o.canal in (c || 'e', c || 'k', c || 'f', c || 'a')))
   on conflict (canal) do nothing
 $$;
+create index if not exists canal_mensajes_firmado_idx on public.canal_mensajes(canal, id) where firmado;
 
 -- Igual que antes (20261108000000_canal_limite_ip.sql) + S1: los canales del negocio piden la sesión de un miembro y cada
 -- mensaje queda marcado si lo firmó un miembro.
@@ -61,6 +71,10 @@ begin
   if neg is not null then
     firma := public.es_miembro(neg);
     if not firma and public.canal_escribir_activo() then raise exception 'sin_permiso' using errcode = '42501'; end if;
+    -- El QR de pago (la llave a la que le pagan los clientes) solo lo cambian el dueño o el administrador.
+    if firma and right(p_canal, 1) = 'f' and p_cuerpo like '%"__qrpago__"%' and coalesce(public.rol_en(neg), '') not in ('dueno', 'admin') then
+      raise exception 'sin_permiso' using errcode = '42501';
+    end if;
   end if;
   -- Límite por canal: 240 mensajes por minuto (un negocio con mucho movimiento usa muchos menos).
   select count(*) into n from canal_mensajes where canal = p_canal and creado > now() - interval '1 minute';
@@ -77,7 +91,7 @@ begin
   end;
   -- Limpieza: los mensajes de más de 8 días se borran de vez en cuando.
   if m.id % 200 = 0 then delete from canal_mensajes where creado < now() - interval '8 days'; end if;
-  return canal_pub(m);
+  return canal_pub(m) || jsonb_build_object('firmado', m.firmado);
 end $$;
 
 -- Igual que antes (20261104000000_canal_pedidos_privado.sql) + S1: cerrados los canales del negocio, sus mensajes sin
@@ -86,8 +100,11 @@ create or replace function public.canal_leer(p_canales text[], p_desde_id bigint
 returns jsonb language plpgsql stable security definer set search_path = public, extensions as $$
 declare ok text[]; protegidos text[] := '{}';
 begin
+  -- Un canal del negocio (Y+e|k|f|a de un Y registrado) se lee siempre (carta, estados, fotos, QR de pago), aunque otro
+  -- negocio lo haya registrado como «suyo» antes de la 1.96 (revisión goldfish).
   select coalesce(array_agg(c), '{}') into ok from unnest(p_canales[1:20]) c
-   where not exists (select 1 from canal_privado p where p.canal = c and p.cerrar_desde <= now() and not public.es_miembro(p.negocio_id));
+   where public.canal_dueno_derivado(c) is not null
+      or not exists (select 1 from canal_privado p where p.canal = c and p.cerrar_desde <= now() and not public.es_miembro(p.negocio_id));
   if public.canal_escribir_activo() then
     select coalesce(array_agg(c), '{}') into protegidos from unnest(ok) c where public.canal_dueno_derivado(c) is not null;
   end if;
@@ -102,6 +119,21 @@ begin
      limit greatest(1, least(coalesce(p_limite, 300), 500))) x);
 end $$;
 
+-- Para el dueño de ORDEVA: mensajes sin firmar que quedan en los canales del negocio en los últimos 3 días (para decidir si
+-- se adelanta o se atrasa el cierre: si quedan muchos, hay celulares sin actualizar).
+create or replace function public.canal_sin_firmar_resumen() returns table(negocio uuid, canales int, mensajes int, ultimo timestamptz)
+language sql stable security definer set search_path = public, extensions as $$
+  select public.canal_dueno_derivado(m.canal), count(distinct m.canal)::int, count(*)::int, max(m.creado) from canal_mensajes m
+   where not m.firmado and m.creado > now() - interval '3 days' and public.canal_dueno_derivado(m.canal) is not null
+   group by 1 order by 3 desc
+$$;
+-- Registros hechos sobre canales que ya tenían mensajes ANTES de registrarse (B1-b): pueden ser de otro. No borra nada.
+create or replace function public.canal_registros_sospechosos() returns table(canal text, negocio uuid, registrado timestamptz, mensajes_antes int)
+language sql stable security definer set search_path = public, extensions as $$
+  select p.canal, p.negocio_id, p.creado_en, count(m.id)::int from canal_privado p
+    join canal_mensajes m on (m.canal = p.canal or m.canal in (p.canal || 'e', p.canal || 'k', p.canal || 'f', p.canal || 'a')) and m.creado < p.creado_en - interval '1 hour'
+   group by 1, 2, 3 order by 4 desc
+$$;
 -- Para el dueño de ORDEVA (revisión goldfish B1-b): registros que chocan (Y de un negocio, Y+letra de otro). No borra nada.
 create or replace function public.canal_choques() returns table(canal text, negocio uuid, derivado_de text, dueno_base uuid)
 language sql stable security definer set search_path = public, extensions as $$
@@ -184,8 +216,8 @@ language sql stable security definer set search_path = public, extensions as $$
     from (select * from public.bonos where negocio_id = p_negocio order by creado_en desc limit 300) b), '[]'::jsonb) end
 $$;
 
-revoke all on function public.canal_escribir_activo(), public.canal_dueno_derivado(text), public.canal_choques(), public.bono_jefe(uuid) from public, anon, authenticated;
-grant execute on function public.canal_escribir_activo(), public.canal_dueno_derivado(text), public.canal_choques(), public.bono_jefe(uuid) to service_role;
+revoke all on function public.canal_escribir_activo(), public.canal_dueno_derivado(text), public.canal_choques(), public.bono_jefe(uuid), public.canal_sin_firmar_resumen(), public.canal_registros_sospechosos() from public, anon, authenticated;
+grant execute on function public.canal_escribir_activo(), public.canal_dueno_derivado(text), public.canal_choques(), public.bono_jefe(uuid), public.canal_sin_firmar_resumen(), public.canal_registros_sospechosos() to service_role;
 revoke all on function public.canal_privado_anotar(uuid, jsonb) from public, anon, authenticated;
 grant execute on function public.canal_privado_anotar(uuid, jsonb) to service_role;
 revoke all on function public.canal_publicar(text, text, text) from public;

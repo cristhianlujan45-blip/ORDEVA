@@ -1500,11 +1500,13 @@ async function cargarFotos(){
     const ctrl=new AbortController(),tmo=setTimeout(()=>ctrl.abort(),6000);
     const r=await fetch('https://canal.vento.local/'+c+'f/json?poll=1&since=12h',{signal:ctrl.signal});
     clearTimeout(tmo);
-    const ls=(await r.text()).trim().split('\n').filter(Boolean),nuevo={};
+    const ls=(await r.text()).trim().split('\n').filter(Boolean),nuevo={};let vioQR=false;
     ls.forEach(l=>{try{const m=JSON.parse(l);if(m.event!=='message')return;const x=JSON.parse(m.message);if(!x||!x.n)return;
-      if(x.n==='__qrpago__'){qrPago=(x.m&&x.s)?{i:qrDeMatriz(x.s,x.m),q:x.q||'',l:x.l||''}:(x.i&&/^data:image\/(png|jpeg|webp);base64,/.test(x.i))?{i:x.i,q:x.q||'',l:x.l||''}:null;jset('qrpago_'+c,qrPago);return}
+      if(x.n==='__qrpago__'){vioQR=true;qrPago=(x.m&&x.s)?{i:qrDeMatriz(x.s,x.m),q:x.q||'',l:x.l||'',t:Date.now()}:(x.i&&/^data:image\/(png|jpeg|webp);base64,/.test(x.i))?{i:x.i,q:x.q||'',l:x.l||'',t:Date.now()}:null;jset('qrpago_'+c,qrPago);return}
       const k=norm(x.n);if(x.i&&/^data:image\/(jpeg|png|webp);base64,/.test(x.i))nuevo[k]=x.i;else delete nuevo[k]}catch(e){}});
     fotos=nuevo;jset('fotos_'+c,fotos);
+    // 1.96: un QR de pago guardado hace más de 12 h que el local ya no publica se olvida (así no queda uno viejo o falso).
+    if(r.ok&&!vioQR&&qrPago&&!(qrPago.t&&Date.now()-qrPago.t<12*36e5)){qrPago=null;jset('qrpago_'+c,null);}
   }catch(e){}
   pintarQR(snap);
 }

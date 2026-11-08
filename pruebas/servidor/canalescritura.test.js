@@ -69,8 +69,41 @@ async function pruebas(sb) {
   chk('… aunque termine en f (no hay un canal de pedidos «vitocanalsinnegocio»)', r.st === 200, r);
   const ruta = await fetch(sb.url + '/functions/v1/vento-pagos/canal/' + C + 'f', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: '{"n":"__qrpago__","l":"@ruta"}' });
   chk('La ruta abierta del servidor de pagos (/vento-pagos/canal/…) tampoco escribe en el QR de pago del bar', !ruta.ok && !(await leer([C + 'f'], null)).join().includes('@ruta'), ruta.status);
+  // ---------- Revisión goldfish del cambio ----------
+  // a) Un negocio cuyo canal de pedidos termina en «f»: el atacante registra el mismo nombre sin la última letra.
+  const VICT = 'vitovictima9f', duenoV = await sb.usuario('dueno@victima.co');
+  const NEGV = (await rpc('crear_negocio', { p_nombre: 'Victima', p_datos: {} }, duenoV.token)).j;
+  await rpc('guardar_datos', { p_negocio: NEGV, p_datos: { businessName: 'Victima', qrCanales: [VICT] }, p_version: 1 }, duenoV.token);
+  const ver2 = (await uno('select version from datos_negocio where negocio_id = $1', [NEG2])).version;
+  await rpc('guardar_datos', { p_negocio: NEG2, p_datos: { businessName: 'Otro', qrCanales: [OTRO, VICT.slice(0, -1)] }, p_version: ver2 }, malo.token);
+  chk('Nadie puede registrar la «raíz» del canal de pedidos de otro (el que termina en f)', !(await sb.sql('select 1 from canal_privado where canal = $1', [VICT.slice(0, -1)])).length);
+  // … y aunque esa raíz ya estuviera registrada de antes (estado real de producción), el canal de pedidos manda.
+  await sb.sql("insert into canal_privado(canal, negocio_id, cerrar_desde, creado_en) values ($1, $2, now(), now() + interval '1 second')", [VICT.slice(0, -1), NEG2]);
+  r = await pub(VICT, '{"t":"pedido","id":"pv1","mesa":2}');
+  chk('… el cliente sigue mandando pedidos a ese canal', r.st === 200, r);
+  l = await leer([VICT], duenoV.token);
+  chk('… y la víctima los sigue leyendo', Array.isArray(l) && l.length === 1, l);
+  // b) Un registro viejo del derivado (c+'k' a nombre de otro, hecho después de c): la carta del bar se sigue leyendo y la escribe el bar.
+  await sb.sql("insert into canal_privado(canal, negocio_id, cerrar_desde, creado_en) values ($1, $2, now() - interval '1 day', now())", [C + 'k', NEG2]);
+  r = await pub(C + 'k', '{"carta":"del bar"}', dueno.token);
+  chk('Registro viejo del derivado por otro negocio: el bar sigue escribiendo su carta (firmada)', r.st === 200 && r.j && r.j.firmado === true, r);
+  l = await leer([C + 'k'], null);
+  chk('… y el cliente la sigue leyendo', Array.isArray(l) && l.some((x) => x.includes('del bar')), l);
+  r = await pub(C + 'k', '{"carta":"falsa"}', malo.token);
+  chk('… y el otro negocio no la escribe', r.st === 401 || r.st === 403, r);
+  // c) El QR de pago solo lo cambian el dueño o el administrador; el mesero sí publica estados y fotos.
+  r = await pub(C + 'f', '{"n":"__qrpago__","l":"@mesero"}', mesero.token);
+  chk('El mesero NO puede cambiar el QR de pago', r.st === 401 || r.st === 403, r);
+  r = await pub(C + 'f', '{"n":"Cerveza","i":""}', mesero.token);
+  chk('… pero sí publicar una foto de producto', r.st === 200, r);
+  r = await pub(C + 'f', '{"n":"__qrpago__","l":"@admin196"}', admin.token);
+  chk('El administrador sí cambia el QR de pago', r.st === 200 && r.j.firmado === true, r);
+  const sos = await sb.sql('select * from canal_sin_firmar_resumen()');
+  chk('canal_sin_firmar_resumen() cuenta los mensajes sin firmar por negocio (para decidir el cierre)', sos.some((x) => x.negocio === NEG && x.mensajes >= 1), sos);
+  await sb.sql('select * from canal_registros_sospechosos()');
+  await sb.sql('delete from canal_privado where canal = $1', [C + 'k']);
   const ch = await sb.sql('select * from canal_choques()');
-  chk('canal_choques() no muestra choques (el registro malo nunca entró)', ch.length === 0, ch);
+  chk('canal_choques() muestra el choque que quedó de antes (la raíz registrada por otro), para revisarlo', ch.length === 1 && ch[0].canal === VICT, ch);
 
   let err = null;
   try { await sb.sql(fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', '20261202000000_canales_del_negocio.sql'), 'utf8')); } catch (e) { err = e.message; }
@@ -91,8 +124,10 @@ async function pruebas(sb) {
     const e = await est(u), txt = JSON.stringify(e);
     chk('S10 · ' + n + ': NO ve el código de Nequi ni la terminal ni la llave, pero sí que están conectados y los métodos de Wompi', !/NQ-123456|T-99|pub_prod_xyz|•••1234|"77"/.test(txt) && e.nequi.estado === 'conectado' && JSON.stringify(e.wompi.publico) === '{"metodos":["NEQUI","CARD"]}', e);
   }
-  const cfg = await fetch(sb.url + '/functions/v1/vento-pagos/config', { method: 'POST', headers: cab(mesero.token), body: JSON.stringify({ negocio: NEG, accion: 'estado' }) }).then((x) => x.json()).catch(() => null);
-  chk('S10 · por /vento-pagos/config el mesero sigue viendo Nequi «conectado» (el botón «Cobrar cuenta») sin el código', cfg && cfg.resumen && cfg.resumen.nequi && cfg.resumen.nequi.estado === 'conectado' && !JSON.stringify(cfg).includes('NQ-123456'), cfg);
+  for (const [u, n] of [[cajero, 'cajero'], [mesero, 'mesero'], [empleado, 'empleado']]) {
+    const cfg = await fetch(sb.url + '/functions/v1/vento-pagos/config', { method: 'POST', headers: cab(u.token), body: JSON.stringify({ negocio: NEG, accion: 'estado' }) }).then((x) => x.json()).catch(() => null);
+    chk('S10 · por /vento-pagos/config el ' + n + ' sigue viendo Nequi «conectado» (el botón «Cobrar cuenta») sin el código', cfg && cfg.resumen && cfg.resumen.nequi && cfg.resumen.nequi.estado === 'conectado' && !/NQ-123456|T-99|pub_prod_xyz/.test(JSON.stringify(cfg)), cfg);
+  }
 
   // ---------- S6 · Bonos ----------
   for (const [u, n, puede] of [[dueno, 'dueño', true], [admin, 'administrador', true], [cajero, 'cajero', true], [mesero, 'mesero', false], [empleado, 'empleado', false]]) {
@@ -108,6 +143,9 @@ async function pruebas(sb) {
   chk('S6 · otro empleado NO puede devolver el saldo de una redención que no hizo', r.st !== 200 && /sin_permiso/.test(JSON.stringify(r.j)), r);
   r = await rpc('bono_devolver', { p_negocio: NEG, p_ref: 'ref-mesero-1' }, mesero.token);
   chk('S6 · quien la hizo sí la devuelve (la devolución de la 1.95.4 sigue funcionando)', r.st === 200 && r.j && r.j.devueltos === 1, r);
+  await rpc('bono_redimir', { p_negocio: NEG, p_codigo: cod, p_monto: 5000, p_ref: 'ref-mesero-2' }, mesero.token);
+  r = await rpc('bono_devolver', { p_negocio: NEG, p_ref: 'ref-mesero-2' }, cajero.token);
+  chk('S6 · el cajero sí devuelve el saldo de una redención que hizo otro', r.st === 200 && r.j && r.j.devueltos === 1, r);
   r = await rpc('bono_devolver', { p_negocio: NEG, p_ref: 'ref-que-no-existe' }, mesero.token);
   chk('S6 · devolver una referencia sin redención no hace nada ni da error', r.st === 200 && r.j && r.j.devueltos === 0, r);
 }

@@ -45,5 +45,5 @@ desordenada.** Eso es de la app de YouTube Music y no lo puede cambiar ORDEVA: h
 - **Música y QR después del cambio:** `cancionesmesa` 17, `musicaqr` 26, `pedidomusica` 14 (después de corregir que tocar
   un resultado sin código de video también cuenta como escogida), `qrprivado` 9, `canalvivo` 17, `pedidostienda` 29,
   `musicafondo` 8, `panelyoutube` 25, `tvocupado` 11, `musicaautoplay` 10.
-- **Lista completa:** RESULTADOS_AQUI
+- **Lista completa:** 128 pruebas, 2.827 revisiones bien y 0 mal. Publicada el 08/11.
 - **No se probó** con un celular, un televisor ni YouTube Music de verdad.
