@@ -14,7 +14,7 @@ Cada falla se revisó contra el código antes de arreglarla.
 |---|---|---|
 | M5 | Al cerrar la caja, «Cancelar» en el conteo del efectivo igual cerraba las cuentas abiertas como «debe», sin dejar el cierre. | Cancelar el conteo deja las cuentas abiertas como estaban, con sus abonos y con lo que entró mientras se contaba. Los números de factura vuelven. |
 | M1 | «Deshacer» un cobro perdía parte de la cuenta: el consumo mínimo propio, la plataforma, el huésped, la hora de entrada, los viajeros y la nota. | «Deshacer» devuelve la cuenta completa. |
-| M2 | El total podía cambiar después de que se decía cómo pagan: lo cambiaban las horas del motel, el consumo mínimo u otro equipo que agregaba algo. El efectivo, las vueltas o lo que entró por Nequi y tarjeta quedaban mal. | Si el total cambia, no se cobra, con cualquier medio menos el fiado. Sale el aviso con el total nuevo para volver a cobrar. |
+| M2 | El total podía cambiar después de que se decía cómo pagan: lo cambiaban las horas del motel, el consumo mínimo u otro equipo que agregaba algo. El efectivo, las vueltas o lo que entró por Nequi y tarjeta quedaban mal. | Si el total cambia mientras se elige cómo pagan, no se cobra con ningún medio menos el fiado. Por voz, no se cobra si el cobro traía efectivo y vueltas. Sale el aviso con el total nuevo para volver a cobrar. Si el cambio es porque el cajero aceptó «Sumar y cobrar» (motel, consumo mínimo), se cobra el total nuevo. |
 | M4 | Si se cancelaba el cobro, la propina quedaba en la cuenta y al volver a cobrar se sumaba otra vez. | Al cancelar cualquier paso, la propina sale, aunque mientras tanto lleguen datos de la nube. También sale el pago «Pagó todo» que no llegó a cobrarse. |
 | M3 | Bonos: un reintento después de un corte de internet podía descontar el bono dos veces. Un «Cancelar» mientras se usaba el bono podía descontarlo sin que hubiera venta. | El reintento usa la misma referencia y el servidor no descuenta dos veces. «Cancelar» espera mientras se usa el bono (15 s como mucho). Al cerrar la ventana de cobro, cada bono que no quedó en la venta se devuelve. Sin internet, la devolución queda guardada y se reintenta sola. |
 | M6 | La diferencia del consumo mínimo le daba comisión al mesero. | Ya no da comisión. |
@@ -112,7 +112,15 @@ Tres revisores sin la conversación (Codebase Details, Design y Zoom Out) revisa
 - **Las 12 pruebas de música de antes** pasan: `cancionesmesa`, `musicaanuncios`, `musicaautoplay`, `musicaequipo`,
   `musicafacil`, `musicafondo`, `panelyoutube`, `pedidomusica`, `puertaytiemporeal`, `tvocupado`, `ventanayoutube` y
   `youtubesincupo`.
-- **Resultados de la lista completa:** RESULTADOS_AQUI
+- **Lista completa (127 pruebas, la misma del CI con `facturascan`):**
+  - **Primera corrida:** 2.808 revisiones bien y 7 mal, en 3 pruebas:
+    - `v185` y `v195`: el arreglo M2 rechazaba el cobro por voz cuando el cajero aceptaba «Sumar y cobrar» (horas del motel,
+      consumo mínimo). Ahí el cajero acepta el total nuevo a sabiendas. Ahora, por voz, solo se rechaza si hay efectivo y
+      vueltas de por medio. Desde la ventana de cobro se rechaza con cualquier medio menos el fiado.
+    - `v189`: espera un orden fijo en «Más». El botón «Productos e inventario» quedó después de Música.
+  - **Esas 3 otra vez, junto con `v1954`, `cajavoz` y `cobrosimple`:** todas bien (`v185` 17, `v189` 7, `v195` 22).
+  - **Las 124 restantes:** pasaron en la primera corrida.
+- **No cambia el servidor ni Android:** valen los de la 1.94.0 (servidor 29 de 29, Android 328 de 328).
 - **No se probó con celulares ni con un televisor de verdad.**
 
 ## Lo que queda para después
