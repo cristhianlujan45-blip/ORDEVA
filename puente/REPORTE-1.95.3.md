@@ -27,5 +27,5 @@
 ## Pruebas
 - `v188` actualizada (12): con el zoom al 125 %, el ancho ya no cambia (360) y la escala queda anotada.
 - `ordeva2` (30), `modos` (55), `vistasencilla` (45) y `pedidostienda` (29): pasan.
-- La lista completa se corre después de publicar, por la urgencia.
+- **Lista completa,** corrida después de publicar por la urgencia: 121 pruebas, 2.710 revisiones, 0 fallas.
 - **Falta confirmarlo en el celular del dueño.** Si el menú sigue sin salir, hace falta un pantallazo para seguir.
