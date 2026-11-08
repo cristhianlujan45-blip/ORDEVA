@@ -114,7 +114,7 @@
   const P = () => window.vitoPedidos;
   const pedidos = () => (P() ? P().lista() : []);
   const activos = () => pedidos().filter(p => ['nuevo', 'recibido', 'preparacion', 'listo'].includes(p.estado));
-  const txtPed = p => tableLabel(p.mesa) + ': ' + p.items.map(i => i.qty + ' ' + i.name).join(', ') + ' (' + (P() ? P().EST[p.estado] : p.estado) + ')';
+  const txtPed = p => tableLabel(p.mesa) + ': ' + p.items.map(i => i.qty + ' ' + i.name).join(', ') + ' (' + (P() ? (P().estNombre ? P().estNombre(p.estado) : P().EST[p.estado]) : p.estado) + ')';
   const M = () => window.vitoMusica || null;
 
   // ---------- Informes ----------
@@ -222,7 +222,7 @@
     const ps = pedidos(); ps.forEach((p, i) => { const dup = ps.slice(Math.max(0, i - 15), i).find(q => q.mesa === p.mesa && q.estado !== 'cancelado' && p.estado !== 'cancelado' && Math.abs(q.at - p.at) < 3 * 6e4 && JSON.stringify(q.items.map(x => [x.name, x.qty])) === JSON.stringify(p.items.map(x => [x.name, x.qty])));
       if(dup) out.push('🛎️ Pedido posiblemente repetido en ' + tableLabel(p.mesa) + ': ' + p.items.map(x => x.qty + ' ' + x.name).join(', ') + '.'); });
     ps.filter(p => !data.tables[p.mesa] && p.estado !== 'cancelado').forEach(p => out.push('🛎️ Pedido de ' + U() + ' ' + p.mesa + ' que ya no existe.'));
-    ps.filter(p => ['recibido', 'preparacion', 'listo', 'entregado'].includes(p.estado) && !p.aplicado).forEach(p => out.push('🛎️ Pedido de ' + tableLabel(p.mesa) + ' marcado «' + P().EST[p.estado] + '» pero no está en la cuenta.'));
+    ps.filter(p => ['recibido', 'preparacion', 'listo', 'entregado'].includes(p.estado) && !p.aplicado).forEach(p => out.push('🛎️ Pedido de ' + tableLabel(p.mesa) + ' marcado «' + (P().estNombre ? P().estNombre(p.estado) : P().EST[p.estado]) + '» pero no está en la cuenta.'));
     activos().filter(p => p.items.some(i => !i.ok)).forEach(p => out.push('🛎️ ' + tableLabel(p.mesa) + ' pidió algo que no existe en tus productos: ' + p.items.filter(i => !i.ok).map(i => i.name).join(', ') + '.'));
     (G() ? G().lista() : []).forEach(g => { if(g.miembros.some(id => !data.tables[id])) out.push('🔗 El grupo ' + G().etiqueta(g) + ' tiene ' + UP().toLowerCase() + ' que ya no existen.'); });
     duplicados().filter(x => x.conf >= 90).slice(0, 3).forEach(x => out.push('📦 Productos duplicados: ' + x.productos.map(p => p.name).join(' = ') + '.'));
@@ -283,7 +283,7 @@
       const id = ids[0], propios = (data.tables[id] && data.tables[id].items || []).filter(i => i.origen == null || i.origen === id);
       const enOtra = []; Object.keys(data.tables).forEach(k => (data.tables[k].items || []).forEach(i => { if(i.origen === id && +k !== id) enOtra.push(i.qty + ' × ' + i.name + ' (ahora en ' + tableLabel(+k) + ')'); }));
       const pm = pedidos().filter(p => p.mesa === id && Date.now() - p.at < DIA);
-      return { text: 'Lo que pidió ' + tableLabel(id) + ':\n' + (propios.length || enOtra.length ? bul(propios.map(i => i.qty + ' × ' + i.name).concat(enOtra)) : '• Nada en la cuenta.') + (pm.length ? '\nPedidos de hoy: ' + pm.map(p => p.items.map(i => i.qty + ' ' + i.name).join(', ') + ' (' + P().EST[p.estado] + ')').join('; ') + '.' : '') };
+      return { text: 'Lo que pidió ' + tableLabel(id) + ':\n' + (propios.length || enOtra.length ? bul(propios.map(i => i.qty + ' × ' + i.name).concat(enOtra)) : '• Nada en la cuenta.') + (pm.length ? '\nPedidos de hoy: ' + pm.map(p => p.items.map(i => i.qty + ' ' + i.name).join(', ') + ' (' + (P().estNombre ? P().estNombre(p.estado) : P().EST[p.estado]) + ')').join('; ') + '.' : '') };
     }
     // Reiniciar
     if(/\b(reinicia|reiniciar|reinicie|resetea|resetear|limpia|limpiar)\b/.test(t) && /\bmesas?\b/.test(t)){
@@ -367,7 +367,7 @@
     }
     if(/\b(cuanto (lleva|llevan|tarda|tardan)|tiempos?|demora\w*|atrasad\w*|lento|lentos|cuanto se demoran)\b/.test(t) && /\b(pedido|pedidos|preparacion|cocina|barra|despacho|mesa)\b/.test(t + ' ' + pn)){
       const x = tiempos(); if(!x.act.length) return { text: 'No hay pedidos activos ahora.' + (x.med != null ? ' Normalmente un pedido tarda ~' + Math.round(x.med) + ' min en estar listo.' : '') };
-      return { text: '⏱️ Tiempos (desde que llegó):\n' + bul(x.act.slice(0, 10).map(y => (window.vitoGrupos ? window.vitoGrupos.etiquetaDe(y.p.mesa) : tableLabel(y.p.mesa)) + ': ' + y.total + ' min · ' + P().EST[y.p.estado] + ' hace ' + y.enEstado + ' min' + (y.lento ? ' ⚠️ demorado' : ''))) + (x.med != null ? '\nLo normal en este local: ~' + Math.round(x.med) + ' min.' : '') };
+      return { text: '⏱️ Tiempos (desde que llegó):\n' + bul(x.act.slice(0, 10).map(y => (window.vitoGrupos ? window.vitoGrupos.etiquetaDe(y.p.mesa) : tableLabel(y.p.mesa)) + ': ' + y.total + ' min · ' + (P().estNombre ? P().estNombre(y.p.estado) : P().EST[y.p.estado]) + ' hace ' + y.enEstado + ' min' + (y.lento ? ' ⚠️ demorado' : ''))) + (x.med != null ? '\nLo normal en este local: ~' + Math.round(x.med) + ' min.' : '') };
     }
     if(/\b(falta por preparar|que falta|por preparar|pendiente por preparar)\b/.test(t)) return { text: INFORMES.preparacion() };
     if(/\b(cuanto inventario|inventario queda|que inventario|valor del inventario)\b/.test(t)) return { text: INFORMES.inventario() };
@@ -435,14 +435,14 @@
       if(!p) return { text: tableLabel(mesaN) + ' no tiene pedidos pendientes.' };
       if(e === 'cancelado') return { text: '¿Cancelo el pedido de ' + tableLabel(mesaN) + ' (' + p.items.map(i => i.qty + ' ' + i.name).join(', ') + ')? Si ya estaba en la cuenta, se descuenta.', actions: [{ tipo: 'laya', op: 'pedido', id: p.id, e, label: '✕ Cancelar el pedido de ' + tableLabel(mesaN) }] };
       P().cambiar(p.id, e); try{ renderCocina(); }catch(x){}
-      return { text: '✅ Pedido de ' + tableLabel(mesaN) + ': ' + P().EST[e] + '.' };
+      return { text: '✅ Pedido de ' + tableLabel(mesaN) + ': ' + (P().estNombre ? P().estNombre(e) : P().EST[e]) + '.' };
     }
     if(mesaN && /\b(pidio|pidieron|pedido|pedidos|lleva|tiene|ordeno|consumio|que hay)\b/.test(t)){
       const tb = data.tables[mesaN]; const pm = pedidos().filter(p => p.mesa === mesaN && Date.now() - p.at < DIA).slice(-5);
       if(!tb && !pm.length) return { text: 'No tengo ' + art() + ' ' + tableLabel(mesaN) + '.' };
       const its = (tb && tb.items) || [];
       return { text: tableLabel(mesaN) + (its.length ? ' lleva:\n' + bul(its.map(i => i.qty + ' × ' + i.name)) + '\nTotal ' + plata(tableTotal(mesaN)) + ', falta pagar ' + plata(tableBalance(mesaN)) + '.' : ': sin nada en la cuenta.') +
-        (pm.length ? '\nPedidos de hoy: ' + pm.map(p => p.items.map(i => i.qty + ' ' + i.name).join(', ') + ' (' + P().EST[p.estado] + ')').join('; ') + '.' : '') };
+        (pm.length ? '\nPedidos de hoy: ' + pm.map(p => p.items.map(i => i.qty + ' ' + i.name).join(', ') + ' (' + (P().estNombre ? P().estNombre(p.estado) : P().EST[p.estado]) + ')').join('; ') + '.' : '') };
     }
     if(/\b(pedidos? (pendientes?|activos?|sin entregar|por entregar|nuevos)|cuantos pedidos|pedidos recientes|ultimos pedidos|que mesas tienen pedidos|mesas con pedidos)\b/.test(t)){
       if(/\b(recientes|ultimos)\b/.test(t)){ const l = pedidos().slice(-8).reverse(); return { text: l.length ? '🛎️ Pedidos recientes:\n' + bul(l.map(p => new Date(p.at).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' }) + ' · ' + txtPed(p))) : 'Todavía no hay pedidos.' }; }
@@ -486,7 +486,7 @@
       const nombres = []; (a.gone || []).forEach(id => { const g = data.products.find(p => p.id === id); if(g){ nombres.push(g.name); (g.skus || []).forEach(s => { keep.skus = keep.skus || []; if(!keep.skus.includes(s)) keep.skus.push(s); }); (g.barcodes || []).forEach(s => { keep.barcodes = keep.barcodes || []; if(!keep.barcodes.includes(s)) keep.barcodes.push(s); }); dupMerge(keep, g); } });
       Object.keys(data.equivalencias || {}).forEach(k => { if((a.gone || []).includes(data.equivalencias[k].productId || data.equivalencias[k])) { if(typeof data.equivalencias[k] === 'object') data.equivalencias[k].productId = keep.id; else data.equivalencias[k] = keep.id; } });
       return '🔗 Uní ' + nombres.map(n => '«' + n + '»').join(', ') + ' en «' + keep.name + '» (stock ahora: ' + (keep.stock != null ? keep.stock : '—') + ').'; }
-    if(a.op === 'pedido' && P()){ const p = P().cambiar(a.id, a.e); try{ renderCocina(); }catch(e){} return p ? 'Pedido de ' + tableLabel(p.mesa) + ': ' + P().EST[p.estado] + '.' : 'No encontré ese pedido.'; }
+    if(a.op === 'pedido' && P()){ const p = P().cambiar(a.id, a.e); try{ renderCocina(); }catch(e){} return p ? 'Pedido de ' + tableLabel(p.mesa) + ': ' + (P().estNombre ? P().estNombre(p.estado) : P().EST[p.estado]) + '.' : 'No encontré ese pedido.'; }
     if(a.op === 'cancion' && M()){ M().cancelar(a.id); return '🗑 Canción quitada de la cola.'; }
     if(a.op === 'aplicarFactura'){ setTimeout(() => { const b = document.getElementById('invoiceApplyBtn'); if(b) b.click(); }, 300); return 'Aplicando la factura…'; }
     return 'No supe hacer eso.';

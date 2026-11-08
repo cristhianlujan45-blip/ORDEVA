@@ -3978,14 +3978,14 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
 
     <div class="settings-group" hidden data-cat="pedidos" data-novocab>
       <h2>🍳 Pantalla de preparación</h2>
-      <div class="settings-desc">Donde el personal ve y prepara los pedidos (los del QR y los de los meseros llegan solos). Es opcional: si tu local no la necesita, desactívala y los pedidos igual llegan a la cuenta.</div>
+      <div class="settings-desc">Donde el personal ve y prepara los pedidos (los del QR y los de los meseros llegan solos). Es opcional: si tu local no la necesita (una tienda, por ejemplo), desactívala: los pedidos quedan «Aceptado» y pasan a «Entregado» al cobrar la cuenta, sin quedar «en preparación».</div>
       <div class="settings-row"><div class="settings-row-text"><strong>Pantalla de preparación</strong><span id="prepOnTxt">Activada</span></div><label class="switch"><input type="checkbox" id="prepOn"><span class="switch-slider"></span></label></div>
       <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:6px" id="prepNomRow">
         <div class="settings-row-text"><strong>¿Cómo se llama en tu local?</strong><span>Se usa en el menú, los títulos, los avisos y en ORDEVA.</span></div>
         <select id="prepNomSel" class="mz-in"></select>
         <input type="text" id="prepNomOtro" class="mz-in" maxlength="24" placeholder="Escribe el nombre (ej. Zona de Producción)" hidden>
       </div>
-      <div class="settings-row"><div class="settings-row-text"><strong>Sumar solos los pedidos del QR</strong><span>Activado: el pedido entra directo a la cuenta de la mesa y aparece como «Recibido». Desactivado: queda «Por aceptar» hasta que alguien lo acepte.</span></div><label class="switch"><input type="checkbox" id="pedAutoOn"><span class="switch-slider"></span></label></div>
+      <div class="settings-row"><div class="settings-row-text"><strong>Sumar solos los pedidos del QR</strong><span>Activado: el pedido entra directo a la cuenta de la mesa. Desactivado: queda «Por aceptar» hasta que alguien lo acepte (así viene en las tiendas: abajo sale «✅ Aceptar / ❌ Rechazar»).</span></div><label class="switch"><input type="checkbox" id="pedAutoOn"><span class="switch-slider"></span></label></div>
       <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:6px" id="prepLinkRow">
         <div class="settings-row-text"><strong>📺 Abrirla en otra pantalla</strong><span>Una tablet o TV en la cocina o la barra: abre este link y los pedidos le llegan en vivo; desde ahí se marcan En preparación, Listo y Entregado.</span></div>
         <input type="text" id="prepLink" class="mz-in" readonly>

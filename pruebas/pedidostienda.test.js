@@ -109,8 +109,61 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     v = await A.evaluate(() => { const m = document.querySelector('.vito-campana-menu') || document.body; const t = m.innerText; return { aceptar: /✅ Aceptar/.test(t), enviar: /Enviar pedido/.test(t), porAceptar: /Por aceptar \(1\)/i.test(t), entregado: /📦 Entregado/.test(t) }; });
     chk('5. La campana: «Por aceptar (1)» con «✅ Aceptar» (no «Enviar pedido») y «📦 Entregado» en los aceptados', v.aceptar && !v.enviar && v.porAceptar && v.entregado, v);
 
-    // ===== 6 =====
-    v = await A.evaluate(() => { data.businessType = 'restaurante'; const r = { simple: window.vitoPedidos.simple(), auto: window.vitoPedidos.auto() }; data.businessType = 'tienda'; data.pedidosAuto = true; r.tiendaAuto = window.vitoPedidos.auto(); delete data.pedidosAuto; return r; });
-    chk('6. Un restaurante sigue igual (entra solo a la cuenta, con cocina); si la tienda prende «aceptar solo», manda eso', v.simple === false && v.auto === true && v.tiendaAuto === true, v);
+    // ===== 6. Revisión goldfish (EGM) =====
+    // 6a. Cancelar un pedido YA aceptado descuenta lo que entró a la cuenta
+    await A.evaluate(() => document.querySelectorAll('.vito-campana-menu').forEach(m => { m.style.display = 'none'; }));
+    await esperar(A, () => !!document.querySelector('#ptHoja [data-pt="ok"]'), null, 10000);
+    await A.click('#ptHoja [data-pt="ok"]');
+    v = await A.evaluate(() => data.tables[2].items.filter(i => /Aceite/.test(i.name)).reduce((s, i) => s + i.qty, 0));
+    chk('6a. (aceptado: 1 aceite en la cuenta)', v === 1, v);
+    await A.evaluate(() => window.ventoPedidosTienda.panel()); await A.waitForTimeout(300);
+    await A.evaluate(() => { const c = [...document.querySelectorAll('#ptOv .pt-card')].find(x => /Aceite/.test(x.innerText) && x.querySelector('[data-pt="ent"]')); c.querySelector('[data-pt="no"]').click(); });
+    await esperar(A, () => { const o = document.getElementById('confirmOkBtn'); return o && o.offsetParent; }, null, 5000);
+    await A.click('#confirmOkBtn'); await A.waitForTimeout(400);
+    v = await A.evaluate(() => ({ aceite: data.tables[2].items.filter(i => /Aceite/.test(i.name)).reduce((s, i) => s + i.qty, 0), est: data.pedidos[data.pedidos.length - 1].estado }));
+    chk('6a. Cancelar un pedido YA aceptado: se descuenta de la cuenta (0 aceites) y queda cancelado', v.aceite === 0 && v.est === 'cancelado', v);
+    await A.evaluate(() => document.getElementById('ptOv').classList.remove('show'));
+    // 6b. Con la Caja abierta: pastilla arriba (no se esconde detrás) y el panel se ve encima de la Caja
+    await A.evaluate(() => window.ventoPOS.abrirCaja()); await A.waitForTimeout(500);
+    await C.waitForTimeout(800); await pedir('1 Arroz Diana 500 g');
+    chk('6b. Con la Caja abierta sale arriba «🛒 1 pedido por aceptar · Ver» (y no el aviso grande)', await esperar(A, () => { const p = document.getElementById('ptPill'); return p && /1 pedido por aceptar/.test(p.textContent) && !document.getElementById('ptHoja'); }, null, 25000));
+    await A.click('#ptPill');
+    v = await A.evaluate(() => { const o = document.getElementById('ptOv'), r = o.getBoundingClientRect(), el = document.elementFromPoint(r.left + r.width / 2, Math.min(r.bottom - 5, innerHeight / 2)); return { z: getComputedStyle(o).zIndex, encima: !!(el && el.closest('#ptOv')) }; });
+    chk('6b. … y «Ver» abre «🛍️ Pedidos» ENCIMA de la Caja', v.encima && Number(v.z) > 8500, v);
+    await A.click('#ptOv .pt-card [data-pt="ok"]');
+    await A.evaluate(() => { document.getElementById('ptOv').classList.remove('show'); document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')); document.querySelectorAll('.pz-caja-ov').forEach(o => o.remove()); });
+    // 6c. Al cobrar la cuenta, sus pedidos aceptados quedan «Entregado» solos
+    v = await A.evaluate(async () => { const e = await window.ventoPOS.cobrarMesa(2, { pago: { method: 'efectivo', metodo: 'efectivo', nota: 'Efectivo' } }); return { e: !!e, est: data.pedidos.filter(p => p.mesa === 2).map(p => p.estado), porEntregar: window.ventoPedidosTienda.aceptados().length }; });
+    chk('6c. Al cobrar la cuenta, los pedidos aceptados quedan «Entregado» solos (no se amontonan)', v.e && !v.est.some(x => ['recibido', 'preparacion', 'listo'].includes(x)) && v.porEntregar === 0, v);
+    // 6d. Un pedido que llega por la nube (otro equipo lo recibió del canal) también suena en este equipo
+    v = await A.evaluate(async () => { let n = 0; const o = window.vitoTimbre; window.vitoTimbre = () => { n++; };
+      data.pedidos.push({ id: 'pnube1', mesa: 4, mesaNombre: 'Cuenta 4', items: [{ productId: 'ar', name: 'Arroz Diana 500 g', qty: 1, price: 3200, ok: true }], total: 3200, at: Date.now(), recibidoEn: Date.now(), estado: 'nuevo', origen: 'qr', hist: [{ e: 'nuevo', at: Date.now() }] });
+      await new Promise(r => setTimeout(r, 1600)); window.vitoTimbre = o; return n; });
+    chk('6d. Un pedido que llega por la nube (de otro equipo) también suena aquí', v === 1, v);
+    await A.evaluate(() => window.vitoPedidos.cambiar('pnube1', 'cancelado'));
+    // 6e. Los avisos pequeños no tapan los botones: un pedido sin el código del QR sale con ⚠️ en el aviso, sin mensajito encima
+    await A.evaluate(() => { window.__toasts = []; const o = window.showToast; window.showToast = function(t){ window.__toasts.push(String(t)); return o.apply(this, arguments); }; });
+    await C.evaluate(([c]) => fetch('https://canal.vento.local/' + c, { method: 'POST', body: JSON.stringify({ t: 'pedido', v: 2, id: 'psincod1', mesa: 5, vm: 'vbnoesdeestamesa', items: [{ n: 'Huevos x 12', q: 1, p: 7500 }, { n: 'Langosta', q: 1, p: 1 }], total: 7501, at: Date.now() }) }), [cfg.topic]);
+    chk('6e. Pedido sin el código del QR y con algo que no está en los productos: el aviso lo dice con ⚠️ y no sale ningún mensajito encima', await esperar(A, () => { const h = document.getElementById('ptHoja'); return h && /no trae el código del QR/.test(h.innerText) && /no está en tus productos/.test(h.innerText); }, null, 25000) &&
+      await A.evaluate(() => !window.__toasts.some(t => /sin el código|no está en tus productos/.test(t))), await A.evaluate(() => window.__toasts));
+    await A.evaluate(() => window.vitoPedidos.cambiar('psincod1', 'cancelado'));
+    // 6f. Las tiendas dejan escrito «esperar a aceptar» (para los celulares con una versión anterior)
+    chk('6f. La tienda deja escrito data.pedidosAuto = false (los celulares viejos tampoco aceptan solos)', await esperar(A, () => data.pedidosAuto === false, null, 8000));
+    // 6g. Un restaurante con cocina sigue igual; un hotel (sin cocina) sigue entrando solo, pero no queda «en preparación»
+    v = await A.evaluate(([vm]) => {
+      const r = {}; const auto0 = data.pedidosAuto; delete data.pedidosAuto;
+      data.businessType = 'restaurante'; data.prep = Object.assign({}, data.prep || {}, { on: true });
+      r.restSimple = window.vitoPedidos.simple(); r.restAuto = window.vitoPedidos.auto();
+      const p1 = window.vitoPedidos.entrante({ id: 'prest1', mesa: 6, vm: window.vitoCanalPrueba.qMesaCodigo(6) || vm, items: [{ n: 'Huevos x 12', q: 1 }] }, 'mesero');
+      r.restEst = p1 && p1.estado;
+      data.prep.on = false; data.businessType = 'hotel';
+      r.hotelSimple = window.vitoPedidos.simple(); r.hotelAuto = window.vitoPedidos.auto();
+      const p2 = window.vitoPedidos.entrante({ id: 'photel1', mesa: 7, items: [{ n: 'Huevos x 12', q: 1 }] }, 'mesero');
+      r.hotelEst = p2 && p2.estado; r.hotelCuenta = (data.tables[7].items || []).length;
+      data.businessType = 'tienda'; data.pedidosAuto = auto0; return r; }, [cfg.v]);
+    chk('6g. Restaurante con cocina: entra solo y queda «Recibido» para la cocina, como siempre', v.restSimple === false && v.restAuto === true && v.restEst === 'recibido', v);
+    chk('6g. Hotel (sin cocina): sigue entrando solo a la cuenta, pero como «Aceptado» (no «en preparación» para siempre)', v.hotelSimple === true && v.hotelAuto === true && v.hotelEst === 'listo' && v.hotelCuenta === 1, v);
+    v = await A.evaluate(() => { data.pedidosAuto = true; const r = window.vitoPedidos.auto(); data.pedidosAuto = false; return r; });
+    chk('6h. Si la tienda prende «Sumar solos los pedidos del QR», manda eso', v === true, v);
   }
 })();
