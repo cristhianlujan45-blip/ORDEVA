@@ -21,11 +21,11 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
    llamadas: [],
    pagos: [
      { id: P1, plan_id: 'pro', plan_name: 'PRO', provider: 'manual', method: 'NEQUI', amount: 59900, currency: 'COP', reference: 'M1234567', payer_name: 'Ana Gómez', payer_phone: '3001234567',
-       paid_at: '2026-10-05', status: 'review', kind: 'new', created_at: iso(-0.1), business_id: NEG1, negocio: 'Bar La 70', user_id: 'u1', usuario_email: 'ana@correo.com',
-       comprobante: true, comprobante_mime: 'image/jpeg', aprobar_desde: '2026-10-05T15:00:00Z', aprobar_hasta: '2026-11-05T15:00:00Z' },
+       paid_at: '2030-10-05', status: 'review', kind: 'new', created_at: iso(-0.1), business_id: NEG1, negocio: 'Bar La 70', user_id: 'u1', usuario_email: 'ana@correo.com',
+       comprobante: true, comprobante_mime: 'image/jpeg', aprobar_desde: '2030-10-05T15:00:00Z', aprobar_hasta: '2030-11-05T15:00:00Z' },
      { id: P2, plan_id: 'pro', plan_name: 'PRO', provider: 'manual', method: 'DAVIPLATA', amount: 59900, currency: 'COP', reference: '<b>R-77</b>', payer_name: MALO, payer_phone: '3109876543',
        paid_at: '2026-10-04', status: 'review', kind: 'new', created_at: iso(-0.05), business_id: NEG2, negocio: MALO, user_id: 'u2', usuario_email: 'malo@correo.com',
-       comprobante: true, comprobante_mime: 'image/png', aprobar_desde: '2026-10-05T15:00:00Z', aprobar_hasta: '2026-11-05T15:00:00Z' }
+       comprobante: true, comprobante_mime: 'image/png', aprobar_desde: '2030-10-05T15:00:00Z', aprobar_hasta: '2030-11-05T15:00:00Z' }
    ],
    subs: [
      { id: 's1', status: 'active', plan_id: 'pro', plan_name: 'PRO', source: 'trial', trial: true, start_date: iso(-7), expiry_date: iso(8), dias_restantes: 8, business_id: NEG1, negocio: 'Bar La 70', dueno_email: 'ana@correo.com', plan_efectivo: 'pro', ultimo_pago: null },
@@ -50,7 +50,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
      miembros: [{ nombre: 'Ana', email: 'ana@correo.com', rol: 'dueno', creado_en: iso(-7) }, { nombre: '<i>Luis</i>', email: null, rol: 'mesero', creado_en: iso(-6) }],
      suscripcion: s, plan_efectivo: n.plan_efectivo, entitlements: Object.fromEntries(ENTS.map(k => [k, k !== 'multi_branch'])),
      pagos: S.pagos.filter(p => p.business_id === id).map(p => Object.assign({}, p)),
-     eventos: [{ id: 2, type: 'payment_approved', payment_id: P1, data: { plan: 'pro', monto: 59900, metodo: 'NEQUI', hasta: '2026-11-05T15:00:00Z' }, created_at: iso(-0.01) },
+     eventos: [{ id: 2, type: 'payment_approved', payment_id: P1, data: { plan: 'pro', monto: 59900, metodo: 'NEQUI', hasta: '2030-11-05T15:00:00Z' }, created_at: iso(-0.01) },
                { id: 1, type: 'trial_started', data: { motivo: '<img src=x onerror="window.__xss=3">' }, created_at: iso(-7) }],
      resumen: n.resumen };
  };
@@ -153,7 +153,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
  chk('Lista de pendientes: pide status «review»', llamadas('pagos').some(x => x.body.status === 'review'));
  chk('Contador de pendientes en la pestaña y en la sección', (await texto('#sxCnt')) === '2' && (await texto('#sxBadge')) === '2' && await visible('#sxBadge'));
  const t1 = await p.$eval('#sxPagos .sxc[data-pago="' + P1 + '"]', e => e.textContent).catch(() => '');
- chk('Tarjeta: negocio, usuario, plan, valor, método, fecha, referencia y estado', ['Bar La 70', 'ana@correo.com', 'PRO', '$59.900', 'NEQUI', '05/10/2026', 'M1234567', 'Por revisar', 'Ana Gómez'].every(x => t1.includes(x)), t1);
+ chk('Tarjeta: negocio, usuario, plan, valor, método, fecha, referencia y estado', ['Bar La 70', 'ana@correo.com', 'PRO', '$59.900', 'NEQUI', '05/10/2030', 'M1234567', 'Por revisar', 'Ana Gómez'].every(x => t1.includes(x)), t1);
  chk('Tarjeta: botones Ver comprobante · Aprobar · Rechazar', (await p.$$('#sxPagos .sxc[data-pago="' + P1 + '"] [data-sxa]')).length === 3);
  chk('Todas las llamadas del admin llevan su sesión', S.llamadas.filter(x => x.accion !== 'yo' || x.auth === 'Bearer TOK-ADMIN').every(x => x.auth === 'Bearer TOK-ADMIN' && /^eyJ/.test(x.apikey || '')));
 
@@ -172,14 +172,14 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
  // Aprobar
  const nPagos = llamadas('pagos').length;
  await p.click('#sxPagos [data-sxa="aprobar"][data-id="' + P1 + '"]');
- chk('Aprobar: confirma mostrando inicio y vencimiento', await esperar(() => document.getElementById('dlgSxOk').open) && (await texto('#sxOkDesde')) === '05/10/2026' && (await texto('#sxOkHasta')) === '05/11/2026', (await texto('#sxOkDesde')) + ' / ' + (await texto('#sxOkHasta')));
+ chk('Aprobar: confirma mostrando inicio y vencimiento', await esperar(() => document.getElementById('dlgSxOk').open) && (await texto('#sxOkDesde')) === '05/10/2030' && (await texto('#sxOkHasta')) === '05/11/2030', (await texto('#sxOkDesde')) + ' / ' + (await texto('#sxOkHasta')));
  chk('Aprobar: no aprueba antes de confirmar', llamadas('aprobar').length === 0);
  await p.click('#sxOkGo');
  chk('Aprobar: refresca la lista (queda 1 pendiente)', await esperar(() => document.querySelectorAll('#sxPagos .sxc').length === 1 && !document.querySelector('#sxPagos .sxc[data-pago="aaaaaaaa-0000-4000-8000-000000000001"]')));
  chk('Aprobar: envía el id correcto (una sola vez)', llamadas('aprobar').length === 1 && llamadas('aprobar')[0].body.payment === P1, JSON.stringify(llamadas('aprobar')));
  chk('Aprobar: volvió a pedir los pagos', llamadas('pagos').length > nPagos);
  const av = await texto('#sxAvisoTxt');
- chk('Aprobar: muestra las fechas resultantes', /05\/10\/2026/.test(av) && /05\/11\/2026/.test(av) && await visible('#sxAviso'), av);
+ chk('Aprobar: muestra las fechas resultantes', /05\/10\/2030/.test(av) && /05\/11\/2030/.test(av) && await visible('#sxAviso'), av);
  chk('Aprobar: el contador baja a 1', (await texto('#sxCnt')) === '1' && (await texto('#sxBadge')) === '1');
 
  // Rechazar (motivo obligatorio)
@@ -191,7 +191,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
  chk('Rechazar: envía el id y el motivo', await esperar(() => document.querySelector('#sxPagos .empty')) && llamadas('rechazar').length === 1 && llamadas('rechazar')[0].body.payment === P2 && llamadas('rechazar')[0].body.motivo === 'El valor no coincide', JSON.stringify(llamadas('rechazar')));
  chk('Rechazar: la lista queda vacía y sin contador', /No hay pagos por revisar/.test(await texto('#sxPagos')) && !(await visible('#sxBadge')));
  await p.selectOption('#sxPagosEstado', 'approved');
- chk('Filtro «Aprobados»: muestra el período del pago aprobado', await esperar(() => /05\/10\/2026 → 05\/11\/2026/.test(document.getElementById('sxPagos').textContent)) && llamadas('pagos').some(x => x.body.status === 'approved'));
+ chk('Filtro «Aprobados»: muestra el período del pago aprobado', await esperar(() => /05\/10\/2030 → 05\/11\/2030/.test(document.getElementById('sxPagos').textContent)) && llamadas('pagos').some(x => x.body.status === 'approved'));
  await p.selectOption('#sxPagosEstado', 'review');
 
  // Suscripciones: filtro, dar meses, cambiar plan, cancelar

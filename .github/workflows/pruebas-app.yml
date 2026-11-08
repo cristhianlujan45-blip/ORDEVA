@@ -58,6 +58,9 @@ jobs:
           npx --prefix pruebas playwright install --with-deps chromium webkit >/dev/null
           # ivaexcel abre el .xlsx con openpyxl; si no se puede instalar, la prueba lo lee con lo que trae Python.
           python3 -m pip install --quiet --break-system-packages openpyxl==3.1.5 || echo 'openpyxl no se pudo instalar: ivaexcel usa zipfile'
+          # facturascan lee las páginas del PDF con pdfinfo/pdftoppm (poppler). Faltaba en la máquina de GitHub: la prueba de
+          # cada noche fallaba con «spawnSync pdfinfo ENOENT» (auditoría 1.95.3).
+          sudo apt-get install -y -qq poppler-utils >/dev/null || echo 'poppler-utils no se pudo instalar: facturascan va a fallar'
       # 1.82.2: la librería de Android 14 (Robolectric android-all, solo para COMPILAR) para que javaavisos corra también
       # aquí la lectura completa de los avisos y SMS de Android (EscuchaPrueba) y los pagos entre equipos (CrucePrueba).
       # Antes solo corrían en el equipo del desarrollador.
