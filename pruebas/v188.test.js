@@ -22,9 +22,10 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
   };
   try{
     let v = await abrir(1.25);
-    chk('1. App de Android con el zoom de pantalla al 125 %: la página se arma a 450 de ancho (como con el tamaño normal)', v.vp === 'width=450, viewport-fit=cover' && v.ancho === 450 && v.esc === '1.25', v);
+    // 🚑 1.95.3: ya no se cambia el ancho (en algunos celulares el menú de abajo quedaba por fuera de la pantalla).
+    chk('1. App de Android con el zoom de pantalla al 125 %: ORDEVA ya NO cambia el ancho de la página (360, el menú cabe); solo anota la escala', /device-width/.test(v.vp) && v.ancho === 360 && v.esc === '1.25', v);
     v = await abrir(1.25, 'mesero.html');
-    chk('1. … lo mismo en la app de meseros', v.vp === 'width=450, viewport-fit=cover' && v.ancho === 450, v);
+    chk('1. … lo mismo en la app de meseros', /device-width/.test(v.vp) && v.ancho === 360, v);
     v = await abrir(1);
     chk('2. Con el tamaño normal no cambia nada (360 de ancho)', /device-width/.test(v.vp) && v.ancho === 360 && !v.esc, v);
     v = await abrir(null);
