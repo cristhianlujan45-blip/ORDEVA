@@ -41,7 +41,9 @@ Había tres fallas:
     - un código desconocido no recibe nada y el dueño recibe el aviso;
     - los códigos guardados solo en un equipo suben a la nube.
   - **En la versión 1.95.0 fallan 7 de esas 12 revisiones.** Es justo lo que se veía: «Tu mesa no tiene consumo todavía».
-- RESULTADOS_AQUI
+- **Resultados:**
+  - lista completa: 120 pruebas, 2.681 revisiones, 0 fallas;
+  - no cambia el servidor ni Android: valen los de la 1.94.0 (servidor 29 de 29, Android 328 de 328).
 - **Límites:**
   - no se probó con celulares ni con QR impresos de verdad;
   - si un QR impreso tiene un código que ningún equipo guardó nunca (el celular que lo imprimió se perdió o se borró), hay
