@@ -46,8 +46,23 @@ En los negocios sin pantalla de cocina que no son de comida ni bar (tiendas, min
 - `pedido.html`: muestra el ícono que manda la tienda.
 - **Sin cambios en el servidor.**
 
+## Revisión goldfish (EGM) antes de publicar
+Tres revisores sin la conversación (Codebase Details, Design y Zoom Out) revisaron este cambio. Detalle:
+`puente/egm/REVISION-GOLDFISH-1.95.2.md`.
+- **El error grave:** cancelar un pedido ya aceptado dejaba sus productos cobrados en la cuenta. Ya está corregido.
+- **También se corrigió:**
+  - **El camino sin cocina** depende solo de la pantalla de cocina. Esperar a aceptar es solo para tiendas: hoteles,
+    moteles, billares y bares siguen entrando solos, pero ya no quedan «en preparación» para siempre.
+  - **Los celulares con versión anterior** tampoco aceptan solos.
+  - **Suena en todos los equipos.**
+  - **Con la Caja abierta** sale una pastilla arriba.
+  - **Los avisos pequeños** ya no tapan los botones.
+  - **Al cobrar la cuenta,** los pedidos quedan «Entregado» solos.
+  - **«Después»** vuelve a avisar a los 3 minutos.
+  - **Laya y Ajustes** usan las palabras de la tienda.
+
 ## Pruebas
-- **Nueva:** `pedidostienda` (19), contra el servidor de pruebas, con la app y `pedido.html` de verdad (el cliente pide
+- **Nueva:** `pedidostienda` (29; eran 19 antes de la revisión goldfish), contra el servidor de pruebas, con la app y `pedido.html` de verdad (el cliente pide
   escribiendo, como en el celular). Cubre aceptar, entregar, rechazar, «Después», el panel, la campana y lo que ve el
   cliente en cada paso. También revisa que el restaurante siga igual.
 - RESULTADOS_AQUI

@@ -89,9 +89,60 @@ nuevo. **Código revisado:** ORDEVA 1.82.2.
 - **Apartados (antes 1.85):** quedan para después; estos negocios casi no los usan. Para las agencias (planes con abonos)
   primero se revisa si los «📅 Créditos» de la caja ya sirven.
 
+## 6c. Estado después de la 1.95.2 (el plan, otra vez al día)
+**Por qué esta sección:**
+- De la 1.88 a la 1.95.2 se trabajó directo desde el chat, sin actualizar este plan ni pasar por revisión goldfish.
+- El dueño pidió revisar que se trabaje con el modelo Elephant Goldfish. La revisión de Zoom Out comparó lo hecho con
+  este plan; está resumida en `puente/egm/REVISION-GOLDFISH-1.95.2.md`.
+
+### Hecho (cada uno con su reporte en `puente/`)
+- **Del plan (sección 5):**
+  - 1.90 · dólares;
+  - 1.91 · menú del día;
+  - 1.92 · asistencia;
+  - 1.93 · bonos de regalo.
+
+  Se hicieron cuando el dueño pidió «haz todo lo que falta», sin que un cliente los pidiera uno por uno.
+- **Fuera del plan:**
+  - 1.88 · igual en todos los celulares (zoom y letra), links de demo y «Dar prueba»;
+  - 1.89 · el orden de los menús;
+  - 1.94 · el agente de chat para agencias;
+  - 1.95.0 · consumo mínimo por mesa. Lo eligió el asistente ante un «continuemos».
+- **Arreglos que el dueño pidió:**
+  - 1.95.1 · el QR sincronizado con la cuenta;
+  - 1.95.2 · los pedidos del QR en tiendas, con la revisión goldfish antes de publicar.
+
+### Lo que sigue, en este orden
+1. **Pruebas con equipos de verdad:** un celular con zoom, la impresora, un QR impreso y dos celulares con el mismo pedido.
+2. **Agencias:** revisar si los «📅 Créditos» de la caja sirven para los planes con abonos, antes de pensar en apartados.
+3. **Hoteles:** IVA exento para extranjeros no residentes. Solo después de que el contador del dueño lo confirme.
+4. **Contabilidad (revisión C anterior):**
+   - una devolución no debe cambiar un mes que ya se mandó al contador;
+   - las propinas, fuera de la hoja de ventas.
+
+   Hay que confirmar si sigue pasando.
+5. **Pendientes de la revisión de la 1.95.2:**
+   - un ajuste guardado para el camino de los pedidos;
+   - un solo lugar con los estados de los pedidos;
+   - cómo se mezcla un mismo pedido aceptado a la vez en dos equipos.
+
+### Guardados (cada uno necesita su propio plan)
+- Varias sedes.
+- Archivar las ventas viejas.
+- La primera carga en 4G.
+
+### Descartados, salvo que un cliente de verdad lo pida
+- Cover consumible (discotecas).
+- Apartados para tiendas de ropa: el dueño no tiene tiendas de ropa.
+
+### Regla para trabajar
+- **«Continúa»** quiere decir el siguiente punto de «Lo que sigue», no una función nueva elegida por el asistente.
+- **Toda función nueva** entra primero a este documento, con el tipo de negocio y lo que pidió el dueño en sus palabras.
+- **Los cambios grandes** (servidor, plata, IA, o algo que cambie cómo se cobra o se acepta) pasan por una revisión
+  goldfish ANTES de publicarlos. Los arreglos pequeños pasan con sus pruebas.
+
 ## 7. Preguntas para el dueño
-1. **Número de factura entre equipos:** ¿del servidor (consecutivo único, necesita internet al vender) o con un prefijo
-   por equipo (A-0001 / B-0001, funciona sin internet)?
+1. ~~**Número de factura entre equipos.**~~ **Respondida:** un prefijo por equipo (A-0001 / B-0001), hecho en la 1.83.
 2. ~~¿Qué tipos de negocio usan más ORDEVA hoy?~~ **Respondida:** tienda de barrio, bar, restaurante, agencia de viajes, hotel
    y motel (sección 6b).
 3. **Apartados:** ¿se pagan solo en la tienda donde se hicieron, o también desde otro equipo o sede?
