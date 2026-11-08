@@ -74,7 +74,10 @@
     quitarTarjeta(pid);
     check();
   }
+  // 🛍️ 1.95.2: en las tiendas (sin cocina) se acepta, se rechaza (preguntando antes) y se entrega desde aquí también.
+  const tiendaSimple=()=>{ try{ return !!(window.ventoPedidosTienda&&window.ventoPedidosTienda.simple()); }catch(e){ return false; } };
   function rechazarPedido(pid){
+    if(tiendaSimple()){ window.ventoPedidosTienda.rechazar(pid).then(()=>{ quitarTarjeta(pid); check(); try{ renderPanel(); }catch(e){} }); return; }
     if(window.vitoRechazarPedido) window.vitoRechazarPedido(pid);
     quitarTarjeta(pid);
     check();
@@ -106,6 +109,7 @@
   /* La tarjeta flotante dura solo 10 segundos desde que llega el pedido; el pedido sigue en la campanita */
   const VIDA_TARJETA=10000, tarjetasCerradas={};
   function sincronizarTarjetas(pendList){
+    if(tiendaSimple()) pendList=[];   // 🛍️ en la tienda el pedido sale en el aviso de abajo (lib/vento-pedidos-tienda.js), no repetido aquí
     const ahora=Date.now();
     const vigentes=pendList.filter(x=>!tarjetasCerradas[x.id] && (ahora-(x.ts||0))<VIDA_TARJETA);
     const ids=vigentes.map(x=>String(x.id));
@@ -331,11 +335,13 @@
     };
     panelBody.appendChild(sec('🔔 Notificaciones'));
     if(pend.length){
-      panelBody.appendChild(sec('Por enviar ('+pend.length+')'));
+      const ts=tiendaSimple();
+      panelBody.appendChild(sec((ts?'Por aceptar (':'Por enviar (')+pend.length+')'));
       pend.forEach(it=>{
-        const f=fila('recibido','📥 Pedido recibido · Mesa '+it.mesa,fmtHora(it.ts),previewPedido(it.items));
+        let nom='Mesa '+it.mesa; try{ nom=tableLabel(it.mesa); }catch(e){}
+        const f=fila('recibido',(ts?'🛒 Pedido nuevo · ':'📥 Pedido recibido · ')+(ts?nom:'Mesa '+it.mesa),fmtHora(it.ts),previewPedido(it.items));
         const acts=document.createElement('div'); acts.className='vito-pedido-card-acts';
-        const bOk=document.createElement('button'); bOk.className='vito-ok'; bOk.textContent='✅ Enviar pedido';
+        const bOk=document.createElement('button'); bOk.className='vito-ok'; bOk.textContent=ts?'✅ Aceptar':'✅ Enviar pedido';
         bOk.onclick=()=>aceptarPedido(it.id);
         const bNo=document.createElement('button'); bNo.className='vito-no'; bNo.textContent='❌ Rechazar';
         bNo.onclick=()=>rechazarPedido(it.id);
@@ -349,14 +355,21 @@
       const ORI={qr:'📱 App',whatsapp:'💬 WhatsApp',mesero:'🧑‍🍳 Mesero',voz:'🎙️ Voz'};
       const curso=pd.filter(x=>['recibido','preparacion','listo'].includes(x.estado)), hechos=pd.filter(x=>['entregado','cancelado'].includes(x.estado));
       const filaPed=x=>{
-        const est=(window.vitoPedidos.EST||{})[x.estado]||x.estado;
+        const est=(window.vitoPedidos.estNombre?window.vitoPedidos.estNombre(x.estado):(window.vitoPedidos.EST||{})[x.estado])||x.estado;
         const f=fila(x.estado==='cancelado'?'rechazado':'enviado',(x.estado==='listo'?'✅ ':x.estado==='cancelado'?'❌ ':x.estado==='entregado'?'🍽️ ':'🍺 ')+'Pedido '+est.toLowerCase()+' · '+(x.mesaNombre||('Mesa '+x.mesa)),
           fmtHora(x.recibidoEn||x.at), (x.items||[]).map(i=>i.qty+' '+i.name+(i.ok===false?' ⚠️':'')).join(', ')+(x.nota?' · 📝 '+x.nota:'')+(ORI[x.origen]?' · '+ORI[x.origen]:''));
         f.dataset.pedido=x.id; f.style.cursor='pointer'; f.title='Abrir la cuenta';
+        if(tiendaSimple()&&['recibido','preparacion','listo'].includes(x.estado)){   // 🛍️ 1.95.2
+          const acts=document.createElement('div'); acts.className='vito-pedido-card-acts';
+          const bE=document.createElement('button'); bE.className='vito-ok'; bE.textContent='📦 Entregado';
+          bE.onclick=()=>{ window.ventoPedidosTienda.entregado(x.id); check(); try{ renderPanel(); }catch(e){} };
+          acts.append(bE); (f.querySelector('.vito-np-cont')||f).appendChild(acts);
+        }
         f.onclick=ev=>{ if(ev.target.closest('button')) return; menu.style.display='none'; try{ openTableModal(x.mesa); }catch(e){} };
         return f;
       };
-      if(curso.length){ panelBody.appendChild(sec('En curso ('+curso.length+')')); curso.forEach(x=>panelBody.appendChild(filaPed(x))); }
+      if(tiendaSimple()){ const bT=document.createElement('button'); bT.type='button'; bT.className='vito-ok'; bT.style.cssText='width:100%;margin:6px 0'; bT.textContent='🛍️ Ver todos los pedidos'; bT.onclick=()=>{ menu.style.display='none'; window.ventoPedidosTienda.panel(); }; panelBody.appendChild(bT); }
+      if(curso.length){ panelBody.appendChild(sec((tiendaSimple()?'Aceptados, por entregar (':'En curso (')+curso.length+')')); curso.forEach(x=>panelBody.appendChild(filaPed(x))); }
       panelBody.appendChild(sec('Pedidos de hoy'));
       if(!hechos.length && !curso.length && !pend.length){
         const v=document.createElement('div'); v.className='vito-np-vacio'; v.textContent='Todavía no hay pedidos. Aquí salen los que hace la gente desde la app, el QR de la mesa o los meseros.';
@@ -415,7 +428,7 @@
   function check(){
     const pendList=getPendList(), songList=getSongList();
     const nAv=avisosVento(); avisosN=nAv;
-    let nCurso=0; try{ const pd=pedidosPanel(); if(pd) nCurso=pd.filter(x=>['recibido','preparacion'].includes(x.estado)).length; }catch(e){}
+    let nCurso=0; try{ const pd=pedidosPanel(); if(pd) nCurso=pd.filter(x=>['recibido','preparacion'].concat(tiendaSimple()?['listo']:[]).includes(x.estado)).length; }catch(e){}
     const total=pendList.length+nCurso+songList.length+nAv;
     sincronizarTarjetas(pendList);
     refrescarPanel();
@@ -431,7 +444,8 @@
     const nuevasCan=songList.filter(x=>lastSongIds.indexOf(x.id)===-1);
     // Avisos de pedidos y de música se pueden apagar por separado (Ajustes → Notificaciones del
     // celular → Qué avisos quieres recibir); si ambos están apagados, ni siquiera suena la campana.
-    const avisaPed=(!window.notifPedidos||window.notifPedidos())&&nuevosPed.length;
+    // 🛍️ 1.95.2: en la tienda el pedido nuevo ya sonó y salió en el aviso grande de abajo: aquí no se repite (el mensajito lo tapaba).
+    const avisaPed=(!window.notifPedidos||window.notifPedidos())&&nuevosPed.length&&!tiendaSimple();
     const avisaMus=(!window.notifMusica||window.notifMusica())&&nuevasCan.length;
     if(lastTotal>=0 && (avisaPed||avisaMus)){
       timbre();

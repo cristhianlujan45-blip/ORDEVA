@@ -1306,7 +1306,7 @@ function pintarEstados(){
   if(!l.length){box.hidden=true;return}
   box.hidden=false;box.textContent='';
   box.appendChild(h('b',null,t('tusPedidos')));
-  l.slice().reverse().slice(0,5).forEach(x=>{const r=h('div');r.appendChild(h('span',null,x.txt));r.appendChild(h('em',null,EST_TXT[x.e]+' '+(x.n||(x.e==='enviado'?'…':''))));box.appendChild(r)});
+  l.slice().reverse().slice(0,5).forEach(x=>{const r=h('div');r.appendChild(h('span',null,x.txt));r.appendChild(h('em',null,(x.i||EST_TXT[x.e])+' '+(x.n||(x.e==='enviado'?'…':''))));box.appendChild(r)});
 }
 let esEst=null;
 function escucharEstados(forzar){
@@ -1317,7 +1317,7 @@ function escucharEstados(forzar){
     if(o.e==='limite'){const mc=jget(MISC,[]);if(!mc.includes(o.id))return;jset(MISC,mc.filter(x=>x!==o.id));
       const a=jget(K,[]);a.pop();jset(K,a);if(modo=='c')pintarCupos();
       setMsg(()=>t('cancionLimiteMesa',{max:o.max||MAXC()||10,min:o.min||1}),'err');return}
-    const l=jget(MISK,[]),x=l.find(y=>y.id===o.id);if(!x)return;x.e=o.e;x.n=o.n||'';delete x.body;jset(MISK,l);pintarEstados();
+    const l=jget(MISK,[]),x=l.find(y=>y.id===o.id);if(!x)return;x.e=o.e;x.n=o.n||'';if(o.i)x.i=String(o.i).slice(0,4);else delete x.i;delete x.body;jset(MISK,l);pintarEstados();
     if(['recibido','preparacion','listo'].includes(o.e)&&$('m').className!=='err')setMsg(()=>t('enviadoOk'),'ok');}catch(e){}};
 }
 // Si el local no confirma: se reenvía el MISMO pedido (mismo ID, no se duplica) y luego se avisa.

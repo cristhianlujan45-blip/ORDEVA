@@ -789,7 +789,19 @@ function procesar(txt){
    mala señal). Cada cambio de estado se le avisa a la página del cliente por el canal «topic+e». */
 const PEDIDO_EST={nuevo:'Nuevo',recibido:'Recibido',preparacion:'En preparación',listo:'Listo',entregado:'Entregado',cancelado:'Cancelado'};
 const pedidosLista=()=>{if(typeof data==='undefined'||!data)return[];if(!Array.isArray(data.pedidos))data.pedidos=[];return data.pedidos;};
-const pedidosAuto=()=>!(data&&data.pedidosAuto===false);        // por defecto el pedido entra solo a la cuenta
+// 🛍️ 1.95.2: negocios SIN pantalla de cocina que no son de comida ni bar (tiendas, minimercados, droguerías…). Antes el
+// pedido del QR entraba solo a la cuenta y quedaba «Recibido / En preparación» para siempre (no hay cocina que lo mueva) y
+// nunca salía «Aceptar / Rechazar». Ahora espera «Por aceptar»; al aceptarlo queda «Aceptado: lo estamos alistando» y luego
+// «Entregado». El cliente ve cada paso con esas palabras.
+function pedidosSimple(){
+  try{ if(typeof usaMod==='function'&&usaMod('k'))return false; const t=typeof tipoNegocio==='function'?tipoNegocio():null; return !(t&&(t.fam==='comida'||t.fam==='bar')); }catch(e){ return false; }
+}
+const PEDIDO_EST_TIENDA={nuevo:'Esperando que lo acepten',recibido:'Aceptado',preparacion:'Lo estamos alistando',listo:'Aceptado: lo estamos alistando',entregado:'Entregado',cancelado:'Rechazado'};
+const PEDIDO_IC_TIENDA={nuevo:'⏳',recibido:'✅',preparacion:'🛍️',listo:'✅',entregado:'📦',cancelado:'❌'};
+const pedidoEstNombre=e=>(pedidosSimple()?PEDIDO_EST_TIENDA:PEDIDO_EST)[e]||e;
+// Por defecto el pedido entra solo a la cuenta; en las tiendas (pedidosSimple) espera a que lo acepten. El interruptor de
+// Ajustes (data.pedidosAuto) manda si el dueño lo cambió.
+const pedidosAuto=()=>{ if(data&&typeof data.pedidosAuto==='boolean')return data.pedidosAuto; return !pedidosSimple(); };
 // Los códigos secretos de la mesa que van en sus QR (los que ya existen; no se inventa uno nuevo aquí): los de este
 // celular, los de los QR fijados y los que guardaron los demás celulares del negocio en data.qrCodigos (1.56.0: así un
 // pedido del QR se reconoce en todos los celulares, no solo en el que generó los QR).
@@ -825,7 +837,7 @@ function pedidoProducto(nombre){
   return data.products.find(p=>!p.oculto&&normVoiceText(p.name)===k)||data.products.find(p=>normVoiceText(p.name+' '+(p.size||''))===k)||matchProductVoice(nombre)||null;
 }
 function pedidoPublicar(p){
-  try{fetch('https://canal.vento.local/'+(p.canal&&qCanalOk(p.canal)?p.canal:qCfg().topic)+'e',{method:'POST',body:JSON.stringify({t:'estado',id:p.id,e:p.estado,m:p.mesa,n:PEDIDO_EST[p.estado],at:Date.now()})}).catch(()=>{});}catch(e){}
+  try{fetch('https://canal.vento.local/'+(p.canal&&qCanalOk(p.canal)?p.canal:qCfg().topic)+'e',{method:'POST',body:JSON.stringify(Object.assign({t:'estado',id:p.id,e:p.estado,m:p.mesa,n:pedidoEstNombre(p.estado),at:Date.now()},pedidosSimple()?{i:PEDIDO_IC_TIENDA[p.estado]}:{}))}).catch(()=>{});}catch(e){}
 }
 function pedidoAplicar(p){
   if(p.aplicado)return;
@@ -873,7 +885,7 @@ function pedidoEntrante(o,origen){
     at:Number(o.at)||Date.now(),recibidoEn:Date.now(),estado:'nuevo',origen:origen||'qr',sinCodigo:!verificado||undefined,negocio:qCfg().topic,canal:qCanalOk(window.__canalTopic)?window.__canalTopic:qCfg().topic,hist:[{e:'nuevo',at:Date.now()}]};
   pedidosLista().push(p);
   try{const g=window.vitoGrupos&&window.vitoGrupos.de(mesa);if(g&&window.ventoAuditar)window.ventoAuditar('pedido en grupo','Nuevo pedido de '+tableLabel(mesa)+' agregado al grupo '+window.vitoGrupos.etiqueta(g)+': '+items.map(i=>i.qty+' '+i.name).join(', '),[mesa]);}catch(e){}
-  if(pedidosAuto()&&verificado){pedidoAplicar(p);p.estado='recibido';p.hist.push({e:'recibido',at:Date.now()});}
+  if(pedidosAuto()&&verificado){pedidoAplicar(p);p.estado=pedidosSimple()?'listo':'recibido';p.hist.push({e:p.estado,at:Date.now()});}
   if(!verificado){
     try{window.ventoAuditar&&window.ventoAuditar('pedido sin código de mesa','Pedido para '+tableLabel(mesa)+' sin el código de su QR: quedó por aceptar ('+items.map(i=>i.qty+' '+i.name).join(', ').slice(0,200)+')');}catch(e){}
     setTimeout(()=>{try{showToast('⚠️ Pedido para '+tableLabel(mesa)+' sin el código de su QR: revísalo antes de aceptarlo.',9000);}catch(e){}},400);
@@ -881,13 +893,17 @@ function pedidoEntrante(o,origen){
   pedidosGuardar();pedidoPublicar(p);
   const txt=items.map(i=>i.qty+' '+i.name+(i.ok?'':' ⚠️')).join(', ');
   try{window.vitoLogNotif&&window.vitoLogNotif(p.estado==='nuevo'?'recibido':'enviado',mesa,items.map(i=>({productText:i.name,qty:i.qty})),id);}catch(e){}
-  if(notifPedidos()){ventoAvisoCel((p.estado==='nuevo'?'🆕 Pedido por aceptar · ':'🍺 Pedido · ')+tableLabel(mesa),txt,'pedidos');showToast((p.estado==='nuevo'?'🆕 Pedido por aceptar · ':'🍺 ')+tableLabel(mesa)+': '+txt,6000);
+  // 🛍️ 1.95.2: en la tienda el pedido nuevo sale en el aviso grande de abajo (con Aceptar / Rechazar): suena y lo dice en voz,
+  // sin el mensajito que tapaba esos botones.
+  if(notifPedidos()&&p.estado==='nuevo'&&pedidosSimple()){ventoAvisoCel('🛒 Pedido nuevo · '+tableLabel(mesa),txt,'pedidos');try{window.vitoTimbre&&window.vitoTimbre();window.vitoDecir&&window.vitoDecir('Pedido nuevo, '+tableLabel(mesa));}catch(e){}}
+  else if(notifPedidos()){ventoAvisoCel((p.estado==='nuevo'?'🆕 Pedido por aceptar · ':'🍺 Pedido · ')+tableLabel(mesa),txt,'pedidos');showToast((p.estado==='nuevo'?'🆕 Pedido por aceptar · ':'🍺 ')+tableLabel(mesa)+': '+txt,6000);
     if(p.estado!=='nuevo'){try{window.vitoTimbre&&window.vitoTimbre();window.vitoDecir&&window.vitoDecir('Pedido recibido, '+tableLabel(mesa));}catch(e){}}}
   const malos=items.filter(i=>!i.ok);
   if(malos.length)showToast('⚠️ '+tableLabel(mesa)+' pidió algo que no está en tus productos: '+malos.map(i=>i.name).join(', ')+'. Agrégalo a mano.',9000);
   return p;
 }
 function pedidoCambiar(id,estado){
+  if(estado==='recibido'&&pedidosSimple())estado='listo';           // 🛍️ 1.95.2: en la tienda, aceptar = «lo estamos alistando»
   const p=pedidosLista().find(x=>x.id===id);if(!p||!PEDIDO_EST[estado]||p.estado===estado)return p;
   // 1.75.0: un «❌ ANULAR» a la cocina (lib/vento-comanda.js) nunca suma ni resta productos de la cuenta.
   if(p.anula){p.estado=estado;p.hist.push({e:estado,at:Date.now()});pedidosGuardar();pedidoPublicar(p);return p;}
@@ -909,7 +925,7 @@ function pedidoRegistrarAplicado(mesa,added,origen){
     at:Date.now(),recibidoEn:Date.now(),estado:'recibido',origen:origen||'mesero',negocio:qCfg().topic,aplicado:true,hist:[{e:'recibido',at:Date.now()}]};
   pedidosLista().push(p);pedidosGuardar();return p;
 }
-window.vitoPedidos={lista:pedidosLista,entrante:pedidoEntrante,cambiar:pedidoCambiar,registrarAplicado:pedidoRegistrarAplicado,guardar:pedidosGuardar,EST:PEDIDO_EST,auto:pedidosAuto};
+window.vitoPedidos={lista:pedidosLista,entrante:pedidoEntrante,cambiar:pedidoCambiar,registrarAplicado:pedidoRegistrarAplicado,guardar:pedidosGuardar,EST:PEDIDO_EST,auto:pedidosAuto,simple:pedidosSimple,estNombre:pedidoEstNombre};
 // Para las pruebas de seguridad de los canales (pruebas/canalseguro.test.js): lo que llega por cada canal.
 window.vitoCanalPrueba={procesar:procesar,procesarMesero:procesarMesero,procesarPrep:procesarPrep,vTopic:vTopic,qMesaCodigo:qMesaCodigo};
 // Compatibilidad con la campana y la pantalla vieja: aceptar = recibido; rechazar = cancelado.
