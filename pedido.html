@@ -223,6 +223,12 @@ h1{
 .nequi-btn{flex:1;min-width:140px;padding:12px 10px;border-radius:12px;border:1px solid #6a3ea1;background:transparent;color:var(--ink);font:600 14px var(--sans);cursor:pointer}
 .nequi-btn-ok{background:#6a3ea1;color:#fff;border-color:#6a3ea1}
 .nequi-ok{margin:10px 0 0;color:var(--gold-hi);font-size:14px}
+.tr-op{margin-top:12px;padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid rgba(201,166,255,.25)}
+.tr-lbl{font:600 13.5px var(--sans);color:#d9c2ff;margin-bottom:6px}
+.tr-row{display:flex;align-items:center;gap:10px}
+.tr-val{flex:1;min-width:0;font-size:22px;overflow-wrap:anywhere}
+.tr-copy{flex:none;min-width:0;padding:10px 12px}
+.nequi-actions .nequi-btn-ok{font-size:15.5px;padding:14px 10px}
 .qp-img{display:block;width:210px;height:210px;object-fit:contain;image-rendering:pixelated;background:#fff;border-radius:16px;padding:10px;margin:6px auto 10px;box-shadow:0 8px 24px rgba(0,0,0,.35)}
 
 /* Botón de enviar: pegado al campo, siempre a la vista */
@@ -489,15 +495,23 @@ img,video,iframe{max-width:100%}
   <section id="vq" class="panel" hidden>
     <h2 class="h2" id="tuCuentaLbl">Tu cuenta</h2>
     <div class="cuenta" id="cs">Cargando tu cuenta…</div>
+    <!-- 1.95.5: un solo recuadro para pagar por transferencia: la llave Bre-B (sirve desde cualquier banco) y Nequi, con
+         un solo «Ya pagué por transferencia» (el local revisa en su cuenta). -->
     <div class="nequi-box" id="nequiBox" hidden>
-      <div class="nequi-h" id="nequiH">💜 Paga con Nequi</div>
-      <div class="nequi-num" id="nequiNum"></div>
-      <div class="nequi-name" id="nequiName" hidden></div>
+      <div class="nequi-h" id="nequiH">💸 Paga por transferencia</div>
       <div class="nequi-monto" id="nequiMonto"></div>
+      <div class="tr-op" id="trBreb" hidden>
+        <div class="tr-lbl" id="trBrebLbl">🔑 Llave Bre-B · desde cualquier banco</div>
+        <div class="tr-row"><div class="nequi-num tr-val" id="trBrebVal"></div><button type="button" class="nequi-btn tr-copy" id="trBrebCopy">📋 Copiar</button></div>
+      </div>
+      <div class="tr-op" id="trNequi" hidden>
+        <div class="tr-lbl" id="trNequiLbl">💜 Nequi</div>
+        <div class="tr-row"><div class="nequi-num tr-val" id="nequiNum"></div><button type="button" class="nequi-btn tr-copy" id="nequiCopyBtn">📋 Copiar</button></div>
+        <div class="nequi-name" id="nequiName" hidden></div>
+      </div>
       <p class="nequi-instr" id="nequiInstr"></p>
       <div class="nequi-actions">
-        <button type="button" class="nequi-btn" id="nequiCopyBtn">📋 Copiar número</button>
-        <button type="button" class="nequi-btn nequi-btn-ok" id="nequiPaidBtn">✅ Ya pagué por Nequi</button>
+        <button type="button" class="nequi-btn nequi-btn-ok" id="nequiPaidBtn">✅ Ya pagué por transferencia</button>
       </div>
       <p class="nequi-ok" id="nequiOkMsg" hidden></p>
     </div>
@@ -609,6 +623,13 @@ const DICT_SRC={
   cancionRepetida:["Esa canción ya está en la cola: no se pidió otra vez.","That song is already in the queue.","Essa música já está na fila.","Cette chanson est déjà dans la file.","这首歌已在队列中。","यह गाना पहले से कतार में है।"],
   cancionVieja:["Tu canción llegó muy tarde al local (sin conexión mucho rato) y no se puso. Pídela otra vez si todavía la quieres.","Your song reached the place too late (offline for a long time) and was not added. Request it again if you still want it.","Sua música chegou tarde demais e não foi colocada. Peça de novo se ainda quiser.","Votre chanson est arrivée trop tard et n’a pas été ajoutée. Redemandez-la si vous la voulez encore.","您的歌曲太晚才送达，未加入。如仍想听请再点一次。","आपका गाना बहुत देर से पहुँचा और नहीं जोड़ा गया। चाहें तो फिर से माँगें।"],
   cancionNoMesa:["Esa mesa no está en el local: pídele al mesero el QR de tu mesa.","That table isn’t set up at this place: ask the waiter for your table’s QR.","Essa mesa não existe no local: peça ao garçom o QR da sua mesa.","Cette table n’existe pas ici : demandez au serveur le QR de votre table.","本店没有这张桌号，请向服务员索取您桌的二维码。","यह टेबल यहाँ नहीं है: वेटर से अपनी टेबल का QR माँगें।"],
+  pagarTransfer:["💸 Paga por transferencia","💸 Pay by bank transfer","💸 Pague por transferência","💸 Payez par virement","💸 转账支付","💸 ट्रांसफ़र से भुगतान करें"],
+  llaveBreb:["🔑 Llave Bre-B · desde cualquier banco","🔑 Bre-B key · from any bank","🔑 Chave Bre-B · de qualquer banco","🔑 Clé Bre-B · depuis n’importe quelle banque","🔑 Bre-B 密钥 · 任何银行均可","🔑 Bre-B की · किसी भी बैंक से"],
+  transferInstr:["Desde la app de tu banco o Nequi, transfiere el valor exacto a la llave o al número. Luego toca «Ya pagué por transferencia» y el local lo revisa.","From your bank or Nequi app, transfer the exact amount to the key or number. Then tap «I paid by transfer» and the staff will check it.","Pelo app do seu banco ou Nequi, transfira o valor exato para a chave ou o número. Depois toque em «Já paguei por transferência».","Depuis l’app de votre banque ou Nequi, virez le montant exact vers la clé ou le numéro. Puis touchez «J’ai payé par virement».","在您的银行或 Nequi 应用中，向密钥或号码转账准确金额，然后点击「我已转账」。","अपने बैंक या Nequi ऐप से सही राशि की या नंबर पर भेजें। फिर «ट्रांसफ़र से भुगतान कर दिया» दबाएँ।"],
+  copiar:["📋 Copiar","📋 Copy","📋 Copiar","📋 Copier","📋 复制","📋 कॉपी"],
+  yaPagueTransfer:["✅ Ya pagué por transferencia","✅ I paid by transfer","✅ Já paguei por transferência","✅ J’ai payé par virement","✅ 我已转账","✅ ट्रांसफ़र से भुगतान कर दिया"],
+  avisoTransfer:["✅ Le avisamos al local: van a revisar tu transferencia.","✅ We told the staff: they will check your transfer.","✅ Avisamos o local: vão conferir sua transferência.","✅ Nous avons prévenu l’établissement : il va vérifier votre virement.","✅ 已通知商家，他们会核对您的转账。","✅ दुकान को बता दिया: वे आपका ट्रांसफ़र जाँचेंगे।"],
+  eligeVersion:["🎵 Toca «▶ Pedir» en la canción correcta. Si no está, vuelve a tocar «Pedir canción» y se manda como la escribiste.","🎵 Tap «▶ Request» on the right song. If it isn’t there, tap «Request song» again to send it as you typed it.","🎵 Toque «▶ Pedir» na música certa. Se não estiver, toque de novo em «Pedir música» e ela vai como você escreveu.","🎵 Touchez «▶ Demander» sur la bonne chanson. Sinon, touchez à nouveau «Demander» pour l’envoyer telle quelle.","🎵 请点击正确歌曲的「▶ 点歌」。如果没有，再点一次「点歌」按原样发送。","🎵 सही गाने पर «▶ माँगें» दबाएँ। न मिले तो «गाना माँगें» फिर दबाएँ, जैसा लिखा वैसा भेज दिया जाएगा।"],
   enviadoOk:["✅ Enviado, ya lo recibió el local.","✅ Sent, the place received it.","✅ Enviado, o local já recebeu.","✅ Envoyé, l’établissement l’a reçu.","✅ 已发送，商家已收到。","✅ भेजा गया, दुकान को मिल गया।"],
   cancionesLlevas:[" Llevas {u} de {max} canciones."," You’ve used {u} of {max} songs."," Você já pediu {u} de {max} músicas."," Vous avez utilisé {u} chansons sur {max}."," 您已点{u}/{max}首歌。"," आपने {max} में से {u} गाने माँगे हैं।"],
   noEnviadoWa:["No se pudo enviar. Usa el botón de WhatsApp.","Couldn’t send. Use the WhatsApp button.","Não foi possível enviar. Use o botão do WhatsApp.","Échec de l’envoi. Utilisez le bouton WhatsApp.","发送失败，请使用WhatsApp按钮。","भेजा नहीं जा सका। WhatsApp बटन का उपयोग करें।"],
@@ -962,7 +983,7 @@ function ytUnesc(s){ return String(s||'').replace(/&amp;/g,'&').replace(/&#39;/g
 function ytThumb(sn){ return (sn&&sn.thumbnails&&(sn.thumbnails.default||sn.thumbnails.medium)||{}).url||''; }
 /* 🎵 1.95.4: el video que el cliente tocó viaja con la canción (vid). Antes el local buscaba otra vez y podía sonar otra
    versión (un cover o una con letra). Solo se manda si el texto sigue siendo el de ese video. */
-let ytElegido=null;
+let ytElegido=null,pedirAsi='';
 const ytVidOk=v=>/^[\w-]{11}$/.test(String(v||''));
 function ytSongRow(box,q,title,channelTitle,thumb,vid){
   const b=h('button','ytrow');b.type='button';
@@ -974,7 +995,7 @@ function ytSongRow(box,q,title,channelTitle,thumb,vid){
   b.appendChild(info);
   b.onmousedown=e=>e.preventDefault();
   b.onclick=()=>{
-    $('s').value=ytUnesc(title||q);ytElegido=ytVidOk(vid)?{t:$('s').value.replace(/\s+/g,' ').trim(),v:vid}:null;
+    $('s').value=ytUnesc(title||q);ytElegido={t:$('s').value.replace(/\s+/g,' ').trim(),v:ytVidOk(vid)?vid:null};
     $('ytPrev').hidden=true;
     if($('sugC'))$('sugC').hidden=true;
     $('s').focus();
@@ -985,7 +1006,7 @@ function ytSongRow(box,q,title,channelTitle,thumb,vid){
   pd.onmousedown=e=>e.preventDefault();
   pd.onclick=async()=>{
     if(pd.disabled)return; pd.disabled=true;
-    $('s').value=ytUnesc(title||q);ytElegido=ytVidOk(vid)?{t:$('s').value.replace(/\s+/g,' ').trim(),v:vid}:null;
+    $('s').value=ytUnesc(title||q);ytElegido={t:$('s').value.replace(/\s+/g,' ').trim(),v:ytVidOk(vid)?vid:null};
     if($('sugC'))$('sugC').hidden=true;
     try{ await $('b').onclick(); }catch(e){}
     if(!$('s').value){ pd.textContent=t('pedida'); pd.classList.add('ok'); setTimeout(()=>{ if($('ytPrev'))$('ytPrev').hidden=true; },900); }
@@ -1243,18 +1264,20 @@ function fila(a,b,cl){
    Pasarela de pago) y solo se ve si hay saldo pendiente por pagar. No cobra
    sola — el cliente transfiere desde su propia app Nequi y avisa con el
    botón; el local confirma el pago cuando lo vea llegar. */
+const llaveBreb=()=>(qrPago&&qrPago.l)?String(qrPago.l).slice(0,60):'';
 function pintarNequi(d){
   const box=$('nequiBox');
   if(!box)return;
-  const saldo=(d&&d.s>0)?d.s:0;
-  if(!nq||saldo<=0){box.hidden=true;return}
+  const saldo=(d&&d.s>0)?d.s:0,ll=llaveBreb();
+  if((!nq&&!ll)||saldo<=0){box.hidden=true;return}
   box.hidden=false;
-  $('nequiNum').textContent=nq;
-  if(nqn){$('nequiName').hidden=false;$('nequiName').textContent=t('aNombreDe')+': '+nqn}
+  // Primero la llave Bre-B (recibe desde cualquier banco), después Nequi.
+  $('trBreb').hidden=!ll;$('trBrebVal').textContent=ll;
+  $('trNequi').hidden=!nq;$('nequiNum').textContent=nq;
+  if(nq&&nqn){$('nequiName').hidden=false;$('nequiName').textContent=t('aNombreDe')+': '+nqn}
   else $('nequiName').hidden=true;
   $('nequiMonto').textContent=fm(saldo);
-  $('nequiOkMsg').hidden=true;
-  $('nequiPaidBtn').disabled=false;
+  if($('nequiPaidBtn').dataset.enviado!=='1'){$('nequiOkMsg').hidden=true;$('nequiPaidBtn').disabled=false;}
 }
 function pintar(d){
   pintarNequi(d);
@@ -1355,29 +1378,33 @@ const wam=()=>{location.href='https://wa.me/'+wa+'?text='+encodeURIComponent(ult
 $('wa').onclick=wam;
 
 /* ---------- Pago con Nequi (manual: el cliente transfiere y avisa) ---------- */
-$('nequiCopyBtn').onclick=async()=>{
-  const b=$('nequiCopyBtn'),orig=b.textContent;
+async function copiarTexto(txt,b){
+  const orig=b.textContent;
   try{
-    if(navigator.clipboard)await navigator.clipboard.writeText(nq);
-    else{const ta=document.createElement('textarea');ta.value=nq;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove()}
+    if(navigator.clipboard)await navigator.clipboard.writeText(txt);
+    else{const ta=document.createElement('textarea');ta.value=txt;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove()}
     b.textContent=t('numeroCopiado');
   }catch(e){}
   setTimeout(()=>{b.textContent=orig},1800);
-};
-$('nequiPaidBtn').onclick=async()=>{
+}
+$('nequiCopyBtn').onclick=()=>copiarTexto(nq,$('nequiCopyBtn'));
+$('trBrebCopy').onclick=()=>copiarTexto(llaveBreb(),$('trBrebCopy'));
+// Un solo aviso para cualquier transferencia (Bre-B desde cualquier banco o Nequi): el local lo revisa en su cuenta.
+async function avisarTransferencia(btn,okEl){
   if(!mesa)return;
-  const monto=$('nequiMonto').textContent,btn=$('nequiPaidBtn');
-  const msg='CUENTA MESA '+mesa+': 💜 Cliente dice que YA PAGÓ '+monto+' por Nequi';
+  const valor=(snap&&snap.s>0)?snap.s:(snap&&snap.c>0)?snap.c:0;
+  const msg='CUENTA MESA '+mesa+': 💸 Cliente dice que YA PAGÓ'+(valor>0?' '+fm(valor):'')+' por transferencia ('+[llaveBreb()?'Bre-B':'',nq?'Nequi':'',qrPago?'QR':''].filter(Boolean).join(' o ')+')';
   btn.disabled=true;
   if(c){
     try{
       const r=await fetch('https://canal.vento.local/'+c,{method:'POST',body:msg});
-      if(r.ok){$('nequiOkMsg').hidden=false;$('nequiOkMsg').textContent=t('avisoNequiEnviado');return}
+      if(r.ok){btn.dataset.enviado='1';okEl.hidden=false;okEl.textContent=t('avisoTransfer');try{mesoraCelebrar(['💸','✅','✨'])}catch(e){}return}
     }catch(e){}
   }
   btn.disabled=false;
   if(wa)location.href='https://wa.me/'+wa+'?text='+encodeURIComponent(msg);
-};
+}
+$('nequiPaidBtn').onclick=()=>avisarTransferencia($('nequiPaidBtn'),$('nequiOkMsg'));
 $('b').onclick=async()=>{
   if((!mesa&&!dom)||(!c&&!wa))return setMsg(()=>t('qrIncompleto'),'err');
   let txt='',env=null;
@@ -1389,6 +1416,16 @@ $('b').onclick=async()=>{
   else txt=$('n').value.replace(/\s+/g,' ').trim();
   if(!txt&&modo!='q')return setMsg(()=>t('escribeAlgo'),'err');
   if(modo=='c'&&MAXC()&&usadas()>=MAXC())return setMsg(()=>t(recMesa().length>recLocal().length?'cancionLimiteMesa':'cancionLimite',{max:MAXC(),min:Math.max(1,Math.ceil((Math.min(...recientes())+V-Date.now())/6e4))}),'err');
+  /* 🎵 1.95.5 («cuando escriben mal el nombre no suena o suena otra cosa»): si la canción se escribió a mano (no se tocó un
+     resultado), primero se muestran los resultados de YouTube para tocar la correcta. Si no está, un segundo toque la
+     manda como se escribió. Sin resultados (sin servidor o sin internet), se manda de una. */
+  if(modo=='c'&&!(ytElegido&&ytElegido.t===txt)&&pedirAsi!==txt&&ytSrv()){
+    pedirAsi=txt;$('b').disabled=true;
+    try{await ytBuscar(txt);}catch(e){}
+    $('b').disabled=false;
+    const prev=$('ytPrev');
+    if(prev&&prev.querySelector('.ytpedir')){prev.hidden=false;try{prev.scrollIntoView({block:'nearest',behavior:'smooth'})}catch(e){}return setMsg(()=>t('eligeVersion'),'ok');}
+  }
   const tipo={p:'PEDIDO',c:'CANCION',q:'CUENTA'}[modo];
   if(dom){
     // DOMICILIO: nombre | teléfono | dirección | productos
@@ -1483,6 +1520,7 @@ function qrDeMatriz(n,m){
 }
 let qrPago=jget('qrpago_'+c,null);
 function pintarQR(d){
+  try{pintarNequi(d)}catch(e){}   // la llave Bre-B llega con el QR: el recuadro de transferencia se vuelve a pintar
   const box=$('qpBox');if(!box)return;
   if(!qrPago){box.hidden=true;return}
   // En domicilio va debajo del botón de enviar (el cliente no está en el local).
@@ -1490,12 +1528,14 @@ function pintarQR(d){
   box.hidden=false;
   $('qpImg').src=qrPago.i;
   $('qpH').textContent=t('pagaQR')+(qrPago.q?' · '+qrPago.q:'');
-  $('qpLlave').hidden=!qrPago.l;$('qpLlave').textContent=qrPago.l?('🔑 '+qrPago.l):'';
+  // La llave Bre-B y el «Ya pagué» van en el recuadro de transferencia cuando se ve (sin botones repetidos).
+  const conTransfer=!$('nequiBox').hidden;
+  $('qpLlave').hidden=!qrPago.l||conTransfer;$('qpLlave').textContent=qrPago.l?('🔑 '+qrPago.l):'';
   const saldo=(d&&d.s>0)?d.s:0;
   $('qpMonto').hidden=!saldo;if(saldo)$('qpMonto').textContent=fm(saldo);
   $('qpInstr').textContent=t('pagaQRInstr');
   $('qpGuardar').textContent=t('guardarQR');
-  $('qpPague').textContent=t('yaPague');$('qpPague').hidden=dom||!mesa;
+  $('qpPague').textContent=t('yaPagueTransfer');$('qpPague').hidden=dom||!mesa||conTransfer;
 }
 $('qpGuardar').onclick=async()=>{
   if(!qrPago)return;
@@ -1503,7 +1543,8 @@ $('qpGuardar').onclick=async()=>{
   try{if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:t('pagaQR')});return}}catch(e){if(e&&e.name==='AbortError')return}
   const a=document.createElement('a');a.href=qrPago.i;a.download='qr-pago.png';document.body.appendChild(a);a.click();a.remove();
 };
-$('qpPague').onclick=async()=>{
+$('qpPague').onclick=()=>avisarTransferencia($('qpPague'),$('qpOk'));
+async function qpPagueViejo(){
   if(!mesa)return;
   // El monto siempre va en el aviso al dueño (antes, si ya no quedaba saldo pendiente, se
   // mandaba sin el valor y el dueño no sabía cuánto le pagaron).
@@ -1842,10 +1883,11 @@ function applyLangStatic(){
   $('tuCuentaLbl').textContent=t('tuCuenta');
   $('hintCuentaEl').textContent=t('hintCuenta');
   $('n').placeholder=t('notaPlaceholder');
-  $('nequiH').textContent=t('pagarNequi');
-  $('nequiInstr').textContent=t('nequiInstr');
-  $('nequiCopyBtn').textContent=t('copiarNumero');
-  $('nequiPaidBtn').textContent=t('yaPagueNequi');
+  $('nequiH').textContent=t('pagarTransfer');
+  $('nequiInstr').textContent=t('transferInstr');
+  $('nequiCopyBtn').textContent=t('copiar');$('trBrebCopy').textContent=t('copiar');
+  $('trBrebLbl').textContent=t('llaveBreb');
+  $('nequiPaidBtn').textContent=t('yaPagueTransfer');
   $('curr').setAttribute('aria-label',t('monedaLabel'));
   if(dom){
     $('domLbl').textContent=t('domDatos');

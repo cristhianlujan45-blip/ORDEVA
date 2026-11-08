@@ -2221,13 +2221,24 @@ window.vitoMusicaVigilar=mzVigilar;window.__mzVigia=mzVigia;
 window.vitoMusicaDiag=()=>{let st=-2,t=0,vd='';try{st=yPl&&yPl.getPlayerState?yPl.getPlayerState():-2;t=yPl&&yPl.getCurrentTime?yPl.getCurrentTime():0;vd=yPl&&yPl.getVideoData?(yPl.getVideoData()||{}).video_id:'';}catch(e){}
   return {pausaManual,cargadoHace:cargadoEn?Math.round((Date.now()-cargadoEn)/1000):null,auto:AUTO(),guardado:!!LS('vito_auto_play',{}).on,otroEquipo:typeof mqOtro==='function'&&mqOtro(),tv:mzHayTV(),api:!!(window.YT&&YT.Player),yListo,probador:yTestListo,toque:gestoUsuario,sonando,estado:st,tiempo:t,video:vd,
     cola:ordenJusto(cola()).slice(0,5).map(x=>({t:(x.title||x.song||'').slice(0,40),vid:x.vid,ok:!!x.ok,st:x.status})),actual:(mzActual()||{}).title||null,visible:!document.hidden};};   // para las pruebas (adelantar el reloj del vigía)
+/* 🎵 1.95.5 («no sigue la lista, pone canciones al azar y no las que pide la gente»): mientras una canción que pidió una
+   mesa todavía se busca o se prueba, la playlist de fondo NO se le adelanta (antes sonaba la siguiente que ya estuviera
+   lista, casi siempre del fondo). Se espera hasta 60 s por la pedida; si no llega, sigue el fondo para no quedar en
+   silencio. Lo usan el reproductor de la app y el TV. */
+const mzLista=y=>!!y.vid&&!y.sinVersion&&(y.ok||!yTestListo);
+function mzOrdenParaSonar(){
+  const o=ordenJusto(cola()),ahora=Date.now();
+  const esperando=o.some(y=>!y.fondo&&!mzLista(y)&&!y.novid&&ahora-(y.ts||0)<60000);
+  return o.filter(y=>mzLista(y)&&!(esperando&&y.fondo));
+}
+// El TV vuelve a recibir la lista cada 15 s (solo si cambió): así, pasados los 60 s de espera de una pedida, sigue el fondo.
+setInterval(()=>{try{tvPublicar();}catch(e){}},15000);
 function siguienteAuto(){
   if(!AUTO()||!yListo||sonando)return;
   if(!gestoUsuario)return;                            // sin el primer toque el navegador no deja sonar: se espera
   if(mzActual()&&mzActual().fuente==='app')return;    // ya hay una sonando: la nueva queda en la cola
   if(tvOn())return;                                   // el TV es el reproductor
-  const o=ordenJusto(cola()).filter(y=>y.vid);
-  const x=o.find(y=>y.ok||!yTestListo);if(!x)return;  // solo versiones ya comprobadas
+  const x=mzOrdenParaSonar()[0];if(!x)return;        // solo versiones ya comprobadas, y lo pedido antes que el fondo
   mzEmpezo(x.id,'app');
   SS('vito_now',x);sonando=true;cargadoEn=Date.now();ytMostrar(true);yPl.loadVideoById(x.vid);renderMusica();
 }
@@ -2328,7 +2339,7 @@ function tvUrl(){
 let tvHash='',tvHashT=0,tvES=null,tvVisto=0,tvSonando='',tvReintT=null;
 function tvPublicar(force){
   if(!tvOn()||mqOtro())return;
-  const q=ordenJusto(cola()).filter(x=>x.vid&&!x.sinVersion&&(x.ok||!yTestListo)).slice(0,15)
+  const q=mzOrdenParaSonar().slice(0,15)
     .map(x=>({i:x.id,v:x.vid,s:String(x.title||x.song).slice(0,60),a:String(x.artist||'').slice(0,40),m:String(tableLabel(x.mesa)).slice(0,20)}));
   const msg={q,b:String(data&&data.businessName||'').slice(0,40)};
   const s=JSON.stringify(msg);
@@ -2931,7 +2942,7 @@ function ypMiniPintar(){
 }
 document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-yp-abrir]');if(b){e.preventDefault();ypAbrir();}});
 window.vitoPanel={abrir:ypAbrir,cerrar:ypCerrar,agregar:ypAgregar,abierto:()=>ypAbierto};
-window.vitoMod = { republicarMesas: () => { Object.keys(pubHash).forEach(k => { if(pubHash[k] !== undefined) pubHash[k] = '-'; }); try{ publicarCuentas(); }catch(e){} }, mzMax, yRenovarServidor, linkMesa, mCfg, mUrl, prepUrl: () => { try{ return prepUrl(); }catch(e){ return ''; } }, prepPublicar: f => { try{ prepPublicar(f); }catch(e){} }, mVistos, mPublicar, reconectarPedidos: () => { try{conectar();}catch(e){} }, qCanales, qProbarPedidos, tvOn, tvUrl, LS, SS, qCfg, yCfg, yTok, yConectar, cola, ordenJusto, mzEmpezo, mzTermino, mzProgreso, yLista, ytAgregar, ySearch, yGet, AUTO, renderMusica, esperarYT: () => cadena, yFuente: () => yFuente, ytDur, ytPosicionSiguiente, ytTanda: () => ytTanda, procesar, notifPedidos, notifMusica };
+window.vitoMod = { mzOrdenParaSonar: () => mzOrdenParaSonar(), republicarMesas: () => { Object.keys(pubHash).forEach(k => { if(pubHash[k] !== undefined) pubHash[k] = '-'; }); try{ publicarCuentas(); }catch(e){} }, mzMax, yRenovarServidor, linkMesa, mCfg, mUrl, prepUrl: () => { try{ return prepUrl(); }catch(e){ return ''; } }, prepPublicar: f => { try{ prepPublicar(f); }catch(e){} }, mVistos, mPublicar, reconectarPedidos: () => { try{conectar();}catch(e){} }, qCanales, qProbarPedidos, tvOn, tvUrl, LS, SS, qCfg, yCfg, yTok, yConectar, cola, ordenJusto, mzEmpezo, mzTermino, mzProgreso, yLista, ytAgregar, ySearch, yGet, AUTO, renderMusica, esperarYT: () => cadena, yFuente: () => yFuente, ytDur, ytPosicionSiguiente, ytTanda: () => ytTanda, procesar, notifPedidos, notifMusica };
 // 🔄 1.95.1: la cuenta en vivo sale a TODOS los códigos conocidos de la mesa (los de este equipo, los QR fijados y los que
 // compartieron los demás equipos en data.qrCodigos). Antes salía solo al código de este equipo: si el QR pegado en la mesa
 // lo imprimió otro celular, el cliente nunca veía su cuenta.
