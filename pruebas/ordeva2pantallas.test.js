@@ -79,6 +79,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     // ===== 4. Cocina en el computador =====
     await p.evaluate(() => {
       const E = window.vitoPedidos;
+      data.prep = Object.assign({}, data.prep || {}, { on: true });   // 1.95.2: la cocina prendida de verdad (sin ella, los pedidos no quedan «en preparación»)
       E.entrante({ id: 'k2', mesa: 2, items: [{ n: 'Café', q: 2 }] }, 'mesero:Ana');
       E.entrante({ id: 'k3', mesa: 3, items: [{ n: 'Agua', q: 1 }] }, 'mesero:Ana');
       E.cambiar('k3', 'recibido'); E.cambiar('k3', 'preparacion');

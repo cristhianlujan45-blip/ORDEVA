@@ -65,5 +65,12 @@ Tres revisores sin la conversación (Codebase Details, Design y Zoom Out) revisa
 - **Nueva:** `pedidostienda` (29; eran 19 antes de la revisión goldfish), contra el servidor de pruebas, con la app y `pedido.html` de verdad (el cliente pide
   escribiendo, como en el celular). Cubre aceptar, entregar, rechazar, «Después», el panel, la campana y lo que ve el
   cliente en cada paso. También revisa que el restaurante siga igual.
-- RESULTADOS_AQUI
+- **Resultados:**
+  - **Lista completa con las correcciones de la revisión:** 121 pruebas, 2.709 revisiones bien y 1 mal.
+  - **La que falló:** `ordeva2pantallas` mostraba la pantalla de cocina a la fuerza en un negocio que la tiene apagada.
+    Como ahora un negocio sin cocina ya no deja pedidos «en preparación», se corrigió la prueba para que prenda la cocina
+    de verdad (`data.prep.on`). Corrida otra vez: 20 de 20, y `pedidostienda`: 29 de 29.
+  - **Antes de esto,** `flujocompleto` falló una vez mientras corrían los revisores al mismo tiempo. Sola pasó 87 de 87, y
+    en la lista final pasó.
+  - **No cambia el servidor ni Android:** valen los de la 1.94.0 (servidor 29 de 29, Android 328 de 328).
 - **No se probó en una tienda de verdad.**
