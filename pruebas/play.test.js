@@ -4,6 +4,12 @@
 //  2. Tres celulares de la mesa 1 entran con su apodo (sin registrarse), uno crea EL SHOW DE LA MESA y los otros se unen
 //     con el código. Juegan: el que acierta suma, la respuesta correcta no viaja antes de tiempo, termina con ganador.
 //  3. EL IMPOSTOR: cada celular ve su papel (la palabra o «eres el impostor»), nunca la de los demás.
+//  3b. Las pistas se ven a medida que llegan; si un civil escribe la palabra, sale el aviso; votan y se ve el resultado.
+//  5. LA BOMBA: quien la tiene ve la cuenta; si falla queda 3 s bloqueado; si acierta, la bomba pasa al otro celular.
+//  6. RULETA DEL CAOS: gira, el elegido ve «¡Lo hice!», «Cambiar» y «Paso»; el otro aplaude (+25) y eso es lo que suma.
+//  7. ÚLTIMO SOBREVIVIENTE: quien falla sale y el otro gana.
+//  8. Sin internet sale «Sin conexión» y se quita al volver; con la pestaña «Pedido» abierta, Play no pregunta nada.
+//  9. PLAY no escribe en los canales de los pedidos (canal_mensajes).
 //  4. El menú y los pedidos siguen funcionando igual; en 320 px no hay scroll de lado.
 'use strict';
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
@@ -92,7 +98,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     chk('2. Ana (acertó) dice «¡Acertaste!» y Beto no', await C1.p.evaluate(() => /Acertaste/.test(document.querySelector('.pl-res').textContent)) && await C2.p.evaluate(() => /Esta vez no/.test(document.querySelector('.pl-res').textContent)));
     // Se adelanta el reloj del servidor hasta el final (8 preguntas).
     for(let i = 0; i < 30; i++){ await sb.sql("update play_salas set fase_hasta = now() - interval '1 second' where id = $1 and estado = 'jugando'", [sala.id]); await sb.sql('select public.play_tick($1)', [sala.id]); const e = (await sb.sql('select estado from play_salas where id = $1', [sala.id]))[0].estado; if(e === 'fin') break; }
-    chk('2. Termina: los tres ven la tabla final con el ganador 👑', (await Promise.all(todos.map(C => esperar(C.p, () => /gana/.test((document.querySelector('.pl-hero h2') || {}).textContent || '') && document.querySelectorAll('.pl-rank li').length === 3, null, 20000)))).every(Boolean));
+    chk('2. Termina: los tres ven la tabla final con el ganador 👑', (await Promise.all(todos.map(C => esperar(C.p, () => /gana|Empate/.test((document.querySelector('.pl-hero h2') || {}).textContent || '') && document.querySelectorAll('.pl-rank li').length === 3, null, 20000)))).every(Boolean));
     await C1.p.click('#plOtra'); await C1.p.click('#plRanking');
     chk('2. La clasificación de hoy muestra a los jugadores y a la mesa 1', await esperar(C1.p, () => /Mesa 1/.test(document.body.innerText) && document.querySelectorAll('.pl-rank li').length >= 3, null, 15000));
 
@@ -108,6 +114,74 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     const sec = (await sb.sql("select secreto->>'palabra' p from play_salas where codigo = $1", [cod2]))[0].p;
     const imps = roles.filter(r => /impostor/i.test(r)), civ = roles.filter(r => r.includes(sec));
     chk('3. EL IMPOSTOR: uno solo ve «Eres el impostor» (sin la palabra) y los otros dos ven la palabra', imps.length === 1 && !imps[0].includes(sec) && civ.length === 2, roles);
+    const civC = todos.filter((C, i) => !/impostor/i.test(roles[i]));
+    await civC[0].p.fill('#plPistaTxt', 'es ' + sec.toLowerCase()); await civC[0].p.click('#plPista button');
+    chk('3b. Si un civil escribe la palabra: sale el aviso y la pista no se manda', await esperar(civC[0].p, () => /No digas la palabra/.test((document.querySelector('.pl-aviso') || {}).textContent || '') && !!document.querySelector('#plPistaTxt'), null, 10000));
+    await C1.p.fill('#plPistaTxt', 'redondo'); await C1.p.click('#plPista button');
+    chk('3b. La pista de Ana la ven los demás de una vez (sin esperar a todos)', await esperar(C2.p, () => /redondo/.test((document.querySelector('.pl-pistas') || {}).textContent || ''), null, 12000));
+    await C2.p.fill('#plPistaTxt', 'grande'); await C2.p.click('#plPista button');
+    await C3.p.fill('#plPistaTxt', 'bonito'); await C3.p.click('#plPista button');
+    chk('3b. Con las tres pistas, todos pasan a votar', (await Promise.all(todos.map(C => esperar(C.p, () => document.querySelectorAll('.pl-op[data-act="votar"]').length === 2, null, 15000)))).every(Boolean));
+    for(const C of todos) await C.p.click('.pl-op[data-act="votar"]');
+    chk('3b. Votan y todos ven el resultado (quién era y la palabra)', (await Promise.all(todos.map(C => esperar(C.p, w => /Era .*la palabra/.test((document.querySelector('.pl-rol') || {}).innerText || '') && document.querySelector('.pl-rol').innerText.includes(w), sec, 15000)))).every(Boolean));
+    const alInicio = async C => { if(await C.p.$('#plSalir')) await C.p.click('#plSalir'); else if(await C.p.$('#plOtra')) await C.p.click('#plOtra'); return esperar(C.p, () => !!document.querySelector('.pl-card'), null, 10000); };
+    const crear = async (juego) => { await C1.p.click('.pl-card[data-j="' + juego + '"]'); await C1.p.click('[data-modo="mesa"]'); await C1.p.waitForSelector('.pl-codigo', { timeout: 15000 }); const c = (await C1.p.textContent('.pl-codigo')).trim(); await C2.p.fill('#plCod', c); await C2.p.click('#plUnirse'); await esperar(C1.p, () => document.querySelectorAll('.pl-jug .pl-j').length === 2, null, 15000); await esperar(C1.p, () => !document.getElementById('plEmpezar').disabled, null, 5000); await C1.p.click('#plEmpezar'); return c; };
+    for(const C of todos) await alInicio(C);
+
+    // ===== 5 · LA BOMBA =====
+    const cb = await crear('bomba');
+    let sb5 = null; for(let i = 0; i < 40 && !sb5; i++){ sb5 = (await sb.sql("select id from play_salas where codigo = $1 and estado = 'jugando'", [cb]))[0]; if(!sb5) await new Promise(z => setTimeout(z, 300)); }
+    await sb.sql("update play_salas set fase_hasta = now() + interval '90 seconds' where id = $1", [sb5.id]);
+    const duo = [C1, C2];
+    await Promise.all(duo.map(C => esperar(C.p, () => !!document.querySelector('.pl-bomba'), null, 15000)));
+    const quien = async () => { for(let i = 0; i < 30; i++){ for(const C of duo) if(await C.p.$('.pl-bomba.mia')) return C; await new Promise(z => setTimeout(z, 300)); } return null; };
+    const H = await quien(), O = duo.find(C => C !== H);
+    chk('5. LA BOMBA: quien la tiene ve «¡Tienes la bomba!» y la cuenta; el otro ve quién la tiene', !!H && await H.p.evaluate(() => document.querySelectorAll('.pl-op[data-i]').length === 4) && await esperar(O.p, () => /La tiene/.test(document.querySelector('.pl-bomba').textContent), null, 8000));
+    let cc = +(await sb.sql("select secreto->>'correcta' c from play_salas where id = $1", [sb5.id]))[0].c;
+    await H.p.click('.pl-op[data-i="' + ((cc + 1) % 4) + '"]');
+    chk('5. Si falla: «¡Fallaste! Espera…», las opciones bloqueadas y sigue con la bomba', await esperar(H.p, () => { const b = document.querySelector('.pl-bloq'); return b && !b.hidden && /Fallaste/.test(b.textContent) && [...document.querySelectorAll('.pl-op[data-i]')].every(x => x.disabled) && !!document.querySelector('.pl-bomba.mia'); }, null, 8000));
+    chk('5. A los 3 s se puede responder otra vez', await esperar(H.p, () => [...document.querySelectorAll('.pl-op[data-i]')].some(x => !x.disabled), null, 6000));
+    cc = +(await sb.sql("select secreto->>'correcta' c from play_salas where id = $1", [sb5.id]))[0].c;
+    await H.p.click('.pl-op[data-i="' + cc + '"]');
+    chk('5. Si acierta, la bomba pasa al otro celular', await esperar(O.p, () => !!document.querySelector('.pl-bomba.mia'), null, 12000) && await esperar(H.p, () => !document.querySelector('.pl-bomba.mia'), null, 8000));
+    for(const C of duo) await alInicio(C);
+
+    // ===== 6 · RULETA DEL CAOS =====
+    await crear('ruleta');
+    await esperar(C2.p, () => !!document.querySelector('[data-act="girar"]'), null, 15000); await C2.p.click('[data-act="girar"]');
+    await Promise.all(duo.map(C => esperar(C.p, () => !!document.querySelector('.pl-reto'), null, 15000)));
+    const E = (await C1.p.$('[data-act="cumplir"]')) ? C1 : C2, Ot = E === C1 ? C2 : C1;
+    chk('6. RULETA: el elegido ve «¡Lo hice!», «Cambiar reto» y «Paso»; el otro ve «Aplaudir»', await E.p.evaluate(() => !!document.querySelector('[data-act="cumplir"]') && !!document.querySelector('[data-act="cambiar"]') && !!document.querySelector('[data-act="pasar"]')) && await esperar(Ot.p, () => !!document.querySelector('[data-act="aplaudir"]'), null, 8000));
+    chk('6. El reto no habla de beber', !/beb|trago|shot|alcohol|cerveza|brind/i.test(await E.p.textContent('.pl-reto')));
+    await E.p.click('[data-act="cumplir"]');
+    await esperar(Ot.p, () => /Lo cumplió/.test(document.body.innerText) && !!document.querySelector('[data-act="aplaudir"]'), null, 10000);
+    await Ot.p.click('[data-act="aplaudir"]');
+    chk('6. Después de «¡Lo hice!» el otro aplaude y eso le da +25 (decir que lo hizo no suma solo)', await esperar(Ot.p, () => /Aplaudiste/.test(document.body.innerText) && /\b25\b/.test(document.querySelector('.pl-jug').innerText), null, 10000));
+    for(const C of duo) await alInicio(C);
+
+    // ===== 7 · ÚLTIMO SOBREVIVIENTE =====
+    const cs = await crear('sobreviviente');
+    await Promise.all(duo.map(C => esperar(C.p, () => document.querySelectorAll('.pl-op[data-i]').length === 4, null, 15000)));
+    let s7 = null; for(let i = 0; i < 40 && !s7; i++){ s7 = (await sb.sql("select id, secreto->>'correcta' c from play_salas where codigo = $1 and estado = 'jugando'", [cs]))[0]; if(!s7) await new Promise(z => setTimeout(z, 300)); }
+    await C1.p.click('.pl-op[data-i="' + s7.c + '"]'); await C2.p.click('.pl-op[data-i="' + ((+s7.c + 1) % 4) + '"]');
+    chk('7. SOBREVIVIENTE: quien falla sale («Salen: Beto»)', await esperar(C1.p, () => /Salen: .*Beto/.test(document.body.innerText), null, 12000));
+    await sb.sql("update play_salas set fase_hasta = now() - interval '1 second' where id = $1", [s7.id]);
+    chk('7. Queda uno solo: Ana gana', await esperar(C2.p, () => /Ana.*gana/.test((document.querySelector('.pl-hero h2') || {}).textContent || ''), null, 15000));
+    for(const C of duo) await alInicio(C);
+
+    // ===== 8 · Sin internet y pestaña escondida =====
+    await crear('show').catch(() => {});
+    await C1.ctx.setOffline(true);
+    chk('8. Sin internet: sale «Sin conexión… reintentando»', await esperar(C1.p, () => { const b = document.querySelector('.pl-off'); return b && !b.hidden; }, null, 20000));
+    await C1.ctx.setOffline(false);
+    chk('8. … y se quita cuando vuelve el internet', await esperar(C1.p, () => { const b = document.querySelector('.pl-off'); return b && b.hidden; }, null, 20000));
+    let pedidas = 0; const cuenta = rq => { if(/rpc\/play_estado/.test(rq.url())) pedidas++; }; C2.p.on('request', cuenta);
+    await C2.p.click('#tp'); await C2.p.waitForTimeout(500); pedidas = 0; await C2.p.waitForTimeout(8000);
+    chk('8. Con la pestaña «Pedido» abierta, Play no pregunta nada al servidor', pedidas === 0, pedidas);
+    await C2.p.click('#tg'); await C2.p.waitForTimeout(6000);
+    chk('8. Al volver a «Play», sigue al día', pedidas > 0, pedidas);
+    C2.p.off('request', cuenta);
+    chk('9. PLAY no escribió en los canales de los pedidos', (await sb.sql("select count(*)::int n from canal_mensajes where canal like 'ply%'"))[0].n === 0);
 
     // ===== 4 =====
     await C2.p.click('#tp');
