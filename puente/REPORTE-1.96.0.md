@@ -99,7 +99,7 @@ Todo quedó corregido y con prueba.
   - los pedidos y sus estados siguen funcionando.
 - **Después de los arreglos:** las 30 pruebas del servidor pasan, y la revisión de migraciones pasa (no borra datos y las 61
   se aplican). También pasan `v1954` y `v193`.
-- **Lista completa:** RESULTADOS_AQUI
+- **Lista completa:** 129 pruebas en el navegador, 2.837 bien, 0 mal (incluye `v196` y `facturascan`). Más las 30 pruebas del servidor y la revisión de migraciones, todas bien.
 - **No se probó** con celulares de verdad ni con la base de datos de producción.
 
 ## Para el dueño de ORDEVA, durante las 72 h
