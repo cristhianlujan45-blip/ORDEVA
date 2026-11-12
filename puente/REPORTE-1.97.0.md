@@ -40,10 +40,12 @@ Después de la auditoría (fase 0, `puente/egm/PLAY-FASE0.md`): «continúa como
 - 25 llamadas cada 10 segundos por jugador (cuentan también las que no valen y las que fallan).
 - 120 entradas por minuto por IP (cuentan también los códigos de mesa malos).
 - Jugadores nuevos: 60 por minuto por IP, 40 por hora por mesa y 1.500 por hora por negocio.
-- Salas abiertas: 8 por mesa y 60 por negocio. Una sala de espera sin movimiento en 10 minutos deja de contar.
+- Salas abiertas: 8 por mesa y 60 por negocio. Solo cuentan las que tienen movimiento: una sala de espera sin nadie deja
+  de contar a los 10 minutos y una partida abandonada a los 15.
 - 3.000 puntos por jugador por día en la clasificación.
 - Apodos y pistas con groserías no pasan (filtro básico). El avatar sale de una lista fija.
-- La limpieza corre sola cada 10 minutos: jugadores y salas de más de 2 días, puntos de más de 90 días.
+- La limpieza corre sola cada 10 minutos: cierra las salas sin movimiento en 30 minutos y borra jugadores y salas de más
+  de 2 días y puntos de más de 90 días.
 
 ## Qué cambió en el código
 - **Servidor:** `supabase/migrations/20261203000000_play.sql`. Tablas nuevas (`play_…`), sin acceso directo: todo pasa por
@@ -58,10 +60,11 @@ Después de la auditoría (fase 0, `puente/egm/PLAY-FASE0.md`): «continúa como
 ## Revisión goldfish
 `puente/egm/REVISION-GOLDFISH-PLAY.md`. La primera ronda (diseño y código) dijo «no está listo»: 3 bloqueantes y unas 30
 correcciones, todas hechas. La segunda ronda verificó esas correcciones (sin bloqueantes) y encontró 5 hallazgos mayores
-más, también corregidos. RONDA3_AQUI
+más, también corregidos. La tercera ronda verificó esos cambios (sin bloqueantes) y encontró un hallazgo mayor (el tope de
+salas por mesa se podía rodear) y 5 menores, también corregidos.
 
 ## Pruebas
-- **Servidor:** `pruebas/servidor/play.test.js`, 86 bien, 0 mal.
+- **Servidor:** `pruebas/servidor/play.test.js`, 91 bien, 0 mal.
 - **Navegador, con varios celulares a la vez:** `pruebas/play.test.js`, 38 bien, 0 mal. Cubre activar, entrar, los 5
   juegos, el aviso sin conexión, la pestaña escondida, un pedido durante el juego y un celular de 320 px.
 - **Las otras 30 pruebas del servidor:** bien.

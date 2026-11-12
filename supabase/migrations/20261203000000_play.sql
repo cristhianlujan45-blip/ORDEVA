@@ -22,7 +22,7 @@
 --    error después de contar, devuelven {error}), jugadores nuevos por IP, por mesa y por negocio, salas abiertas por mesa
 --    y por negocio, y puntos por jugador por día. La limpieza corre con pg_cron, no dentro de una petición de un cliente.
 --  • Sin acceso directo a las tablas (RLS sin políticas para anon/authenticated): todo pasa por funciones que validan.
---  No borra nada de lo existente. Se puede volver a correr.
+--  No borra nada de lo existente. Se puede volver a correr (esta misma versión; ningún servidor corrió los borradores).
 -- =====================================================================
 
 create table if not exists public.play_config (
@@ -56,6 +56,7 @@ create table if not exists public.play_origen (
   n        int not null default 0,
   desde    timestamptz not null default now()
 );
+create index if not exists play_origen_desde_idx on public.play_origen(desde);
 create table if not exists public.play_salas (
   id          uuid primary key default gen_random_uuid(),
   negocio_id  uuid not null references public.negocios(id) on delete cascade,
@@ -190,6 +191,8 @@ language plpgsql security definer set search_path = public, extensions as $$
 declare c int;
 begin
   if p_origen is null then return true; end if;
+  -- De vez en cuando se borran los contadores viejos (por si este Supabase no tiene pg_cron).
+  if random() < 0.01 then delete from play_origen where desde < now() - interval '1 hour'; end if;
   insert into play_origen as o (origen_h, n, desde) values (p_origen, 1, now())
   on conflict (origen_h) do update set
       n = case when o.desde < now() - interval '1 minute' then 1 else least(o.n + 1, 100000) end,
@@ -244,6 +247,15 @@ language sql volatile set search_path = public, extensions as $$
     (select texto from play_retos where not solo_mesa order by random() limit 1))
 $$;
 
+-- EL SHOW: suma los puntos anotados en las respuestas buenas de una ronda. Se llama UNA vez por ronda: al cerrar la
+-- pregunta o, si la partida se acaba con la pregunta abierta, al terminar (siempre con la sala bloqueada y en «pregunta»).
+create or replace function public.play_show_abonar(p_sala uuid, p_ronda int) returns void
+language sql security definer set search_path = public, extensions as $$
+  update play_miembros m set puntos = m.puntos + coalesce((e.dato->>'pts')::int, 0)
+    from play_eventos e where e.sala_id = p_sala and e.ronda = p_ronda and e.tipo = 'responder' and (e.dato->>'ok')::boolean
+     and m.sala_id = p_sala and m.jugador_id = e.jugador_id
+$$;
+
 -- ---------- Fin de la partida: puntos que quedan ----------
 -- Tope de 3.000 puntos por jugador por día en la clasificación (lo que pase del tope no cuenta para el día).
 -- p_bono = false cuando la partida se acaba porque los demás se fueron o el negocio apagó PLAY: sin el +200 del final.
@@ -253,6 +265,8 @@ declare s play_salas; top int; fin jsonb;
 begin
   select * into s from play_salas where id = p_sala;
   if s.estado = 'fin' then return; end if;
+  -- EL SHOW que se acaba con una pregunta abierta (apagaron PLAY, se fueron todos): las respuestas buenas ya dadas cuentan.
+  if s.juego = 'show' and s.estado = 'jugando' and s.fase = 'pregunta' then perform play_show_abonar(p_sala, s.ronda); end if;
   -- Sobrevivientes al final (LA BOMBA, ÚLTIMO SOBREVIVIENTE): +200.
   if p_bono and s.juego in ('bomba', 'sobreviviente') then update play_miembros set puntos = puntos + 200 where sala_id = p_sala and vivo; end if;
   select max(puntos) into top from play_miembros where sala_id = p_sala;
@@ -293,9 +307,7 @@ declare s play_salas; conteo jsonb;
 begin
   select * into s from play_salas where id = p_sala;
   -- Los puntos se suman AQUÍ, al cerrar la pregunta: si se sumaran al responder, el marcador delataría la opción correcta.
-  update play_miembros m set puntos = m.puntos + coalesce((e.dato->>'pts')::int, 0)
-    from play_eventos e where e.sala_id = p_sala and e.ronda = s.ronda and e.tipo = 'responder' and (e.dato->>'ok')::boolean
-     and m.sala_id = p_sala and m.jugador_id = e.jugador_id;
+  perform play_show_abonar(p_sala, s.ronda);
   select coalesce(jsonb_object_agg(i, n), '{}'::jsonb) into conteo from (select dato->>'i' i, count(*) n from play_eventos where sala_id = p_sala and ronda = s.ronda and tipo = 'responder' group by 1) x;
   perform play_fase(p_sala, 'resultado', 5, s.publico || jsonb_build_object('correcta', s.secreto->'correcta', 'conteo', conteo));
 end $$;
@@ -532,7 +544,7 @@ begin
   end if;
   if not (conocido and j.mesa = p_mesa) then
     select datos->'qrCodigos'->(p_mesa::text) into cods from datos_negocio where negocio_id = neg;
-    if p_vm is null or cods is null or not (case when jsonb_typeof(cods) = 'array' then cods ? p_vm else cods #>> '{}' = p_vm end) then return play_err('play_mesa'); end if;
+    if p_vm is null or cods is null or not coalesce(case when jsonb_typeof(cods) = 'array' then cods ? p_vm else cods #>> '{}' = p_vm end, false) then return play_err('play_mesa'); end if;
   end if;
   al := left(regexp_replace(trim(coalesce(p_alias, '')), '\s+', ' ', 'g'), 20);
   if al = '' or play_grosero(al) then al := 'Jugador'; end if;
@@ -563,12 +575,13 @@ begin
       and (s.modo = 'local' or s.mesa = j.mesa)), '[]'::jsonb);
 end $$;
 
--- Salas abiertas que cuentan para los topes: las que se están jugando y las de espera con movimiento en los últimos 10
--- minutos (una sala de espera abandonada deja de contar sola).
+-- Salas abiertas que cuentan para los topes: solo las que tienen movimiento. Una partida viva cambia de fase al menos
+-- cada minuto y una sala de espera con gente mirándola se marca cada 2 minutos (play_estado); una abandonada (nadie la
+-- mira, el reloj no corre) deja de contar a los 15 o a los 10 minutos, y play_limpiar la cierra a los 30.
 create or replace function public.play_abiertas(p_neg uuid, p_mesa int default null) returns int
 language sql stable security definer set search_path = public, extensions as $$
   select count(*)::int from play_salas where negocio_id = p_neg and (p_mesa is null or mesa = p_mesa)
-     and ((estado = 'jugando' and actualizado > now() - interval '3 hours') or (estado = 'espera' and actualizado > now() - interval '10 minutes'))
+     and ((estado = 'jugando' and actualizado > now() - interval '15 minutes') or (estado = 'espera' and actualizado > now() - interval '10 minutes'))
 $$;
 
 create or replace function public.play_crear(p_token text, p_juego text, p_modo text default 'mesa') returns jsonb
@@ -634,6 +647,9 @@ begin
   select count(*) into n from play_miembros where sala_id = s.id;
   minimo := 2; if s.juego = 'impostor' then minimo := 3; end if;
   if n < minimo then return play_err('play_pocos'); end if;
+  -- Una sala de espera vieja (ya no contaba para los topes) no se puede empezar si la mesa o el local ya están en el tope:
+  -- así no se juntan salas viejas para saltarse el tope empezándolas todas a la vez.
+  if s.actualizado <= now() - interval '10 minutes' and (play_abiertas(s.negocio_id, s.mesa) >= 8 or play_abiertas(s.negocio_id) >= 60) then return play_err('play_lleno'); end if;
   update play_salas set estado = 'jugando', ronda = 0, version = version + 1, actualizado = now() where id = s.id;
   case s.juego
     when 'show' then perform play_show_ronda(s.id);
@@ -750,6 +766,11 @@ begin
       update play_salas set anfitrion = nuevo, version = version + 1, actualizado = now() where id = s.id and estado = 'espera' and anfitrion is not distinct from s.anfitrion;
     end if;
   end if;
+  -- Una sala de espera con gente mirándola sigue «con movimiento» (como mucho una escritura cada 2 minutos): no se esconde
+  -- de la lista ni la cierra la limpieza mientras alguien espera en ella.
+  if s.estado = 'espera' and s.actualizado < now() - interval '2 minutes' then
+    update play_salas set actualizado = now() where id = s.id and estado = 'espera' and actualizado < now() - interval '2 minutes';
+  end if;
   if p_ver is not null and p_ver = (select version from play_salas where id = p_sala) then return jsonb_build_object('igual', true, 'ahora', play_ms(now())); end if;
   return play_vista(p_sala, j.id);
 end $$;
@@ -847,9 +868,9 @@ create or replace function public.play_limpiar() returns jsonb
 language plpgsql security definer set search_path = public, extensions as $$
 declare a int; b int; c int; d int;
 begin
-  update play_salas set estado = 'fin', fase = 'fin', fase_hasta = null
-   where id in (select id from play_salas where (estado = 'jugando' and actualizado < now() - interval '3 hours')
-                                             or (estado = 'espera' and actualizado < now() - interval '30 minutes') limit 2000);
+  -- Salas sin movimiento en 30 minutos (nadie las mira): se cierran. La versión sube para que un celular que vuelva lo vea.
+  update play_salas set estado = 'fin', fase = 'fin', fase_hasta = null, version = version + 1
+   where id in (select id from play_salas where estado <> 'fin' and actualizado < now() - interval '30 minutes' limit 2000);
   get diagnostics a = row_count;
   delete from play_origen where desde < now() - interval '1 hour';
   delete from play_salas where id in (select id from play_salas where estado = 'fin' and actualizado < now() - interval '2 days' limit 2000);
@@ -865,7 +886,7 @@ end $$;
 do $$ declare f text; begin
   foreach f in array array['play_ms(timestamptz)','play_hoy()','play_norm(text)','play_grosero(text)','play_dice_palabra(text, text)','play_i(jsonb)','play_yo(text)',
     'play_cupo(uuid, int)','play_cupo_origen(text, int)','play_err(text)','play_abiertas(uuid, int)','play_mate(int)','play_vivos(uuid)','play_azar(uuid[], uuid)',
-    'play_sumar(uuid, uuid, int)','play_fase(uuid, text, numeric, jsonb, jsonb, int)','play_reto(uuid, text)','play_terminar(uuid, boolean)','play_show_ronda(uuid)','play_show_resultado(uuid)',
+    'play_sumar(uuid, uuid, int)','play_fase(uuid, text, numeric, jsonb, jsonb, int)','play_reto(uuid, text)','play_show_abonar(uuid, int)','play_terminar(uuid, boolean)','play_show_ronda(uuid)','play_show_resultado(uuid)',
     'play_bomba_pregunta(uuid, uuid, int)','play_bomba_ronda(uuid)','play_bomba_explota(uuid)','play_impostor_pistas(uuid, int)','play_impostor_ronda(uuid)','play_impostor_votar(uuid)','play_impostor_resultado(uuid)',
     'play_ruleta_girar(uuid)','play_ruleta_ronda(uuid)','play_ruleta_cerrar(uuid, text)','play_sobre_ronda(uuid)','play_sobre_resolver(uuid)','play_revisar(uuid)','play_vencio(uuid)','play_tick(uuid)',
     'play_vista(uuid, uuid)','play_no(uuid, uuid, text)','play_ranking_de(uuid)','play_limpiar()'] loop

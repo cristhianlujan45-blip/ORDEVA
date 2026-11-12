@@ -261,6 +261,20 @@ async function pruebas(sb) {
   await sb.sql("update play_salas set actualizado = now() - interval '11 minutes' where mesa = 3 and estado = 'espera'");
   r = await rpc('play_crear', { p_token: m3[0].token, p_juego: 'show' });
   chk('Las salas de espera sin movimiento en 10 minutos dejan de contar', !!(r.j && r.j.sala), r.j);
+  // … pero no sirven para saltarse el tope: con la mesa otra vez en 8, una sala vieja no se puede empezar.
+  const vieja = (await uno("select id, anfitrion from play_salas where mesa = 3 and estado = 'espera' and actualizado < now() - interval '10 minutes' limit 1"));
+  const tkV = m3.find((t) => t.jugador === vieja.anfitrion), tkOtro = m3.find((t) => t.jugador !== vieja.anfitrion);
+  await sb.sql('insert into play_miembros(sala_id, jugador_id, orden) values ($1, $2, 2)', [vieja.id, tkOtro.jugador]);
+  for (let i = 0; i < 9; i++) await rpc('play_crear', { p_token: m3[i % 3].token, p_juego: 'show' });
+  await respiro();
+  r = await rpc('play_empezar', { p_token: tkV.token, p_sala: vieja.id });
+  chk('Una sala de espera vieja no se puede empezar si la mesa ya está en el tope', /play_lleno/.test(err(r)) && !(r.j && r.j.sala), r.j);
+  await sb.sql("update play_salas set estado = 'jugando', actualizado = now() - interval '16 minutes' where mesa = 3 and estado = 'espera'");
+  r = await rpc('play_crear', { p_token: m3[1].token, p_juego: 'show' });
+  chk('Las partidas abandonadas (15 minutos sin movimiento) dejan de contar para el tope', !!(r.j && r.j.sala), r.j);
+  await sb.sql("update play_salas set actualizado = now() - interval '5 minutes' where id = $1", [lob.id]);
+  await rpc('play_estado', { p_token: beto.token, p_sala: lob.id });
+  chk('Una sala de espera con alguien mirándola sigue «con movimiento» (no se esconde ni se cierra)', (await uno("select actualizado > now() - interval '1 minute' ok from play_salas where id = $1", [lob.id])).ok);
   const o2 = (await rpc('play_crear', { p_token: ana.token, p_juego: 'sobreviviente' })).j.sala;
   await rpc('play_unirse', { p_token: beto.token, p_codigo: o2.codigo }); await rpc('play_empezar', { p_token: ana.token, p_sala: o2.id });
   await rpc('play_salir', { p_token: beto.token, p_sala: o2.id });
@@ -291,10 +305,18 @@ async function pruebas(sb) {
   chk('PLAY no escribió NI UN mensaje en canal_mensajes (no le quita cupo a los pedidos)', cm.n === 0, cm);
   r = await rpc('play_config_guardar', { p_negocio: NEG, p_activo: true, p_juegos: [], p_retos: ['divertido'] }, dueno.token);
   chk('No se puede prender sin ningún juego', r.st !== 200 && /play_sin_juegos/.test(err(r)), r);
+  await respiro();
+  const sh3 = (await rpc('play_crear', { p_token: ana.token, p_juego: 'show' })).j.sala;
+  await rpc('play_unirse', { p_token: beto.token, p_codigo: sh3.codigo }); await rpc('play_empezar', { p_token: ana.token, p_sala: sh3.id });
+  const c3 = (await uno('select secreto->>\'correcta\' c from play_salas where id = $1', [sh3.id])).c | 0;
+  await rpc('play_accion', { p_token: ana.token, p_sala: sh3.id, p_tipo: 'responder', p_dato: { i: c3 }, p_cid: cid() });
   const abiertas = (await sb.sql("select count(*)::int n from play_salas where negocio_id = $1 and estado <> 'fin'", [NEG]))[0].n;
   await rpc('play_config_guardar', { p_negocio: NEG, p_activo: false, p_juegos: ['show'], p_retos: ['divertido'] }, dueno.token);
   const quedan = (await sb.sql("select count(*)::int n from play_salas where negocio_id = $1 and estado <> 'fin'", [NEG]))[0].n;
   chk('Apagar PLAY termina las partidas abiertas', abiertas > 0 && quedan === 0, { abiertas, quedan });
+  const p3 = (await uno('select puntos from play_puntos where sala_id = $1 and jugador_id = $2', [sh3.id, ana.jugador]));
+  chk('… y la respuesta buena que ya se había dado en la pregunta abierta sí cuenta', p3 && p3.puntos >= 100, p3);
+  chk('… las salas de espera solo se cierran (no quedan como partidas de 0 puntos)', !(await sb.sql('select 1 from play_puntos where sala_id = $1', [lob.id])).length);
   await rpc('play_config_guardar', { p_negocio: NEG, p_activo: true, p_juegos: ['show'], p_retos: ['divertido'] }, dueno.token);
   // Entradas: las que fallan también cuentan por IP, y hay tope de jugadores nuevos por mesa.
   const ip = { 'x-forwarded-for': '203.0.113.77' };

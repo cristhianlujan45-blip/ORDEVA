@@ -38,7 +38,7 @@ encontró esto:
 |---|---|---|
 | En EL SHOW el marcador subía apenas alguien acertaba, y todos ven el marcador: con celulares de más se probaban las opciones y el marcador delataba la correcta (lo mismo que se había cerrado con `acerte`). | Mayor | Los puntos se anotan en la jugada y se suman al cerrar la pregunta. Pruebas en el servidor y en el navegador. |
 | El límite de llamadas no contaba las que terminaban en error (el error deshace el contador): unirse con códigos al azar o jugar en salas ajenas no tenía freno. | Mayor | Después de contar, las funciones del cliente no lanzan error: devuelven `{error}` y el celular lo muestra igual. Pruebas con códigos al azar y con salas ajenas. |
-| El tope de 60 salas por negocio lo llenaba una sola mesa con unas 70 llamadas, y dejaba al local sin PLAY 3 horas. | Mayor | 8 salas abiertas por mesa. Las salas de espera sin movimiento en 10 minutos dejan de contar, y la limpieza las cierra a los 30. Pruebas. |
+| El tope de 60 salas por negocio lo llenaba una sola mesa con unas 70 llamadas, y dejaba al local sin PLAY 3 horas. | Mayor | 8 salas abiertas por mesa. Las salas de espera sin movimiento en 10 minutos dejan de contar, y la limpieza las cierra a los 30 (se terminó de cerrar en la ronda 3). Pruebas. |
 | El tope de 400 jugadores nuevos por hora por negocio se gastaba desde una sola IP en 7 minutos. | Mayor | 40 jugadores nuevos por hora por mesa y 1.500 por negocio. Quien ya tiene su token sigue entrando. Pruebas. |
 | `play_entrar` no frenaba los intentos fallidos (código de mesa malo) y leía los datos del negocio en cada llamada. | Mayor | 120 entradas por minuto por IP, contadas antes de leer nada, también las que fallan. Volver con el mismo token a la misma mesa ya no lee los datos del negocio. Prueba. |
 | LA BOMBA: con la misma pregunta se podía ir descartando opciones (3 fallos como mucho). | Menor | Al fallar sale otra pregunta, además de los 3 s. Pruebas. |
@@ -55,8 +55,24 @@ encontró esto:
 - El límite por IP confía en la primera dirección de `x-forwarded-for`, igual que el de los canales (de antes).
 - El tope de puntos por día es por jugador: quien entra de nuevo sin su token empieza otra cuenta.
 
+## Ronda 3 · Verificación de la ronda 2
+Otro revisor con contexto limpio leyó solo los cambios de la ronda 2: las 11 filas están hechas como dicen, sin
+bloqueantes. Encontró esto:
+
+| Hallazgo | Gravedad | Qué se hizo |
+|---|---|---|
+| El tope de 8 salas por mesa se podía rodear: las partidas empezadas y abandonadas contaban 3 horas (una mesa se dejaba sin PLAY a sí misma), y juntando salas de espera viejas y empezándolas todas, 2 o 3 mesas llenaban el tope del local. | Mayor | Solo cuentan las salas con movimiento: una partida abandonada deja de contar a los 15 minutos y la limpieza la cierra a los 30. Una sala de espera vieja no se puede empezar si la mesa o el local ya están en el tope. Pruebas. |
+| Una sala de espera con gente esperando se escondía de la lista a los 10 minutos y la limpieza la cerraba a los 30. | Menor | Mientras alguien la mira, queda «con movimiento» (una marca cada 2 minutos). La limpieza sube la versión para que el celular lo vea. Prueba. |
+| Si EL SHOW se acababa con una pregunta abierta (apagaron PLAY, se fueron todos), las respuestas buenas ya dadas no sumaban. | Menor | Se suman al terminar. Prueba. |
+| El contador por IP crecía sin límite si no hay pg_cron. | Menor | Se limpia solo de vez en cuando. |
+| Un código de mesa guardado como «nulo» dejaba pasar la revisión (hoy la app no guarda eso). | Menor | Si no se puede comparar, no entra. |
+| Al volver a entrar con «vas muy rápido» no salía el aviso. | Menor | Sale. |
+
+**No se cambió (y por qué):** los topes cuentan y después insertan, sin candado: varias llamadas a la vez pueden pasarse por
+unas pocas. Son topes contra abusos, no cuentas exactas.
+
 ## Pruebas después de los arreglos
-- `pruebas/servidor/play.test.js`: **86 bien, 0 mal** (49 al empezar, 75 después de la ronda 1).
+- `pruebas/servidor/play.test.js`: **91 bien, 0 mal** (49 al empezar, 75 después de la ronda 1, 86 después de la 2).
 - `pruebas/play.test.js` (navegador, varios celulares): **38 bien, 0 mal** (19 al empezar, 37 después de la ronda 1). Cubre los 5 juegos, las pistas y los
   votos del impostor, la bomba bloqueada, la ruleta con aplausos, sin conexión, la pestaña escondida y que no escribe en
   los canales.

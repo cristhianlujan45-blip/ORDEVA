@@ -298,7 +298,7 @@
       rpc('play_entrar', { p_canal: ctx.c, p_mesa: +ctx.mesa, p_vm: ctx.v, p_alias: prev.alias, p_avatar: prev.avatar, p_token: prev.token })
         .then(r => { Object.assign(st, { token: r.token, jugador: r.jugador, juegos: r.juegos || [], local: !!r.local }); guardar();
           if(prev.sala) rpc('play_estado', { p_token: st.token, p_sala: prev.sala }).then(entrarSala, () => inicio()); else inicio(); })
-        .catch(e => { if(e.codigo === 'play_no_disponible' || e.codigo === 'play_mesa'){ pintar('<div class="pl-hero"><div class="pl-logo">🎮</div><p>' + esc(e.message) + '</p></div>'); } else pantallaEntrar(prev); });
+        .catch(e => { if(e.codigo === 'play_no_disponible' || e.codigo === 'play_mesa'){ pintar('<div class="pl-hero"><div class="pl-logo">🎮</div><p>' + esc(e.message) + '</p></div>'); } else { pantallaEntrar(prev); if(e.codigo === 'demasiados' || e.codigo === 'red') aviso(e.message, true); } });
     } else pantallaEntrar(null);
   }
   function cerrar(){ parar(); }
