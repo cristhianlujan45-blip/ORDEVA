@@ -632,9 +632,13 @@ async function enrutar(ctx, sb, opts) {
       if (String(h.authorization || '') === 'Bearer ' + h.apikey) h.authorization = 'Bearer ' + sb.anonKey;
       h.apikey = sb.anonKey;
     }
-    const resp = await fetch(sb.url + u.pathname + u.search, { method: pq.method(), headers: h, body: ['GET', 'HEAD'].includes(pq.method()) ? undefined : pq.postDataBuffer() || undefined });
-    const out = {}; resp.headers.forEach((v, k) => { if (!/^(content-encoding|content-length|transfer-encoding|connection)$/i.test(k)) out[k] = v; });
-    await r.fulfill({ status: resp.status, headers: out, body: Buffer.from(await resp.arrayBuffer()) });
+    // Si la prueba ya está cerrando (el navegador o este servidor se apagan con una petición en el aire), la petición se
+    // corta sin tumbar la prueba: antes, ese error sin atrapar hacía salir a Node con código 1 después de pasar todo.
+    try {
+      const resp = await fetch(sb.url + u.pathname + u.search, { method: pq.method(), headers: h, body: ['GET', 'HEAD'].includes(pq.method()) ? undefined : pq.postDataBuffer() || undefined });
+      const out = {}; resp.headers.forEach((v, k) => { if (!/^(content-encoding|content-length|transfer-encoding|connection)$/i.test(k)) out[k] = v; });
+      await r.fulfill({ status: resp.status, headers: out, body: Buffer.from(await resp.arrayBuffer()) });
+    } catch (e) { await r.abort().catch(() => {}); }
   });
   if (!ctx.routeWebSocket) return;
   // Canal en vivo (Realtime «broadcast») — solo si la prueba lo pide (opts.enVivo). Imita lo que usa la app: unirse a un

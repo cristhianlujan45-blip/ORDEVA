@@ -127,8 +127,10 @@ nuevo. **Código revisado:** ORDEVA 1.82.2.
      `bono_redimir` con su referencia. Hoy la 1.95.4 solo achica la ventana (revisión de diseño, M4);
    - **bonos con «apartar y confirmar»** y un tiempo límite para lo que nunca se confirma.
 0a. **ORDEVA PLAY** (pedido del dueño el 08/11: «continúa como creas mejor; los premios son opcionales»). Fase 0 hecha
-    (auditoría). Fase 1 en la rama `play/fase1`: el motor y LA BOMBA, EL IMPOSTOR, RULETA DEL CAOS, ÚLTIMO SOBREVIVIENTE y
-    EL SHOW DE LA MESA. Los premios son opcionales para cada negocio, y los premios con alcohol están apagados.
+    (auditoría, `puente/egm/PLAY-FASE0.md`). Fase 1 (1.97.0): el motor y LA BOMBA, EL IMPOSTOR, RULETA DEL CAOS, ÚLTIMO
+    SOBREVIVIENTE y EL SHOW DE LA MESA, con las correcciones de la revisión goldfish
+    (`puente/egm/REVISION-GOLDFISH-PLAY.md`, `puente/REPORTE-1.97.0.md`). Sigue: premios y cupones (opcionales para cada
+    negocio; con alcohol, apagados), los otros 7 juegos, la pantalla del televisor (sin tocar `tv.html`) y más contenido.
 0b. **Lo que dejó la 1.95.4 para después** (`puente/egm/REVISION-GOLDFISH-1.95.4.md`):
    - **Música, primero lo que puede dejar el bar en silencio:**
      - un televisor emparejado con un equipo que no es el de la música no recibe nada;
