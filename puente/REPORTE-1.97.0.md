@@ -73,7 +73,7 @@ salas por mesa se podía rodear) y 5 menores, también corregidos.
 - **Navegador, con varios celulares a la vez:** `pruebas/play.test.js`, 38 bien, 0 mal. Cubre activar, entrar, los 5
   juegos, el aviso sin conexión, la pestaña escondida, un pedido durante el juego y un celular de 320 px.
 - **Las otras 30 pruebas del servidor:** bien.
-- **Lista completa:** RESULTADOS_AQUI
+- **Lista completa:** 130 pruebas en el navegador, 2.876 bien, 0 mal, sobre la versión final (incluye `play`, `v196` y `facturascan`). Más las 31 pruebas del servidor y la revisión de migraciones (las 62 se aplican y no borran datos), todas bien. En la primera pasada falló `v196` una vez: era el defecto del QR de pago de arriba; después del arreglo pasó 6 veces seguidas y en la lista completa.
 - **No se probó** con celulares de verdad ni con la base de datos de producción.
 
 ## Lo que queda
