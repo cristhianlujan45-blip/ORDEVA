@@ -70,4 +70,11 @@
 .pl-rank li{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-radius:14px;background:var(--card)}
 .pl-rank li.yo{outline:2px solid rgba(201,166,255,.6)}
 .pl-rank small{color:var(--ink2)}
+/* 🏆 Torneo entre mesas (1.98.0) */
+.pl-torneo{display:flex;flex-direction:column;gap:4px;width:100%;text-align:left;padding:14px 16px;border-radius:20px;border:1px solid rgba(251,191,36,.55);background:linear-gradient(135deg,rgba(251,191,36,.2),rgba(236,72,153,.16));color:var(--ink);cursor:pointer}
+.pl-torneo b{font:800 16.5px var(--sans,inherit)}
+.pl-torneo span{font:600 14px var(--sans,inherit)}
+.pl-torneo small{font:500 12.5px var(--sans,inherit);color:var(--ink2)}
+.pl-torneo.fin{border-color:rgba(201,166,255,.45);background:var(--card)}
+.pl-torneo:focus-visible{outline:3px solid var(--gold-hi,#c084fc);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){.pl-logo,.pl-bomba.mia,.pl-reloj.poco{animation:none}}

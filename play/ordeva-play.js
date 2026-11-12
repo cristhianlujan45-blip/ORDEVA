@@ -9,6 +9,10 @@
      celular está bloqueado, y deja de preguntar cuando la partida termina. PLAY no usa los canales de los pedidos.
    • Cada jugada lleva un id único (un doble toque o un reintento no cuenta dos veces) y la ronda que vio el jugador
      (una jugada hecha en una pantalla vieja no cuenta).
+   • 🏆 Torneo entre mesas (1.98.0): si el negocio empezó uno, el inicio muestra la tarjeta con el tiempo y el puesto de la
+     mesa. Se pregunta al abrir el inicio, al terminar una partida y cada minuto mientras Play se ve (cada 15 s en la
+     pantalla del torneo), con la versión de la tabla: si no cambió, la respuesta es corta. Si una partida sumó o no al
+     torneo lo dice el servidor.
    ===================================================================== */
 (function(){
   'use strict';
@@ -68,6 +72,7 @@
 
   // ---------- Entrar (alias y avatar) ----------
   function pantallaEntrar(prev){
+    pantalla = 'entrar';
     const av = (prev && prev.avatar) || AVATARES[Math.floor(Math.random() * AVATARES.length)];
     pintar('<div class="pl-hero"><div class="pl-logo">🎮</div><h2>ORDEVA PLAY</h2><p>Juega con tu mesa o contra las otras mesas. Sin registrarte.</p></div>' +
       '<label class="pl-lbl" for="plAlias">¿Cómo te llamamos?</label><input id="plAlias" class="pl-in" maxlength="20" autocomplete="off" placeholder="Tu apodo" value="' + esc((prev && prev.alias) || '') + '">' +
@@ -86,10 +91,11 @@
 
   // ---------- Inicio: juegos, unirse con código, salas abiertas, clasificación ----------
   async function inicio(){
-    salirSala(true);
+    salirSala(true); pantalla = 'inicio';
     const cards = Object.keys(JUEGOS).filter(k => !st.juegos.length || st.juegos.includes(k)).map(k => { const g = JUEGOS[k];
       return '<button type="button" class="pl-card" data-j="' + k + '"><span class="pl-cic">' + g.ic + '</span><span class="pl-ctx"><b>' + esc(g.n) + '</b><small>' + esc(g.d) + '</small></span><span class="pl-min">' + g.min + '+</span></button>'; }).join('');
     pintar('<div class="pl-top"><span class="pl-yo">' + esc(st.avatar) + ' ' + esc(st.alias) + ' · Mesa ' + esc(ctx.mesa) + '</span><button type="button" class="pl-link" id="plCambiar">Cambiar</button></div>' +
+      '<div id="plTorneoCaja"></div>' +
       '<div class="pl-unirse"><input id="plCod" class="pl-in pl-cod" maxlength="4" autocomplete="off" placeholder="CÓDIGO" aria-label="Código de la sala"><button type="button" class="pl-btn" id="plUnirse">Unirme</button></div>' +
       '<div class="pl-abiertas" id="plAbiertas"></div><h3 class="pl-h3">Elige un juego</h3><div class="pl-cards">' + cards + '</div>' +
       '<button type="button" class="pl-btn pl-ghost pl-wide" id="plRanking">🏅 Clasificación de hoy</button>');
@@ -98,6 +104,7 @@
     root.querySelector('#plCod').onkeydown = e => { if(e.key === 'Enter') unirse(e.target.value); };
     root.querySelectorAll('.pl-card').forEach(b => b.onclick = () => presentacion(b.dataset.j));
     root.querySelector('#plRanking').onclick = ranking;
+    torneoPoner(); torneoPedir().then(torneoPoner);
     try{
       const l = await rpc('play_salas_abiertas', { p_token: st.token }), box = root.querySelector('#plAbiertas'); if(!box) return;
       box.innerHTML = l.length ? '<h3 class="pl-h3">Salas abiertas</h3>' + l.slice(0, 6).map(s => '<button type="button" class="pl-sala" data-cod="' + esc(s.codigo) + '">' + (JUEGOS[s.juego] || {}).ic + ' <b>' + esc((JUEGOS[s.juego] || {}).n) + '</b> · ' + (s.modo === 'local' ? 'todo el local' : 'Mesa ' + esc(s.mesa)) + ' · ' + s.jugadores + ' 👤 <span>Unirme · ' + esc(s.codigo) + '</span></button>').join('') : '';
@@ -105,6 +112,7 @@
     }catch(e){ if(e.codigo === 'play_sesion') pantallaEntrar({ alias: st.alias, avatar: st.avatar }); }
   }
   function presentacion(k){
+    pantalla = 'juego';
     const g = JUEGOS[k];
     pintar('<button type="button" class="pl-link" id="plVolver">← Juegos</button><div class="pl-hero"><div class="pl-logo">' + g.ic + '</div><h2>' + esc(g.n) + '</h2><p>' + esc(g.d) + '</p></div>' +
       '<ol class="pl-como">' + g.como.map(x => '<li>' + esc(x) + '</li>').join('') + '</ol><p class="pl-nota">Mínimo ' + g.min + ' jugadores. Todos los retos se pueden pasar.</p>' +
@@ -118,14 +126,85 @@
   }
   async function ranking(){
     let r = null; try{ r = await rpc('play_ranking', { p_token: st.token }); }catch(e){ aviso(e.message, true); return; }
+    pantalla = 'ranking';
     pintar('<button type="button" class="pl-link" id="plVolver">← Juegos</button><h2 class="pl-h2">🏅 Clasificación de hoy</h2>' +
       '<h3 class="pl-h3">Jugadores</h3>' + (r.jugadores.length ? '<ol class="pl-rank">' + r.jugadores.map((x, i) => '<li><span>' + (i === 0 ? '👑' : (i + 1) + '.') + ' ' + esc(x.avatar) + ' ' + esc(x.alias) + ' <small>Mesa ' + esc(x.mesa) + '</small></span><b>' + x.puntos + '</b></li>').join('') + '</ol>' : '<p class="pl-nota">Todavía nadie ha jugado hoy.</p>') +
       '<h3 class="pl-h3">Mesas</h3>' + (r.mesas.length ? '<ol class="pl-rank">' + r.mesas.map((x, i) => '<li><span>' + (i === 0 ? '🏆' : (i + 1) + '.') + ' Mesa ' + esc(x.mesa) + '</span><b>' + x.puntos + '</b></li>').join('') + '</ol>' : ''));
     root.querySelector('#plVolver').onclick = inicio;
   }
 
+  // ---------- 🏆 Torneo entre mesas ----------
+  // «tor» es lo último que dijo el servidor (o null si no hay torneo). Nada del torneo lo decide el celular.
+  let tor = null, torIv = null, torTics = 0, pantalla = '', torFin = { sala: null, txt: '' };
+  const torFaltan = () => tor ? Math.max(0, Math.ceil((tor.fin - (Date.now() + (tor.desfase || 0))) / 60000)) : 0;
+  const torNombres = m => (m && m.jugadores && m.jugadores.length ? ' · ' + m.jugadores.map(esc).join(', ') : '');
+  async function torneoPedir(completo){
+    if(!st.token) return tor;
+    let r = null;
+    try{ r = await rpc('play_torneo', { p_token: st.token, p_ver: (!completo && tor && tor.v) || null }); }catch(e){ return tor; }
+    if(r && r.igual){ if(tor) tor.desfase = r.ahora - Date.now(); return tor; }
+    const antes = tor; tor = (r && r.torneo) || null;
+    if(tor){
+      tor.desfase = tor.ahora - Date.now();
+      // Empezó un torneo mientras estaba en otra pantalla de Play: se avisa (en el inicio ya sale la tarjeta).
+      if(tor.abierto && (!antes || antes.id !== tor.id) && pantalla !== 'inicio' && pantalla !== 'torneo' && pantalla !== 'entrar' && root && root.querySelector('.pl-aviso')) aviso('🏆 ¡Empezó un torneo de mesas! Las partidas que terminen antes de que acabe suman a tu mesa.');
+    }
+    return tor;
+  }
+  function torneoGanador(){
+    const g = (tor.mesas || [])[0];
+    return !g ? 'Nadie jugó' : (tor.total === 1 ? 'Solo jugó la Mesa ' + esc(g.mesa) : 'Ganó la Mesa ' + esc(g.mesa)) + torNombres(g);
+  }
+  function torneoTarjeta(){
+    if(!tor) return '';
+    if(!tor.abierto) return '<button type="button" class="pl-torneo fin" id="plTorneo"><b>🏆 Torneo de mesas terminado</b><span>' + torneoGanador() + '</span></button>';
+    const m = torFaltan();
+    const mia = tor.miPuesto && tor.mia ? 'Tu mesa va ' + tor.miPuesto + '.ª de ' + tor.total + ' · ' + tor.mia.puntos + ' puntos' : 'Tu mesa todavía no suma: ¡juega una partida!';
+    return '<button type="button" class="pl-torneo" id="plTorneo"><b>🏆 Torneo de mesas · ' + (m > 0 ? 'faltan ' + m + ' min' : 'terminando…') + '</b><span>' + mia + '</span>' +
+      (m > 0 && m <= 5 ? '<small>⏳ Quedan menos de 5 minutos: una partida larga puede no alcanzar.</small>' : '') + '</button>';
+  }
+  function torneoPoner(){
+    const c = root && root.querySelector('#plTorneoCaja'); if(!c) return;
+    c.innerHTML = torneoTarjeta();
+    const b = c.querySelector('#plTorneo'); if(b) b.onclick = pantallaTorneo;
+  }
+  function pantallaTorneo(){
+    if(!tor){ inicio(); return; }
+    pantalla = 'torneo';
+    const t = tor, ms = t.mesas || [], m = torFaltan();
+    const filas = ms.map((x, i) => '<li class="' + (x.mesa === t.miMesa ? 'yo' : '') + '"><span>' + (i === 0 ? '👑' : (i + 1) + '.') + ' Mesa ' + esc(x.mesa) + (x.mesa === t.miMesa ? ' (tu mesa)' : '') +
+      (x.jugadores && x.jugadores.length ? ' <small>' + x.jugadores.map(esc).join(', ') + '</small>' : '') + '</span><b>' + x.puntos + '</b></li>').join('') +
+      (t.miPuesto && t.mia && t.miPuesto > ms.length ? '<li class="yo"><span>' + t.miPuesto + '. Mesa ' + esc(t.mia.mesa) + ' (tu mesa)</span><b>' + t.mia.puntos + '</b></li>' : '');
+    pintar('<button type="button" class="pl-link" id="plVolver">← Juegos</button>' +
+      '<div class="pl-hero"><div class="pl-logo">🏆</div><h2>Torneo de mesas</h2><p>' + (t.abierto ? (m > 0 ? 'Faltan ' + m + ' minutos' : 'Terminando…') : torneoGanador()) + '</p></div>' +
+      '<p class="pl-nota">Cada partida le da a tu mesa hasta 100 puntos (los de su mejor jugador). Cuentan las 5 mejores partidas de la mesa. La Ruleta es por diversión: no suma.</p>' +
+      (t.abierto && m > 0 && m <= 5 ? '<p class="pl-nota">⏳ Quedan menos de 5 minutos: una partida larga puede no alcanzar.</p>' : '') +
+      (filas ? '<ol class="pl-rank" id="plTorneoTabla">' + filas + '</ol>' : '<p class="pl-nota" id="plTorneoTabla">' + (t.abierto ? 'Todavía ninguna mesa suma. ¡Sé la primera!' : 'Nadie jugó en este torneo.') + '</p>') +
+      (t.abierto && !t.miPuesto && filas ? '<p class="pl-nota">Tu mesa todavía no suma: ¡juega una partida!</p>' : '') +
+      '<button type="button" class="pl-cta" id="plJugar">' + (t.abierto ? '▶ Jugar' : 'Volver a los juegos') + '</button>');
+    root.querySelector('#plVolver').onclick = inicio; root.querySelector('#plJugar').onclick = inicio;
+  }
+  // Mientras Play se ve: la pantalla del torneo se refresca cada 15 s; en las demás, se pregunta cada minuto.
+  function torneoTic(){
+    if(!st.token || !visible()) return;
+    torTics++;
+    if(pantalla === 'torneo'){ const v0 = tor && tor.v, m0 = torFaltan(); torneoPedir().then(() => { if(pantalla === 'torneo' && (!tor || tor.v !== v0 || torFaltan() !== m0)) pantallaTorneo(); }); }
+    else if(torTics % 4 === 0) torneoPedir().then(() => { if(pantalla === 'inicio') torneoPoner(); });
+    else if(pantalla === 'inicio') torneoPoner();   // el «faltan N min» de la tarjeta
+  }
+  // Al terminar una partida: el servidor dice si sumó al torneo.
+  async function torneoAlTerminar(sala){
+    await torneoPedir(true);
+    if(!tor || !tor.miUltima || st.sala !== sala) return;
+    const u = tor.miUltima, reciente = tor.abierto || (Date.now() + (tor.desfase || 0)) - tor.fin < 10 * 60000;
+    if(!u.sumo && !reciente) return;
+    torFin = { sala, txt: u.sumo ? '🏆 Esta partida sumó al torneo de mesas.' : u.juego === 'ruleta' ? '🏆 Hay torneo de mesas, pero la Ruleta es por diversión: no suma.' : '🏆 Esta partida no alcanzó a sumar al torneo de mesas.' };
+    const e = root && root.querySelector('#plTorneoFin'); if(e){ e.textContent = torFin.txt; e.hidden = false; }
+  }
+
   // ---------- La sala ----------
   function entrarSala(v){
+    pantalla = 'sala';
     st.sala = v.sala.id; guardar(); completa = 0; aplicar(v, true);
     programar(); clearInterval(reloj); reloj = setInterval(pintarReloj, 250);
   }
@@ -219,8 +298,9 @@
       const titulo = gan.length > 1 ? '¡Empate! ' + gan.map(x => esc(x.avatar) + ' ' + esc(x.alias)).join(' y ') : gan.length ? esc(gan[0].avatar) + ' ' + esc(gan[0].alias) + ' gana' : 'Fin del juego';
       html += '<div class="pl-hero"><div class="pl-logo">🏆</div><h2>' + titulo + '</h2></div>' +
         '<ol class="pl-rank">' + f.map((x, i) => '<li class="' + (x.j === st.jugador ? 'yo' : '') + '"><span>' + (x.gano ? '👑' : (i + 1) + '.') + ' ' + esc(x.avatar) + ' ' + esc(x.alias) + ' <small>Mesa ' + esc(x.mesa) + '</small></span><b>' + x.puntos + '</b></li>').join('') + '</ol>' +
+        '<p class="pl-nota" id="plTorneoFin"' + (torFin.sala === s.id && torFin.txt ? '>' + esc(torFin.txt) : ' hidden>') + '</p>' +
         '<button type="button" class="pl-cta" id="plOtra">Jugar otra</button>';
-      if(!antes || antes.sala.estado !== 'fin'){ try{ window.mesoraCelebrar && window.mesoraCelebrar(['🏆', '🎉', '✨']); }catch(e){} }
+      if(!antes || antes.sala.estado !== 'fin'){ try{ window.mesoraCelebrar && window.mesoraCelebrar(['🏆', '🎉', '✨']); }catch(e){} torneoAlTerminar(s.id); }
     } else html += juego(s, p, m, me);
     // Lo que el jugador estaba escribiendo (la pista) no se pierde cuando llega una actualización.
     const escr = root.querySelector('#plPistaTxt'), txt = escr ? escr.value : '', foco = escr && document.activeElement === escr;
@@ -292,6 +372,7 @@
   function abrir(el, c){
     if(root === el && st.token){ if(st.sala){ refrescar(true); if(!poll) programar(); if(!reloj) reloj = setInterval(pintarReloj, 250); } return; }   // ya estaba abierto: solo se actualiza
     root = el; ctx = c;
+    if(!torIv) torIv = setInterval(torneoTic, 15000);
     const prev = leer();
     if(prev && prev.token){
       Object.assign(st, prev);

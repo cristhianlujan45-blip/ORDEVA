@@ -11,8 +11,8 @@
 --    puntos sin el tope del día («brutos»). Si algo falla en el disparador, la partida termina igual, sin torneo.
 --  • Sin carrera con el cierre: el disparador lee el torneo con candado compartido; el cierre toma el exclusivo y solo
 --    después calcula el resultado.
---  • La tabla de mesas se guarda y se recalcula como mucho cada 8 segundos. El cliente manda su versión y, si no cambió,
---    recibe una respuesta corta.
+--  • La tabla de mesas se guarda y solo se recalcula cuando terminó una partida nueva del torneo (se compara cuántas
+--    partidas tiene). El cliente manda su versión y, si no cambió, recibe una respuesta corta.
 --  • Sin premios: esta fase solo anuncia la mesa ganadora (los premios son la fase 3).
 --  • Sin acceso directo a la tabla (RLS sin políticas). No borra nada de lo existente. Se puede volver a correr.
 -- =====================================================================
@@ -25,6 +25,7 @@ create table if not exists public.play_torneos (
   cerrado     timestamptz,                               -- cuándo se cerró (a mano o por tiempo); null = abierto
   tabla       jsonb not null default '[]'::jsonb,        -- la tabla de mesas guardada
   tabla_en    timestamptz,                               -- cuándo se calculó
+  tabla_n     int,                                       -- con cuántas filas de puntos se calculó (para saber si hay nuevas)
   resultado   jsonb,                                     -- congelado al cerrar: la tabla y la regla usada
   creado_por  uuid,
   check (fin > inicio)
@@ -85,11 +86,14 @@ language sql stable security definer set search_path = public, extensions as $$
     from mesas
 $$;
 
--- Recalcula la tabla guardada de un torneo abierto, como mucho cada 8 segundos (o ya, si p_ya).
+-- Recalcula la tabla guardada de un torneo abierto SOLO si terminó alguna partida nueva (o ya, si p_ya): compara cuántas
+-- filas de puntos tiene el torneo con las que tenía al calcular. Sin partidas nuevas es un conteo por índice y nada más.
 create or replace function public.play_torneo_refrescar(p_torneo uuid, p_ya boolean default false) returns void
 language sql security definer set search_path = public, extensions as $$
-  update play_torneos set tabla = play_torneo_tabla(id), tabla_en = clock_timestamp()
-   where id = p_torneo and cerrado is null and (p_ya or tabla_en is null or tabla_en < now() - interval '8 seconds')
+  update play_torneos t set tabla = play_torneo_tabla(t.id), tabla_en = clock_timestamp(),
+         tabla_n = (select count(*) from play_puntos p where p.torneo_id = t.id)
+   where t.id = p_torneo and t.cerrado is null
+     and (p_ya or t.tabla_n is distinct from (select count(*)::int from play_puntos p where p.torneo_id = t.id))
 $$;
 
 -- Cierra un torneo: primero el candado (espera a las partidas que se están guardando) y después, en otra instrucción, el
@@ -102,6 +106,7 @@ begin
   if not found then return false; end if;
   tab := play_torneo_tabla(t.id);
   update play_torneos set fin = least(fin, now()), cerrado = now(), tabla = tab, tabla_en = clock_timestamp(),
+      tabla_n = (select count(*) from play_puntos p where p.torneo_id = t.id),
       resultado = jsonb_build_object('mesas', tab, 'regla', jsonb_build_object('tope', 100, 'mejores', 5,
         'ref', jsonb_build_object('show', 1600, 'bomba', 600, 'impostor', 600, 'sobreviviente', 560), 'sin', jsonb_build_array('ruleta')))
    where id = t.id;

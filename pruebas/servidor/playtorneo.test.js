@@ -22,9 +22,8 @@ async function pruebas(sb) {
   const rpc = async (fn, args, tok) => { const r = await fetch(sb.url + '/rest/v1/rpc/' + fn, { method: 'POST', headers: cab(tok), body: JSON.stringify(args || {}) }); return { st: r.status, j: await r.json().catch(() => null) }; };
   const err = (r) => JSON.stringify(r.j || '');
   const uno = async (q, p) => (await sb.sql(q, p))[0];
-  // La prueba va mucho más rápido que una persona: el límite de llamadas y la tabla guardada (8 s) se reinician a mano.
+  // La prueba va mucho más rápido que una persona: el límite de llamadas se reinicia a mano.
   const respiro = () => sb.sql('update play_jugadores set cupo_n = 0');
-  const fresco = () => sb.sql('update play_torneos set tabla_en = null where cerrado is null');
 
   const dueno = await sb.usuario('dueno@torneobar.co');
   const NEG = (await rpc('crear_negocio', { p_nombre: 'Bar Torneo', p_datos: {} }, dueno.token)).j;
@@ -99,7 +98,7 @@ async function pruebas(sb) {
   r = await rpc('play_torneo', { p_token: a1.token });
   chk('El cliente ve el torneo abierto, su mesa y que todavía no suma', r.j.torneo && r.j.torneo.abierto && r.j.torneo.miMesa === 1 && r.j.torneo.miPuesto === null && r.j.torneo.mesas.length === 0, r.j);
   chk('… y su última partida (de antes del torneo) no sumó', r.j.torneo.miUltima && r.j.torneo.miUltima.sumo === false, r.j.torneo.miUltima);
-  const tabla = async (tok) => { await fresco(); await respiro(); return (await rpc('play_torneo', { p_token: (tok || a1).token })).j.torneo; };
+  const tabla = async (tok) => { await respiro(); return (await rpc('play_torneo', { p_token: (tok || a1).token })).j.torneo; };
   const de = (t, mesa) => t.mesas.find((m) => m.mesa === mesa) || null;
 
   let s1 = await partida('show', [[a1, 800], [a2, 400], [a3, 1200]]);
@@ -150,9 +149,11 @@ async function pruebas(sb) {
   r = await rpc('play_torneo', { p_token: b1.token, p_ver: t.v });
   chk('Si la tabla no cambió, la respuesta es corta', r.j && r.j.igual === true && !r.j.torneo, r.j);
   const guardada = (await uno('select tabla_en from play_torneos where id = $1', [T.id])).tabla_en;
+  for (const tk of [a2, b2, c2]) await rpc('play_torneo', { p_token: tk.token });
+  chk('La tabla guardada no se recalcula en cada lectura (solo si terminó una partida nueva)', String((await uno('select tabla_en from play_torneos where id = $1', [T.id])).tabla_en) === String(guardada));
   await partida('show', [[a1, 160], [a2, 0]]);
-  await rpc('play_torneo', { p_token: a2.token });
-  chk('La tabla guardada no se recalcula en cada lectura (como mucho cada 8 s)', String((await uno('select tabla_en from play_torneos where id = $1', [T.id])).tabla_en) === String(guardada));
+  r = await rpc('play_torneo', { p_token: a2.token, p_ver: t.v });
+  chk('… y apenas termina una partida nueva, la siguiente lectura ya trae la tabla al día (sin esperar)', r.j.torneo && r.j.torneo.v !== t.v && de(r.j.torneo, 1).partidas === de(t, 1).partidas + 1, r.j.torneo && de(r.j.torneo, 1));
   await respiro(); let lim = 0;
   for (let i = 0; i < 32; i++) { const x = await rpc('play_torneo', { p_token: a3.token }); if (x.st === 200 && x.j && x.j.error === 'demasiados') lim++; }
   chk('El límite de llamadas también cuenta aquí y contesta {error} sin lanzar error', lim >= 5, lim);

@@ -58,8 +58,10 @@ tiempo real, puntuaciones y torneos entre mesas.» Después de la fase 1 (1.97.0
     pasan por ahí, haya torneo o no).
   - **Sin carrera con el cierre:** el disparador lee el torneo con candado compartido; el cierre toma el candado exclusivo y
     solo después calcula. Una partida que alcanzó a ver el torneo abierto queda en el resultado.
-- **La tabla de mesas se guarda** y se recalcula como mucho cada 8 segundos (no en cada lectura). El cliente manda la versión
-  que ya tiene y, si no cambió, recibe una respuesta corta. Se devuelven las 10 primeras mesas más la del que pregunta.
+- **La tabla de mesas se guarda** y solo se recalcula cuando terminó una partida nueva del torneo (no en cada lectura ni por
+  tiempo: al probarlo, con «cada 8 segundos» la tarjeta seguía diciendo «tu mesa todavía no suma» después de jugar). El
+  cliente manda la versión que ya tiene y, si no cambió, recibe una respuesta corta. Se devuelven las 10 primeras mesas más
+  la del que pregunta.
 - **Cierre:** a mano o cuando pasa su hora. Se cierra al leerlo y con pg_cron cada 5 minutos, por si nadie lo mira. El
   resultado de un torneo se muestra hasta 3 horas después de su **hora de fin** (no de cuándo se cerró).
 - **Para el negocio (con su sesión):**
