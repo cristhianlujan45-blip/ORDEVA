@@ -56,12 +56,18 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
 
     // Se cierra la gracia. El negocio publica la carta y su QR de pago (la llave Bre-B) con su sesión.
     await sb.sql("update servidor_config set valor = jsonb_build_object('t', now() - interval '1 minute') where clave = 'canal_escribir_desde'");
+    // El dueño pone su QR de pago como en la app (Ajustes → Mi QR de pago): la app lo publica. Se pide publicar «sin QR» y
+    // enseguida el QR (como cuando la app recién abre y el dueño lo cambia): las publicaciones van en fila y gana la última.
     await A.evaluate(async () => {
       window.vitoPublicarCatalogo && window.vitoPublicarCatalogo(true);
-      await fetch('https://canal.vento.local/' + window.vitoMod.qCfg().topic + 'f', { method: 'POST', body: JSON.stringify({ n: '__qrpago__', q: 'Bre-B', l: '@barseguro', i: 'data:image/png;base64,iVBORw0KGgo=' }) });
+      const sinQR = window.qrPagoPublicar(true);
+      data.qrPago = { img: 'data:image/png;base64,iVBORw0KGgo=', tipo: 'Bre-B', llave: '@barseguro' }; saveData();
+      await Promise.all([sinQR, window.qrPagoPublicar(true)]);
     });
     const firmados = async (s) => (await sb.sql('select count(*)::int n from canal_mensajes where canal = $1 and firmado', [topic + s]))[0].n;
     chk('1. La app del negocio publica el QR de pago con su sesión (queda firmado)', await (async () => { for(let i = 0; i < 30; i++){ if(await firmados('f') > 0) return true; await new Promise(z => setTimeout(z, 500)); } return false; })());
+    const ultimo = async () => { const r = await sb.sql("select cuerpo from canal_mensajes where canal = $1 and firmado and cuerpo like '%__qrpago__%' order by id desc limit 1", [topic + 'f']); return r[0] ? JSON.parse(r[0].cuerpo) : null; };
+    chk('1. Lo último publicado es el QR del bar, no «sin QR» (las publicaciones van en fila: gana la última)', await (async () => { for(let i = 0; i < 40; i++){ const u = await ultimo(); if(u && u.l === '@barseguro') return true; await new Promise(z => setTimeout(z, 500)); } return false; })(), await ultimo());
     chk('1. … y la carta también', await (async () => { for(let i = 0; i < 30; i++){ if(await firmados('k') > 0) return true; await new Promise(z => setTimeout(z, 500)); } return false; })());
 
     const otro = await fetch(sb.url + '/rest/v1/rpc/canal_publicar', { method: 'POST', headers: { apikey: sb.anonKey, Authorization: 'Bearer ' + sb.anonKey, 'Content-Type': 'application/json' },

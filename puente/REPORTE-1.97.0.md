@@ -53,6 +53,11 @@ Después de la auditoría (fase 0, `puente/egm/PLAY-FASE0.md`): «continúa como
 - **Cliente del QR:** `play/ordeva-play.js` y `play/play.css` (se cargan solo al tocar «Play»); en `pedido.html`, la
   pestaña y su panel.
 - **Negocio:** `lib/vento-play.js` (el panel) y la casilla en «Más»; la carta publicada lleva `pl:1` cuando está prendido.
+- **QR de pago (arreglo que salió de la lista completa):** `app/16-pago-dueno-sube.js`. Desde la 1.96 la app espera hasta
+  15 segundos la sesión antes de publicar el QR de pago. Si en ese rato el dueño cambiaba su QR, el mensaje viejo («sin
+  QR») podía salir después del nuevo y los clientes dejaban de verlo hasta el repaso de los 30 minutos. Ahora las
+  publicaciones van en fila y gana la última. Por eso fallaba a veces la prueba `v196`, que ahora publica el QR como lo
+  hace la app y comprueba que lo último publicado es el QR del negocio.
 - **Pruebas:** un arreglo en el ayudante de pruebas (`pruebas/servidor/supabase-local.js`): una petición en el aire al
   cerrar ya no tumba la prueba. Eso hizo fallar `pedidostienda` en GitHub con la 1.96, después de pasar sus 29
   comprobaciones.

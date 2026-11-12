@@ -69,7 +69,17 @@
     for(const lado of [240, 200, 170, 140, 110]){ const u = blancoNegro(canvasDe(img, lado)).toDataURL('image/png'); if(u.length <= 3600) return { img: u, txt }; }
     return null;
   }
+  // 1.97: una publicación a la vez. Publicar puede tardar (espera hasta 15 s la sesión del negocio): si mientras tanto el QR
+  // cambia, se publica otra vez al terminar, con lo que haya en ese momento. Antes las dos salían a la vez y el mensaje
+  // viejo («sin QR») podía llegar DESPUÉS del nuevo: los clientes dejaban de ver el QR hasta el repaso de los 30 minutos.
+  let qpEnCurso = false, qpOtra = null;
   async function qpPublicar(forzar){
+    if(qpEnCurso){ qpOtra = { forzar: !!forzar || !!(qpOtra && qpOtra.forzar) }; return; }
+    qpEnCurso = true;
+    try{ await qpPublicarYa(forzar); }
+    finally{ qpEnCurso = false; if(qpOtra){ const f = qpOtra.forzar; qpOtra = null; qpPublicar(f); } }
+  }
+  async function qpPublicarYa(forzar){
     const q = QP(), cfg = window.vitoQCfg ? window.vitoQCfg() : null;
     if(!cfg || !cfg.topic || !navigator.onLine) return;
     // 1.96: el QR de pago solo lo publican el dueño o el administrador (el servidor no deja a los demás).
