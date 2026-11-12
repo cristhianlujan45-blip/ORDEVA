@@ -15,9 +15,9 @@
   if(window.ordevaPlay) return;
   const JUEGOS = {
     show: { ic: '🎤', n: 'El Show de la Mesa', d: 'Preguntas rápidas: el que responde bien y más rápido gana más puntos.', min: 2, como: ['Sale una pregunta con 4 opciones.', 'Tienes 20 segundos: entre más rápido, más puntos.', '8 preguntas y gana quien más sume.'] },
-    bomba: { ic: '💣', n: 'La Bomba', d: 'Responde bien para pasar la bomba antes de que explote.', min: 2, como: ['Si tienes la bomba, responde la cuenta para pasarla.', 'Nadie sabe cuándo explota.', 'A quien le explota, sale y le toca un reto (puede pasar).'] },
+    bomba: { ic: '💣', n: 'La Bomba', d: 'Responde bien para pasar la bomba antes de que explote.', min: 2, como: ['Si tienes la bomba, responde la cuenta para pasarla.', 'Si fallas, sale otra cuenta y esperas 3 segundos.', 'Nadie sabe cuándo explota.', 'A quien le explota, sale y le toca un reto (puede pasar).'] },
     impostor: { ic: '🕵️', n: 'El Impostor', d: 'Todos tienen la palabra secreta menos uno. ¿Quién es?', min: 3, como: ['Cada uno da una pista de la palabra, sin decirla.', 'El impostor no la sabe: tiene que disimular.', 'Voten quién es el impostor.'] },
-    ruleta: { ic: '🎡', n: 'Ruleta del Caos', d: 'La ruleta elige a alguien y un reto divertido.', min: 2, como: ['Gira la ruleta: elige a una persona y un reto.', 'Puede cumplirlo, cambiarlo una vez o pasar.', 'Los demás aplauden si lo hizo bien.'] },
+    ruleta: { ic: '🎡', n: 'Ruleta del Caos', d: 'La ruleta elige a alguien y un reto divertido.', min: 2, como: ['Gira la ruleta: elige a una persona y un reto.', 'Puede cumplirlo, cambiarlo una vez o pasar.', 'Si lo cumple, los demás aplauden: cada aplauso le da puntos.'] },
     sobreviviente: { ic: '🏆', n: 'Último Sobreviviente', d: 'Cada ronda más rápida. Quien falla, sale. Gana el último.', min: 2, como: ['Sale un reto de cálculo con 4 opciones.', 'Si fallas o no respondes a tiempo, quedas fuera.', 'Cada ronda hay menos tiempo.'] }
   };
   const AVATARES = ['😎', '🦁', '🐯', '🦊', '🐼', '🐸', '🦄', '🐙', '🤖', '👽', '🎃', '🌟'];
@@ -46,6 +46,9 @@
     if(fallos){ fallos = 0; sinRed(); }
     let j = null; try{ j = t ? JSON.parse(t) : null; }catch(e){}
     if(!r.ok){ const m = (j && (j.message || j.hint)) || ('HTTP ' + r.status); const k = Object.keys(ERRORES).find(x => m.indexOf(x) >= 0); const e = new Error(k ? ERRORES[k] : 'No se pudo: ' + m); e.codigo = k || ''; throw e; }
+    // El servidor contesta {error: …} (sin lanzar error, para que su límite de llamadas sí cuente): aquí se vuelve un error.
+    // Una jugada que no vale trae la vista Y el error: esa la maneja jugar().
+    if(j && typeof j.error === 'string' && !j.sala){ const e = new Error(ERRORES[j.error] || ERRORES.play_jugada); e.codigo = j.error; throw e; }
     return j;
   }
   const cid = () => 'j' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -149,7 +152,10 @@
       if(sala !== st.sala) return;   // ya salió de esa sala: no se vuelve a pintar
       if(v && v.igual){ st.desfase = v.ahora - Date.now(); return; }
       aplicar(v);
-    }catch(e){ if(sala === st.sala && (e.codigo === 'play_sala' || e.codigo === 'play_sesion')){ salirSala(true); aviso(e.message, true); inicio(); } }
+    }catch(e){ if(sala === st.sala && (e.codigo === 'play_sala' || e.codigo === 'play_sesion')){
+      // Primero la pantalla y después el aviso (la pantalla nueva borraba el aviso).
+      salirSala(true); if(e.codigo === 'play_sesion') pantallaEntrar({ alias: st.alias, avatar: st.avatar }); else inicio();
+      aviso(e.message, true); } }
     finally{ pidiendo = false; }
   }
   async function jugar(tipo, dato){
@@ -166,6 +172,7 @@
   }
   function aplicar(v, forzar){
     if(!v || !v.sala || v.sala.id !== st.sala) return;
+    if(st.vista && v.sala.version < st.ver) return;   // una respuesta vieja que llegó tarde no pisa lo más nuevo
     if(!forzar && st.vista && v.sala.version === st.ver && v.sala.fase === st.vista.sala.fase) { st.vista = v; return; }
     const antes = st.vista; st.vista = v; st.ver = v.sala.version; st.desfase = v.sala.ahora - Date.now();
     pintarSala(antes);
@@ -206,7 +213,7 @@
       html += '<div class="pl-hero"><p>Comparte este código con tu ' + (s.modo === 'local' ? 'mesa o con otras mesas' : 'mesa') + ':</p><div class="pl-codigo">' + esc(s.codigo) + '</div></div>' +
         '<h3 class="pl-h3">Cómo se juega</h3><ol class="pl-como">' + g.como.map(x => '<li>' + esc(x) + '</li>').join('') + '<li>Todos los retos se pueden pasar.</li></ol>' +
         '<h3 class="pl-h3">Jugadores (' + n + ')</h3>' + tabla() +
-        (s.anfitrion ? '<button type="button" class="pl-cta" id="plEmpezar"' + (n < g.min ? ' disabled' : '') + '>' + (n < g.min ? 'Faltan ' + (g.min - n) + ' para empezar' : '▶ Empezar') + '</button>' : '<p class="pl-nota">Esperando a que ' + nombre(v.jugadores[0] && v.jugadores[0].id) + ' empiece…</p>');
+        (s.anfitrion ? '<button type="button" class="pl-cta" id="plEmpezar"' + (n < g.min ? ' disabled' : '') + '>' + (n < g.min ? 'Faltan ' + (g.min - n) + ' para empezar' : '▶ Empezar') + '</button>' : '<p class="pl-nota">Esperando a que ' + nombre(s.anfitrionId) + ' empiece…</p>');
     } else if(s.estado === 'fin'){
       const f = p.final || [], gan = f.filter(x => x.gano);
       const titulo = gan.length > 1 ? '¡Empate! ' + gan.map(x => esc(x.avatar) + ' ' + esc(x.alias)).join(' y ') : gan.length ? esc(gan[0].avatar) + ' ' + esc(gan[0].alias) + ' gana' : 'Fin del juego';
@@ -259,9 +266,9 @@
       if(f === 'girar') return '<div class="pl-bomba">🎡<b>¡A girar la ruleta!</b><span>Cualquiera puede girarla</span></div><button type="button" class="pl-cta" data-act="girar">🎡 Girar</button>' + tabla();
       if(f === 'reto'){
         const mio = p.elegido === st.jugador;
-        return '<div class="pl-bomba">🎯<b>' + nombre(p.elegido) + '</b></div><div class="pl-reto"><small>Reto</small>' + esc(p.reto) + '</div>' +
+        return '<div class="pl-bomba">🎯<b>' + nombre(p.elegido) + '</b></div><div class="pl-reto"><small>Reto (se puede pasar)</small>' + esc(p.reto) + '</div>' +
           (mio ? '<p class="pl-nota">Hazlo y toca «¡Lo hice!»: los puntos te los dan los aplausos de los demás.</p><div class="pl-ops"><button type="button" class="pl-op ok" data-act="cumplir">✅ ¡Lo hice!</button>' + (p.cambio ? '<button type="button" class="pl-op" data-act="cambiar">🔄 Cambiar reto</button>' : '') + '<button type="button" class="pl-op" data-act="pasar">⏭ Paso</button></div>'
-            : aplauso(p, m)) + tabla();
+            : '<p class="pl-nota">Cuando lo haga, podrás aplaudir 👏 (cada aplauso le da +25).</p>') + tabla();
       }
       return '<div class="pl-bomba">' + (p.hizo === 'cumplir' ? '🎉<b>¡Lo cumplió!</b>' : '⏭<b>Pasó</b>') + '</div>' + (p.hizo === 'cumplir' && p.elegido !== st.jugador ? aplauso(p, m) : '') + tabla();
     }
@@ -283,7 +290,7 @@
 
   // ---------- Abrir ----------
   function abrir(el, c){
-    if(root === el && st.token){ if(st.sala){ refrescar(true); if(!poll) programar(); } return; }   // ya estaba abierto: solo se actualiza
+    if(root === el && st.token){ if(st.sala){ refrescar(true); if(!poll) programar(); if(!reloj) reloj = setInterval(pintarReloj, 250); } return; }   // ya estaba abierto: solo se actualiza
     root = el; ctx = c;
     const prev = leer();
     if(prev && prev.token){

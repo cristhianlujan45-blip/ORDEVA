@@ -18,8 +18,9 @@
 --    que hablan de «tu mesa» o «tu derecha» no salen en el modo «todo el local».
 --  • Cada negocio decide si lo activa (apagado por defecto) y qué juegos y retos ofrece. Apagarlo (o quitar un juego)
 --    termina las partidas abiertas.
---  • Límites: jugadas por jugador (cuentan también las que fallan), jugadores nuevos por IP y por negocio, salas abiertas
---    por negocio y puntos por jugador por día. La limpieza corre con pg_cron, no dentro de una petición de un cliente.
+--  • Límites: llamadas por jugador y entradas por IP (cuentan también las que fallan: las funciones del cliente no lanzan
+--    error después de contar, devuelven {error}), jugadores nuevos por IP, por mesa y por negocio, salas abiertas por mesa
+--    y por negocio, y puntos por jugador por día. La limpieza corre con pg_cron, no dentro de una petición de un cliente.
 --  • Sin acceso directo a las tablas (RLS sin políticas para anon/authenticated): todo pasa por funciones que validan.
 --  No borra nada de lo existente. Se puede volver a correr.
 -- =====================================================================
@@ -49,6 +50,12 @@ create table if not exists public.play_jugadores (
 create index if not exists play_jugadores_neg_idx on public.play_jugadores(negocio_id, creado);
 create index if not exists play_jugadores_origen_idx on public.play_jugadores(origen_h, creado) where origen_h is not null;
 create index if not exists play_jugadores_creado_idx on public.play_jugadores(creado);
+-- Entradas por IP (play_entrar): cuenta TODAS, también las que fallan (código de mesa malo). Ventana de 1 minuto.
+create table if not exists public.play_origen (
+  origen_h text primary key,
+  n        int not null default 0,
+  desde    timestamptz not null default now()
+);
 create table if not exists public.play_salas (
   id          uuid primary key default gen_random_uuid(),
   negocio_id  uuid not null references public.negocios(id) on delete cascade,
@@ -118,7 +125,7 @@ create table if not exists public.play_palabras (id serial primary key, categori
 create table if not exists public.play_retos (id serial primary key, categoria text not null, texto text not null unique, solo_mesa boolean not null default false);
 
 do $$ declare t text; begin
-  foreach t in array array['play_config','play_jugadores','play_salas','play_miembros','play_eventos','play_puntos','play_preguntas','play_palabras','play_retos'] loop
+  foreach t in array array['play_config','play_jugadores','play_origen','play_salas','play_miembros','play_eventos','play_puntos','play_preguntas','play_palabras','play_retos'] loop
     execute 'alter table public.' || t || ' enable row level security';
     execute 'revoke all on public.' || t || ' from anon, authenticated';
   end loop;
@@ -164,18 +171,33 @@ begin
   return j;
 end $$;
 
--- Límite de llamadas por jugador: p_max en 10 s. Cuenta TODAS las llamadas (también las que no hacen nada), porque las
--- jugadas que no valen no lanzan error (devuelven la vista con «error») y el contador no se deshace.
-create or replace function public.play_cupo(p_jug uuid, p_max int) returns void
+-- Límite de llamadas por jugador: p_max en 10 s. Cuenta TODAS las llamadas (también las que no hacen nada o no valen):
+-- después de contar, las funciones del cliente NO lanzan error (devuelven {error: …}), porque un error deshace el contador.
+-- Devuelve false si se pasó (quien llama devuelve {error: 'demasiados'}).
+create or replace function public.play_cupo(p_jug uuid, p_max int) returns boolean
 language plpgsql security definer set search_path = public, extensions as $$
 declare n int;
 begin
   update play_jugadores set
-      cupo_n = case when cupo_desde < now() - interval '10 seconds' then 1 else cupo_n + 1 end,
+      cupo_n = case when cupo_desde < now() - interval '10 seconds' then 1 else least(cupo_n + 1, 100000) end,
       cupo_desde = case when cupo_desde < now() - interval '10 seconds' then now() else cupo_desde end
    where id = p_jug returning cupo_n into n;
-  if n > p_max then raise exception 'demasiados'; end if;
+  return coalesce(n, 0) <= p_max;
 end $$;
+-- Lo mismo por IP, para play_entrar (120 entradas por minuto: un local entero sale por la misma IP del wifi).
+create or replace function public.play_cupo_origen(p_origen text, p_max int) returns boolean
+language plpgsql security definer set search_path = public, extensions as $$
+declare c int;
+begin
+  if p_origen is null then return true; end if;
+  insert into play_origen as o (origen_h, n, desde) values (p_origen, 1, now())
+  on conflict (origen_h) do update set
+      n = case when o.desde < now() - interval '1 minute' then 1 else least(o.n + 1, 100000) end,
+      desde = case when o.desde < now() - interval '1 minute' then now() else o.desde end
+  returning o.n into c;
+  return coalesce(c, 0) <= p_max;
+end $$;
+create or replace function public.play_err(p_motivo text) returns jsonb language sql immutable as $$ select jsonb_build_object('error', p_motivo) $$;
 
 -- Una pregunta de cálculo (LA BOMBA, ÚLTIMO SOBREVIVIENTE): más difícil en cada nivel. 4 opciones, una correcta.
 create or replace function public.play_mate(p_nivel int) returns jsonb
@@ -224,14 +246,15 @@ $$;
 
 -- ---------- Fin de la partida: puntos que quedan ----------
 -- Tope de 3.000 puntos por jugador por día en la clasificación (lo que pase del tope no cuenta para el día).
-create or replace function public.play_terminar(p_sala uuid) returns void
+-- p_bono = false cuando la partida se acaba porque los demás se fueron o el negocio apagó PLAY: sin el +200 del final.
+create or replace function public.play_terminar(p_sala uuid, p_bono boolean default true) returns void
 language plpgsql security definer set search_path = public, extensions as $$
 declare s play_salas; top int; fin jsonb;
 begin
   select * into s from play_salas where id = p_sala;
   if s.estado = 'fin' then return; end if;
   -- Sobrevivientes al final (LA BOMBA, ÚLTIMO SOBREVIVIENTE): +200.
-  if s.juego in ('bomba', 'sobreviviente') then update play_miembros set puntos = puntos + 200 where sala_id = p_sala and vivo; end if;
+  if p_bono and s.juego in ('bomba', 'sobreviviente') then update play_miembros set puntos = puntos + 200 where sala_id = p_sala and vivo; end if;
   select max(puntos) into top from play_miembros where sala_id = p_sala;
   insert into play_puntos(negocio_id, sala_id, jugador_id, alias, avatar, mesa, juego, puntos, gano)
     select s.negocio_id, p_sala, j.id, j.alias, j.avatar, j.mesa, s.juego,
@@ -269,12 +292,17 @@ language plpgsql security definer set search_path = public, extensions as $$
 declare s play_salas; conteo jsonb;
 begin
   select * into s from play_salas where id = p_sala;
+  -- Los puntos se suman AQUÍ, al cerrar la pregunta: si se sumaran al responder, el marcador delataría la opción correcta.
+  update play_miembros m set puntos = m.puntos + coalesce((e.dato->>'pts')::int, 0)
+    from play_eventos e where e.sala_id = p_sala and e.ronda = s.ronda and e.tipo = 'responder' and (e.dato->>'ok')::boolean
+     and m.sala_id = p_sala and m.jugador_id = e.jugador_id;
   select coalesce(jsonb_object_agg(i, n), '{}'::jsonb) into conteo from (select dato->>'i' i, count(*) n from play_eventos where sala_id = p_sala and ronda = s.ronda and tipo = 'responder' group by 1) x;
   perform play_fase(p_sala, 'resultado', 5, s.publico || jsonb_build_object('correcta', s.secreto->'correcta', 'conteo', conteo));
 end $$;
 
 -- ---------- LA BOMBA (pasa la bomba respondiendo bien; si te explota, pierdes) ----------
--- «n» cuenta las preguntas: una respuesta a una pregunta vieja no vale. Si fallas, la pregunta sigue y quedas 3 s bloqueado.
+-- «n» cuenta las preguntas: una respuesta a una pregunta vieja no vale. Si fallas, sale OTRA pregunta y quedas 3 s
+-- bloqueado: ni tocar al azar ni ir descartando opciones sirve.
 create or replace function public.play_bomba_pregunta(p_sala uuid, p_portador uuid, p_pases int) returns void
 language plpgsql security definer set search_path = public, extensions as $$
 declare s play_salas; m jsonb;
@@ -346,7 +374,8 @@ begin
 end $$;
 
 -- ---------- RULETA DEL CAOS (la ruleta elige a alguien y un reto; aceptar, cambiar una vez o pasar) ----------
--- Los puntos NO los pone quien hace el reto: salen solo de los aplausos de los demás (+25 cada uno, uno por persona).
+-- Los puntos NO los pone quien hace el reto: salen solo de los aplausos de los demás (+25 cada uno, uno por persona), y
+-- solo se aplaude después de «¡Lo hice!» (quien pasa no se lleva aplausos).
 create or replace function public.play_ruleta_girar(p_sala uuid) returns void
 language plpgsql security definer set search_path = public, extensions as $$
 declare s play_salas;
@@ -367,8 +396,8 @@ language plpgsql security definer set search_path = public, extensions as $$
 declare s play_salas;
 begin
   select * into s from play_salas where id = p_sala;
-  -- Si lo cumplió, los demás tienen 8 s más para aplaudir.
-  perform play_fase(p_sala, 'resultado', case when p_que = 'cumplir' then 8 else 4 end, s.publico || jsonb_build_object('hizo', p_que));
+  -- Si lo cumplió, los demás tienen 10 s para aplaudir.
+  perform play_fase(p_sala, 'resultado', case when p_que = 'cumplir' then 10 else 4 end, s.publico || jsonb_build_object('hizo', p_que));
 end $$;
 
 -- ---------- ÚLTIMO SOBREVIVIENTE (cada ronda más rápida; quien falla o no responde, sale) ----------
@@ -404,7 +433,8 @@ begin
   select * into s from play_salas where id = p_sala;
   if s.estado <> 'jugando' then return; end if;
   v := play_vivos(p_sala); nv := coalesce(array_length(v, 1), 0);
-  if nv = 0 or (s.juego in ('bomba', 'sobreviviente') and nv <= 1) then perform play_terminar(p_sala); return; end if;
+  -- Se fueron los demás: se acaba, sin el +200 del final (no se gana porque el otro se salió).
+  if nv = 0 or (s.juego in ('bomba', 'sobreviviente') and nv <= 1) then perform play_terminar(p_sala, false); return; end if;
   t_ev := case when s.juego in ('show') and s.fase = 'pregunta' then 'responder'
                when s.juego = 'sobreviviente' and s.fase = 'reto' then 'responder'
                when s.juego = 'impostor' and s.fase = 'pistas' then 'pista'
@@ -473,7 +503,7 @@ begin
   -- LA BOMBA: la hora de la explosión no se manda (es la gracia del juego).
   hasta := case when s.juego = 'bomba' and s.fase = 'bomba' then null else play_ms(s.fase_hasta) end;
   return jsonb_build_object('sala', jsonb_build_object('id', s.id, 'codigo', s.codigo, 'juego', s.juego, 'modo', s.modo, 'mesa', s.mesa, 'estado', s.estado,
-      'fase', s.fase, 'ronda', s.ronda, 'version', s.version, 'hasta', hasta, 'ahora', play_ms(now()), 'anfitrion', s.anfitrion = p_jug),
+      'fase', s.fase, 'ronda', s.ronda, 'version', s.version, 'hasta', hasta, 'ahora', play_ms(now()), 'anfitrion', s.anfitrion = p_jug, 'anfitrionId', s.anfitrion),
     'publico', s.publico, 'jugadores', jug, 'mio', mio);
 end $$;
 -- Una jugada que no vale: la vista de siempre con el motivo (sin lanzar error, para que el límite de jugadas sí cuente).
@@ -486,30 +516,37 @@ $$;
 -- Entrar: el canal del negocio + la mesa + el código secreto de esa mesa (el del QR impreso).
 create or replace function public.play_entrar(p_canal text, p_mesa int, p_vm text, p_alias text, p_avatar text default null, p_token text default null) returns jsonb
 language plpgsql security definer set search_path = public, extensions as $$
-declare neg uuid; cfg play_config; cods jsonb; tok text; j play_jugadores; o text := public.canal_origen(); al text; av text;
+declare neg uuid; cfg play_config; cods jsonb; tok text; j play_jugadores; o text := public.canal_origen(); al text; av text; conocido boolean := false;
 begin
+  -- Primero el límite por IP, antes de leer nada del negocio. Desde aquí no se lanza error: se devuelve {error}.
+  if not play_cupo_origen(o, 120) then return play_err('demasiados'); end if;
   select negocio_id into neg from canal_privado where canal = p_canal;
-  if neg is null then raise exception 'play_no_disponible'; end if;
+  if neg is null then return play_err('play_no_disponible'); end if;
   select * into cfg from play_config where negocio_id = neg;
-  if not found or not cfg.activo then raise exception 'play_no_disponible'; end if;
-  if p_mesa is null or p_mesa < 1 or p_mesa > 500 then raise exception 'play_mesa'; end if;
-  select datos->'qrCodigos'->(p_mesa::text) into cods from datos_negocio where negocio_id = neg;
-  if p_vm is null or cods is null or not (case when jsonb_typeof(cods) = 'array' then cods ? p_vm else cods #>> '{}' = p_vm end) then raise exception 'play_mesa'; end if;
+  if not found or not cfg.activo then return play_err('play_no_disponible'); end if;
+  if p_mesa is null or p_mesa < 1 or p_mesa > 500 then return play_err('play_mesa'); end if;
+  -- Volver con el mismo token a la MISMA mesa (recargó la página): ya se le revisó el código de esa mesa al entrar.
+  if p_token is not null and char_length(p_token) >= 20 then
+    select * into j from play_jugadores where token_h = encode(digest(p_token, 'sha256'), 'hex') and negocio_id = neg and creado > now() - interval '12 hours';
+    conocido := found;
+  end if;
+  if not (conocido and j.mesa = p_mesa) then
+    select datos->'qrCodigos'->(p_mesa::text) into cods from datos_negocio where negocio_id = neg;
+    if p_vm is null or cods is null or not (case when jsonb_typeof(cods) = 'array' then cods ? p_vm else cods #>> '{}' = p_vm end) then return play_err('play_mesa'); end if;
+  end if;
   al := left(regexp_replace(trim(coalesce(p_alias, '')), '\s+', ' ', 'g'), 20);
   if al = '' or play_grosero(al) then al := 'Jugador'; end if;
   -- El avatar solo de la lista del juego.
   av := case when p_avatar = any(array['😎','🦁','🐯','🦊','🐼','🐸','🦄','🐙','🤖','👽','🎃','🌟','🙂']) then p_avatar else '🙂' end;
-  -- Volver con el mismo token (recargó la página): se conserva el jugador.
-  if p_token is not null and char_length(p_token) >= 20 then
-    select * into j from play_jugadores where token_h = encode(digest(p_token, 'sha256'), 'hex') and negocio_id = neg and creado > now() - interval '12 hours';
-    if found then
-      update play_jugadores set alias = al, avatar = av, mesa = p_mesa, visto = now() where id = j.id;
-      return jsonb_build_object('token', p_token, 'jugador', j.id, 'juegos', to_jsonb(cfg.juegos), 'local', cfg.local);
-    end if;
+  if conocido then
+    update play_jugadores set alias = al, avatar = av, mesa = p_mesa, visto = now() where id = j.id;
+    return jsonb_build_object('token', p_token, 'jugador', j.id, 'juegos', to_jsonb(cfg.juegos), 'local', cfg.local);
   end if;
-  -- Jugadores nuevos: 60 por minuto por IP (un local entero puede salir por la misma IP del wifi) y 400 por hora por negocio.
-  if o is not null and (select count(*) from play_jugadores where origen_h = o and creado > now() - interval '1 minute') >= 60 then raise exception 'demasiados'; end if;
-  if (select count(*) from play_jugadores where negocio_id = neg and creado > now() - interval '1 hour') >= 400 then raise exception 'demasiados'; end if;
+  -- Jugadores nuevos: 60 por minuto por IP, 40 por hora por mesa y 1.500 por hora por negocio. (El tope por mesa hace que
+  -- desde una sola mesa no se pueda gastar el tope de todo el negocio.)
+  if o is not null and (select count(*) from play_jugadores where origen_h = o and creado > now() - interval '1 minute') >= 60 then return play_err('demasiados'); end if;
+  if (select count(*) from play_jugadores where negocio_id = neg and mesa = p_mesa and creado > now() - interval '1 hour') >= 40 then return play_err('demasiados'); end if;
+  if (select count(*) from play_jugadores where negocio_id = neg and creado > now() - interval '1 hour') >= 1500 then return play_err('demasiados'); end if;
   tok := encode(gen_random_bytes(24), 'hex');
   insert into play_jugadores(negocio_id, mesa, alias, avatar, token_h, origen_h) values (neg, p_mesa, al, av, encode(digest(tok, 'sha256'), 'hex'), o) returning * into j;
   return jsonb_build_object('token', tok, 'jugador', j.id, 'juegos', to_jsonb(cfg.juegos), 'local', cfg.local);
@@ -519,26 +556,35 @@ create or replace function public.play_salas_abiertas(p_token text) returns json
 language plpgsql security definer set search_path = public, extensions as $$
 declare j play_jugadores := play_yo(p_token);
 begin
-  perform play_cupo(j.id, 25);
+  if not play_cupo(j.id, 25) then return '[]'::jsonb; end if;
   return coalesce((select jsonb_agg(jsonb_build_object('id', s.id, 'codigo', s.codigo, 'juego', s.juego, 'modo', s.modo, 'mesa', s.mesa, 'estado', s.estado,
       'jugadores', (select count(*) from play_miembros m where m.sala_id = s.id)) order by s.creado desc)
     from play_salas s where s.negocio_id = j.negocio_id and s.estado = 'espera' and s.actualizado > now() - interval '10 minutes'
       and (s.modo = 'local' or s.mesa = j.mesa)), '[]'::jsonb);
 end $$;
 
+-- Salas abiertas que cuentan para los topes: las que se están jugando y las de espera con movimiento en los últimos 10
+-- minutos (una sala de espera abandonada deja de contar sola).
+create or replace function public.play_abiertas(p_neg uuid, p_mesa int default null) returns int
+language sql stable security definer set search_path = public, extensions as $$
+  select count(*)::int from play_salas where negocio_id = p_neg and (p_mesa is null or mesa = p_mesa)
+     and ((estado = 'jugando' and actualizado > now() - interval '3 hours') or (estado = 'espera' and actualizado > now() - interval '10 minutes'))
+$$;
+
 create or replace function public.play_crear(p_token text, p_juego text, p_modo text default 'mesa') returns jsonb
 language plpgsql security definer set search_path = public, extensions as $$
 declare j play_jugadores := play_yo(p_token); cfg play_config; s play_salas; c text; n int := 0; modo text := case when p_modo = 'local' then 'local' else 'mesa' end;
 begin
-  perform play_cupo(j.id, 25);
+  if not play_cupo(j.id, 25) then return play_err('demasiados'); end if;
   select * into cfg from play_config where negocio_id = j.negocio_id;
-  if not found or not cfg.activo then raise exception 'play_no_disponible'; end if;
-  if not (p_juego = any(cfg.juegos)) then raise exception 'play_juego'; end if;
-  if modo = 'local' and not cfg.local then raise exception 'play_local'; end if;
-  if (select count(*) from play_salas where anfitrion = j.id and creado > now() - interval '10 minutes') >= 10 then raise exception 'demasiados'; end if;
-  if (select count(*) from play_salas where negocio_id = j.negocio_id and estado <> 'fin' and actualizado > now() - interval '3 hours') >= 60 then raise exception 'play_lleno'; end if;
+  if not found or not cfg.activo then return play_err('play_no_disponible'); end if;
+  if p_juego is null or not (p_juego = any(cfg.juegos)) then return play_err('play_juego'); end if;
+  if modo = 'local' and not cfg.local then return play_err('play_local'); end if;
+  if (select count(*) from play_salas where anfitrion = j.id and creado > now() - interval '10 minutes') >= 10 then return play_err('demasiados'); end if;
+  -- 8 salas abiertas por mesa y 60 por negocio: una mesa sola no puede llenar el local.
+  if play_abiertas(j.negocio_id, j.mesa) >= 8 or play_abiertas(j.negocio_id) >= 60 then return play_err('play_lleno'); end if;
   loop
-    n := n + 1; if n > 30 then raise exception 'play_codigo'; end if;
+    n := n + 1; if n > 30 then return play_err('play_codigo'); end if;
     c := substr(translate(upper(encode(gen_random_bytes(6), 'base64')), '+/=0O1IL', ''), 1, 4);
     continue when length(c) <> 4;
     begin
@@ -555,10 +601,10 @@ create or replace function public.play_unirse(p_token text, p_codigo text) retur
 language plpgsql security definer set search_path = public, extensions as $$
 declare j play_jugadores := play_yo(p_token); s play_salas;
 begin
-  perform play_cupo(j.id, 25);
+  if not play_cupo(j.id, 25) then return play_err('demasiados'); end if;
   select * into s from play_salas where negocio_id = j.negocio_id and codigo = upper(trim(coalesce(p_codigo, ''))) and estado <> 'fin' for update;
-  if not found then raise exception 'play_sala'; end if;
-  if s.modo = 'mesa' and s.mesa is distinct from j.mesa then raise exception 'play_otra_mesa'; end if;
+  if not found then return play_err('play_sala'); end if;
+  if s.modo = 'mesa' and s.mesa is distinct from j.mesa then return play_err('play_otra_mesa'); end if;
   if exists (select 1 from play_miembros where sala_id = s.id and jugador_id = j.id) then
     -- Volvió a una partida que no elimina (show, ruleta, impostor): juega otra vez. En la bomba y el sobreviviente, mira.
     if s.estado = 'jugando' and s.juego in ('show', 'ruleta', 'impostor') then
@@ -567,8 +613,8 @@ begin
     end if;
     return play_vista(s.id, j.id);
   end if;
-  if s.estado <> 'espera' then raise exception 'play_empezo'; end if;
-  if (select count(*) from play_miembros where sala_id = s.id) >= 12 then raise exception 'play_llena'; end if;
+  if s.estado <> 'espera' then return play_err('play_empezo'); end if;
+  if (select count(*) from play_miembros where sala_id = s.id) >= 12 then return play_err('play_llena'); end if;
   insert into play_miembros(sala_id, jugador_id, orden) values (s.id, j.id, (select coalesce(max(orden), 0) + 1 from play_miembros where sala_id = s.id));
   update play_salas set version = version + 1, actualizado = now() where id = s.id;
   return play_vista(s.id, j.id);
@@ -578,16 +624,16 @@ create or replace function public.play_empezar(p_token text, p_sala uuid) return
 language plpgsql security definer set search_path = public, extensions as $$
 declare j play_jugadores := play_yo(p_token); s play_salas; cfg play_config; n int; minimo int;
 begin
-  perform play_cupo(j.id, 25);
+  if not play_cupo(j.id, 25) then return play_err('demasiados'); end if;
   select * into s from play_salas where id = p_sala and negocio_id = j.negocio_id for update;
-  if not found then raise exception 'play_sala'; end if;
-  if s.anfitrion is distinct from j.id then raise exception 'play_anfitrion'; end if;
+  if not found then return play_err('play_sala'); end if;
+  if s.anfitrion is distinct from j.id then return play_err('play_anfitrion'); end if;
   if s.estado <> 'espera' then return play_vista(s.id, j.id); end if;
   select * into cfg from play_config where negocio_id = s.negocio_id;
-  if not found or not cfg.activo or not (s.juego = any(cfg.juegos)) then raise exception 'play_no_disponible'; end if;
+  if not found or not cfg.activo or not (s.juego = any(cfg.juegos)) then return play_err('play_no_disponible'); end if;
   select count(*) into n from play_miembros where sala_id = s.id;
   minimo := 2; if s.juego = 'impostor' then minimo := 3; end if;
-  if n < minimo then raise exception 'play_pocos'; end if;
+  if n < minimo then return play_err('play_pocos'); end if;
   update play_salas set estado = 'jugando', ronda = 0, version = version + 1, actualizado = now() where id = s.id;
   case s.juego
     when 'show' then perform play_show_ronda(s.id);
@@ -606,10 +652,10 @@ language plpgsql security definer set search_path = public, extensions as $$
 declare j play_jugadores := play_yo(p_token); s play_salas; m play_miembros; d jsonb := case when jsonb_typeof(p_dato) = 'object' then p_dato else '{}'::jsonb end;
         ok boolean := false; i int; t text; obj uuid; ins int; sig uuid;
 begin
-  if p_cid is null or char_length(p_cid) not between 4 and 60 then raise exception 'play_jugada'; end if;
-  perform play_cupo(j.id, 25);
+  if not play_cupo(j.id, 25) then return play_err('demasiados'); end if;
+  if p_cid is null or char_length(p_cid) not between 4 and 60 then return play_err('play_jugada'); end if;
   -- Primero: ¿es de este negocio y de esta sala? Solo después se mueve el reloj y se bloquea la sala.
-  if not exists (select 1 from play_miembros pm join play_salas ps on ps.id = pm.sala_id where pm.sala_id = p_sala and pm.jugador_id = j.id and ps.negocio_id = j.negocio_id) then raise exception 'play_sala'; end if;
+  if not exists (select 1 from play_miembros pm join play_salas ps on ps.id = pm.sala_id where pm.sala_id = p_sala and pm.jugador_id = j.id and ps.negocio_id = j.negocio_id) then return play_err('play_sala'); end if;
   perform play_tick(p_sala);
   select * into s from play_salas where id = p_sala for update;
   select * into m from play_miembros where sala_id = s.id and jugador_id = j.id;
@@ -622,9 +668,9 @@ begin
   if s.juego = 'show' and s.fase = 'pregunta' and p_tipo = 'responder' then
     i := play_i(d); if i is null then return play_no(s.id, j.id, 'play_jugada'); end if;
     ok := i = (s.secreto->>'correcta')::int;
-    insert into play_eventos(sala_id, jugador_id, ronda, tipo, dato, cid) values (s.id, j.id, s.ronda, 'responder', jsonb_build_object('i', i, 'ok', ok), 'r' || s.ronda) on conflict do nothing;
-    get diagnostics ins = row_count;
-    if ins = 1 and ok then perform play_sumar(s.id, j.id, 100 + 5 * greatest(0, floor(extract(epoch from s.fase_hasta - now())))::int); end if;
+    -- Los puntos (100 + rapidez) quedan anotados en la jugada y se suman al cerrar la pregunta (play_show_resultado).
+    insert into play_eventos(sala_id, jugador_id, ronda, tipo, dato, cid)
+      values (s.id, j.id, s.ronda, 'responder', jsonb_build_object('i', i, 'ok', ok, 'pts', 100 + 5 * greatest(0, floor(extract(epoch from s.fase_hasta - now())))::int), 'r' || s.ronda) on conflict do nothing;
     perform play_revisar(s.id);
 
   elsif s.juego = 'bomba' and s.fase = 'bomba' and p_tipo = 'responder' then
@@ -639,8 +685,9 @@ begin
         if sig is null then perform play_terminar(s.id);
         else perform play_sumar(s.id, j.id, 20); perform play_bomba_pregunta(s.id, sig, coalesce((s.publico->>'pases')::int, 0) + 1); end if;
       else
-        -- Falló: la misma pregunta y 3 s sin poder responder (adivinar al azar no sirve).
-        update play_salas set publico = publico || jsonb_build_object('bloqueo', play_ms(now() + interval '3 seconds')), version = version + 1, actualizado = now() where id = s.id;
+        -- Falló: otra pregunta y 3 s sin poder responder (adivinar al azar o descartar opciones no sirve).
+        perform play_bomba_pregunta(s.id, j.id, coalesce((s.publico->>'pases')::int, 0));
+        update play_salas set publico = publico || jsonb_build_object('bloqueo', play_ms(now() + interval '3 seconds')) where id = s.id;
       end if;
     end if;
 
@@ -673,7 +720,7 @@ begin
       get diagnostics ins = row_count;
       if ins = 1 then perform play_ruleta_cerrar(s.id, p_tipo); end if;
     end if;
-  elsif s.juego = 'ruleta' and p_tipo = 'aplaudir' and (s.fase = 'reto' or (s.fase = 'resultado' and s.publico->>'hizo' = 'cumplir')) then
+  elsif s.juego = 'ruleta' and p_tipo = 'aplaudir' and s.fase = 'resultado' and s.publico->>'hizo' = 'cumplir' then
     if (s.publico->>'elegido')::uuid is not distinct from j.id then return play_vista(s.id, j.id); end if;
     insert into play_eventos(sala_id, jugador_id, ronda, tipo, dato, cid) values (s.id, j.id, s.ronda, 'aplaudir', '{}'::jsonb, 'a' || s.ronda) on conflict do nothing;
     get diagnostics ins = row_count;
@@ -711,10 +758,13 @@ create or replace function public.play_salir(p_token text, p_sala uuid) returns 
 language plpgsql security definer set search_path = public, extensions as $$
 declare j play_jugadores := play_yo(p_token); s play_salas; otro uuid; sig uuid;
 begin
-  perform play_cupo(j.id, 25);
-  select * into s from play_salas where id = p_sala and negocio_id = j.negocio_id for update;
+  if not play_cupo(j.id, 25) then return play_err('demasiados'); end if;
   -- Solo quien está en la sala puede salir de ella (y salir dos veces no hace nada).
-  if not found or not exists (select 1 from play_miembros where sala_id = s.id and jugador_id = j.id and vivo) then return jsonb_build_object('ok', true); end if;
+  if not exists (select 1 from play_miembros pm join play_salas ps on ps.id = pm.sala_id where pm.sala_id = p_sala and pm.jugador_id = j.id and pm.vivo and ps.negocio_id = j.negocio_id) then return jsonb_build_object('ok', true); end if;
+  -- El reloj primero: si la bomba ya explotó, explota en manos de quien la tenía (no se la pasa a otro al salir).
+  perform play_tick(p_sala);
+  select * into s from play_salas where id = p_sala for update;
+  if not exists (select 1 from play_miembros where sala_id = s.id and jugador_id = j.id and vivo) then return jsonb_build_object('ok', true); end if;
   if s.estado = 'espera' then
     delete from play_miembros where sala_id = s.id and jugador_id = j.id;
     if s.anfitrion = j.id then
@@ -745,7 +795,7 @@ create or replace function public.play_ranking(p_token text) returns jsonb
 language plpgsql security definer set search_path = public, extensions as $$
 declare j play_jugadores := play_yo(p_token);
 begin
-  perform play_cupo(j.id, 25);
+  if not play_cupo(j.id, 25) then return play_err('demasiados'); end if;
   return public.play_ranking_de(j.negocio_id);
 end $$;
 create or replace function public.play_ranking_de(p_neg uuid) returns jsonb
@@ -773,10 +823,10 @@ begin
       from play_puntos where negocio_id = p_negocio and creado >= play_hoy()));
 end $$;
 -- Guardar (dueño o administrador). Prendido necesita al menos un juego. Apagarlo, o quitar un juego, termina las partidas
--- abiertas de ese juego (los puntos que llevaban quedan).
+-- abiertas de ese juego: los puntos que llevaban quedan (sin el +200 del final) y las salas de espera solo se cierran.
 create or replace function public.play_config_guardar(p_negocio uuid, p_activo boolean, p_juegos text[], p_retos text[], p_local boolean default false) returns jsonb
 language plpgsql security definer set search_path = public, extensions as $$
-declare r text := public.rol_en(p_negocio); jg text[]; rt text[]; sid uuid;
+declare r text := public.rol_en(p_negocio); jg text[]; rt text[]; sid uuid; est text;
 begin
   if r is null or r not in ('dueno', 'admin') then raise exception 'sin_permiso'; end if;
   jg := array(select distinct x from unnest(coalesce(p_juegos, '{}')) x where x in ('show','bomba','impostor','ruleta','sobreviviente'));
@@ -785,8 +835,9 @@ begin
   if array_length(rt, 1) is null then rt := array['divertido']; end if;
   insert into play_config(negocio_id, activo, juegos, retos, local, actualizado_en, actualizado_por) values (p_negocio, coalesce(p_activo, false), jg, rt, coalesce(p_local, false), now(), auth.uid())
   on conflict (negocio_id) do update set activo = excluded.activo, juegos = excluded.juegos, retos = excluded.retos, local = excluded.local, actualizado_en = now(), actualizado_por = auth.uid();
-  for sid in select id from play_salas where negocio_id = p_negocio and estado <> 'fin' and (not coalesce(p_activo, false) or not (juego = any(jg))) for update loop
-    perform play_terminar(sid);
+  for sid, est in select id, estado from play_salas where negocio_id = p_negocio and estado <> 'fin' and (not coalesce(p_activo, false) or not (juego = any(jg))) for update loop
+    if est = 'espera' then update play_salas set estado = 'fin', fase = 'fin', fase_hasta = null, version = version + 1, actualizado = now() where id = sid;
+    else perform play_terminar(sid, false); end if;
   end loop;
   return public.play_config_ver(p_negocio);
 end $$;
@@ -797,8 +848,10 @@ language plpgsql security definer set search_path = public, extensions as $$
 declare a int; b int; c int; d int;
 begin
   update play_salas set estado = 'fin', fase = 'fin', fase_hasta = null
-   where id in (select id from play_salas where estado <> 'fin' and actualizado < now() - interval '3 hours' limit 2000);
+   where id in (select id from play_salas where (estado = 'jugando' and actualizado < now() - interval '3 hours')
+                                             or (estado = 'espera' and actualizado < now() - interval '30 minutes') limit 2000);
   get diagnostics a = row_count;
+  delete from play_origen where desde < now() - interval '1 hour';
   delete from play_salas where id in (select id from play_salas where estado = 'fin' and actualizado < now() - interval '2 days' limit 2000);
   get diagnostics b = row_count;
   delete from play_jugadores where id in (select id from play_jugadores where creado < now() - interval '2 days' limit 2000);
@@ -811,8 +864,8 @@ end $$;
 -- ---------- Permisos ----------
 do $$ declare f text; begin
   foreach f in array array['play_ms(timestamptz)','play_hoy()','play_norm(text)','play_grosero(text)','play_dice_palabra(text, text)','play_i(jsonb)','play_yo(text)',
-    'play_cupo(uuid, int)','play_mate(int)','play_vivos(uuid)','play_azar(uuid[], uuid)',
-    'play_sumar(uuid, uuid, int)','play_fase(uuid, text, numeric, jsonb, jsonb, int)','play_reto(uuid, text)','play_terminar(uuid)','play_show_ronda(uuid)','play_show_resultado(uuid)',
+    'play_cupo(uuid, int)','play_cupo_origen(text, int)','play_err(text)','play_abiertas(uuid, int)','play_mate(int)','play_vivos(uuid)','play_azar(uuid[], uuid)',
+    'play_sumar(uuid, uuid, int)','play_fase(uuid, text, numeric, jsonb, jsonb, int)','play_reto(uuid, text)','play_terminar(uuid, boolean)','play_show_ronda(uuid)','play_show_resultado(uuid)',
     'play_bomba_pregunta(uuid, uuid, int)','play_bomba_ronda(uuid)','play_bomba_explota(uuid)','play_impostor_pistas(uuid, int)','play_impostor_ronda(uuid)','play_impostor_votar(uuid)','play_impostor_resultado(uuid)',
     'play_ruleta_girar(uuid)','play_ruleta_ronda(uuid)','play_ruleta_cerrar(uuid, text)','play_sobre_ronda(uuid)','play_sobre_resolver(uuid)','play_revisar(uuid)','play_vencio(uuid)','play_tick(uuid)',
     'play_vista(uuid, uuid)','play_no(uuid, uuid, text)','play_ranking_de(uuid)','play_limpiar()'] loop

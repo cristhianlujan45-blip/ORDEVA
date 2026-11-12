@@ -16,9 +16,9 @@ Después de la auditoría (fase 0, `puente/egm/PLAY-FASE0.md`): «continúa como
 | Juego | Cómo es | Jugadores |
 |---|---|---|
 | 🎤 El Show de la Mesa | 8 preguntas con 4 opciones y 20 segundos. Más rápido, más puntos. | 2 o más |
-| 💣 La Bomba | Quien tiene la bomba responde una cuenta para pasarla. Nadie sabe cuándo explota. Si falla, queda 3 segundos bloqueado. | 2 o más |
+| 💣 La Bomba | Quien tiene la bomba responde una cuenta para pasarla. Nadie sabe cuándo explota. Si falla, sale otra cuenta y queda 3 segundos bloqueado. | 2 o más |
 | 🕵️ El Impostor | Todos tienen la palabra menos uno. Cada uno da una pista y después votan. 3 rondas. | 3 o más |
-| 🎡 Ruleta del Caos | La ruleta elige a alguien y un reto. Puede cumplirlo, cambiarlo una vez o pasar. Los puntos se los dan los aplausos de los demás. | 2 o más |
+| 🎡 Ruleta del Caos | La ruleta elige a alguien y un reto. Puede cumplirlo, cambiarlo una vez o pasar. Si lo cumple, los puntos se los dan los aplausos de los demás. | 2 o más |
 | 🏆 Último Sobreviviente | Cuentas cada vez más rápidas. Quien falla o no responde, sale. | 2 o más |
 
 ## Reglas que se cumplen
@@ -37,8 +37,10 @@ Después de la auditoría (fase 0, `puente/egm/PLAY-FASE0.md`): «continúa como
 - Apagarlo, o quitar un juego, termina las partidas abiertas de ese juego.
 
 ## Contra abusos
-- 25 jugadas cada 10 segundos por jugador (cuentan también las que no valen).
-- 60 jugadores nuevos por minuto por IP y 400 por hora por negocio; 60 salas abiertas por negocio.
+- 25 llamadas cada 10 segundos por jugador (cuentan también las que no valen y las que fallan).
+- 120 entradas por minuto por IP (cuentan también los códigos de mesa malos).
+- Jugadores nuevos: 60 por minuto por IP, 40 por hora por mesa y 1.500 por hora por negocio.
+- Salas abiertas: 8 por mesa y 60 por negocio. Una sala de espera sin movimiento en 10 minutos deja de contar.
 - 3.000 puntos por jugador por día en la clasificación.
 - Apodos y pistas con groserías no pasan (filtro básico). El avatar sale de una lista fija.
 - La limpieza corre sola cada 10 minutos: jugadores y salas de más de 2 días, puntos de más de 90 días.
@@ -55,11 +57,12 @@ Después de la auditoría (fase 0, `puente/egm/PLAY-FASE0.md`): «continúa como
 
 ## Revisión goldfish
 `puente/egm/REVISION-GOLDFISH-PLAY.md`. La primera ronda (diseño y código) dijo «no está listo»: 3 bloqueantes y unas 30
-correcciones, todas hechas. RONDA2_AQUI
+correcciones, todas hechas. La segunda ronda verificó esas correcciones (sin bloqueantes) y encontró 5 hallazgos mayores
+más, también corregidos. RONDA3_AQUI
 
 ## Pruebas
-- **Servidor:** `pruebas/servidor/play.test.js`, SERVIDOR_AQUI.
-- **Navegador, con varios celulares a la vez:** `pruebas/play.test.js`, NAVEGADOR_AQUI. Cubre activar, entrar, los 5
+- **Servidor:** `pruebas/servidor/play.test.js`, 86 bien, 0 mal.
+- **Navegador, con varios celulares a la vez:** `pruebas/play.test.js`, 38 bien, 0 mal. Cubre activar, entrar, los 5
   juegos, el aviso sin conexión, la pestaña escondida, un pedido durante el juego y un celular de 320 px.
 - **Las otras 30 pruebas del servidor:** bien.
 - **Lista completa:** RESULTADOS_AQUI

@@ -41,7 +41,7 @@ async function pruebas(sb) {
 
   // ---------- Activar ----------
   let r = await rpc('play_entrar', { p_canal: C, p_mesa: 1, p_vm: 'm1codigo01', p_alias: 'Ana' });
-  chk('Apagado por defecto: no se puede entrar', r.st !== 200 && /play_no_disponible/.test(err(r)), r);
+  chk('Apagado por defecto: no se puede entrar', /play_no_disponible/.test(err(r)) && !(r.j && r.j.sala), r);
   r = await rpc('play_config_guardar', { p_negocio: NEG, p_activo: true, p_juegos: ['show', 'bomba', 'impostor', 'ruleta', 'sobreviviente'], p_retos: ['divertido', 'musica'] }, mesero.token);
   chk('Un mesero NO puede prender ORDEVA PLAY', r.st !== 200 && /sin_permiso/.test(err(r)), r);
   r = await rpc('play_config_guardar', { p_negocio: NEG, p_activo: true, p_juegos: ['show', 'bomba', 'impostor', 'ruleta', 'sobreviviente', 'hackeo'], p_retos: ['divertido', 'musica', 'beber'] }, dueno.token);
@@ -50,9 +50,9 @@ async function pruebas(sb) {
 
   // ---------- Entrar ----------
   r = await rpc('play_entrar', { p_canal: C, p_mesa: 1, p_vm: 'codigofalso', p_alias: 'Ana' });
-  chk('Con un código de mesa falso NO se entra', r.st !== 200 && /play_mesa/.test(err(r)), r);
+  chk('Con un código de mesa falso NO se entra', /play_mesa/.test(err(r)) && !(r.j && r.j.sala), r);
   r = await rpc('play_entrar', { p_canal: C, p_mesa: 2, p_vm: 'm1codigo01', p_alias: 'Ana' });
-  chk('Con el código de OTRA mesa tampoco', r.st !== 200 && /play_mesa/.test(err(r)), r);
+  chk('Con el código de OTRA mesa tampoco', /play_mesa/.test(err(r)) && !(r.j && r.j.sala), r);
   const entrar = async (mesa, alias, avatar) => (await rpc('play_entrar', { p_canal: C, p_mesa: mesa, p_vm: 'm' + mesa + 'codigo0' + mesa, p_alias: alias, p_avatar: avatar || '😎' })).j;
   const raro = (await rpc('play_entrar', { p_canal: C, p_mesa: 3, p_vm: 'm3codigo03', p_alias: 'hijueputa', p_avatar: '<img src=x>' })).j;
   const raroV = await uno('select alias, avatar from play_jugadores where id = $1', [raro.jugador]);
@@ -69,14 +69,14 @@ async function pruebas(sb) {
   const show = r.j && r.j.sala;
   chk('Ana crea una sala del SHOW con un código de 4 letras', show && /^[A-Z0-9]{4}$/.test(show.codigo) && show.anfitrion === true, r);
   r = await rpc('play_unirse', { p_token: zoe.token, p_codigo: show.codigo });
-  chk('Un jugador de OTRO negocio no encuentra la sala', r.st !== 200 && /play_sala/.test(err(r)), r);
+  chk('Un jugador de OTRO negocio no encuentra la sala', /play_sala/.test(err(r)) && !(r.j && r.j.sala), r);
   r = await rpc('play_unirse', { p_token: dani.token, p_codigo: show.codigo });
-  chk('Uno de OTRA mesa no entra a una sala «de mesa»', r.st !== 200 && /play_otra_mesa/.test(err(r)), r);
+  chk('Uno de OTRA mesa no entra a una sala «de mesa»', /play_otra_mesa/.test(err(r)) && !(r.j && r.j.sala), r);
   r = await rpc('play_empezar', { p_token: ana.token, p_sala: show.id });
-  chk('Solo no se puede empezar (mínimo 2)', r.st !== 200 && /play_pocos/.test(err(r)), r);
+  chk('Solo no se puede empezar (mínimo 2)', /play_pocos/.test(err(r)) && !(r.j && r.j.sala), r);
   await rpc('play_unirse', { p_token: beto.token, p_codigo: show.codigo });
   r = await rpc('play_empezar', { p_token: beto.token, p_sala: show.id });
-  chk('Solo quien creó la sala la empieza', r.st !== 200 && /play_anfitrion/.test(err(r)), r);
+  chk('Solo quien creó la sala la empieza', /play_anfitrion/.test(err(r)) && !(r.j && r.j.sala), r);
   r = await rpc('play_empezar', { p_token: ana.token, p_sala: show.id });
   let v = r.j;
   chk('Empieza: pregunta 1 con 4 opciones y 20 s', v.sala.estado === 'jugando' && v.sala.fase === 'pregunta' && v.publico.opciones.length === 4 && v.sala.hasta - v.sala.ahora > 15000, v);
@@ -88,11 +88,12 @@ async function pruebas(sb) {
   chk('Si nada cambió, play_estado responde corto (sin toda la vista)', r.j && r.j.igual === true && !r.j.sala, r.j);
   r = await rpc('play_accion', { p_token: ana.token, p_sala: show.id, p_tipo: 'responder', p_dato: { i: corr }, p_cid: cid() });
   chk('Mientras la pregunta está abierta no se dice si acertó (no sirve para probar opciones)', r.j.sala.fase === 'pregunta' && r.j.mio.hecho === true && r.j.mio.acerte === false, r.j.mio);
-  const pAna = (await uno('select puntos from play_miembros where sala_id = $1 and jugador_id = $2', [show.id, ana.jugador])).puntos;
+  chk('… ni el marcador: los puntos NO suben hasta que se cierra la pregunta (el marcador no delata la opción correcta)', r.j.jugadores.every((x) => x.puntos === 0), r.j.jugadores);
   await rpc('play_accion', { p_token: ana.token, p_sala: show.id, p_tipo: 'responder', p_dato: { i: corr }, p_cid: cid() });
-  chk('Responder bien da 100 + rapidez; responder otra vez no suma de nuevo', pAna >= 100 && (await uno('select puntos from play_miembros where sala_id = $1 and jugador_id = $2', [show.id, ana.jugador])).puntos === pAna, pAna);
   r = await rpc('play_accion', { p_token: beto.token, p_sala: show.id, p_tipo: 'responder', p_dato: { i: (corr + 1) % 4 }, p_cid: cid() });
   chk('Cuando todos respondieron: se muestra la correcta y cuántos eligieron cada una', r.j.sala.fase === 'resultado' && Number(r.j.publico.correcta) === corr && r.j.publico.conteo, r.j.publico);
+  const pAna = r.j.jugadores.find((x) => x.id === ana.jugador).puntos, pBeto = r.j.jugadores.find((x) => x.id === beto.jugador).puntos;
+  chk('Al cerrar: responder bien da 100 + rapidez una sola vez (responder dos veces no suma de nuevo); fallar da 0', pAna >= 100 && pAna <= 200 && pBeto === 0, { pAna, pBeto });
   // Se acaba el tiempo del resultado → la siguiente pregunta. (Se adelanta el reloj en la base de datos.)
   const vencer = (id) => sb.sql("update play_salas set fase_hasta = now() - interval '1 second' where id = $1", [id]);
   await vencer(show.id); v = (await rpc('play_estado', { p_token: beto.token, p_sala: show.id })).j;
@@ -116,15 +117,16 @@ async function pruebas(sb) {
   const noPort = Object.keys(tokDe).find((x) => x !== port);
   await rpc('play_accion', { p_token: tokDe[noPort], p_sala: bom.id, p_tipo: 'responder', p_dato: { i: 0 }, p_cid: cid() });
   chk('Quien no tiene la bomba no puede responder por el otro', (await uno('select publico->>\'portador\' p from play_salas where id = $1', [bom.id])).p === port);
-  const q0 = v.publico.q, n0 = v.publico.n;
+  const n0 = v.publico.n;
   v = (await rpc('play_accion', { p_token: tokDe[port], p_sala: bom.id, p_tipo: 'responder', p_dato: { i: (cb + 1) % 4, n: n0 }, p_cid: cid() })).j;
-  chk('LA BOMBA: si falla, sigue la MISMA pregunta y queda 3 s bloqueado', v.publico.portador === port && v.publico.q === q0 && v.publico.n === n0 && v.publico.bloqueo > v.sala.ahora + 2000, v.publico);
-  v = (await rpc('play_accion', { p_token: tokDe[port], p_sala: bom.id, p_tipo: 'responder', p_dato: { i: cb, n: n0 }, p_cid: cid() })).j;
+  chk('LA BOMBA: si falla, sale OTRA pregunta, sigue con la bomba y queda 3 s bloqueado', v.publico.portador === port && v.publico.n === n0 + 1 && v.publico.pases === 0 && v.publico.bloqueo > v.sala.ahora + 2000, v.publico);
+  const cb2 = (await uno('select secreto->>\'correcta\' c from play_salas where id = $1', [bom.id])).c | 0;
+  v = (await rpc('play_accion', { p_token: tokDe[port], p_sala: bom.id, p_tipo: 'responder', p_dato: { i: cb2, n: n0 + 1 }, p_cid: cid() })).j;
   chk('… y mientras está bloqueado, ni la correcta pasa la bomba (adivinar rápido no sirve)', v.publico.portador === port, v.publico);
   await sb.sql("update play_salas set publico = publico - 'bloqueo' where id = $1", [bom.id]);
-  v = (await rpc('play_accion', { p_token: tokDe[port], p_sala: bom.id, p_tipo: 'responder', p_dato: { i: cb, n: n0 - 1 }, p_cid: cid() })).j;
+  v = (await rpc('play_accion', { p_token: tokDe[port], p_sala: bom.id, p_tipo: 'responder', p_dato: { i: cb2, n: n0 }, p_cid: cid() })).j;
   chk('Una respuesta a una pregunta vieja (pantalla atrasada) no cuenta', v.publico.portador === port, v.publico);
-  v = (await rpc('play_accion', { p_token: tokDe[port], p_sala: bom.id, p_tipo: 'responder', p_dato: { i: cb, n: n0 }, p_cid: cid() })).j;
+  v = (await rpc('play_accion', { p_token: tokDe[port], p_sala: bom.id, p_tipo: 'responder', p_dato: { i: cb2, n: n0 + 1 }, p_cid: cid() })).j;
   chk('Responder bien pasa la bomba a otro (+20)', v.publico.portador !== port && v.publico.pases === 1, v.publico);
   await vencer(bom.id); v = (await rpc('play_estado', { p_token: ana.token, p_sala: bom.id })).j;
   const perdio = v.publico.perdio;
@@ -137,7 +139,7 @@ async function pruebas(sb) {
   const imp = (await rpc('play_crear', { p_token: ana.token, p_juego: 'impostor' })).j.sala;
   await rpc('play_unirse', { p_token: beto.token, p_codigo: imp.codigo });
   r = await rpc('play_empezar', { p_token: ana.token, p_sala: imp.id });
-  chk('EL IMPOSTOR necesita 3 o más', r.st !== 200 && /play_pocos/.test(err(r)), r);
+  chk('EL IMPOSTOR necesita 3 o más', /play_pocos/.test(err(r)) && !(r.j && r.j.sala), r);
   await rpc('play_unirse', { p_token: caro.token, p_codigo: imp.codigo });
   await rpc('play_empezar', { p_token: ana.token, p_sala: imp.id });
   const sec = await uno('select secreto from play_salas where id = $1', [imp.id]);
@@ -176,6 +178,8 @@ async function pruebas(sb) {
   const reto1 = v.publico.reto;
   v = (await rpc('play_accion', { p_token: tkE, p_sala: rul.id, p_tipo: 'cambiar', p_dato: {}, p_cid: cid() })).j;
   chk('Puede cambiar el reto una vez', v.publico.cambio === false && v.sala.fase === 'reto', v.publico);
+  await rpc('play_accion', { p_token: tkO, p_sala: rul.id, p_tipo: 'aplaudir', p_dato: {}, p_cid: cid() });
+  chk('Antes de «¡lo hice!» no se puede aplaudir (quien pasa no se lleva aplausos)', !(await sb.sql("select 1 from play_eventos where sala_id = $1 and tipo = 'aplaudir'", [rul.id])).length);
   v = (await rpc('play_accion', { p_token: tkE, p_sala: rul.id, p_tipo: 'cumplir', p_dato: {}, p_cid: cid() })).j;
   chk('Decir «¡lo hice!» NO da puntos solo (los puntos los dan los demás)', v.sala.fase === 'resultado' && v.publico.hizo === 'cumplir' && v.jugadores.find((x) => x.id === eleg).puntos === 0, v.jugadores);
   await rpc('play_accion', { p_token: tkO, p_sala: rul.id, p_tipo: 'aplaudir', p_dato: {}, p_cid: cid() });
@@ -187,7 +191,7 @@ async function pruebas(sb) {
   // ---------- ÚLTIMO SOBREVIVIENTE ----------
   await respiro();
   r = await rpc('play_crear', { p_token: ana.token, p_juego: 'sobreviviente', p_modo: 'local' });
-  chk('«Contra otras mesas» viene apagado: no se puede crear una sala de todo el local', r.st !== 200 && /play_local/.test(err(r)), r);
+  chk('«Contra otras mesas» viene apagado: no se puede crear una sala de todo el local', /play_local/.test(err(r)) && !(r.j && r.j.sala), r);
   r = await rpc('play_config_guardar', { p_negocio: NEG, p_activo: true, p_juegos: ['show', 'bomba', 'impostor', 'ruleta', 'sobreviviente'], p_retos: ['divertido', 'musica'], p_local: true }, dueno.token);
   chk('El dueño prende «contra otras mesas»', r.st === 200 && r.j.local === true, r.j);
   const sob = (await rpc('play_crear', { p_token: ana.token, p_juego: 'sobreviviente', p_modo: 'local' })).j.sala;
@@ -242,6 +246,26 @@ async function pruebas(sb) {
   await respiro();
   let lim = 0; for (let i = 0; i < 32; i++) { const x = await rpc('play_accion', { p_token: caro.token, p_sala: sh2.id, p_tipo: 'nada', p_dato: {}, p_cid: cid() }); if (/demasiados/.test(err(x))) lim++; }
   chk('Límite de jugadas: también cuentan las que no hacen nada (25 cada 10 s)', lim >= 5, lim);
+  await respiro(); lim = 0;
+  for (let i = 0; i < 32; i++) { const x = await rpc('play_unirse', { p_token: caro.token, p_codigo: 'ZZZ' + (i % 9) }); if (/demasiados/.test(err(x))) lim++; }
+  chk('… y las que FALLAN (unirse con códigos al azar): el contador no se deshace con el error', lim >= 5, lim);
+  await respiro(); lim = 0;
+  for (let i = 0; i < 32; i++) { const x = await rpc('play_accion', { p_token: caro.token, p_sala: show.id.replace(/.$/, 'f'), p_tipo: 'responder', p_dato: { i: 0 }, p_cid: cid() }); if (/demasiados/.test(err(x))) lim++; }
+  chk('… y jugar en salas que no son suyas', lim >= 5, lim);
+  await respiro();
+  // Topes de salas: 8 abiertas por mesa (una mesa sola no llena el local) y las de espera abandonadas dejan de contar.
+  const m3 = []; for (let i = 0; i < 3; i++) m3.push((await rpc('play_entrar', { p_canal: C, p_mesa: 3, p_vm: 'm3codigo03', p_alias: 'T' + i })).j);
+  let hechas = 0, llenas = 0;
+  for (const t of m3) for (let i = 0; i < 4; i++) { const x = await rpc('play_crear', { p_token: t.token, p_juego: 'show' }); if (x.j && x.j.sala) hechas++; else if (/play_lleno/.test(err(x))) llenas++; }
+  chk('Una mesa no puede tener más de 8 salas abiertas (las demás mesas siguen pudiendo crear)', hechas === 8 && llenas === 4 && !!(await rpc('play_crear', { p_token: dani.token, p_juego: 'show' })).j.sala, { hechas, llenas });
+  await sb.sql("update play_salas set actualizado = now() - interval '11 minutes' where mesa = 3 and estado = 'espera'");
+  r = await rpc('play_crear', { p_token: m3[0].token, p_juego: 'show' });
+  chk('Las salas de espera sin movimiento en 10 minutos dejan de contar', !!(r.j && r.j.sala), r.j);
+  const o2 = (await rpc('play_crear', { p_token: ana.token, p_juego: 'sobreviviente' })).j.sala;
+  await rpc('play_unirse', { p_token: beto.token, p_codigo: o2.codigo }); await rpc('play_empezar', { p_token: ana.token, p_sala: o2.id });
+  await rpc('play_salir', { p_token: beto.token, p_sala: o2.id });
+  v = (await rpc('play_estado', { p_token: ana.token, p_sala: o2.id })).j;
+  chk('Si el otro se sale, la partida termina SIN el +200 del final (no se gana porque el otro se fue)', v.sala.estado === 'fin' && v.jugadores.find((x) => x.yo).puntos === 0, v.jugadores);
 
   // ---------- Clasificación ----------
   await respiro();
@@ -254,7 +278,9 @@ async function pruebas(sb) {
   r = await rpc('play_config_ver', { p_negocio: NEG }, otro.token);
   chk('Otro negocio no ve la configuración ni las estadísticas', r.st !== 200, r);
   r = await rpc('play_estado', { p_token: zoe.token, p_sala: show.id });
-  chk('Un jugador de otro negocio no puede ver una sala ajena', r.st !== 200 && /play_sala/.test(err(r)), r);
+  chk('Un jugador de otro negocio no puede ver una sala ajena', /play_sala/.test(err(r)) && !(r.j && r.j.sala), r);
+  r = await rpc('play_accion', { p_token: zoe.token, p_sala: show.id, p_tipo: 'responder', p_dato: { i: 0 }, p_cid: cid() });
+  chk('… ni jugar en ella', /play_sala/.test(err(r)) && !(r.j && r.j.sala), r);
   r = await rpc('play_estado', { p_token: 'tokenfalsotokenfalsotokenfalso', p_sala: show.id });
   chk('Sin un token válido no se ve nada', r.st !== 200 && /play_sesion/.test(err(r)), r);
   const filas = await sb.sql("select count(*)::int n from play_retos where texto ~* 'beb|trago|shot|alcohol|cerveza|emborrach|brind|tomando|licor|guaro|aguardiente'");
@@ -269,6 +295,18 @@ async function pruebas(sb) {
   await rpc('play_config_guardar', { p_negocio: NEG, p_activo: false, p_juegos: ['show'], p_retos: ['divertido'] }, dueno.token);
   const quedan = (await sb.sql("select count(*)::int n from play_salas where negocio_id = $1 and estado <> 'fin'", [NEG]))[0].n;
   chk('Apagar PLAY termina las partidas abiertas', abiertas > 0 && quedan === 0, { abiertas, quedan });
+  await rpc('play_config_guardar', { p_negocio: NEG, p_activo: true, p_juegos: ['show'], p_retos: ['divertido'] }, dueno.token);
+  // Entradas: las que fallan también cuentan por IP, y hay tope de jugadores nuevos por mesa.
+  const ip = { 'x-forwarded-for': '203.0.113.77' };
+  const rpcIp = async (args) => { const x = await fetch(sb.url + '/rest/v1/rpc/play_entrar', { method: 'POST', headers: { ...cab(), ...ip }, body: JSON.stringify(args) }); return { st: x.status, j: await x.json().catch(() => null) }; };
+  let malas = 0, frenadas = 0;
+  for (let i = 0; i < 130; i++) { const x = await rpcIp({ p_canal: C, p_mesa: 1, p_vm: 'adivina' + i, p_alias: 'x' }); if (/play_mesa/.test(err(x))) malas++; else if (/demasiados/.test(err(x))) frenadas++; }
+  chk('Probar códigos de mesa desde una IP se frena a las 120 por minuto (las que fallan sí cuentan)', malas === 120 && frenadas === 10, { malas, frenadas });
+  let nuevos = 0, tope = 0;
+  for (let i = 0; i < 45; i++) { const x = await rpc('play_entrar', { p_canal: C, p_mesa: 2, p_vm: 'm2codigo02', p_alias: 'N' + i }); if (x.j && x.j.token) nuevos++; else if (/demasiados/.test(err(x))) tope++; }
+  chk('Como mucho 40 jugadores nuevos por hora desde una mesa (una mesa sola no gasta el tope del negocio)', nuevos > 30 && nuevos <= 40 && tope >= 5, { nuevos, tope });
+  r = await rpc('play_entrar', { p_canal: C, p_mesa: 2, p_vm: 'otracosa', p_alias: 'Dani', p_token: dani.token });
+  chk('… y quien ya tenía su token en esa mesa sigue entrando', r.j && r.j.jugador === dani.jugador, r.j);
   await sb.sql("update play_jugadores set creado = now() - interval '3 days' where id = $1", [raro.jugador]);
   await sb.sql("insert into play_puntos(negocio_id, sala_id, jugador_id, alias, mesa, juego, puntos, creado) values ($1, gen_random_uuid(), gen_random_uuid(), 'viejo', 1, 'show', 10, now() - interval '100 days')", [NEG]);
   const lp = await uno('select public.play_limpiar() r');

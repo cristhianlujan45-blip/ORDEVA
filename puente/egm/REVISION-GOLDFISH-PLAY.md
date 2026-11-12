@@ -11,13 +11,13 @@ goldfish del diseño **y** del cambio antes de publicar. Dos revisores con conte
 | El impostor podía descubrir la palabra: su pista se rechazaba si la tenía, y probando palabras de la categoría la encontraba. Los intentos fallidos no contaban para el límite. | 🔴 Bloqueante | Al impostor no se le revisa la pista. Las jugadas que no valen ya no lanzan error (devuelven la vista con `error`), así el límite sí las cuenta. Prueba. |
 | Un reto decía «brindis… con lo que estés tomando». | 🔴 Bloqueante | Cambiado. La prueba busca también `brind`, `tomando`, `licor`, `guaro` y `aguardiente`. |
 | `play_salir` no pedía estar en la sala ni tenía límite. | Mayor | Pide estar en la sala y tiene límite. Prueba. |
-| LA BOMBA se ganaba tocando al azar: fallar no costaba nada. | Mayor | Si falla, sigue la misma pregunta y queda 3 s bloqueado. Una respuesta a una pregunta vieja no vale. Pruebas en el servidor y en el navegador. |
+| LA BOMBA se ganaba tocando al azar: fallar no costaba nada. | Mayor | Si falla, queda 3 s bloqueado (y, desde la ronda 2, sale otra pregunta). Una respuesta a una pregunta vieja no vale. Pruebas en el servidor y en el navegador. |
 | Quien salía de la partida seguía jugando y contando: las fases se cerraban antes de tiempo. | Mayor | Solo cuentan y juegan los que siguen (`play_revisar`). Si se va quien tiene la bomba, la bomba pasa; si se va el elegido de la ruleta, pasa; si se va el impostor, se revela. Pruebas. |
 | La limpieza corría dentro de `play_entrar`, sin índices: se podía pasar del tiempo y tumbar la entrada. | Mayor | La limpieza corre con pg_cron cada 10 minutos (`play_limpiar`, en lotes). Índices nuevos en eventos, miembros, salas y puntos. Los puntos se borran a los 90 días. Prueba. |
 | La clasificación se podía inflar: en la ruleta cada uno decía «lo hice» (+100), `acerte` decía si una opción era la correcta antes de tiempo y las opciones siempre salían en el mismo orden. | Mayor | En la ruleta los puntos salen solo de los aplausos de los demás (+25 cada uno). `acerte` se dice solo al cerrar la pregunta. Las opciones salen revueltas. Tope de 3.000 puntos por jugador por día. Pruebas. |
 | El celular preguntaba dos veces (sondeo + EventSource), sin parar al terminar ni con la pestaña escondida, varias preguntas a la vez y cada 250 ms con el reloj en 0. | Mayor | Una pregunta a la vez, 2 s jugando y 3,5 s esperando. No pregunta con la pestaña «Pedido» abierta ni con el celular bloqueado, y para al terminar. Cada llamada tiene 8 s de tiempo. Pruebas en el navegador. |
 | Los límites solo contaban las jugadas que salían bien. Varias funciones no tenían límite. | Mayor | `play_cupo`: 25 llamadas cada 10 s por jugador, en todas las funciones menos `play_estado`, que es una lectura corta con la versión. Prueba. |
-| Abusos: muchos jugadores o salas por negocio, avatar libre, apodos y pistas groseros, «contra otras mesas» prendido para todos. | Mayor | 400 jugadores nuevos por hora por negocio y 60 por minuto por IP (un local entero sale por la misma IP del wifi). 60 salas abiertas por negocio. Avatar solo de la lista. Filtro básico de groserías. «Contra otras mesas» apagado hasta que el negocio lo prenda. Pruebas. |
+| Abusos: muchos jugadores o salas por negocio, avatar libre, apodos y pistas groseros, «contra otras mesas» prendido para todos. | Mayor | 60 jugadores nuevos por minuto por IP (un local entero sale por la misma IP del wifi) y topes por negocio de jugadores y de salas (los números quedaron en la ronda 2). Avatar solo de la lista. Filtro básico de groserías. «Contra otras mesas» apagado hasta que el negocio lo prenda. Pruebas. |
 | Los retos de «tu mesa» o «tu derecha» salían en el modo «todo el local». | Menor | `solo_mesa`: no salen en ese modo. Prueba. |
 | EL IMPOSTOR: las pistas solo se veían al final; solo 2 rondas. | Menor | Las pistas se ven a medida que llegan. 3 rondas, y cada ronda revisa que sigan siendo 3 o más. Pruebas. |
 | `hecho` contaba la pista como voto: en «votar» la pantalla decía «Votaste» sin haber votado. | Mayor (se encontró al probar) | `hecho` mira solo la jugada de la fase. Prueba. |
@@ -30,9 +30,34 @@ goldfish del diseño **y** del cambio antes de publicar. Dos revisores con conte
 | Accesibilidad: avisos sin `aria-live`, avatares sin `aria-pressed`, bordes claros fijos. | Menor | Arreglado (`role="status"`, `aria-pressed`, `var(--line)`, foco visible). |
 | Las secuencias de las tablas tenían los permisos de siempre. | Menor | Quitados a `anon` y `authenticated`. |
 
+## Ronda 2 · Verificación de los arreglos
+Un revisor con contexto limpio comprobó cada fila de la ronda 1: 20 verificadas y 2 a medias, sin bloqueantes. Además
+encontró esto:
+
+| Hallazgo | Gravedad | Qué se hizo |
+|---|---|---|
+| En EL SHOW el marcador subía apenas alguien acertaba, y todos ven el marcador: con celulares de más se probaban las opciones y el marcador delataba la correcta (lo mismo que se había cerrado con `acerte`). | Mayor | Los puntos se anotan en la jugada y se suman al cerrar la pregunta. Pruebas en el servidor y en el navegador. |
+| El límite de llamadas no contaba las que terminaban en error (el error deshace el contador): unirse con códigos al azar o jugar en salas ajenas no tenía freno. | Mayor | Después de contar, las funciones del cliente no lanzan error: devuelven `{error}` y el celular lo muestra igual. Pruebas con códigos al azar y con salas ajenas. |
+| El tope de 60 salas por negocio lo llenaba una sola mesa con unas 70 llamadas, y dejaba al local sin PLAY 3 horas. | Mayor | 8 salas abiertas por mesa. Las salas de espera sin movimiento en 10 minutos dejan de contar, y la limpieza las cierra a los 30. Pruebas. |
+| El tope de 400 jugadores nuevos por hora por negocio se gastaba desde una sola IP en 7 minutos. | Mayor | 40 jugadores nuevos por hora por mesa y 1.500 por negocio. Quien ya tiene su token sigue entrando. Pruebas. |
+| `play_entrar` no frenaba los intentos fallidos (código de mesa malo) y leía los datos del negocio en cada llamada. | Mayor | 120 entradas por minuto por IP, contadas antes de leer nada, también las que fallan. Volver con el mismo token a la misma mesa ya no lee los datos del negocio. Prueba. |
+| LA BOMBA: con la misma pregunta se podía ir descartando opciones (3 fallos como mucho). | Menor | Al fallar sale otra pregunta, además de los 3 s. Pruebas. |
+| Si la bomba ya había explotado y quien la tenía salía, se la pasaba a otro. | Menor | `play_salir` mueve el reloj primero. |
+| Ganar +200 porque el otro se salió, o porque el negocio apagó PLAY; las salas de espera quedaban como partidas de 0 puntos. | Menor | Sin el +200 en esos casos, y las salas de espera solo se cierran. Prueba. |
+| RULETA: se podía aplaudir antes de que hiciera el reto, y quien pasaba se quedaba con los puntos. | Menor | Solo se aplaude después de «¡Lo hice!» (10 s). Pruebas. |
+| En la sala de espera, después de pasar el anfitrión, salía el nombre del anterior. | Menor | La vista trae quién es el anfitrión. |
+| Una respuesta vieja podía pisar una más nueva en la pantalla; el aviso de «sesión vencida» se borraba; el reloj no volvía después de cerrar. | Menor | Se ignoran las versiones viejas; primero la pantalla y después el aviso; el reloj vuelve al abrir. |
+
+**No se cambió (y por qué):**
+- Volver a correr la migración sobre un borrador anterior no quita el contenido viejo: ningún servidor corrió el borrador
+  (la migración solo se despliega desde la rama de producción).
+- `play_estado` sigue sin límite: es la lectura corta con la versión.
+- El límite por IP confía en la primera dirección de `x-forwarded-for`, igual que el de los canales (de antes).
+- El tope de puntos por día es por jugador: quien entra de nuevo sin su token empieza otra cuenta.
+
 ## Pruebas después de los arreglos
-- `pruebas/servidor/play.test.js`: **75 bien, 0 mal** (antes 49).
-- `pruebas/play.test.js` (navegador, varios celulares): **37 bien, 0 mal** (antes 19). Cubre los 5 juegos, las pistas y los
+- `pruebas/servidor/play.test.js`: **86 bien, 0 mal** (49 al empezar, 75 después de la ronda 1).
+- `pruebas/play.test.js` (navegador, varios celulares): **38 bien, 0 mal** (19 al empezar, 37 después de la ronda 1). Cubre los 5 juegos, las pistas y los
   votos del impostor, la bomba bloqueada, la ruleta con aplausos, sin conexión, la pestaña escondida y que no escribe en
   los canales.
 
