@@ -20,7 +20,29 @@
   // También en la nube (clave «rec/<id>»): facturas escaneadas, sus fotos originales y los recibos de gastos se ven
   // en todos los equipos de la cuenta. El texto detectado («-ocr») no se sube: cada equipo lo saca si lo necesita.
   const nubeRec = id => !/-(ocr|o)$/.test(String(id)) && window.ventoNube && window.ventoNube.enNube && window.ventoNube.enNube() && window.ventoNube.archivos;
-  window.ctReciboGuardar = (id, url) => { const n = nubeRec(id); if(n) n.subir('rec/' + id, url); return tx('readwrite', st => st.put(url, id)).catch(() => showToast('⚠️ No se pudo guardar el recibo en este celular.')); };
+  // 1.98.3: la nube recibe archivos de hasta 6 millones de letras. Una página escaneada en HD a veces pesa más: antes NO
+  // subía y no avisaba (quedaba solo en el celular que la escaneó). Ahora a la nube va una copia más liviana (el celular
+  // conserva la HD) y, si ni así cabe, se avisa.
+  const NUBE_MAX = 5800000;
+  async function paraNube(url){
+    url = String(url || '');
+    if(url.length <= NUBE_MAX) return url;
+    if(!/^data:image\//.test(url)) return null;
+    try{
+      const im = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+      for(const [lado, q] of [[2200, 0.82], [1800, 0.75], [1500, 0.68], [1200, 0.6]]){
+        const f = Math.min(1, lado / Math.max(im.width, im.height)), c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(im.width * f)); c.height = Math.max(1, Math.round(im.height * f));
+        const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(im, 0, 0, c.width, c.height);
+        const u = c.toDataURL('image/jpeg', q);
+        if(u.length <= NUBE_MAX) return u;
+      }
+    }catch(e){}
+    return null;
+  }
+  window.ctReciboParaNube = paraNube;
+  const subirNube = (n, id, url) => paraNube(url).then(u => { if(u) return n.subir('rec/' + id, u); showToast('⚠️ Esta foto es muy pesada para subirla: quedó guardada solo en este celular.', 9000); return false; }).catch(() => false);
+  window.ctReciboGuardar = (id, url) => { const n = nubeRec(id); if(n) subirNube(n, id, url); return tx('readwrite', st => st.put(url, id)).catch(() => showToast('⚠️ No se pudo guardar el recibo en este celular.')); };
   window.ctReciboBorrar = id => { const n = nubeRec(id); if(n) n.borrar('rec/' + id); return tx('readwrite', st => st.delete(id)).catch(() => {}); };
   const leerAqui = id => tx('readonly', st => st.get(id));
   const leer = async id => {

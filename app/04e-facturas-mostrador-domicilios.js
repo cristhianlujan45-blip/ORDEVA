@@ -1482,7 +1482,8 @@ document.getElementById('invoiceApplyBtn').addEventListener('click', async () =>
     subtotal: purchaseItems.reduce((a, x) => a + (x.subtotal || 0), 0), ivaTotal: purchaseItems.reduce((a, x) => a + (x.ivaTotal || 0), 0),
     header: draft.header || {}, invoiceNumber: (draft.header && draft.header.invoiceNumber) || '', archivoId, fuente: draft.fuente, usuario: authUser || '',
     procesadaEn: new Date().toISOString(), modificaciones: purchaseItems.filter(x => x.modificado).length, avisos: fiValidar(draft).map(a => a.txt), at: new Date().toISOString() });
-  if(data.purchases.length > 300) data.purchases = data.purchases.slice(0, 300);
+  // 1.98.3: ya NO se recortan a 300. Antes cada factura nueva borraba la más vieja (en todos los equipos), y con ella
+  // cambiaban los gastos, el IVA descontable y el historial de costos de los meses pasados.
   saveData();
   renderInventario(); renderProductos();
   invoiceClose();

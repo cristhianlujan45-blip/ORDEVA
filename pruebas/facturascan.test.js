@@ -86,7 +86,19 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 
     // ---------- 2. Aplicar ----------
     await p.evaluate(async () => { window.showConfirm = async () => true; window.__fiArchivos = [await __foto(5, false)]; window.__fiArchivo = window.__fiArchivos[0]; invoiceDraft.archivos = window.__fiArchivos; invoiceDraft.archivo = window.__fiArchivo; });
+    // 1.98.3: con 300 facturas de compra ya guardadas, la nueva NO borra la más vieja.
+    await p.evaluate(() => { data.purchases = Array.from({ length: 300 }, (_, i) => ({ id: 'vieja' + i, supplier: 'Proveedor viejo', date: '2026-01-01', items: [], total: 1000 + i, at: '2026-01-01T00:00:00Z' })); });
     await p.click('#invoiceApplyBtn'); await p.waitForTimeout(800);
+    const cuantas = await p.evaluate(() => ({ n: data.purchases.length, ultima: data.purchases[data.purchases.length - 1].id, nueva: data.purchases[0].supplier }));
+    chk('2. Con 300 facturas de compra guardadas, la nueva se suma y NO se borra la más vieja (quedan 301)', cuantas.n === 301 && cuantas.ultima === 'vieja299' && cuantas.nueva !== 'Proveedor viejo', cuantas);
+    await p.evaluate(() => { data.purchases = data.purchases.filter(x => !/^vieja/.test(x.id)); });
+    const liviana = await p.evaluate(async () => {
+      const c = document.createElement('canvas'); c.width = 2600; c.height = 3400; const x = c.getContext('2d'), d = x.createImageData(c.width, c.height);
+      for(let i = 0; i < d.data.length; i += 4){ d.data[i] = Math.random() * 255; d.data[i + 1] = Math.random() * 255; d.data[i + 2] = Math.random() * 255; d.data[i + 3] = 255; }
+      x.putImageData(d, 0, 0); const grande = c.toDataURL('image/jpeg', 0.95), u = await window.ctReciboParaNube(grande);
+      return { antes: grande.length, despues: u ? u.length : 0, img: /^data:image\/jpeg/.test(u || ''), chica: (await window.ctReciboParaNube('data:image/jpeg;base64,AAAA')) === 'data:image/jpeg;base64,AAAA', pdf: await window.ctReciboParaNube('data:application/pdf;base64,' + 'A'.repeat(6000000)) };
+    });
+    chk('2. Una página que pesa más de lo que recibe la nube sube en una copia más liviana (antes no subía y no avisaba)', liviana.antes > 5800000 && liviana.despues > 0 && liviana.despues <= 5800000 && liviana.img && liviana.chica && liviana.pdf === null, liviana);
     const prods = await p.evaluate(() => data.products.filter(x => x.id !== 'pk').map(x => ({ n: x.name, cat: x.categoryId, cod: x.codigo || null, bc: x.barcodes || [] })));
     const sinT = x => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     const por = n => prods.find(x => sinT(x.n).includes(sinT(n))) || {};
