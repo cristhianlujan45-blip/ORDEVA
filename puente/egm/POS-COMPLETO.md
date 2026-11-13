@@ -129,8 +129,10 @@ nuevo. **Código revisado:** ORDEVA 1.82.2.
 0a. **ORDEVA PLAY** (pedido del dueño el 08/11: «continúa como creas mejor; los premios son opcionales»). Fase 0 hecha
     (auditoría, `puente/egm/PLAY-FASE0.md`). Fase 1 (1.97.0): el motor y LA BOMBA, EL IMPOSTOR, RULETA DEL CAOS, ÚLTIMO
     SOBREVIVIENTE y EL SHOW DE LA MESA, con las correcciones de la revisión goldfish
-    (`puente/egm/REVISION-GOLDFISH-PLAY.md`, `puente/REPORTE-1.97.0.md`). Sigue: premios y cupones (opcionales para cada
-    negocio; con alcohol, apagados), los otros 7 juegos, la pantalla del televisor (sin tocar `tv.html`) y más contenido.
+    (`puente/egm/REVISION-GOLDFISH-PLAY.md`, `puente/REPORTE-1.97.0.md`). Fase 2 (1.98.0): torneos entre mesas
+    (`puente/egm/PLAN-PLAY-FASE2.md`, `puente/REPORTE-1.98.0.md`). Sigue la fase 3: premios y cupones (opcionales para cada
+    negocio; con alcohol, apagados; el premio va a los jugadores que sumaron, no al número de la mesa). Después: más
+    estadísticas del panel, la pantalla del televisor (sin tocar `tv.html`), los otros 7 juegos y más contenido.
 0b. **Lo que dejó la 1.95.4 para después** (`puente/egm/REVISION-GOLDFISH-1.95.4.md`):
    - **Música, primero lo que puede dejar el bar en silencio:**
      - un televisor emparejado con un equipo que no es el de la música no recibe nada;

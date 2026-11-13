@@ -30,6 +30,8 @@ async function pruebas(sb) {
   await rpc('guardar_datos', { p_negocio: NEG, p_datos: { businessName: 'Bar Torneo', qrCanales: [C], qrCodigos: { 1: ['m1codigo01'], 2: ['m2codigo02'], 3: ['m3codigo03'], 4: ['m4codigo04'] } }, p_version: 1 }, dueno.token);
   const mesero = await sb.usuario('mesero@torneobar.co');
   const inv = (await rpc('crear_invitacion', { p_negocio: NEG, p_rol: 'mesero' }, dueno.token)).j; await rpc('unirse_con_codigo', { p_codigo: inv, p_nombre: 'Pedro' }, mesero.token);
+  const admin = await sb.usuario('admin@torneobar.co');
+  const inv2 = (await rpc('crear_invitacion', { p_negocio: NEG, p_rol: 'admin' }, dueno.token)).j; await rpc('unirse_con_codigo', { p_codigo: inv2, p_nombre: 'Rosa' }, admin.token);
   const otro = await sb.usuario('dueno@otrotorneo.co');
   const NEG2 = (await rpc('crear_negocio', { p_nombre: 'Otro', p_datos: {} }, otro.token)).j;
   await rpc('guardar_datos', { p_negocio: NEG2, p_datos: { businessName: 'Otro', qrCanales: [C2], qrCodigos: { 1: ['o1codigo01'] } }, p_version: 1 }, otro.token);
@@ -84,11 +86,16 @@ async function pruebas(sb) {
   chk('Cualquiera del equipo del negocio ve el torneo', r.st === 200 && r.j.torneo && r.j.torneo.id === T.id && r.j.activo === true && r.j.local === true, r.j);
   r = await rpc('play_torneo_ver', { p_negocio: NEG }, otro.token);
   chk('Otro negocio no ve el torneo', r.st !== 200 && /sin_permiso/.test(err(r)), r);
-  r = await rpc('play_torneo_cerrar', { p_negocio: NEG }, otro.token);
+  r = await rpc('play_torneo_cerrar', { p_negocio: NEG, p_torneo: T.id }, otro.token);
   chk('… ni lo puede terminar', r.st !== 200 && /sin_permiso/.test(err(r)), r);
-  for (const [fn, args] of [['play_torneo_tabla', { p_torneo: T.id }], ['play_torneos_repaso', {}], ['play_torneo_cerrar_uno', { p_torneo: T.id, p_ahora: true }], ['play_torneo_refrescar', { p_torneo: T.id, p_ya: true }], ['play_torneo_actual', { p_neg: NEG }]]) {
-    r = await rpc(fn, args, a1.token && undefined);
-    chk('Un cliente no puede llamar la función interna ' + fn, r.st !== 200, r.st);
+  r = await rpc('play_torneo_ver', { p_negocio: NEG });
+  chk('Sin sesión no se ve el torneo del negocio', r.st !== 200, r.st);
+  r = await rpc('play_torneo_cerrar', { p_negocio: NEG, p_torneo: T.id });
+  chk('… ni se termina', r.st !== 200, r.st);
+  for (const [fn, args] of [['play_torneo_tabla', { p_torneo: T.id }], ['play_torneos_repaso', {}], ['play_torneo_cerrar_uno', { p_torneo: T.id, p_ahora: true }], ['play_torneo_refrescar', { p_torneo: T.id }], ['play_torneo_actual', { p_neg: NEG }], ['play_torneo_regla', {}], ['play_torneo_ref', { p_juego: 'show' }]]) {
+    r = await rpc(fn, args);
+    const r2 = await rpc(fn, args, mesero.token);
+    chk('Ni un cliente ni un mesero con sesión pueden llamar la función interna ' + fn, r.st !== 200 && r2.st !== 200, [r.st, r2.st]);
   }
   chk('… y el torneo sigue abierto', (await uno('select cerrado from play_torneos where id = $1', [T.id])).cerrado === null);
   r = await fetch(sb.url + '/rest/v1/play_torneos?select=*', { headers: cab() });
@@ -97,7 +104,7 @@ async function pruebas(sb) {
   // ---------- La regla ----------
   r = await rpc('play_torneo', { p_token: a1.token });
   chk('El cliente ve el torneo abierto, su mesa y que todavía no suma', r.j.torneo && r.j.torneo.abierto && r.j.torneo.miMesa === 1 && r.j.torneo.miPuesto === null && r.j.torneo.mesas.length === 0, r.j);
-  chk('… y su última partida (de antes del torneo) no sumó', r.j.torneo.miUltima && r.j.torneo.miUltima.sumo === false, r.j.torneo.miUltima);
+  chk('… y su última partida (de antes del torneo) no sumó: viene con su sala y su hora, anterior al torneo', r.j.torneo.miUltima && r.j.torneo.miUltima.sumo === false && r.j.torneo.miUltima.sala === antes && r.j.torneo.miUltima.cuando < r.j.torneo.inicio, r.j.torneo.miUltima);
   const tabla = async (tok) => { await respiro(); return (await rpc('play_torneo', { p_token: (tok || a1).token })).j.torneo; };
   const de = (t, mesa) => t.mesas.find((m) => m.mesa === mesa) || null;
 
@@ -108,7 +115,7 @@ async function pruebas(sb) {
   chk('De cada partida cuenta el MEJOR de la mesa, en escala de 0 a 100 (1.200 de 1.600 = 75)', de(t, 1) && de(t, 1).puntos === 75 && de(t, 1).partidas === 1 && t.miPuesto === 1, de(t, 1));
   chk('… con los apodos de quienes sumaron', JSON.stringify(de(t, 1).jugadores) === JSON.stringify(['Alba']), de(t, 1));
   r = await rpc('play_torneo', { p_token: a1.token });
-  chk('La última partida de Ana sí sumó (lo dice el servidor)', r.j.torneo.miUltima.sumo === true, r.j.torneo.miUltima);
+  chk('La última partida de Ana sí sumó (lo dice el servidor, con la sala de esa partida)', r.j.torneo.miUltima.sumo === true && r.j.torneo.miUltima.sala === s1 && r.j.torneo.miUltima.cuando >= r.j.torneo.inicio, r.j.torneo.miUltima);
   await partida('show', [[a1, 1600], [a2, 1600], [a3, 1600]]);
   t = await tabla();
   chk('La misma persona con tres celulares en una partida no suma más: esa partida da 100, no 300', de(t, 1).puntos === 175 && de(t, 1).partidas === 2, de(t, 1));
@@ -144,6 +151,10 @@ async function pruebas(sb) {
   await partida('show', [[b1, 1600], [b2, 0]]); await partida('show', [[b1, 800], [b2, 0]]);
   t = await tabla(b1);
   chk('Empate a 250: va primero la mesa que llegó antes a ese puntaje (la 3), y la 2 de segunda', de(t, 2).puntos === 250 && de(t, 3).puntos === 250 && t.mesas[0].mesa === 3 && t.mesas[1].mesa === 2 && t.miPuesto === 2, t.mesas.map((m) => [m.mesa, m.puntos]));
+  // La mesa 3 (la que llegó primero) juega después una partida de 0 puntos: no pierde el desempate por eso.
+  await partida('show', [[c1, 0], [c2, 0]]);
+  t = await tabla(b1);
+  chk('Una partida de 0 puntos jugada después no le quita el desempate a la mesa que llegó primero', t.mesas[0].mesa === 3 && t.mesas[1].mesa === 2 && de(t, 3).puntos === 250 && de(t, 3).partidas === 8, t.mesas.map((m) => [m.mesa, m.puntos]));
 
   // ---------- Versión corta, límite y aislamiento ----------
   r = await rpc('play_torneo', { p_token: b1.token, p_ver: t.v });
@@ -182,7 +193,7 @@ async function pruebas(sb) {
   await rpc('play_config_guardar', { p_negocio: NEG, p_activo: true, p_juegos: TODOS, p_retos: ['divertido'], p_local: true }, dueno.token);
 
   // ---------- Cierre ----------
-  r = await rpc('play_torneo_cerrar', { p_negocio: NEG }, mesero.token);
+  r = await rpc('play_torneo_cerrar', { p_negocio: NEG, p_torneo: T.id }, mesero.token);
   chk('Un mesero no puede terminar el torneo', r.st !== 200 && /sin_permiso/.test(err(r)), r);
   // Se acaba el tiempo: una partida que termina después ya no cuenta, y al leerlo se cierra con el resultado congelado.
   await sb.sql("update play_torneos set inicio = now() - interval '1 hour', fin = now() - interval '1 second' where id = $1", [T.id]);
@@ -193,7 +204,9 @@ async function pruebas(sb) {
   chk('Al pasar la hora el torneo se cierra solo (al leerlo) y el cliente ve el resultado', fin && fin.abierto === false && fin.mesas[0].mesa === 3 && fin.mesas[0].puntos === 250 && fin.miPuesto === 1, fin && fin.mesas.map((m) => [m.mesa, m.puntos]));
   chk('… y a Caro le dice que su última partida no alcanzó a sumar', fin.miUltima.sumo === false && fin.miUltima.juego === 'show', fin.miUltima);
   const res = (await uno('select resultado, cerrado from play_torneos where id = $1', [T.id]));
-  chk('El resultado queda congelado, con la regla usada y los apodos de quienes sumaron', res.cerrado && res.resultado.regla.mejores === 5 && res.resultado.regla.tope === 100 && res.resultado.mesas[0].mesa === 3 && res.resultado.mesas[0].jugadores.includes('Caro'), res.resultado && res.resultado.mesas[0]);
+  r = await rpc('play_torneo', { p_token: c1.token, p_ver: fin.v });
+  chk('Con el torneo cerrado, la respuesta también es corta si no cambió', r.j && r.j.igual === true, r.j);
+  chk('El resultado queda congelado, con la regla usada y los apodos de quienes sumaron', res.cerrado && res.resultado.regla.mejores === 5 && res.resultado.regla.tope === 100 && res.resultado.regla.ref.show === 1600 && res.resultado.regla.ref.sobreviviente === 560 && res.resultado.mesas[0].mesa === 3 && res.resultado.mesas[0].jugadores.includes('Caro'), res.resultado && res.resultado.mesas[0]);
   r = await rpc('play_torneo_ver', { p_negocio: NEG }, dueno.token);
   chk('El negocio ve el resultado del torneo que acaba de terminar', r.j.torneo && r.j.torneo.abierto === false && r.j.torneo.mesas.length === 4, r.j.torneo && r.j.torneo.mesas.map((m) => [m.mesa, m.puntos]));
   // Visibilidad: 3 horas para el cliente y 12 para el negocio, contadas desde la HORA DE FIN.
@@ -218,10 +231,30 @@ async function pruebas(sb) {
   chk('… y solo hay uno abierto', (await uno('select count(*)::int n from play_torneos where negocio_id = $1 and cerrado is null', [NEG])).n === 1);
   // Terminar ahora (a mano), con una mesa sola y luego uno sin partidas.
   await partida('show', [[b1, 800], [b2, 0]]);
-  r = await rpc('play_torneo_cerrar', { p_negocio: NEG }, dueno.token);
-  chk('El dueño lo termina ahora: queda cerrado, con la hora de fin de este momento y la mesa que jugó', r.st === 200 && r.j.torneo.abierto === false && r.j.torneo.fin <= r.j.torneo.ahora && r.j.torneo.mesas.length === 1 && r.j.torneo.mesas[0].mesa === 2 && r.j.torneo.mesas[0].puntos === 50, r.j.torneo);
+  // «Terminar ahora» con el torneo VIEJO en pantalla (otro administrador ya lo cerró y empezó este): no cierra el nuevo.
+  r = await rpc('play_torneo_cerrar', { p_negocio: NEG, p_torneo: T.id }, dueno.token);
+  chk('Terminar un torneo que ya no es el abierto no cierra el nuevo por equivocación', r.st === 200 && r.j.torneo.id === T2.id && r.j.torneo.abierto === true, r.j.torneo);
+  // Sin carrera con el cierre: una partida que se está guardando (vio el torneo abierto) hace esperar al cierre y queda adentro.
+  {
+    const { Client } = require('pg'); const k1 = new Client({ connectionString: sb.pgUrl }), k2 = new Client({ connectionString: sb.pgUrl });
+    await k1.connect(); await k2.connect();
+    await k1.query('begin');
+    await k1.query("insert into play_puntos(negocio_id, sala_id, jugador_id, alias, mesa, juego, puntos) values ($1, gen_random_uuid(), gen_random_uuid(), 'Tardia', 4, 'show', 1600)", [NEG]);
+    let cerro = false; const cierre = k2.query('select public.play_torneo_cerrar_uno($1, true) r', [T2.id]).then((x) => { cerro = true; return x; });
+    await new Promise((z) => setTimeout(z, 700));
+    const esperaba = !cerro;
+    await k1.query('commit'); await cierre; await k1.end(); await k2.end();
+    const rr = (await uno('select resultado from play_torneos where id = $1', [T2.id])).resultado;
+    chk('El cierre espera a la partida que se está guardando, y esa partida queda en el resultado', esperaba && rr.mesas.some((m) => m.mesa === 4 && m.puntos === 100 && m.jugadores.includes('Tardia')), { esperaba, mesas: rr.mesas });
+  }
+  r = await rpc('play_torneo_crear', { p_negocio: NEG, p_minutos: 30 }, admin.token);
+  const T2b = r.j && r.j.torneo;
+  chk('El administrador también puede empezar un torneo', r.st === 200 && T2b && T2b.abierto, r.j);
+  await partida('show', [[b1, 800], [b2, 0]]);
+  r = await rpc('play_torneo_cerrar', { p_negocio: NEG, p_torneo: T2b.id }, admin.token);
+  chk('El administrador lo termina ahora: queda cerrado, con la hora de fin de este momento y la mesa que jugó', r.st === 200 && r.j.torneo.abierto === false && r.j.torneo.fin <= r.j.torneo.ahora && r.j.torneo.mesas.length === 1 && r.j.torneo.mesas[0].mesa === 2 && r.j.torneo.mesas[0].puntos === 50, r.j.torneo);
   const despues = await partida('show', [[b1, 1600], [b2, 0]]);
-  chk('Una partida después de cerrar no entra ni cambia el resultado', (await filas(despues)).every((x) => x.torneo_id === null) && (await uno('select resultado from play_torneos where id = $1', [T2.id])).resultado.mesas[0].puntos === 50);
+  chk('Una partida después de cerrar no entra ni cambia el resultado', (await filas(despues)).every((x) => x.torneo_id === null) && (await uno('select resultado from play_torneos where id = $1', [T2b.id])).resultado.mesas[0].puntos === 50);
   r = await rpc('play_torneo_crear', { p_negocio: NEG, p_minutos: 15 }, dueno.token);
   const T3 = r.j.torneo;
   await sb.sql("update play_torneos set inicio = now() - interval '20 minutes', fin = now() - interval '1 second' where id = $1", [T3.id]);

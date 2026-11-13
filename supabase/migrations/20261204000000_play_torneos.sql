@@ -26,13 +26,14 @@ create table if not exists public.play_torneos (
   tabla       jsonb not null default '[]'::jsonb,        -- la tabla de mesas guardada
   tabla_en    timestamptz,                               -- cuándo se calculó
   tabla_n     int,                                       -- con cuántas filas de puntos se calculó (para saber si hay nuevas)
-  resultado   jsonb,                                     -- congelado al cerrar: la tabla y la regla usada
+  resultado   jsonb,                                     -- congelado al cerrar: la tabla y la regla usada (para la fase 3: premios)
   creado_por  uuid,
   check (fin > inicio)
 );
 create unique index if not exists play_torneos_abierto_idx on public.play_torneos(negocio_id) where cerrado is null;
 create index if not exists play_torneos_neg_idx on public.play_torneos(negocio_id, fin desc);
 create index if not exists play_torneos_fin_idx on public.play_torneos(fin) where cerrado is null;
+create index if not exists play_torneos_viejos_idx on public.play_torneos(fin);   -- para borrar los de más de 90 días
 alter table public.play_torneos enable row level security;
 revoke all on public.play_torneos from anon, authenticated;
 
@@ -59,6 +60,8 @@ begin
     select id into t from play_torneos where negocio_id = new.negocio_id and cerrado is null and inicio <= now() and fin > now() for share;
     new.torneo_id := t;
   exception when others then
+    -- Queda en el registro del servidor: si el disparador se daña, los torneos dejan de sumar y hay que poder verlo.
+    raise warning 'ORDEVA PLAY: la partida % se guardó sin torneo (%)', new.sala_id, sqlerrm;
     new.torneo_id := null; new.brutos := coalesce(new.brutos, new.puntos);
   end;
   return new;
@@ -67,7 +70,8 @@ drop trigger if exists play_puntos_torneo_tg on public.play_puntos;
 create trigger play_puntos_torneo_tg before insert on public.play_puntos for each row execute function public.play_puntos_torneo();
 
 -- La tabla de mesas de un torneo, con la regla. Cada mesa: sus puntos, cuántas partidas jugó, cuántas cuentan y los apodos
--- de quienes sumaron (hasta 4). Orden: más puntos y, si empatan, la que llegó primero.
+-- de quienes sumaron (hasta 4). Orden: más puntos y, si empatan, la que llegó primero. «Llegó» es la última partida QUE LE
+-- DIO PUNTOS: una partida de 0 puntos jugada después no le quita el desempate a la mesa que llegó antes.
 create or replace function public.play_torneo_tabla(p_torneo uuid) returns jsonb
 language sql stable security definer set search_path = public, extensions as $$
   with filas as (
@@ -78,22 +82,29 @@ language sql stable security definer set search_path = public, extensions as $$
     select distinct on (mesa, sala_id) mesa, sala_id, p, alias, avatar, creado from filas order by mesa, sala_id, p desc, creado, id),
   orden as (select *, row_number() over (partition by mesa order by p desc, creado) rn, count(*) over (partition by mesa) jugadas from por_sala),
   mesas as (
-    select mesa, sum(p)::int puntos, max(jugadas)::int partidas, count(*)::int cuentan, max(creado) llego,
-           (array_agg(distinct alias))[1:4] nombres
+    select mesa, sum(p)::int puntos, max(jugadas)::int partidas, count(*)::int cuentan,
+           coalesce(max(creado) filter (where p > 0), max(creado)) llego,
+           (array_agg(distinct alias) filter (where p > 0))[1:4] nombres
       from orden where rn <= 5 group by mesa)
-  select coalesce(jsonb_agg(jsonb_build_object('mesa', mesa, 'puntos', puntos, 'partidas', partidas, 'cuentan', cuentan, 'jugadores', to_jsonb(nombres))
+  select coalesce(jsonb_agg(jsonb_build_object('mesa', mesa, 'puntos', puntos, 'partidas', partidas, 'cuentan', cuentan, 'jugadores', coalesce(to_jsonb(nombres), '[]'::jsonb))
                             order by puntos desc, llego, mesa), '[]'::jsonb)
     from mesas
 $$;
+-- La regla, para dejarla escrita en el resultado de cada torneo (sale de play_torneo_ref: no se repiten los números).
+create or replace function public.play_torneo_regla() returns jsonb language sql stable set search_path = public, extensions as $$
+  select jsonb_build_object('tope', 100, 'mejores', 5,
+    'ref', (select jsonb_object_agg(j, play_torneo_ref(j)) from unnest(array['show','bomba','impostor','sobreviviente']) j),
+    'sin', jsonb_build_array('ruleta'))
+$$;
 
--- Recalcula la tabla guardada de un torneo abierto SOLO si terminó alguna partida nueva (o ya, si p_ya): compara cuántas
--- filas de puntos tiene el torneo con las que tenía al calcular. Sin partidas nuevas es un conteo por índice y nada más.
-create or replace function public.play_torneo_refrescar(p_torneo uuid, p_ya boolean default false) returns void
+-- Recalcula la tabla guardada de un torneo abierto SOLO si terminó alguna partida nueva: compara cuántas filas de puntos
+-- tiene el torneo con las que tenía al calcular. Sin partidas nuevas es un conteo por índice y nada más.
+create or replace function public.play_torneo_refrescar(p_torneo uuid) returns void
 language sql security definer set search_path = public, extensions as $$
   update play_torneos t set tabla = play_torneo_tabla(t.id), tabla_en = clock_timestamp(),
          tabla_n = (select count(*) from play_puntos p where p.torneo_id = t.id)
    where t.id = p_torneo and t.cerrado is null
-     and (p_ya or t.tabla_n is distinct from (select count(*)::int from play_puntos p where p.torneo_id = t.id))
+     and t.tabla_n is distinct from (select count(*)::int from play_puntos p where p.torneo_id = t.id)
 $$;
 
 -- Cierra un torneo: primero el candado (espera a las partidas que se están guardando) y después, en otra instrucción, el
@@ -105,10 +116,10 @@ begin
   select * into t from play_torneos where id = p_torneo and cerrado is null and (p_ahora or fin <= now()) for update;
   if not found then return false; end if;
   tab := play_torneo_tabla(t.id);
-  update play_torneos set fin = least(fin, now()), cerrado = now(), tabla = tab, tabla_en = clock_timestamp(),
+  -- (La hora de fin nunca queda antes del inicio, aunque el reloj de esta transacción venga atrasado.)
+  update play_torneos set fin = greatest(inicio + interval '1 millisecond', least(fin, now())), cerrado = now(), tabla = tab, tabla_en = clock_timestamp(),
       tabla_n = (select count(*) from play_puntos p where p.torneo_id = t.id),
-      resultado = jsonb_build_object('mesas', tab, 'regla', jsonb_build_object('tope', 100, 'mejores', 5,
-        'ref', jsonb_build_object('show', 1600, 'bomba', 600, 'impostor', 600, 'sobreviviente', 560), 'sin', jsonb_build_array('ruleta')))
+      resultado = jsonb_build_object('mesas', tab, 'regla', play_torneo_regla())
    where id = t.id;
   return true;
 end $$;
@@ -156,6 +167,8 @@ $$;
 create or replace function public.play_torneo(p_token text, p_ver bigint default null) returns jsonb
 language plpgsql security definer set search_path = public, extensions as $$
 declare j play_jugadores := play_yo(p_token); t play_torneos; r jsonb; mia jsonb; puesto int; ult record;
+-- «miUltima»: la última partida de ESTE jugador (con su sala y su hora, para que el celular sepa de cuál se habla) y si sumó
+-- a ESTE torneo.
 begin
   if not play_cupo(j.id, 25) then return play_err('demasiados'); end if;
   if not exists (select 1 from play_config where negocio_id = j.negocio_id and activo) then return jsonb_build_object('torneo', null); end if;
@@ -168,9 +181,10 @@ begin
   if p_ver is not null and p_ver = play_ms(coalesce(t.cerrado, t.tabla_en, t.inicio)) then return jsonb_build_object('igual', true, 'ahora', play_ms(now())); end if;
   r := play_torneo_json(t, 10);
   select x, n::int into mia, puesto from jsonb_array_elements(t.tabla) with ordinality as e(x, n) where (x->>'mesa')::int = j.mesa limit 1;
-  select p.torneo_id, p.juego into ult from play_puntos p where p.jugador_id = j.id order by p.creado desc limit 1;
+  select p.torneo_id, p.juego, p.sala_id, p.creado into ult from play_puntos p where p.jugador_id = j.id order by p.creado desc limit 1;
   return jsonb_build_object('torneo', r || jsonb_build_object('miMesa', j.mesa, 'miPuesto', puesto, 'mia', mia,
-    'miUltima', case when ult.juego is null then null else jsonb_build_object('sumo', ult.torneo_id is not distinct from t.id and play_torneo_ref(ult.juego) is not null, 'juego', ult.juego) end));
+    'miUltima', case when ult.juego is null then null else jsonb_build_object('sumo', ult.torneo_id is not distinct from t.id and play_torneo_ref(ult.juego) is not null,
+      'juego', ult.juego, 'sala', ult.sala_id, 'cuando', play_ms(ult.creado)) end));
 end $$;
 
 -- ---------- Para el negocio (con su sesión) ----------
@@ -204,26 +218,28 @@ begin
   return public.play_torneo_ver(p_negocio);
 end $$;
 
-create or replace function public.play_torneo_cerrar(p_negocio uuid) returns jsonb
+-- Termina ESE torneo (el que el dueño está viendo): si mientras tanto otro administrador lo cerró y empezó uno nuevo, no
+-- se cierra el nuevo por equivocación.
+create or replace function public.play_torneo_cerrar(p_negocio uuid, p_torneo uuid) returns jsonb
 language plpgsql security definer set search_path = public, extensions as $$
 declare r text := public.rol_en(p_negocio); t uuid;
 begin
   if r is null or r not in ('dueno', 'admin') then raise exception 'sin_permiso'; end if;
-  select id into t from play_torneos where negocio_id = p_negocio and cerrado is null;
+  select id into t from play_torneos where negocio_id = p_negocio and id = p_torneo and cerrado is null;
   if t is not null then perform play_torneo_cerrar_uno(t, true); end if;
   return public.play_torneo_ver(p_negocio);
 end $$;
 
 -- ---------- Permisos ----------
 do $$ declare f text; begin
-  foreach f in array array['play_torneo_ref(text)','play_puntos_torneo()','play_torneo_tabla(uuid)','play_torneo_refrescar(uuid, boolean)',
+  foreach f in array array['play_torneo_ref(text)','play_puntos_torneo()','play_torneo_tabla(uuid)','play_torneo_regla()','play_torneo_refrescar(uuid)',
     'play_torneo_cerrar_uno(uuid, boolean)','play_torneo_actual(uuid)','play_torneos_repaso()','play_torneo_json(public.play_torneos, int)'] loop
     execute 'revoke all on function public.' || f || ' from public, anon, authenticated';
     execute 'grant execute on function public.' || f || ' to service_role';
   end loop;
   execute 'revoke all on function public.play_torneo(text, bigint) from public';
   execute 'grant execute on function public.play_torneo(text, bigint) to anon, authenticated, service_role';
-  foreach f in array array['play_torneo_ver(uuid)','play_torneo_crear(uuid, int)','play_torneo_cerrar(uuid)'] loop
+  foreach f in array array['play_torneo_ver(uuid)','play_torneo_crear(uuid, int)','play_torneo_cerrar(uuid, uuid)'] loop
     execute 'revoke all on function public.' || f || ' from public, anon';
     execute 'grant execute on function public.' || f || ' to authenticated, service_role';
   end loop;

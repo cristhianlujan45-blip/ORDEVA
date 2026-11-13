@@ -52,14 +52,15 @@ servidor, y jugar con la mesa o contra las otras mesas. **Lo nuevo:** los equipo
 ## Revisión goldfish
 - **Del plan** (`puente/egm/PLAN-PLAY-FASE2.md`): «no está listo». 1 bloqueante: mi primera regla de puntos era injusta con
   las mesas de 2 y premiaba abrir varios celulares. Se cambió por la regla de arriba. 9 mayores, todos en el plan.
-- **Del código:** REVISION_AQUI
+- **Del código:** sin bloqueantes. 3 mayores (el desempate, la duración que se cambiaba sola en el panel y el aviso «sumó al torneo» que
+  podía ser de otra partida) y varios menores, todos corregidos. El detalle está al final del plan.
 
 ## Pruebas
-- **Servidor nueva:** `pruebas/servidor/playtorneo.test.js`, SERVIDOR_AQUI.
-- **Navegador nueva, con cuatro celulares en dos mesas:** `pruebas/playtorneo.test.js`, NAVEGADOR_AQUI.
+- **Servidor nueva:** `pruebas/servidor/playtorneo.test.js`, 72 bien, 0 mal.
+- **Navegador nueva, con cuatro celulares en dos mesas:** `pruebas/playtorneo.test.js`, 23 bien, 0 mal.
 - **Un defecto que encontró la prueba:** después de jugar, la tarjeta seguía diciendo «tu mesa todavía no suma» hasta por un
   minuto. Corregido: la tabla se pone al día apenas termina una partida.
-- **Fase 1 y el resto del servidor:** OTRAS_AQUI
+- **Fase 1 y el resto del servidor:** `play` 38 bien, 0 mal; las otras 31 pruebas del servidor, bien; `modulos` 12 bien (ahora revisa la versión de los archivos de PLAY).
 - **Lista completa:** RESULTADOS_AQUI
 - **No se probó** con celulares de verdad ni con la base de datos de producción.
 

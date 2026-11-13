@@ -113,6 +113,13 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     chk('5. «Terminar ahora» pregunta antes y avisa que las partidas sin terminar no suman', dialogos.some(d => /Terminar el torneo ahora/.test(d) && /no suman/.test(d)), dialogos);
     chk('5. El panel muestra el resultado: «Último torneo: ganó la Mesa 1 · Ana» y deja empezar otro', await esperar(A, () => /Último torneo: ganó la Mesa 1 · Ana/.test((document.querySelector('.pla-t-res') || {}).textContent || '') && !!document.querySelector('.pla-t-ini'), null, 15000), await A.evaluate(() => (document.querySelector('.pla-torneo') || {}).textContent));
 
+    // El dueño elige 2 horas para el siguiente. Pasa el tiempo (aquí se adelanta 3 minutos el torneo ya terminado) y el panel
+    // se repasa solo: la duración elegida NO vuelve a «1 hora».
+    await A.selectOption('.pla-t-min', '120');
+    await sb.sql("update play_torneos set inicio = inicio - interval '3 minutes', fin = fin - interval '3 minutes' where cerrado is not null");
+    await A.waitForTimeout(12500);
+    chk('5. Con un torneo recién terminado en pantalla, la duración elegida para el siguiente (2 horas) no se cambia sola', await A.evaluate(() => document.querySelector('.pla-t-min').value === '120'));
+
     // ===== 6 · Los clientes ven quién ganó =====
     chk('6. Caro (en la pantalla del torneo) ve «Ganó la Mesa 1 · Ana» sin recargar', await esperar(C3.p, () => /Ganó la Mesa 1 · Ana/.test((document.querySelector('.pl-hero') || {}).textContent || ''), null, 30000));
     await C1.p.click('#plRanking'); await C1.p.waitForSelector('#plVolver', { timeout: 10000 }); await C1.p.click('#plVolver');

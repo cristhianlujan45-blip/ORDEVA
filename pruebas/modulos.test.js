@@ -17,6 +17,10 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
   chk('1. index.html carga ' + tags.length + ' archivos de app/', tags.length >= 20);
   chk('1. Todos existen', tags.every(t => fs.existsSync(path.join(raiz, t.f))), tags.filter(t => !fs.existsSync(path.join(raiz, t.f))));
   chk('1. Todos con ?v=' + vers + ' (la versión de la app) y version.txt igual', !!vers && tags.every(t => t.v === vers) && txt.endsWith('v' + vers), { vers, txt, distintos: tags.filter(t => t.v !== vers) });
+  // 🎮 ORDEVA PLAY: pedido.html carga play/play.css y play/ordeva-play.js con ?v=. Si no es la versión de la app, el celular
+  // del cliente se queda con el archivo viejo que tiene guardado.
+  const ped = fs.readFileSync(path.join(raiz, 'pedido.html'), 'utf8'), plays = [...ped.matchAll(/(play\/(?:play\.css|ordeva-play\.js))\?v=([\d.]+)/g)].map(m => ({ f: m[1], v: m[2] }));
+  chk('1. pedido.html carga los dos archivos de ORDEVA PLAY con ?v=' + vers, plays.length === 2 && plays.every(t => t.v === vers && fs.existsSync(path.join(raiz, t.f))), plays);
   const otros = [...html.matchAll(/<script src="((?:lib|nube)\/[^"?]+\.js)(?:\?v=([^"]+))?"/g)].map(m => ({ f: m[1], v: m[2] || '' })).filter(t => t.f !== 'nube/config.js');
   chk('1. Los de lib/ y nube/ también llevan ?v=' + vers + ' (el equipo los guarda y abre al instante, sin mezclar versiones)', otros.length >= 15 && otros.every(t => t.v === vers && fs.existsSync(path.join(raiz, t.f))), otros.filter(t => t.v !== vers));
   const adm = (fs.readFileSync(path.join(raiz, 'admin.html'), 'utf8').match(/var ADMIN_VERSION = '([^']+)'/) || [])[1];

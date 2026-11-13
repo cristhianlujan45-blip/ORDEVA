@@ -79,7 +79,6 @@ tiempo real, puntuaciones y torneos entre mesas.» Después de la fase 1 (1.97.0
 
 ## Aislamiento y abusos
 - Todo se filtra por el negocio del token o por `es_miembro` / `rol_en`.
-- El nombre del torneo lo escribe el negocio: se limita a 40 caracteres y se muestra escapado.
 - Entrar otra vez sin token crea otro jugador, pero de cada partida solo cuenta el mejor de la mesa.
 - Un rival puede entrar a una partida de «todo el local» y salirse para dañarla: la regla lo aguanta (cuentan las 5
   mejores).
@@ -120,3 +119,25 @@ Un revisor de diseño con contexto limpio dijo «no está listo»: 1 bloqueante 
 2, premiaba abrir varias pestañas y no tenía tope por partida) y 9 mayores (el disparador sin red, la carrera con el
 cierre, crear después de vencer, el ganador de ayer, la medianoche, los permisos, calcular la tabla en cada lectura, el
 mensaje «suma al torneo» sin que lo diga el servidor, y la mesa que no es el grupo). Todo quedó en este plan.
+
+## Revisión goldfish del código
+Un revisor con contexto limpio leyó todo el cambio: sin bloqueantes, 3 mayores y varios menores. Lo que se hizo:
+
+| Hallazgo | Gravedad | Qué se hizo |
+|---|---|---|
+| El desempate usaba la última partida contada, aunque fuera de 0 puntos: una mesa que llegó primero perdía el empate por jugar después una partida mala. | Mayor | «Llegó» es la última partida que le dio puntos. Prueba. |
+| En el panel, con un torneo recién terminado, la pantalla se repintaba cada minuto y la duración elegida para el siguiente volvía sola a «1 hora». | Mayor | Los minutos solo cuentan con el torneo abierto. Prueba en el navegador. |
+| El aviso «esta partida sumó» podía ser de la partida anterior (si fallaba la conexión) o de otro torneo. | Mayor | El servidor manda la sala y la hora de la última partida; el celular solo habla si contestó ahora y es de esa sala. Prueba. |
+| «Terminar ahora» cerraba el torneo que estuviera abierto, no el que el dueño estaba viendo. | Menor | Se manda el id del torneo. Prueba. |
+| Si el disparador fallaba, nadie se enteraba. | Menor | Deja un aviso en el registro del servidor. |
+| La hora de fin podía quedar antes del inicio con un reloj atrasado. | Menor | Nunca queda antes. |
+| El panel mostraba 10 mesas de las 20 que manda el servidor; la regla estaba escrita dos veces; un parámetro sin uso; faltaba un índice para borrar los viejos. | Menor | Arreglado. |
+| Al volver a la pestaña Play la tarjeta no se ponía al día; al recargar se anunciaba como nuevo un torneo de hace una hora; dos preguntas cruzadas; la sesión vencida dejaba la pantalla quieta; la tarjeta se rehacía cada 15 s; se preguntaba cada minuto aunque no hubiera torneo. | Menor | Arreglado (sin torneo se pregunta cada 2 minutos; en «entrar» o con PLAY apagado, no). |
+| El panel podía pintar una respuesta vieja encima; sin conexión no avisaba. | Menor | Arreglado. |
+| Nada revisaba que `pedido.html` cargara los archivos de PLAY con la versión. | Menor | `pruebas/modulos.test.js` lo revisa. |
+
+**Pruebas que pidió y se agregaron:** el cierre contra una partida que se está guardando (dos conexiones), las funciones
+internas con la sesión de un mesero, el rol de administrador, y `miUltima` con una partida de antes del torneo.
+
+**No se cambió:** un paso guardado por cada fila de puntos (solo pesa si el negocio apaga PLAY con muchas salas abiertas);
+la duración en el servidor acepta de 15 a 120 minutos y el panel ofrece cuatro.

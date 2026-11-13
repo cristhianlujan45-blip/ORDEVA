@@ -135,21 +135,30 @@
 
   // ---------- 🏆 Torneo entre mesas ----------
   // «tor» es lo último que dijo el servidor (o null si no hay torneo). Nada del torneo lo decide el celular.
-  let tor = null, torIv = null, torTics = 0, pantalla = '', torFin = { sala: null, txt: '' };
+  let tor = null, torIv = null, torTics = 0, torSec = 0, pantalla = '', torFin = { sala: null, txt: '' };
   const torFaltan = () => tor ? Math.max(0, Math.ceil((tor.fin - (Date.now() + (tor.desfase || 0))) / 60000)) : 0;
   const torNombres = m => (m && m.jugadores && m.jugadores.length ? ' · ' + m.jugadores.map(esc).join(', ') : '');
+  // Devuelve true si el servidor contestó (y «tor» quedó al día) y false si no se pudo: quien llama no debe usar un «tor»
+  // viejo como si fuera de ahora. Si dos preguntas se cruzan, solo vale la respuesta de la última.
   async function torneoPedir(completo){
-    if(!st.token) return tor;
-    let r = null;
-    try{ r = await rpc('play_torneo', { p_token: st.token, p_ver: (!completo && tor && tor.v) || null }); }catch(e){ return tor; }
-    if(r && r.igual){ if(tor) tor.desfase = r.ahora - Date.now(); return tor; }
+    if(!st.token) return false;
+    const n = ++torSec; let r = null;
+    try{ r = await rpc('play_torneo', { p_token: st.token, p_ver: (!completo && tor && tor.v) || null }); }
+    catch(e){
+      // La sesión de juego venció (12 h): a entrar de nuevo, en vez de dejar la pantalla del torneo quieta para siempre.
+      if(e.codigo === 'play_sesion' && n === torSec && (pantalla === 'torneo' || pantalla === 'inicio')){ pantallaEntrar({ alias: st.alias, avatar: st.avatar }); aviso(e.message, true); }
+      return false;
+    }
+    if(n !== torSec) return false;
+    if(r && r.igual){ if(tor) tor.desfase = r.ahora - Date.now(); return true; }
     const antes = tor; tor = (r && r.torneo) || null;
     if(tor){
       tor.desfase = tor.ahora - Date.now();
-      // Empezó un torneo mientras estaba en otra pantalla de Play: se avisa (en el inicio ya sale la tarjeta).
-      if(tor.abierto && (!antes || antes.id !== tor.id) && pantalla !== 'inicio' && pantalla !== 'torneo' && pantalla !== 'entrar' && root && root.querySelector('.pl-aviso')) aviso('🏆 ¡Empezó un torneo de mesas! Las partidas que terminen antes de que acabe suman a tu mesa.');
+      // Un torneo que ACABA de empezar (menos de 2 minutos) mientras estaba en otra pantalla de Play: se avisa. En el inicio
+      // ya sale la tarjeta, y al recargar no se anuncia como nuevo un torneo que lleva una hora.
+      if(tor.abierto && (!antes || antes.id !== tor.id) && tor.ahora - tor.inicio < 120000 && pantalla === 'sala' && root && root.querySelector('.pl-aviso')) aviso('🏆 ¡Empezó un torneo de mesas! Las partidas que terminen antes de que acabe suman a tu mesa.');
     }
-    return tor;
+    return true;
   }
   function torneoGanador(){
     const g = (tor.mesas || [])[0];
@@ -165,7 +174,8 @@
   }
   function torneoPoner(){
     const c = root && root.querySelector('#plTorneoCaja'); if(!c) return;
-    c.innerHTML = torneoTarjeta();
+    const h = torneoTarjeta(); if(c.dataset.h === h) return;   // sin cambios no se rehace (no se pierde un toque a medias)
+    c.dataset.h = h; c.innerHTML = h;
     const b = c.querySelector('#plTorneo'); if(b) b.onclick = pantallaTorneo;
   }
   function pantallaTorneo(){
@@ -185,21 +195,29 @@
     root.querySelector('#plVolver').onclick = inicio; root.querySelector('#plJugar').onclick = inicio;
   }
   // Mientras Play se ve: la pantalla del torneo se refresca cada 15 s; en las demás, se pregunta cada minuto.
+  // Con torneo a la vista se pregunta cada minuto; sin torneo, cada 2 minutos (para enterarse si empieza uno). En la pantalla
+  // de entrar o si PLAY no está disponible, no se pregunta.
   function torneoTic(){
-    if(!st.token || !visible()) return;
+    if(!st.token || !visible() || pantalla === '' || pantalla === 'entrar' || pantalla === 'cerrado') return;
     torTics++;
     if(pantalla === 'torneo'){ const v0 = tor && tor.v, m0 = torFaltan(); torneoPedir().then(() => { if(pantalla === 'torneo' && (!tor || tor.v !== v0 || torFaltan() !== m0)) pantallaTorneo(); }); }
-    else if(torTics % 4 === 0) torneoPedir().then(() => { if(pantalla === 'inicio') torneoPoner(); });
+    else if(torTics % (tor ? 4 : 8) === 0) torneoPedir().then(() => { if(pantalla === 'inicio') torneoPoner(); });
     else if(pantalla === 'inicio') torneoPoner();   // el «faltan N min» de la tarjeta
   }
   // Al terminar una partida: el servidor dice si sumó al torneo.
+  // Solo se dice algo si el servidor contestó AHORA y habla de ESTA partida (su sala). Si la conexión falla, no se dice nada
+  // (antes que mostrar lo de la partida anterior).
   async function torneoAlTerminar(sala){
-    await torneoPedir(true);
-    if(!tor || !tor.miUltima || st.sala !== sala) return;
-    const u = tor.miUltima, reciente = tor.abierto || (Date.now() + (tor.desfase || 0)) - tor.fin < 10 * 60000;
-    if(!u.sumo && !reciente) return;
-    torFin = { sala, txt: u.sumo ? '🏆 Esta partida sumó al torneo de mesas.' : u.juego === 'ruleta' ? '🏆 Hay torneo de mesas, pero la Ruleta es por diversión: no suma.' : '🏆 Esta partida no alcanzó a sumar al torneo de mesas.' };
-    const e = root && root.querySelector('#plTorneoFin'); if(e){ e.textContent = torFin.txt; e.hidden = false; }
+    if(!(await torneoPedir(true))) return;
+    if(!tor || !tor.miUltima || st.sala !== sala || tor.miUltima.sala !== sala) return;
+    const u = tor.miUltima, ahora = Date.now() + (tor.desfase || 0);
+    let txt = '';
+    if(u.sumo) txt = '🏆 Esta partida sumó al torneo de mesas.';
+    else if(u.cuando >= tor.inicio && tor.abierto && u.juego === 'ruleta') txt = '🏆 Hay torneo de mesas, pero la Ruleta es por diversión: no suma.';
+    else if(u.cuando >= tor.inicio && !tor.abierto && ahora - tor.fin < 10 * 60000 && u.juego !== 'ruleta') txt = '🏆 Esta partida no alcanzó a sumar al torneo de mesas (ya había terminado).';
+    if(!txt) return;
+    torFin = { sala, txt };
+    const e = root && root.querySelector('#plTorneoFin'); if(e){ e.textContent = txt; e.hidden = false; }
   }
 
   // ---------- La sala ----------
@@ -370,7 +388,13 @@
 
   // ---------- Abrir ----------
   function abrir(el, c){
-    if(root === el && st.token){ if(st.sala){ refrescar(true); if(!poll) programar(); if(!reloj) reloj = setInterval(pintarReloj, 250); } return; }   // ya estaba abierto: solo se actualiza
+    if(root === el && st.token){
+      if(st.sala){ refrescar(true); if(!poll) programar(); if(!reloj) reloj = setInterval(pintarReloj, 250); }
+      // Al volver a la pestaña Play: el torneo al día de una vez (pudo empezar o terminar mientras miraba la carta).
+      else if(pantalla === 'inicio') torneoPedir().then(torneoPoner);
+      else if(pantalla === 'torneo') torneoPedir().then(() => { if(pantalla === 'torneo') pantallaTorneo(); });
+      return;
+    }   // ya estaba abierto: solo se actualiza
     root = el; ctx = c;
     if(!torIv) torIv = setInterval(torneoTic, 15000);
     const prev = leer();
@@ -379,7 +403,7 @@
       rpc('play_entrar', { p_canal: ctx.c, p_mesa: +ctx.mesa, p_vm: ctx.v, p_alias: prev.alias, p_avatar: prev.avatar, p_token: prev.token })
         .then(r => { Object.assign(st, { token: r.token, jugador: r.jugador, juegos: r.juegos || [], local: !!r.local }); guardar();
           if(prev.sala) rpc('play_estado', { p_token: st.token, p_sala: prev.sala }).then(entrarSala, () => inicio()); else inicio(); })
-        .catch(e => { if(e.codigo === 'play_no_disponible' || e.codigo === 'play_mesa'){ pintar('<div class="pl-hero"><div class="pl-logo">🎮</div><p>' + esc(e.message) + '</p></div>'); } else { pantallaEntrar(prev); if(e.codigo === 'demasiados' || e.codigo === 'red') aviso(e.message, true); } });
+        .catch(e => { if(e.codigo === 'play_no_disponible' || e.codigo === 'play_mesa'){ pantalla = 'cerrado'; pintar('<div class="pl-hero"><div class="pl-logo">🎮</div><p>' + esc(e.message) + '</p></div>'); } else { pantallaEntrar(prev); if(e.codigo === 'demasiados' || e.codigo === 'red') aviso(e.message, true); } });
     } else pantallaEntrar(null);
   }
   function cerrar(){ parar(); }

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Sube la versión de ORDEVA en TODOS los lugares a la vez (si falta uno, la app pide «Actualizar» o mezcla archivos):
-#   MESORA_VERSION (app/*.js), ?v= de los archivos de app/, lib/ y nube/ en index.html, version.txt y ADMIN_VERSION (admin.html).
+#   MESORA_VERSION (app/*.js), ?v= de los archivos de app/, lib/ y nube/ en index.html, version.txt, ADMIN_VERSION (admin.html)
+#   y ?v= de los archivos de ORDEVA PLAY (play/) en pedido.html.
 # Uso: bash puente/subir-version.sh 1.59.1        (la fecha es la de hoy)
 # Después: pruebas/modulos.test.js revisa que todo quedó igual.
 set -euo pipefail
@@ -19,7 +20,7 @@ sed -i -E "s#(href=\"lib/[^\"?]+\.css)(\?v=[0-9.]+)?\"#\1?v=$NUEVA\"#g" index.ht
 sed -i -E "s#src=\"nube/config\.js\?v=[0-9.]+\"#src=\"nube/config.js\"#" index.html
 # 🎮 ORDEVA PLAY: pedido.html carga play/play.css y play/ordeva-play.js solo al tocar la pestaña, con ?v=. Si no sube con la
 # versión, el celular del cliente sigue usando el archivo viejo que tiene guardado.
-sed -i -E "s#('play/(play\.css|ordeva-play\.js))\?v=[0-9.]+'#\1?v=$NUEVA'#g; s#(play/(play\.css|ordeva-play\.js))\?v=[0-9.]+#\1?v=$NUEVA#g" pedido.html
+sed -i -E "s#(play/(play\.css|ordeva-play\.js))\?v=[0-9.]+#\1?v=$NUEVA#g" pedido.html
 sed -i "s/var ADMIN_VERSION = '[^']*'/var ADMIN_VERSION = '$TXT'/" admin.html
 printf '%s\n' "$TXT" > version.txt
 echo "Listo: $TXT"
