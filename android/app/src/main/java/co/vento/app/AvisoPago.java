@@ -19,7 +19,7 @@ public final class AvisoPago {
     // DaviPlata escribe de «usted»: «Le llegó plata», «Le pasaron»; Nequi de «tú»: «Te llegó plata».
     // También las transferencias de OTROS bancos por la llave Bre-B («Llegaron $50.000 a tu llave», «Recibiste $X por Bre-B»,
     // «Te mandaron», «Te giraron», «Se acreditó en tu cuenta»).
-    static final Pattern RECIBIDO = Pattern.compile("recibiste|has recibido|ha recibido|(te|le) lleg[oó]|(te|le) llegaron|(te|le) pas[oó]|(te|le) pasaron|pasaron plata|(te|le) envi[oó]|(te|le) enviaron|(te|le) transfiri|(te|le) pag[oó]|(te|le) pagaron|(te|le) consign|(te|le) abon|consignaron|abonaron|entr[oó] (plata|dinero)|lleg[oó] (plata|dinero)|ingres[oó]|recibi[oó]|recepci[oó]n|pago recibido|dinero recibido|transferencia recibida|abono a (tu|su) cuenta"
+    static final Pattern RECIBIDO = Pattern.compile("recibiste|has recibido|ha recibido|(te|le) lleg[oó]|(te|le) llegaron|(te|le) pas[oó]|(te|le) pasaron|pasaron plata|(te|le) envi[oó]|(te|le) enviaron|(te|le) transfiri|(te|le) pag[oó]|(te|le) pagaron|(te|le) consign|(te|le) abon|consignaron|abonaron|entr[oó] (plata|dinero)|lleg[oó] (plata|dinero)|ingres[oó](?![a-zñ])|recibi[oó]|recepci[oó]n|pago recibido|dinero recibido|transferencia recibida|abono a (tu|su) cuenta"
             + "|(te|le) mand(o|ó|aron)|(te|le) gir(o|ó|aron)|(te|le) deposit|dep[oó]sito recibido|(te|le|se) acredit|acredit\\w*\\s+(a|en)\\s+(tu|su)\\s+(cuenta|llave|nequi|daviplata)"
             + "|lleg(o|ó|aron)\\s+(\\$|cop|plata|dinero)|a (tu|su) llave|(recib|lleg|entr|ingres)[^.]{0,40}bre-?b|bre-?b[^.]{0,40}(recib|lleg|entr|ingres)"
             // Más formas de los bancos para la plata que entra (transferencias por llave Bre-B y de otros bancos)
@@ -32,7 +32,10 @@ public final class AvisoPago {
     static final Pattern SEGURO = Pattern.compile("recibiste|recibi[oó]|ha recibido|(te|le) lleg", Pattern.CASE_INSENSITIVE);
     // Nunca es plata que llegó, diga lo que diga: solicitudes y cobros («JUAN te pidió $20.000», «Recibiste una solicitud»),
     // pagos rechazados, fallidos, reversados o programados.
-    static final Pattern NUNCA = Pattern.compile("solicitud|(te|le) pide|(te|le) pidi[oó]|(te|le) cobr|cobro pendiente|rechazad|fall[oó]|no se pudo|reversad|programad", Pattern.CASE_INSENSITIVE);
+    static final Pattern NUNCA = Pattern.compile("solicitud|(te|le) pide|(te|le) pidi[oó]|(te|le) cobr|cobro pendiente|rechazad|fall[oó]|no se pudo|reversad|programad"
+            // 1.98.1: cobranzas y deudas («su obligacion con OCCIDENTE registra una deuda de $ 9.265.137… embargo») nunca son
+            // plata que llegó, aunque nombren un banco y traigan un valor.
+            + "|deuda|obligaci[oó]n|\\bmora\\b|proceso (judicial|jur[ií]dico)|embargo|medidas? cautelar|cobranza|cobro (pre)?jur[ií]dic|(ponte|p[oó]ngase|pongase) al d[ií]a|acuerdo de pago|centrales de riesgo|datacr[eé]dito|saldo (vencido|en mora)|cuota vencida|pago m[ií]nimo|fecha l[ií]mite de pago|contact[aáe]nos", Pattern.CASE_INSENSITIVE);
     // Frases que solo trae un pago de verdad: con ellas un «¿…?» o un «bolsillo» en el mismo aviso no lo vuelven publicidad
     // (antes un «¿La guardas en un bolsillo?» en el aviso de Nequi hacía que el pago no sonara).
     static final Pattern FUERTE = Pattern.compile("(te|le) (envi[oó]|enviaron|pas[oó]|pasaron|transfiri[oó]|transfirieron|consign[oó]|consignaron|mand[oó]|mandaron|gir[oó]|giraron|pag[oó]|pagaron)(?![a-záéíóúñ])|(recibiste|recibi[oó]|ha recibido|has recibido)\\s+(\\$|cop|\\d|una transferencia|un pago|dinero|plata)|transferencia recibida|pago recibido|a (tu|su) llave|(te|le) lleg[oó]\\s+(\\$|cop|\\d|plata|dinero)", Pattern.CASE_INSENSITIVE);
@@ -47,6 +50,7 @@ public final class AvisoPago {
             // Nequi también escribe el valor sin $: «MARIBE ARIAS te envió 1500, ¡lo mejor!» (1.41.3)
             + "|(?:te|le)\\s+(?:envi[oó]|enviaron|pas[oó]|pasaron|mand[oó]|mandaron|transfiri[oó]|transfirieron|consign[oó]|consignaron|gir[oó]|giraron|pag[oó]|pagaron))\\s+(\\d{1,3}(?:[.,]\\d{3})+(?![.,]?\\d)|\\d{1,7}(?!\\d|[.,]\\d))(?!\\s*(?:%|min|seg|horas?|d[ií]as?|veces))", Pattern.CASE_INSENSITIVE);
 
+    static final Pattern COBRANZA = Pattern.compile("deuda|obligaci[oó]n|\\bmora\\b|proceso (judicial|jur[ií]dico)|embargo|medidas? cautelar|cobranza|cobro (pre)?jur[ií]dic|(ponte|p[oó]ngase|pongase) al d[ií]a|acuerdo de pago|centrales de riesgo|datacr[eé]dito|saldo (vencido|en mora)|cuota vencida|pago m[ií]nimo|fecha l[ií]mite de pago|contact[aáe]nos", Pattern.CASE_INSENSITIVE);
     static boolean esBanco(String app) { return app != null && BANCO.matcher(app).find(); }
 
     // Plata que llega como RECARGA desde un banco (1.55.1): una transferencia de Bancolombia (u otro banco) a Nequi sale en
@@ -81,9 +85,13 @@ public final class AvisoPago {
     // 💸 1.66.5: plata que SALE de la cuenta del negocio (lo que el dueño envía o paga por Nequi, DaviPlata o el banco), para
     // clasificarla en Contabilidad (proveedor u otro gasto). Nunca suena ni sale del celular: solo queda para la página.
     // Nunca un código o clave, ni algo rechazado, fallido, programado o una solicitud.
-    static final Pattern SALIDA = Pattern.compile("enviaste|pagaste|pasaste|transferiste|compraste|compra exitosa|retiraste|sacaste|usted (envi|pag|transfiri|pas)|retiro (exitoso|aprobado|en|por|de)|se debit[oó]|debitamos|compra aprobada|avance (por|de|en)|usted retir", Pattern.CASE_INSENSITIVE);
+    static final Pattern SALIDA = Pattern.compile("enviaste|pagaste|pasaste|transferiste|compraste|compra exitosa|retiraste|sacaste|usted (envi|pag|transfiri|pas)|retiro (exitoso|aprobado|en|por|de)|se debit[oó]|debitamos|compra aprobada|avance (por|de|en)|usted retir"
+            // 1.98.1: más formas en que Nequi, DaviPlata y los bancos avisan lo que el dueño pagó o envió.
+            + "|env[ií]o (exitoso|realizado)|pago (exitoso|realizado|aprobado)|transferencia (exitosa|realizada|enviada)|transacci[oó]n exitosa|(hiciste|realizaste) (un|una|el|la|tu) (pago|env[ií]o|transferencia|compra|retiro)|has (enviado|pagado|transferido)|sali[oó] plata|(tu|su) (pago|env[ií]o|transferencia) (fue|ha sido) (exitos|realizad|aprobad)|(tu|su) (pago|env[ií]o|transferencia) (de|por) (\\$|cop|\\d)", Pattern.CASE_INSENSITIVE);
     static boolean esSalida(String todo) {
         if (todo == null || !SALIDA.matcher(todo).find() || CODIGO.matcher(todo).find() || NUNCA.matcher(todo).find()) return false;
+        // «Pago exitoso: recibiste $…» es plata que ENTRA: nunca una salida.
+        if (SEGURO.matcher(todo).find() || FUERTE.matcher(todo).find()) return false;
         if (Pattern.compile("clave din[aá]mica|\\botp\\b|c[oó]digo (de )?(seguridad|verificaci)", Pattern.CASE_INSENSITIVE).matcher(todo).find()) return false;
         return Pattern.compile("\\d").matcher(todo).find();   // con algún número (el valor lo lee la página)
     }
@@ -336,6 +344,7 @@ public final class AvisoPago {
         if (t == null || t.trim().isEmpty()) return "aviso vacío";
         if (SALE.matcher(t).find()) return "plata que SALE (pasaste, enviaste, compra…)";
         if (CODIGO.matcher(t).find()) return "código de seguridad";
+        if (COBRANZA.matcher(t).find()) return "cobranza o deuda (no es plata que llegó)";
         if (NUNCA.matcher(t).find()) return "solicitud, rechazado o programado";
         if (RECARGA.matcher(t).find() && RECARGA_NO.matcher(t).find()) return "recarga de celular o que no se hizo";
         if (!RECIBIDO.matcher(t).find() && !esRecarga(t)) return "no dice que llegó plata";

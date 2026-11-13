@@ -230,6 +230,18 @@ public class AvisoPagoPrueba {
         for (String rn : recargasNo) chk("Recarga que NO es plata que llegó: «" + rn + "»", !AvisoPago.esRecibido(rn), rn);
         chk("Por qué no: «recarga de celular o que no se hizo»", AvisoPago.porQueNo("Recarga Claro por $10.000 desde Bancolombia").startsWith("recarga de celular"), AvisoPago.porQueNo("Recarga Claro por $10.000 desde Bancolombia"));
         chk("Una recarga que no se entendió igual se le pasa a la página (sirveCrudo)", AvisoPago.sirveCrudo("Recarga exitosa por $9.000"), "");
+        // 1.98.1: los SMS de cobranza que le llegaron al dueño del 87068 y sonaron como plata recibida.
+        String[] cobros = { "Liquitty/PRA: AMPARO, su obligacion con OCCIDENTE registra una deuda de $ 9.265.137. Se iniciara el proceso judicial y podrian solicitarse medidas cautelares sobre sus ingresos, incluida la posibilidad de embargo salarial. Contactenos antes de las 5 p.m: 3336032698",
+            "Liquitty/PRA: AMPARO. Tienes hasta las 6p.m. para evitar el proceso judicial y ahorrar hoy un 93% de DESCUENTO pagando el total de tu deuda con OCCIDENTE: $ 656.691 Contactanos: 3336032698",
+            "Banco de Bogota: su credito presenta mora de 45 dias por $ 320.000. Pongase al dia y evite reporte en centrales de riesgo",
+            "Bancolombia: recuerda que tu cuota vencida es de $ 150.000. Te ofrecemos un acuerdo de pago" };
+        for (String x : cobros) chk("Cobranza o deuda NO es plata que llegó ni una salida: «" + x.substring(0, 60) + "…»", !AvisoPago.esRecibido(x) && !AvisoPago.esSmsDePago("87068", x) && !AvisoPago.esSalida(x) && AvisoPago.porQueNo(x).contains("cobranza"), AvisoPago.porQueNo(x));
+        chk("«sobre sus ingresos» no es «ingresó plata», pero «Ingresó $20.000 a tu cuenta Nequi» sí", !AvisoPago.RECIBIDO.matcher("medidas sobre sus ingresos").find() && AvisoPago.esRecibido("Nequi: Ingresó $20.000 a tu cuenta"), "");
+        String[] reales = { "Nequi | JUAN PEREZ te envió $20.000", "DaviPlata: Recibiste 140,000. Para saber mas, consulta tus movimientos", "Bancolombia: Recibiste una transferencia por $50.000 de MARIA" };
+        for (String x : reales) chk("Un pago de verdad sigue siendo pago: «" + x + "»", AvisoPago.esRecibido(x), AvisoPago.porQueNo(x));
+        String[] pagos = { "Nequi | Envío exitoso | Tu envío de $35.000 a DISTRIBUIDORA EL SOL fue exitoso", "Nequi | Pago exitoso por $18.500 en TIENDA D1", "DaviPlata: Transaccion exitosa por 25,000 a otro DaviPlata", "Nequi | Hiciste un pago de $12.000 a CLARO", "Bancolombia: Transferencia exitosa por $80.000 a la cuenta 123" };
+        for (String x : pagos) chk("Lo que el dueño pagó o envió es salida y no pago recibido: «" + x + "»", AvisoPago.esSalida(x) && !AvisoPago.esRecibido(x), x);
+        chk("«Pago exitoso: recibiste $20.000» es plata que ENTRA, no una salida", !AvisoPago.esSalida("Nequi | Pago exitoso: recibiste $20.000 de JUAN") && AvisoPago.esRecibido("Nequi | Pago exitoso: recibiste $20.000 de JUAN"), "");
         System.out.println("RESULTADO " + ok + " bien " + mal + " mal");
         System.exit(mal > 0 ? 1 : 0);
     }

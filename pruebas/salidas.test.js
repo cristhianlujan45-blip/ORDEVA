@@ -132,6 +132,11 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     chk('8. La próxima vez a MAMÁ ya no se anota sola', v.filas === 0 && !v.gasto, v);
 
     // ===== 9. Retiros =====
+    // 1.98.1: más formas en que Nequi, DaviPlata y los bancos avisan lo que el dueño pagó o envió.
+    const L98 = await p.evaluate(() => { const S = window.ventoSalidas; return [
+      'Nequi | Envío exitoso | Tu envío de $35.000 a DISTRIBUIDORA EL SOL fue exitoso', 'Nequi | Nequi | Pago exitoso por $18.500 en TIENDA D1',
+      'SMS | 85888 | DaviPlata: Transaccion exitosa por 25,000 a otro DaviPlata', 'Nequi | Nequi | Hiciste un pago de $12.000 a CLARO'].map(t => [S.montoDe(t), S.destinoDe(t)]); });
+    chk('1.98.1 «Envío exitoso», «Pago exitoso», «Transacción exitosa» y «Hiciste un pago»: se lee el valor y a quién', JSON.stringify(L98.map(x => x[0])) === JSON.stringify([35000, 18500, 25000, 12000]) && /DISTRIBUIDORA EL SOL/i.test(L98[0][1]) && /TIENDA D1/i.test(L98[1][1]) && /CLARO/i.test(L98[3][1]), L98);
     const L9 = await p.evaluate(() => { const S = window.ventoSalidas; return ['Bancolombia | Bancolombia | Retiraste $50.000 en cajero Bancolombia', 'DaviPlata | DaviPlata | Retiro exitoso por $200.000 en corresponsal', 'Nequi | Nequi | Enviaste $5.000 a JUAN'].map(t => [S.esRetiro(t), S.montoDe(t)]); });
     chk('9. «Retiraste $50.000 en cajero» y «Retiro exitoso por $200.000 en corresponsal» son retiros; «Enviaste» no', L9[0][0] && L9[0][1] === 50000 && L9[1][0] && L9[1][1] === 200000 && !L9[2][0], L9);
     const res0 = await p.evaluate(() => { const x = ctMovimientos({ ini: 0, fin: Date.now() + 864e5 }); const s = t => x.mov.filter(m => m.tipo === t).reduce((a, m) => a + m.monto, 0); return { g: s('gasto'), i: s('venta') + s('ingreso') }; });
