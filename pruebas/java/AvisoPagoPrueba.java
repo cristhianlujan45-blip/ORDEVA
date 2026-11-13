@@ -242,6 +242,10 @@ public class AvisoPagoPrueba {
         String[] pagos = { "Nequi | Envío exitoso | Tu envío de $35.000 a DISTRIBUIDORA EL SOL fue exitoso", "Nequi | Pago exitoso por $18.500 en TIENDA D1", "DaviPlata: Transaccion exitosa por 25,000 a otro DaviPlata", "Nequi | Hiciste un pago de $12.000 a CLARO", "Bancolombia: Transferencia exitosa por $80.000 a la cuenta 123" };
         for (String x : pagos) chk("Lo que el dueño pagó o envió es salida y no pago recibido: «" + x + "»", AvisoPago.esSalida(x) && !AvisoPago.esRecibido(x), x);
         chk("«Pago exitoso: recibiste $20.000» es plata que ENTRA, no una salida", !AvisoPago.esSalida("Nequi | Pago exitoso: recibiste $20.000 de JUAN") && AvisoPago.esRecibido("Nequi | Pago exitoso: recibiste $20.000 de JUAN"), "");
+        // 1.98.2: las palabras de cobranza no callan un pago de verdad.
+        String[] conPalabra = { "Nequi | JUAN MORA te envió $20.000", "Nequi | Nequi | CARLOS EMBARGO te pasó $15.000. Contáctanos si tienes dudas", "DaviPlata | MARIA DEUDA le transfirió $8.000 a su DaviPlata", "Bancolombia: Recibiste una transferencia por $50.000 de JOSE MORA. Sin embargo revisa tu saldo" };
+        for (String x : conPalabra) chk("Un pago de verdad con una palabra de cobranza (apellido Mora, «contáctanos», «sin embargo») sigue sonando: «" + x + "»", AvisoPago.esRecibido(x) && AvisoPago.monto(x) > 0, AvisoPago.porQueNo(x));
+        chk("«Pagaste $50.000 de tu obligación» sí es una salida; «pagando el total de tu deuda» no", AvisoPago.esSalida("Bancolombia: Pagaste $50.000 de tu obligacion 1234") && !AvisoPago.esSalida("PRA: ahorra pagando el total de tu deuda con OCCIDENTE: $ 656.691"), "");
         System.out.println("RESULTADO " + ok + " bien " + mal + " mal");
         System.exit(mal > 0 ? 1 : 0);
     }

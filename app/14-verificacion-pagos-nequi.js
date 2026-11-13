@@ -59,7 +59,9 @@ function pagoHuella(t){
 
   // ---------- Leer la notificación ----------
   const APPS = [[/daviplata/i, 'DaviPlata'], [/nequi/i, 'Nequi'], [/bancolombia/i, 'Bancolombia'], [/movii/i, 'Movii'], [/\bdale\b/i, 'Dale'], [/davivienda/i, 'Davivienda'], [/bre-?b/i, 'Bre-B']];
-  const PG_NUNCA = /solicitud|(?:te|le) pide|(?:te|le) pidi[oó]|(?:te|le) cobr|cobro pendiente|rechazad|fall[oó]|no se pudo|reversad|programad|deuda|obligaci[oó]n|\bmora\b|proceso (?:judicial|jur[ií]dico)|embargo|medidas? cautelar|cobranza|cobro (?:pre)?jur[ií]dic|(?:ponte|p[oó]ngase|pongase) al d[ií]a|acuerdo de pago|centrales de riesgo|datacr[eé]dito|saldo (?:vencido|en mora)|cuota vencida|pago m[ií]nimo|fecha l[ií]mite de pago|contact[aáe]nos/i;   // 1.98.1: + cobranzas y deudas (nunca son plata que llegó)
+  const PG_NUNCA = /solicitud|(?:te|le) pide|(?:te|le) pidi[oó]|(?:te|le) cobr|cobro pendiente|rechazad|fall[oó]|no se pudo|reversad|programad/i;
+  // 1.98.1/1.98.2: cobranzas y deudas. Solo vetan si el aviso NO trae una frase fuerte de pago recibido («JUAN MORA te envió…»).
+  const PG_COBRANZA = /deuda|obligaci[oó]n|\bmora\b|proceso (?:judicial|jur[ií]dico)|embargo|medidas? cautelar|cobranza|cobro (?:pre)?jur[ií]dic|(?:ponte|p[oó]ngase|pongase) al d[ií]a|acuerdo de pago|centrales de riesgo|datacr[eé]dito|saldo (?:vencido|en mora)|cuota vencida|pago m[ií]nimo|fecha l[ií]mite de pago|contact[aáe]nos/i;
   const PG_FUERTE = /(?:te|le) (?:envi[oó]|enviaron|pas[oó]|pasaron|transfiri[oó]|transfirieron|consign[oó]|consignaron|mand[oó]|mandaron|gir[oó]|giraron|pag[oó]|pagaron)|(?:recibiste|recibi[oó]|ha recibido|has recibido)\s+(?:\$|cop|\d|una transferencia|un pago|dinero|plata)|transferencia recibida|pago recibido|a (?:tu|su) llave|(?:te|le) lleg[oó]\s+(?:\$|cop|\d|plata|dinero)/i;
   // 1.55.1: plata que llega como «Recarga desde Bancolombia» (transferencia de un banco a Nequi). Nunca la recarga de un
   // celular, una fallida o pendiente, ni «Recarga tu Nequi…» (la misma regla de la app Android: AvisoPago.RECARGA).
@@ -110,6 +112,7 @@ function pagoHuella(t){
     if(PG_NUNCA.test(t)) return null;
     // Un «¿…?» o «bolsillo» junto a un pago de verdad («te envió $20.000. ¿La guardas?») no lo vuelve publicidad.
     if(PG_PROMO.test(t) && !PG_FUERTE.test(t)) return null;
+    if(PG_COBRANZA.test(t) && !PG_FUERTE.test(t)) return null;
     // Con signo ($20.000), «COP 20.000» o sin él («Recibiste 25.000 pesos», «transferencia por 30.000»)
     // Con signo ($20.000), «COP 20.000», «25.000 pesos» o sin signo como el SMS de DaviPlata («recibiste  100,000»,
     // «Recibiste 140,000.»). Un número de celular (10 cifras) no es el valor.

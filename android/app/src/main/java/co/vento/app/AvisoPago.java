@@ -32,10 +32,7 @@ public final class AvisoPago {
     static final Pattern SEGURO = Pattern.compile("recibiste|recibi[oó]|ha recibido|(te|le) lleg", Pattern.CASE_INSENSITIVE);
     // Nunca es plata que llegó, diga lo que diga: solicitudes y cobros («JUAN te pidió $20.000», «Recibiste una solicitud»),
     // pagos rechazados, fallidos, reversados o programados.
-    static final Pattern NUNCA = Pattern.compile("solicitud|(te|le) pide|(te|le) pidi[oó]|(te|le) cobr|cobro pendiente|rechazad|fall[oó]|no se pudo|reversad|programad"
-            // 1.98.1: cobranzas y deudas («su obligacion con OCCIDENTE registra una deuda de $ 9.265.137… embargo») nunca son
-            // plata que llegó, aunque nombren un banco y traigan un valor.
-            + "|deuda|obligaci[oó]n|\\bmora\\b|proceso (judicial|jur[ií]dico)|embargo|medidas? cautelar|cobranza|cobro (pre)?jur[ií]dic|(ponte|p[oó]ngase|pongase) al d[ií]a|acuerdo de pago|centrales de riesgo|datacr[eé]dito|saldo (vencido|en mora)|cuota vencida|pago m[ií]nimo|fecha l[ií]mite de pago|contact[aáe]nos", Pattern.CASE_INSENSITIVE);
+    static final Pattern NUNCA = Pattern.compile("solicitud|(te|le) pide|(te|le) pidi[oó]|(te|le) cobr|cobro pendiente|rechazad|fall[oó]|no se pudo|reversad|programad", Pattern.CASE_INSENSITIVE);
     // Frases que solo trae un pago de verdad: con ellas un «¿…?» o un «bolsillo» en el mismo aviso no lo vuelven publicidad
     // (antes un «¿La guardas en un bolsillo?» en el aviso de Nequi hacía que el pago no sonara).
     static final Pattern FUERTE = Pattern.compile("(te|le) (envi[oó]|enviaron|pas[oó]|pasaron|transfiri[oó]|transfirieron|consign[oó]|consignaron|mand[oó]|mandaron|gir[oó]|giraron|pag[oó]|pagaron)(?![a-záéíóúñ])|(recibiste|recibi[oó]|ha recibido|has recibido)\\s+(\\$|cop|\\d|una transferencia|un pago|dinero|plata)|transferencia recibida|pago recibido|a (tu|su) llave|(te|le) lleg[oó]\\s+(\\$|cop|\\d|plata|dinero)", Pattern.CASE_INSENSITIVE);
@@ -69,6 +66,9 @@ public final class AvisoPago {
     static boolean esRecibido(String todo) {
         if (todo == null || !(RECIBIDO.matcher(todo).find() || esRecarga(todo)) || NUNCA.matcher(todo).find() || CODIGO.matcher(todo).find()) return false;
         if (PROMO.matcher(todo).find() && !FUERTE.matcher(todo).find()) return false;
+        // 1.98.2: una cobranza o deuda no es plata que llegó… salvo que el aviso traiga una frase fuerte de pago recibido
+        // («JUAN MORA te envió $20.000»: «mora» ahí es un apellido). Antes vetaba siempre y podía callar un pago de verdad.
+        if (COBRANZA.matcher(todo).find() && !FUERTE.matcher(todo).find()) return false;
         // Un pago de verdad puede traer «nunca compartas tu clave» o «tu código de transacción»: con una frase fuerte de
         // plata recibida («te envió $…», «a tu llave») sigue siendo pago. Antes esos avisos se descartaban.
         return !PRIVADO.matcher(todo).find() || SEGURO.matcher(todo).find() || (FUERTE.matcher(todo).find() && !SALE.matcher(todo).find());
@@ -92,6 +92,7 @@ public final class AvisoPago {
         if (todo == null || !SALIDA.matcher(todo).find() || CODIGO.matcher(todo).find() || NUNCA.matcher(todo).find()) return false;
         // «Pago exitoso: recibiste $…» es plata que ENTRA: nunca una salida.
         if (SEGURO.matcher(todo).find() || FUERTE.matcher(todo).find()) return false;
+        if (COBRANZA.matcher(todo).find() && !SALE.matcher(todo).find()) return false;   // «pagando el total de tu deuda» no es un pago hecho
         if (Pattern.compile("clave din[aá]mica|\\botp\\b|c[oó]digo (de )?(seguridad|verificaci)", Pattern.CASE_INSENSITIVE).matcher(todo).find()) return false;
         return Pattern.compile("\\d").matcher(todo).find();   // con algún número (el valor lo lee la página)
     }
@@ -344,7 +345,7 @@ public final class AvisoPago {
         if (t == null || t.trim().isEmpty()) return "aviso vacío";
         if (SALE.matcher(t).find()) return "plata que SALE (pasaste, enviaste, compra…)";
         if (CODIGO.matcher(t).find()) return "código de seguridad";
-        if (COBRANZA.matcher(t).find()) return "cobranza o deuda (no es plata que llegó)";
+        if (COBRANZA.matcher(t).find() && !FUERTE.matcher(t).find()) return "cobranza o deuda (no es plata que llegó)";
         if (NUNCA.matcher(t).find()) return "solicitud, rechazado o programado";
         if (RECARGA.matcher(t).find() && RECARGA_NO.matcher(t).find()) return "recarga de celular o que no se hizo";
         if (!RECIBIDO.matcher(t).find() && !esRecarga(t)) return "no dice que llegó plata";

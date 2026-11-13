@@ -38,3 +38,12 @@ por Nequi y DaviPlata no quedan como salida en la contabilidad; y los avisos se 
 - Página: `pagosaviso` 95 bien, 0 mal; `salidas` 27 bien, 0 mal.
 - **Lista completa:** 131 pruebas en el navegador, 2.916 bien, 0 mal, sobre la versión final.
 - **No se probó** en un celular de verdad.
+
+## 1.98.2 · Corrección de la 1.98.1 (el mismo día)
+- **Qué pasaba:** la regla contra cobranzas vetaba siempre. Un pago de verdad con una de esas palabras se habría callado:
+  «JUAN MORA te envió $20.000» (por «mora»), o un aviso con «contáctanos» o «sin embargo».
+- **Quién lo encontró:** la auditoría general (`puente/egm/AUDITORIA-1.98-GENERAL.md`), después de publicar.
+- **Arreglo:** la cobranza solo veta si el aviso no trae una frase fuerte de pago recibido. Los dos SMS del pantallazo
+  siguen bloqueados. «Pagaste $… de tu obligación» vuelve a contar como salida.
+- **Pruebas:** reglas de la app Android 281 bien, 0 mal; página: `pagosaviso` 95, `pagosguia` 29, `salidas` 27,
+  `confirmapago` 61, `alertaspagos` 13, `modulos` 12, todas sin fallas. **La lista completa no se volvió a correr.**

@@ -210,7 +210,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
       const no = ['SMS | 87068 | Liquitty/PRA: AMPARO, su obligacion con OCCIDENTE registra una deuda de $ 9.265.137. Se iniciara el proceso judicial y podrian solicitarse medidas cautelares sobre sus ingresos, incluida la posibilidad de embargo salarial. Contactenos antes de las 5 p.m: 3336032698',
         'SMS | 87068 | Liquitty/PRA: AMPARO. Tienes hasta las 6p.m. para evitar el proceso judicial y ahorrar hoy un 93% de DESCUENTO pagando el total de tu deuda con OCCIDENTE: $ 656.691 Contactanos: 3336032698',
         'Banco de Bogota: su credito presenta mora de 45 dias por $ 320.000. Pongase al dia', 'Bancolombia: tu cuota vencida es de $ 150.000. Te ofrecemos un acuerdo de pago'];
-      const si = ['Nequi | Nequi | Ingresó $20.000 a tu cuenta', 'Nequi | JUAN PEREZ te envió $20.000', 'DaviPlata: Recibiste 140,000. Para saber mas, consulta tus movimientos'];
+      const si = ['Nequi | JUAN MORA te envió $20.000', 'Nequi | Nequi | CARLOS EMBARGO te pasó $15.000. Contáctanos si tienes dudas', 'Nequi | Nequi | Ingresó $20.000 a tu cuenta', 'Nequi | JUAN PEREZ te envió $20.000', 'DaviPlata: Recibiste 140,000. Para saber mas, consulta tus movimientos'];
       return { si: si.filter(t => !window.pagosLeer(t)), no: no.filter(t => window.pagosLeer(t)) };
     });
     chk('16c. Una cobranza o deuda NO es plata que llegó (y los pagos de verdad siguen entrando)', !rCobro.no.length && !rCobro.si.length, rCobro);

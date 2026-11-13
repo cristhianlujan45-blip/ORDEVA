@@ -1261,8 +1261,8 @@ let playCargado=null;
 function cargarPlay(){
   if(playCargado)return playCargado;
   playCargado=new Promise((res,rej)=>{
-    const l=document.createElement('link');l.rel='stylesheet';l.href='play/play.css?v=1.98.1';document.head.appendChild(l);
-    const sc=document.createElement('script');sc.src='play/ordeva-play.js?v=1.98.1';sc.onload=()=>res(window.ordevaPlay);sc.onerror=()=>{playCargado=null;rej(new Error('play'))};document.head.appendChild(sc);
+    const l=document.createElement('link');l.rel='stylesheet';l.href='play/play.css?v=1.98.2';document.head.appendChild(l);
+    const sc=document.createElement('script');sc.src='play/ordeva-play.js?v=1.98.2';sc.onload=()=>res(window.ordevaPlay);sc.onerror=()=>{playCargado=null;rej(new Error('play'))};document.head.appendChild(sc);
   });
   return playCargado;
 }
