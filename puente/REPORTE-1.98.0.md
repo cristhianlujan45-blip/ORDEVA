@@ -61,7 +61,7 @@ servidor, y jugar con la mesa o contra las otras mesas. **Lo nuevo:** los equipo
 - **Un defecto que encontró la prueba:** después de jugar, la tarjeta seguía diciendo «tu mesa todavía no suma» hasta por un
   minuto. Corregido: la tabla se pone al día apenas termina una partida.
 - **Fase 1 y el resto del servidor:** `play` 38 bien, 0 mal; las otras 31 pruebas del servidor, bien; `modulos` 12 bien (ahora revisa la versión de los archivos de PLAY).
-- **Lista completa:** RESULTADOS_AQUI
+- **Lista completa:** 131 pruebas en el navegador, 2.900 bien, 0 mal, sobre la versión final (incluye `play`, `playtorneo`, `v196` y `facturascan`). Más las 32 pruebas del servidor, todas bien.
 - **No se probó** con celulares de verdad ni con la base de datos de producción.
 
 ## Lo que queda
