@@ -36,5 +36,5 @@ por Nequi y DaviPlata no quedan como salida en la contabilidad; y los avisos se 
 - Reglas de la app Android (`javaavisos`): 276 bien, 0 mal. Incluye los dos SMS del pantallazo, otras dos cobranzas, pagos
   de verdad que siguen entrando y las formas nuevas de salida.
 - Página: `pagosaviso` 95 bien, 0 mal; `salidas` 27 bien, 0 mal.
-- **Lista completa:** RESULTADOS_AQUI
+- **Lista completa:** 131 pruebas en el navegador, 2.916 bien, 0 mal, sobre la versión final.
 - **No se probó** en un celular de verdad.
