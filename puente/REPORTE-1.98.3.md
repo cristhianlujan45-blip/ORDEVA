@@ -50,7 +50,7 @@ Sin bloqueantes. 5 mayores, todos corregidos después de la lista completa:
 - La regla de la página y la de Android quedaron iguales (la barra entre título y texto ya no las separa).
 - Menores: el botón «Detener» se rearma al prender o apagar la lectura de pagos; el estado del celular se limpia al parar.
 - **Después de estos arreglos** se repitieron las reglas de Android (362 bien, 0 mal) y las pruebas de página de pagos y
-  salidas (PAGINA_AQUI). La lista completa no se repitió sobre este último cambio.
+  salidas (`pagosaviso` 95, `salidas` 29, `pagosguia` 29, `confirmapago` 61, sin fallas). La lista completa no se repitió sobre este último cambio.
 
 ## Lo que sigue (mismo «hazlo»)
 4. Facturas mejor organizadas: buscador, por día y por mes, número y forma de pago a la vista, y el libro en Excel.
