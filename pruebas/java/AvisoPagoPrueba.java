@@ -251,6 +251,11 @@ public class AvisoPagoPrueba {
         for (String x : noSon983) chk("No es plata que llegó: «" + x + "»", !AvisoPago.esRecibido(x) && !AvisoPago.esSmsDePago("85540", x), AvisoPago.porQueNo(x));
         String[] siSon983 = { "Nequi | Nequi | Ingresó $20.000 a tu cuenta", "Bancolombia: Recibiste un abono de $80.000 en tu cuenta de ahorros", "DaviPlata: Recibiste 140,000. Para saber mas, consulta tus movimientos" };
         for (String x : siSon983) chk("Sigue siendo plata que llegó: «" + x + "»", AvisoPago.esRecibido(x), AvisoPago.porQueNo(x));
+        // Revisión goldfish 1.98.3: los vetos nuevos no callan pagos de verdad.
+        String[] siGold = { "Nequi | Nequi | JUAN te envió $50.000. Activa tu tarjeta Nequi", "Nequi | Nequi | Recibiste $50.000 de JUAN. Acumulaste 5 puntos", "Nequi | Nequi | JUAN te envió $30.000. Concepto: abono a su cuota", "Bold: Pago recibido por $50.000 con tarjeta débito", "Nequi | Nequi | Te llegaron $20.000 de ANA MORA", "Bancolombia informa recepcion transferencia de JUAN MORA por $50.000 en tu cuenta" };
+        for (String x : siGold) chk("Goldfish: sigue siendo plata que llegó: «" + x + "»", AvisoPago.esRecibido(x), AvisoPago.porQueNo(x));
+        String[] noGold = { "Davivienda | Pago recibido | Gracias por el pago de tu tarjeta de credito por $200.000", "Bancolombia: Recibimos tu pago por $200.000 a tu tarjeta de credito" };
+        for (String x : noGold) chk("Goldfish: no es plata que llegó: «" + x + "»", !AvisoPago.esRecibido(x), AvisoPago.porQueNo(x));
         System.out.println("RESULTADO " + ok + " bien " + mal + " mal");
         System.exit(mal > 0 ? 1 : 0);
     }

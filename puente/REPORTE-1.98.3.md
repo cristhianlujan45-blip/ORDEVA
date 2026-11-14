@@ -37,8 +37,20 @@ y de proponerle el orden: «Hazlo».
 - Reglas de la app Android con la lectura completa simulada: 354 bien, 0 mal.
 - Página: `facturascan` 35, `pagosaviso` 95, `salidas` 28, `pagosguia` 29, `confirmapago` 61, sin fallas.
 - Diseño: medido en un navegador a 390 px (los 8 botones de billetes caben; «Agregar» 324 × 48; Ajustes 390 de ancho).
-- **Lista completa:** RESULTADOS_AQUI
+- **Lista completa:** 131 pruebas en el navegador, 2.997 bien, 0 mal, sobre el commit 8fce272. Las pruebas del servidor no se repitieron: este lote no toca el servidor.
 - **No se probó** en un celular de verdad.
+
+## Revisión goldfish (antes de publicar)
+Sin bloqueantes. 5 mayores, todos corregidos después de la lista completa:
+- Los vetos nuevos de «abono a tu crédito» y «puntos» callaban pagos de verdad («JUAN te envió $50.000. Activa tu tarjeta»,
+  «Recibiste $50.000 de JUAN. Acumulaste 5 puntos»). Ahora solo vetan si el aviso no trae una frase fuerte de plata recibida.
+- «Pago recibido por $50.000 con tarjeta débito» (datáfono) ya no se veta: solo «pago recibido … de/a/en tu tarjeta».
+- El apellido «Mora» y «contáctanos» ya no cuentan como cobranza; «te llegaron $…» y «recepción transferencia» son frases fuertes.
+- Lo que pagas: solo se funde el aviso de la app con el SMS **del mismo banco**, y cada pareja una sola vez.
+- La regla de la página y la de Android quedaron iguales (la barra entre título y texto ya no las separa).
+- Menores: el botón «Detener» se rearma al prender o apagar la lectura de pagos; el estado del celular se limpia al parar.
+- **Después de estos arreglos** se repitieron las reglas de Android (362 bien, 0 mal) y las pruebas de página de pagos y
+  salidas (PAGINA_AQUI). La lista completa no se repitió sobre este último cambio.
 
 ## Lo que sigue (mismo «hazlo»)
 4. Facturas mejor organizadas: buscador, por día y por mes, número y forma de pago a la vista, y el libro en Excel.

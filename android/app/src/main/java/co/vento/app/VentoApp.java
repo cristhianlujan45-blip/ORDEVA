@@ -1214,6 +1214,8 @@ public class VentoApp extends Application {
         @JavascriptInterface
         public void pagosAvisos(boolean on) {
             getSharedPreferences("vento", MODE_PRIVATE).edit().putBoolean(VentoEscucha.PREF_ON, on).apply();
+            // El aviso fijo se rearma para que el botón «Detener» salga o no según la lectura de pagos.
+            if (VentoServicio.activo) VentoServicio.arrancar(VentoApp.this);
         }
 
         /** {on, permiso}: si está prendido aquí y si Vento tiene el «Acceso a notificaciones». */

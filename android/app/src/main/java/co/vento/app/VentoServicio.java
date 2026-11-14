@@ -198,7 +198,7 @@ public class VentoServicio extends Service {
 
     @Override
     public void onDestroy() {
-        activo = false;
+        activo = false; estadoCel = "";
         VentoApp.ui.removeCallbacks(latido);
         VentoApp.ui.removeCallbacks(cruce);
         if (enVivo != null) { enVivo.parar(); enVivo = null; enVivoClave = ""; }

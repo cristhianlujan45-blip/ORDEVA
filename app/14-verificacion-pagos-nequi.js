@@ -61,8 +61,8 @@ function pagoHuella(t){
   const APPS = [[/daviplata/i, 'DaviPlata'], [/nequi/i, 'Nequi'], [/bancolombia/i, 'Bancolombia'], [/movii/i, 'Movii'], [/\bdale\b/i, 'Dale'], [/davivienda/i, 'Davivienda'], [/bre-?b/i, 'Bre-B']];
   const PG_NUNCA = /solicitud|(?:te|le) pide|(?:te|le) pidi[oó]|(?:te|le) cobr|cobro pendiente|rechazad|fall[oó]|no se pudo|reversad|programad/i;
   // 1.98.1/1.98.2: cobranzas y deudas. Solo vetan si el aviso NO trae una frase fuerte de pago recibido («JUAN MORA te envió…»).
-  const PG_COBRANZA = /deuda|obligaci[oó]n|\bmora\b|proceso (?:judicial|jur[ií]dico)|embargo|medidas? cautelar|cobranza|cobro (?:pre)?jur[ií]dic|(?:ponte|p[oó]ngase|pongase) al d[ií]a|acuerdo de pago|centrales de riesgo|datacr[eé]dito|saldo (?:vencido|en mora)|cuota vencida|pago m[ií]nimo|fecha l[ií]mite de pago|contact[aáe]nos/i;
-  const PG_FUERTE = /(?:te|le) (?:envi[oó]|enviaron|pas[oó]|pasaron|transfiri[oó]|transfirieron|consign[oó]|consignaron|mand[oó]|mandaron|gir[oó]|giraron|pag[oó]|pagaron)|(?:recibiste|recibi[oó]|ha recibido|has recibido)\s+(?:\$|cop|\d|una transferencia|un pago|dinero|plata)|transferencia recibida|pago recibido|a (?:tu|su) llave|(?:te|le) lleg[oó]\s+(?:\$|cop|\d|plata|dinero)/i;
+  const PG_COBRANZA = /deuda|obligaci[oó]n|en mora|d[ií]as de mora|\bmora de \d|proceso (?:judicial|jur[ií]dico)|embargo|medidas? cautelar|cobranza|cobro (?:pre)?jur[ií]dic|(?:ponte|p[oó]ngase|pongase) al d[ií]a|acuerdo de pago|centrales de riesgo|datacr[eé]dito|saldo (?:vencido|en mora)|cuota vencida|pago m[ií]nimo|fecha l[ií]mite de pago/i;
+  const PG_FUERTE = /(?:te|le) (?:envi[oó]|enviaron|pas[oó]|pasaron|transfiri[oó]|transfirieron|consign[oó]|consignaron|mand[oó]|mandaron|gir[oó]|giraron|pag[oó]|pagaron)(?![a-záéíóúñ])|(?:recibiste|recibi[oó]|ha recibido|has recibido)\s+(?:\$|cop|\d|una transferencia|un pago|dinero|plata)|transferencia recibida|pago recibido|a (?:tu|su) llave|(?:te|le) (?:lleg[oó]|llegaron)\s+(?:\$|cop|\d|plata|dinero)|recepci[oó]n (?:de )?transferencia/i;
   // 1.55.1: plata que llega como «Recarga desde Bancolombia» (transferencia de un banco a Nequi). Nunca la recarga de un
   // celular, una fallida o pendiente, ni «Recarga tu Nequi…» (la misma regla de la app Android: AvisoPago.RECARGA).
   const PG_RECARGA = /recarga(?:ste)?\b[^|\n]{0,60}?\b(?:(?:desde|de|por|con)\s+(?:tu\s+|su\s+)?(?:cuenta\s+(?:de\s+)?)?)?(?:bancolombia|davivienda|daviplata|bbva|scotiabank|colpatria|av villas|ita[uú]|banco\s+(?:de\s+)?\w+|pse|otr[oa]s?\s+(?:entidad|banco))\b|recibiste\s+una\s+recarga|(?:te|le)\s+recargaron|\brecarga\s+(?:exitosa|realizada|recibida|aprobada|confirmada)\b|\brecargaste\s+(?:\$|cop)\s?\d|\brecarg(?:amos|ado|ada|[oó]|aron)(?![a-zñ])[^|\n]{0,40}?(?:\$|cop)\s?\d|(?:nequi|cuenta|daviplata)\s+(?:fue|ha sido|se)\s+recarg|\brecarg[oó]\s+(?:tu|su)\s+(?:nequi|cuenta|daviplata)/i;
@@ -114,7 +114,9 @@ function pagoHuella(t){
     if(PG_PROMO.test(t) && !PG_FUERTE.test(t)) return null;
     if(PG_COBRANZA.test(t) && !PG_FUERTE.test(t)) return null;
     // 1.98.3: abono o pago A una deuda propia, puntos o millas, y el aviso de ingreso a la banca (igual que AvisoPago.NO_ES).
-    if(/a (?:tu|su) (?:cr[eé]dito|tarjeta|pr[eé]stamo|obligaci[oó]n|cuota)|\d\s*(?:puntos|millas)\b|ingres[oó] a (?:la |tu |su )?(?:sucursal|app|banca|portal)|inicio de sesi[oó]n|ingresaste a|pago recibido[^|]{0,40}tarjeta/i.test(t)) return null;
+    // Unos vetan siempre (ingreso a la banca, «pago recibido» de la propia tarjeta) y otros solo sin frase fuerte.
+    if(/ingres[oó] a (?:la |tu |su )?(?:sucursal|app|banca|portal)|inicio de sesi[oó]n|ingresaste a|pago recibido.{0,60}\b(?:de|a|en) (?:tu|su) tarjeta|(?:recibiste|recibi[oó]|ha recibido|has recibido)\s+[\d.,]+\s*(?:puntos|millas)\b/i.test(t)) return null;
+    if(/\b(?:abon|pag)[a-záéíóúñ]*.{0,40}\ba (?:tu|su) (?:cr[eé]dito|tarjeta|pr[eé]stamo|obligaci[oó]n|cuota)|\d\s*(?:puntos|millas)\b/i.test(t) && !PG_FUERTE.test(t)) return null;
     // Con signo ($20.000), «COP 20.000» o sin él («Recibiste 25.000 pesos», «transferencia por 30.000»)
     // Con signo ($20.000), «COP 20.000», «25.000 pesos» o sin signo como el SMS de DaviPlata («recibiste  100,000»,
     // «Recibiste 140,000.»). Un número de celular (10 cifras) no es el valor.
