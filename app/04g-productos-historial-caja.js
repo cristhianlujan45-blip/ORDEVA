@@ -1379,6 +1379,34 @@ let histMostrar = HIST_PAGINA;
 const histFmtFecha = new Intl.DateTimeFormat('es-CO', { day: '2-digit', month: 'short', year: 'numeric' });
 const histFmtHora = new Intl.DateTimeFormat('es-CO', { hour: '2-digit', minute: '2-digit' });
 function histFiltroActual(){ const b = document.querySelector('#histFilter button.on'); return (b && b.dataset.f) || 'todos'; }
+/* 1.99.0 · Facturas mejor organizadas: número y forma de pago a la vista, buscador, por mes, por día con subtotal y el
+   libro de facturas para Excel. Nada de esto cambia los datos: solo cómo se muestran. */
+function histNumero(h){ return String((h && h.dian && h.dian.documento) || (h && h.invoiceNo) || ''); }
+function histMedios(h){
+  const v = []; ((h && h.payments) || []).forEach(p => { const n = String(CIERRE_MEDIOS[medioDePago(p)] || p.method || '').replace(/^\S+\s/, '').replace(/ \(.*$/, ''); if(n && v.indexOf(n) < 0) v.push(n); });
+  return v.join(' + ');
+}
+function histRef(h){ const n = histNumero(h), m = histMedios(h); return (n ? 'N.º ' + n : '') + (n && m ? ' · ' : '') + m; }
+function histTextoBusca(h){
+  return [histNumero(h), h.tableName || ('mesa ' + h.table), h.person, h.cliente, h.by, h.observacion, histMedios(h), Math.round(Number(h.total) || 0),
+    ((h.items || []).map(it => it.name + ' ' + (it.person || '')).join(' ')), ((h.payments || []).map(p => p.note || '').join(' '))].join(' ')
+    .toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+function histCoincide(h, q){
+  if(!q) return true;
+  const t = histTextoBusca(h), soloNum = q.replace(/[.,$\s]/g, '');
+  return q.split(/\s+/).every(w => { const n = w.replace(/[.,$]/g, ''); return t.indexOf(w) >= 0 || (/^\d{3,}$/.test(n) && t.indexOf(n) >= 0); }) || (/^\d{3,}$/.test(soloNum) && t.indexOf(soloNum) >= 0);
+}
+function histMesDe(h){ const d = new Date(h.date); return isNaN(d) ? '' : d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
+function histConsulta(){ const i = document.getElementById('histBuscar'); return String((i && i.value) || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+function histLibroCsv(lista){
+  const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  const filas = [['Fecha', 'Hora', 'Número', 'Mesa o cliente', 'Productos', 'Forma de pago', 'Total', 'Propina', 'Descuento', 'Queda debiendo', 'Atendió', 'Corregida']].concat(lista.map(h => { const d = new Date(h.date); return [
+    isNaN(d) ? '' : d.toLocaleDateString('es-CO'), isNaN(d) ? '' : histFmtHora.format(d), histNumero(h), (h.tableName || ('Mesa ' + h.table)) + (h.person ? ' — ' + h.person : ''),
+    (h.items || []).map(it => it.name + ' ×' + it.qty).join(', '), histMedios(h), Math.round(Number(h.total) || 0), Math.round(propinaDe(h)), Math.round((h.descuento && Number(h.descuento.valor)) || 0), Math.round(Number(h.debt) || 0), h.by || '', h.corregida ? 'Sí' : '']; }));
+  return '\ufeff' + filas.map(f => f.map(q).join(';')).join('\r\n');
+}
+window.histLibroCsv = histLibroCsv;
 function histFila(h, idx){
   const d = new Date(h.date);
   const dateStr = histFmtFecha.format(d) + ' · ' + histFmtHora.format(d);
@@ -1400,6 +1428,7 @@ function histFila(h, idx){
         <div class="hist-left">
           <div class="hist-table">${h.tableName || (i18nPut(espacioN()) + ' ' + h.table)}${h.person ? ' — ' + h.person : ''}${debt > 0 ? ' · <span class="hist-debt-flag">DEBE</span>' : ''}${h.corregida ? ' · ✏️ corregida' : ''}</div>
           <div class="hist-date">${dateStr}</div>
+          ${histRef(h) ? `<div class="hist-ref">${invEsc(histRef(h))}</div>` : ''}
         </div>
         <div class="hist-total">${fmt(h.total)}</div>
       </div>
@@ -1490,12 +1519,48 @@ function renderHistorial(masPagina){
   // Equipo sin permiso de historial completo: solo las ventas de hoy (para revisar o corregir), sin totales.
   let soloHoy = false; try{ soloHoy = !!(window.ventoRoles && window.ventoRoles.soloHoy()); }catch(e){}
   const hoy = new Date().toDateString();
-  data.history.forEach((h, idx) => { const debe = (h.debt || 0) > 0; if(soloHoy && new Date(h.date).toDateString() !== hoy) return; if(f === 'todos' || (f === 'deben' && debe) || (f === 'pagaron' && !debe)) idxs.push(idx); });
+  // 1.99.0: buscador y mes. El selector de meses se arma con los meses que de verdad tienen ventas.
+  const selMes = document.getElementById('histMes'), q = histConsulta();
+  if(selMes){
+    const meses = []; data.history.forEach(h => { const m = histMesDe(h); if(m && meses.indexOf(m) < 0) meses.push(m); }); meses.sort().reverse();
+    const firma = meses.join(',');
+    if(selMes.dataset.firma !== firma){
+      const antes = selMes.value; selMes.dataset.firma = firma;
+      selMes.innerHTML = '<option value="">Todos los meses</option>' + meses.map(m => { const d = new Date(+m.slice(0, 4), +m.slice(5) - 1, 1); return '<option value="' + m + '">' + d.toLocaleDateString('es-CO', { month: 'long', year: 'numeric' }) + '</option>'; }).join('');
+      selMes.value = meses.indexOf(antes) >= 0 ? antes : '';
+    }
+    const caja = document.getElementById('histBuscarCaja'); if(caja) caja.classList.toggle('solo-hoy', soloHoy);
+    selMes.parentNode.hidden = soloHoy;   // quien solo ve hoy no elige mes ni descarga el libro
+  }
+  const mes = (!soloHoy && selMes && selMes.value) || '';
+  data.history.forEach((h, idx) => { const debe = (h.debt || 0) > 0; if(soloHoy && new Date(h.date).toDateString() !== hoy) return; if(mes && histMesDe(h) !== mes) return; if(!histCoincide(h, q)) return; if(f === 'todos' || (f === 'deben' && debe) || (f === 'pagaron' && !debe)) idxs.push(idx); });
+  window.__histVisibles = idxs;
+  const res = document.getElementById('histBuscarRes');
+  if(res){
+    const filtrando = !!(q || mes);
+    res.hidden = !filtrando;
+    if(filtrando) res.textContent = idxs.length + (idxs.length === 1 ? ' factura' : ' facturas') + (soloHoy ? '' : ' · ' + fmt(idxs.reduce((t, i) => t + (Number(data.history[i].total) || 0), 0)));
+  }
+  // Por día: un encabezado con cuántas y cuánto (de TODO el día dentro del filtro, no solo de lo que cabe en la página).
+  const porDia = {}; idxs.forEach(i => { const k = new Date(data.history[i].date).toDateString(), x = porDia[k] || (porDia[k] = { n: 0, t: 0 }); x.n++; x.t += Number(data.history[i].total) || 0; });
   const frag = document.createDocumentFragment();
-  idxs.slice(0, histMostrar).forEach(idx => frag.appendChild(histFila(data.history[idx], idx)));
+  let diaAnt = null;
+  idxs.slice(0, histMostrar).forEach(idx => {
+    const h = data.history[idx], dd = new Date(h.date), k = dd.toDateString();
+    if(k !== diaAnt){
+      diaAnt = k;
+      const e = document.createElement('div'); e.className = 'hist-dia';
+      const nom = k === hoy ? 'Hoy' : isNaN(dd) ? 'Sin fecha' : dd.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', year: dd.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' });
+      const s1 = document.createElement('span'); s1.textContent = nom.charAt(0).toUpperCase() + nom.slice(1) + ' · ' + porDia[k].n + (porDia[k].n === 1 ? ' factura' : ' facturas');
+      e.appendChild(s1);
+      if(!soloHoy){ const b1 = document.createElement('b'); b1.textContent = fmt(porDia[k].t); e.appendChild(b1); }
+      frag.appendChild(e);
+    }
+    frag.appendChild(histFila(h, idx));
+  });
   if(!idxs.length){
     const v = document.createElement('div'); v.className = 'empty-state';
-    v.textContent = soloHoy && f === 'todos' ? 'Hoy todavía no hay ventas.' : f === 'deben' ? 'Nadie te debe. 🎉' : 'No hay cuentas con ese filtro.';
+    v.textContent = (q || mes) ? 'No hay facturas con esa búsqueda.' : soloHoy && f === 'todos' ? 'Hoy todavía no hay ventas.' : f === 'deben' ? 'Nadie te debe. 🎉' : 'No hay cuentas con ese filtro.';
     frag.appendChild(v);
   } else if(idxs.length > histMostrar){
     const b = document.createElement('button');
@@ -1982,6 +2047,22 @@ function closeDeleteHistory(){
   deleteHistoryOverlay.classList.remove('show');
 }
 document.getElementById('deleteHistoryDayBtn').addEventListener('click', openDeleteHistory);
+// 1.99.0: buscador, mes y libro de facturas.
+(function(){
+  const i = document.getElementById('histBuscar'), m = document.getElementById('histMes'), l = document.getElementById('histLibro');
+  let t = null;
+  if(i) i.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => renderHistorial(), 180); });
+  if(m) m.addEventListener('change', () => renderHistorial());
+  if(l) l.addEventListener('click', () => {
+    const idxs = window.__histVisibles || [];
+    if(!idxs.length){ showToast('No hay facturas para descargar con ese filtro.'); return; }
+    const csv = histLibroCsv(idxs.map(x => data.history[x]).filter(Boolean).reverse());
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    a.download = 'facturas-' + String(data.businessName || 'negocio').replace(/[^\w]+/g, '-') + (m && m.value ? '-' + m.value : '') + '.csv';
+    document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    showToast('⬇️ ' + idxs.length + (idxs.length === 1 ? ' factura descargada' : ' facturas descargadas') + ': ábrelo con Excel o Google Sheets.');
+  });
+})();
 document.getElementById('deleteHistoryCloseBtn').addEventListener('click', closeDeleteHistory);
 deleteHistoryOverlay.addEventListener('click', (e)=>{ if(e.target === deleteHistoryOverlay) closeDeleteHistory(); });
 
