@@ -179,7 +179,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     const modal7 = E => E.p.evaluate(() => { const o = document.getElementById('pagoOv'); return !!o && o.classList.contains('show') && /27\.300/.test(o.innerText); });
     for(let i = 0; i < 6; i++){ await latir(TAB); await new Promise(r => setTimeout(r, 500)); }
     chk('7. El celular y la tablet NO abren «Llegó un pago» para esa mesa (se registra en el computador)', !(await modal7(CEL)) && !(await modal7(TAB)));
-    chk('7. Queda registrado UNA sola vez en todos los equipos', await esperar(CEL.p, () => (data.tables[4].payments || []).length === 1, null, 15000) && await esperar(TAB.p, () => (data.tables[4].payments || []).length === 1, null, 15000));
+    chk('7. Queda registrado UNA sola vez en todos los equipos', await esperar(CEL.p, () => (data.tables[4].payments || []).length === 1, null, 15000) && await esperar(TAB.p, () => (data.tables[4].payments || []).length === 1, null, 15000), [await CEL.p.evaluate(() => data.tables[4].payments), await TAB.p.evaluate(() => data.tables[4].payments), await PC.p.evaluate(() => data.tables[4].payments)]);
 
     // ===== 6. El valor que entendió la app manda cuando el servidor no entiende el aviso =====
     const dev = await CEL.p.evaluate(() => JSON.parse(localStorage.getItem('vento_pagos_dev')));

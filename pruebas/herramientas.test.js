@@ -98,7 +98,8 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
  // ---------- 1.43.8: «🧓 Modo fácil» con su propio botón en Ajustes ----------
  await p.evaluate(()=>{ const b=document.querySelector('nav button[data-view="ajustes"]'); if(b) b.click(); else { const m=document.querySelector('.more-tile[data-go="ajustes"]'); if(m) m.click(); } }); await p.waitForTimeout(400);
  r=await p.evaluate(()=>{ const t=[...document.querySelectorAll('#ajustesCats .ajustes-cat')].filter(b=>b.checkVisibility()); const i=t.findIndex(b=>b.dataset.cat==='facil'); return { i, txt: i>=0 ? t[i].textContent : '' }; });
- chk('Ajustes: «🧓 Modo fácil» tiene su propio botón, arriba (de los 2 primeros)', r.i>=0 && r.i<=1 && /Modo fácil/.test(r.txt), r);
+ // 1.89.0 cambió el orden de Ajustes a pedido del dueño (primero el negocio y el día a día): «Modo fácil» ya no va de primero.
+ chk('Ajustes: «🧓 Modo fácil» tiene su propio botón, a la vista', r.i>=0 && /Modo fácil/.test(r.txt), r);
  await p.evaluate(()=>document.querySelector('#ajustesCats .ajustes-cat[data-cat="facil"]').click()); await p.waitForTimeout(300);
  chk('…y abre «Activar modo fácil»', await vis('#easyModeToggle') || await p.evaluate(()=>{ const c=document.getElementById('easyModeToggle'); const g=c&&c.closest('.settings-group'); return !!g && !g.hidden; }));
 
