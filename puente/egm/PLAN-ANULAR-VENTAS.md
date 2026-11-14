@@ -66,3 +66,26 @@ Las ventas anuladas **no se quedan en `data.history`**. Pasan a una lista nueva 
 1. ¿Lista aparte (`data.anuladas`) o marca en la misma venta? ¿Ves un sitio donde la lista aparte falle?
 2. ¿Guardar los cierres de caja del día anulado en la misma lista es buena idea, o mejor no dejar borrar cierres?
 3. ¿Falta algún sitio que lea `h.corregida` o que dependa de que la venta desaparezca del todo?
+
+## Revisión goldfish del plan (14/11)
+**Veredicto: «no está listo».** Sin bloqueantes; la lista aparte es la decisión correcta y la fusión y el servidor la
+aceptan tal cual (no hay lista blanca de claves ni tope; las tablas del servidor solo leen `history` y `closures`).
+Seis mayores, que entran al plan así:
+
+- **M1 · Equipo sin copia base** (`nube/vento-nube.js:963`, `REGISTROS`): agregar `'anuladas'`, y quitar de `history`
+  toda venta cuyo id esté en `anuladas` (ahí y al cargar). De paso cierra el hallazgo A7 (la venta borrada que vuelve).
+- **M2 · Corregir hasta dejar 0 productos** hoy borra la venta sin registro (`app/28…:129`): pasa a ser una anulación con
+  motivo «corregida a cero».
+- **M3 · DIAN:** la respuesta de la nota crédito busca la venta solo en `history` (`nube/vento-dian.js:123-137`): debe
+  buscar también en `anuladas[].venta`.
+- **M4 · Ids:** `'an-v-' + id` para ventas y `'an-c-' + id` para cierres; si falta el id, uno generado. Se insertan al
+  comienzo de la lista.
+- **M5 · La pantalla trabaja por índice de `data.history`:** las anuladas llevan su propia rutina de pintado, por id, sin
+  botones de corregir ni borrar, y la pantalla vacía no debe tapar «Anuladas».
+- **M6 · El rastro lo puede borrar el mismo equipo auditado.** Protegerlo exige un cambio en el servidor
+  (`datos_proteger_equipo`). **Queda fuera de esta entrega y es decisión del dueño**; mientras tanto, la actividad del
+  equipo (que sí está protegida) sigue anotando cada anulación.
+
+Menores que entran: saneado al abrir (`app/12…:3168`, `app/04a…:313`); anular un día pasa por la autorización, la
+actividad del equipo y `ventoDian.alBorrar` por cada venta; la confirmación avisa que un abono ya recibido de un fiado no
+se devuelve solo; un día que ya tiene cierre de caja pide una confirmación más fuerte.
