@@ -113,6 +113,25 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     v = await p.evaluate(() => { const d = { history: [{ id: 'x1' }, { id: 'x2' }], anuladas: [{ id: 'an-c-x1', tipo: 'cierre', cierre: { id: 'x1' } }] }; return [window.ventoQuitarAnuladas(d), d.history.length, window.ventoQuitarAnuladas({ history: [{ id: 'x1' }] })]; });
     chk('5. Un cierre anulado con el mismo id no quita ventas; sin lista de anuladas no toca nada', v[0] === 0 && v[1] === 2 && v[2] === 0, v);
 
+    // Revisión goldfish del código: lo que se GUARDA al aplicar datos de la nube ya va sin la anulada, y restaurar un punto
+    // viejo no borra el registro de anuladas ni revive la venta.
+    v = await p.evaluate(async () => {
+      const d = JSON.parse(JSON.stringify(data)); d.history.unshift(JSON.parse(JSON.stringify(d.anuladas.find(a => a.id === 'an-v-a1').venta)));
+      await window.ventoAplicarDatosNube(d, false); await new Promise(r => setTimeout(r, 300));
+      return { mem: data.history.map(x => x.id).join(), guardado: JSON.parse(localStorage.getItem('bar-data') || '{}').history };
+    });
+    v.guardado = (v.guardado || []).map(x => x.id).join();
+    await p.evaluate(() => { const viejo = JSON.parse(JSON.stringify(data)); viejo.anuladas = []; viejo.history.unshift({ id: 'a1', date: new Date().toISOString(), total: 10000, items: [], payments: [] });
+      restoreAutoBackupPoint({ at: Date.now() - 864e5, data: JSON.stringify(viejo) }); });
+    await p.waitForSelector('.overlay.show button', { timeout: 5000 }).catch(() => {});
+    await p.evaluate(() => { const b = [...document.querySelectorAll('.overlay.show button')].find(x => /Sí, restaurar/.test(x.textContent)); if(b) b.click(); }); await pausa(800);
+    const v2 = await p.evaluate(() => ({ h: data.history.map(x => x.id).join(), an: (data.anuladas || []).length }));
+    chk('5. Al aplicar datos de la nube que todavía traían la anulada, no vuelve (ni en memoria)', v.mem === 'a2', v);
+    chk('5. Restaurar un punto viejo conserva las 5 anuladas y no revive la venta anulada', v2.h === 'a2' && v2.an === 5, v2);
+    await p.click('#histFAnuladas'); await p.fill('#histBuscar', 'cobro dos'); await pausa(350);
+    chk('5. Buscar el motivo sin tildes («cobro dos» → «Se cobró dos veces»)', (await filas()).length === 1);
+    await p.fill('#histBuscar', ''); await pausa(300); await p.click('#histFilter [data-f="todos"]'); await pausa(200);
+
     // ===== 6 · Volver a abrir =====
     await p.evaluate(() => saveData()); await pausa(600);
     await p.reload({ waitUntil: 'load' }); await pausa(1200);

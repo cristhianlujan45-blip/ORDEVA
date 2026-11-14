@@ -959,6 +959,15 @@
     var hay = 0; hl.forEach(function(x){ if(x && ids[x.id]){ hay++; ids[x.id] = 0; } });
     return (n - hay) / n > 0.5;
   }
+  // 🚫 1.99.1: una venta ANULADA (data.anuladas, tipo 'venta') no puede seguir en history: si otro equipo todavía la tenía,
+  // se quita. Vive aquí (este archivo carga primero) para existir cuando la app abre sus datos o aplica los de la nube.
+  function quitarAnuladas(d){
+    if(!d || !Array.isArray(d.anuladas) || !Array.isArray(d.history) || !d.anuladas.length) return 0;
+    var ids = {}; d.anuladas.forEach(function(a){ if(a && a.tipo === 'venta' && a.ventaId != null) ids[String(a.ventaId)] = 1; });
+    var antes = d.history.length; d.history = d.history.filter(function(h){ return !(h && h.id != null && ids[String(h.id)]); });
+    return antes - d.history.length;
+  }
+  window.ventoQuitarAnuladas = quitarAnuladas;
   // Sin copia de referencia: los datos de la nube + los registros de este equipo que la nube no tiene (por id).
   var REGISTROS = ['history', 'closures', 'purchases', 'contab', 'anuladas'];   // 1.99.1: + las ventas anuladas
   function registrosNuevos(local, nube){
@@ -975,7 +984,7 @@
       }
       out[k] = junto;
     });
-    try{ window.ventoQuitarAnuladas && window.ventoQuitarAnuladas(out); }catch(e){}   // una anulada no vuelve como vendida
+    try{ quitarAnuladas(out); }catch(e){}   // una anulada no vuelve como vendida
     return out;
   }
   function conectado(email){ return !!(st.negocio && st.email === String(email || '').trim().toLowerCase()); }

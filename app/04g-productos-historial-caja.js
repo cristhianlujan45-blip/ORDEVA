@@ -1541,7 +1541,7 @@ function renderHistorial(masPagina){
     if(histFiltroActual() === 'anuladas'){
       const q = histConsulta(), selMes = document.getElementById('histMes'), mes = (selMes && selMes.value) || '';
       const vis = an.filter(a => { if(!a) return false; const ref = a.tipo === 'cierre' ? { date: (a.cierre || {}).date, tableName: 'cierre de caja', total: (a.cierre || {}).totalSold } : (a.venta || {});
-        if(mes && histMesDe(ref) !== mes) return false; return !q || histCoincide(ref, q) || String(a.motivo || '').toLowerCase().indexOf(q) >= 0; });
+        if(mes && histMesDe(ref) !== mes) return false; return !q || histCoincide(ref, q) || String(a.motivo || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').indexOf(q) >= 0; });
       window.__histVisibles = []; window.__histAnuladasVisibles = vis;
       const res = document.getElementById('histBuscarRes'); if(res){ res.hidden = false; res.textContent = vis.length + (vis.length === 1 ? ' anulada' : ' anuladas') + ' · ' + fmt(vis.reduce((t, a) => t + (a.tipo === 'venta' ? Number((a.venta || {}).total) || 0 : 0), 0)) + ' que ya no cuentan'; }
       const fr = document.createDocumentFragment();
@@ -2070,12 +2070,14 @@ async function deleteHistoryDay(key){
   // ventas y los cierres de ese día pasan a «Anuladas». El inventario NO se devuelve (igual que antes).
   let como = 'jefe';
   try{ if(window.ventoAutorizarVenta){ como = await window.ventoAutorizarVenta('anular las ventas del ' + dateStr); if(!como) return; } }catch(e){}
-  const cierres = (data.closures || []).filter(c => dayKey(c.date) === key);
-  const msg = 'Vas a anular ' + day.count + ' cuenta' + (day.count===1?'':'s') + ' cerrada' + (day.count===1?'':'s') + ' (' + fmt(day.total) + ')' + (cierres.length ? ' y ' + cierres.length + ' cierre' + (cierres.length === 1 ? '' : 's') + ' de caja YA HECHO' + (cierres.length === 1 ? '' : 'S') : '') + ' de ese día.\nDejan de contar en todos los totales y quedan guardados en Facturas → «Anuladas».\n⚠️ El inventario no se devuelve' + (day.debt > 0 ? ' y los fiados de ese día (' + fmt(day.debt) + ') dejan de cobrarse' : '') + '. Verifica bien la fecha.';
+  let cierres = (data.closures || []).filter(c => dayKey(c.date) === key);
+  const msg = 'Vas a anular ' + day.count + ' cuenta' + (day.count===1?'':'s') + ' cerrada' + (day.count===1?'':'s') + ' (' + fmt(day.total) + ')' + (cierres.length ? ' y ' + cierres.length + ' cierre' + (cierres.length === 1 ? '' : 's') + ' de caja YA HECHO' + (cierres.length === 1 ? '' : 'S') : '') + ' de ese día.\nDejan de contar en todos los totales y quedan guardados en Facturas → «Anuladas». Con facturación electrónica se pide la nota crédito de cada una.\n⚠️ El inventario no se devuelve' + (day.debt > 0 ? ' y los fiados de ese día (' + fmt(day.debt) + ') dejan de cobrarse' : '') + '. Verifica bien la fecha.';
   let motivo = '';
   if(window.ventoPreguntarMotivo){ motivo = await window.ventoPreguntarMotivo('¿Anular las ventas del ' + dateStr + '?', msg, 'Sí, anular ese día'); if(motivo == null) return; }
   else if(!await showConfirm({ title: '¿Anular las ventas del ' + dateStr + '?', message: msg, confirmText: 'Sí, anular ese día', cancelText: 'Cancelar', icon: '🚫' })) return;
+  // Se vuelven a leer DESPUÉS del motivo: mientras tanto pudo llegar por la nube otra venta o un cierre de ese día.
   const ventas = (data.history||[]).filter(h=> dayKey(h.date) === key);
+  cierres = (data.closures || []).filter(c => dayKey(c.date) === key);
   const mot = 'día anulado' + (motivo ? ': ' + motivo : '');
   if(window.ventoAnotarAnulada){ ventas.slice().reverse().forEach(h => window.ventoAnotarAnulada(h, 'venta', mot, como)); cierres.forEach(c => window.ventoAnotarAnulada(c, 'cierre', mot, como)); }
   data.history = (data.history||[]).filter(h=> dayKey(h.date) !== key);

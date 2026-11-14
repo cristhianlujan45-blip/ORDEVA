@@ -421,6 +421,7 @@ window.ventoAplicarDatosNube = async (obj, respaldarLocal) => {
       // Antes de cambiar este celular a los datos de la nube, se deja un punto de restauración local.
       await autoBackupAgregar({ day: new Date().toISOString().slice(0, 10) + ' (antes de la nube)', at: Date.now(), data: JSON.stringify(data) }, 8, false);
     }
+    try{ window.ventoQuitarAnuladas && window.ventoQuitarAnuladas(obj); }catch(e){}   // 🚫 1.99.1: lo que se GUARDA ya va sin las anuladas
     const txt = JSON.stringify(obj);
     escrito = storageSet(STORAGE_KEY, txt);                       // se guarda mientras se pinta (no se espera para mostrarlo)
     if(typeof authUser !== 'undefined' && authUser) await loadData(txt);
@@ -542,7 +543,11 @@ async function restoreAutoBackupPoint(point){
   });
   if(!ok) return;
   try{
+    const anActual = (typeof data !== 'undefined' && data && Array.isArray(data.anuladas)) ? data.anuladas : [];
     data = JSON.parse(point.data);
+    // 🚫 1.99.1: restaurar un punto viejo no borra el registro de anuladas ni revive una venta anulada después.
+    if(anActual.length){ const ya = {}; (Array.isArray(data.anuladas) ? data.anuladas : []).forEach(a => { if(a && a.id) ya[a.id] = 1; }); data.anuladas = anActual.filter(a => a && !ya[a.id]).concat(Array.isArray(data.anuladas) ? data.anuladas : []); }
+    try{ window.ventoQuitarAnuladas && window.ventoQuitarAnuladas(data); }catch(e){}
     await saveData();
     renderAll();
     if(typeof renderMesas === 'function') renderMesas();

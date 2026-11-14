@@ -211,7 +211,8 @@ function mejorarHist(){
         [['efectivo','efectivo'],['transferencia','transf.']].forEach(([m,l])=>{const b=document.createElement('button');b.textContent='✅ Ya pagó ('+l+')';b.onclick=ev=>{ev.stopPropagation();pagarDeuda(h,m);};sr.appendChild(b);});
       }
     }
-    row.style.display=(filtro==='todos'||filtro===e)?'':'none';
+    const fa=(typeof histFiltroActual==='function')?histFiltroActual():filtro;   // 1.99.1: el filtro que se VE (pudo volver solo a «Todos»)
+    row.style.display=(fa==='todos'||fa===e)?'':'none';
   });
 }
 

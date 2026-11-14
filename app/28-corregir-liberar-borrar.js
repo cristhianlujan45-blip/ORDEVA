@@ -91,14 +91,7 @@
     data.anuladas.unshift(reg);
     return reg;
   }
-  // Una venta anulada en otro equipo no vuelve a «Facturas» porque este equipo todavía la tenía (o la cambió a la vez).
-  function quitarAnuladas(d){
-    if(!d || !Array.isArray(d.anuladas) || !Array.isArray(d.history) || !d.anuladas.length) return 0;
-    const ids = {}; d.anuladas.forEach(a => { if(a && a.tipo === 'venta' && a.ventaId != null) ids[String(a.ventaId)] = 1; });
-    const antes = d.history.length; d.history = d.history.filter(h => !(h && h.id != null && ids[String(h.id)]));
-    return antes - d.history.length;
-  }
-  window.ventoQuitarAnuladas = quitarAnuladas;
+  // (ventoQuitarAnuladas vive en nube/vento-nube.js, que carga primero: así existe cuando se abren los datos.)
   window.ventoAnotarAnulada = anotarAnulada;
   // Pregunta con motivo (opcional). Devuelve el motivo ('' si no escribió) o null si canceló.
   function preguntarMotivo(titulo, mensaje, boton){
@@ -120,7 +113,8 @@
     const abonos = Array.isArray(h.abonosLib) && h.abonosLib.length;
     const motivo = await preguntarMotivo('¿Anular esta venta?', nombreVenta(h) + '\nSale de las ventas y lo vendido vuelve al inventario. Queda guardada en Facturas → «Anuladas» y en la actividad del equipo.' + (abonos ? '\n⚠️ Esta venta tenía abonos de un fiado: esa plata ya recibida no se devuelve sola.' : ''), 'Sí, anular');
     if(motivo == null) return;
-    if(data.history.indexOf(h) < 0) return;   // ya no está (otro equipo, doble toque)
+    // Mientras se escribía el motivo pudieron llegar datos de la nube (data se reemplaza): se vuelve a buscar por id.
+    h = venta(h.id); if(!h){ showToast('Esa venta ya no está (la cambiaron en otro equipo). No se anuló nada.', 6000); return; }
     anotarAnulada(h, 'venta', motivo, como);
     data.history = data.history.filter(x => x !== h);
     try{ window.ventoDian && window.ventoDian.alBorrar(h); }catch(x){}   // 🧾 nota crédito si ya estaba en la DIAN
@@ -158,6 +152,8 @@
       ov.oninput = pinta; pinta();   // (no addEventListener: la ventanita se reutiliza y el anterior seguía vivo)
       ov.querySelector('#vfNo').onclick = cerrar;
       ov.querySelector('#vfSi').onclick = () => {
+        const hv = venta(h.id); if(!hv){ cerrar(); showToast('Esa venta ya no está (la cambiaron en otro equipo). No se corrigió nada.', 6000); return; }
+        if(hv !== h){ cerrar(); showToast('Esa venta acaba de cambiar en otro equipo. Ábrela otra vez para corregirla.', 6000); return; }
         const q = qs(), antes = (h.items || []).map(i => i.qty + ' ' + i.name).join(', '), totAntes = h.total, nuevo = total();
         const metodoAntes = unPago ? pagos[0].method : null, metodo = unPago ? ov.querySelector('#vfMetodo').value : null;
         const fotoAntes = JSON.parse(JSON.stringify({ items: h.items || [], total: h.total, payments: h.payments || [], debt: h.debt || 0 }));
