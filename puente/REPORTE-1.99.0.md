@@ -29,7 +29,7 @@ las auditorías, «Hazlo». Son los puntos 4 y 5 del orden aprobado (`puente/egm
 ## Pruebas
 - **Nueva:** `pruebas/facturasorden.test.js`, 21 bien, 0 mal (entra a la lista de GitHub).
 - Diseño mirado en capturas a 390 px y 320 px.
-- **Lista completa:** RESULTADOS_AQUI
+- **Lista completa:** 132 pruebas en el navegador, 3.027 bien, 0 mal, sobre el commit 965250e. Después se corrigió una regla de estilo (los iconos de la cuenta se estiraban en la vista normal) y se repitieron `mesa` 51, `facturasorden` 21 y `vistasencilla` 45, sin fallas. Las pruebas del servidor no se repitieron: este lote no toca el servidor.
 - **No se probó** en un celular de verdad.
 
 ## Lo que sigue
