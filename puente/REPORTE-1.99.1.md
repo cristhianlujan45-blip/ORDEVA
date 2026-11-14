@@ -59,5 +59,5 @@
 - **Nueva:** `pruebas/anularventas.test.js`, 27 bien, 0 mal (entra a la lista de GitHub).
 - Las que tocan lo mismo: `facturasorden` 21, `equipoactividad` 32, `ordeva2pantallas` 20, `cerrarcaja` 26, sin fallas
   (`equipoactividad` falló una vez en un paso que no toca este cambio y pasó al repetirla).
-- **Lista completa:** RESULTADOS_AQUI
+- **Lista completa:** 136 pruebas en el navegador, 3.165 bien, 0 mal, sobre el commit e434ae1 (con los arreglos de la revisión del código). `safari` no corre aquí (no hay WebKit en esta máquina). Las pruebas del servidor no se repitieron: este lote no toca el servidor.
 - **No se probó** en un celular de verdad, ni con dos equipos reales a la vez, ni con la DIAN de verdad.
