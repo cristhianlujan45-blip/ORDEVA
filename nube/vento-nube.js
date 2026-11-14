@@ -960,7 +960,7 @@
     return (n - hay) / n > 0.5;
   }
   // Sin copia de referencia: los datos de la nube + los registros de este equipo que la nube no tiene (por id).
-  var REGISTROS = ['history', 'closures', 'purchases', 'contab'];
+  var REGISTROS = ['history', 'closures', 'purchases', 'contab', 'anuladas'];   // 1.99.1: + las ventas anuladas
   function registrosNuevos(local, nube){
     var out = clonar(nube);
     REGISTROS.forEach(function(k){
@@ -975,6 +975,7 @@
       }
       out[k] = junto;
     });
+    try{ window.ventoQuitarAnuladas && window.ventoQuitarAnuladas(out); }catch(e){}   // una anulada no vuelve como vendida
     return out;
   }
   function conectado(email){ return !!(st.negocio && st.email === String(email || '').trim().toLowerCase()); }

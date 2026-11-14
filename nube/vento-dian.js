@@ -122,7 +122,11 @@
   // La venta cuyo documento ACTUAL es ese (una corregida o cambiada por factura ya tiene otro: lo viejo no la toca).
   function entradaDe(ventaId){
     var d = D(); if(!d || !d.history) return null;
-    return d.history.find(function(h){ return h.dian ? h.dian.venta === ventaId : String(h.id) === String(ventaId); }) || null;
+    var es = function(h){ return h && (h.dian ? h.dian.venta === ventaId : String(h.id) === String(ventaId)); };
+    var v = d.history.find(es);
+    // 1.99.1: la nota crédito de una venta ANULADA llega cuando la venta ya no está en history: se anota en su copia.
+    if(!v && Array.isArray(d.anuladas)){ var a = d.anuladas.find(function(x){ return x && x.tipo === 'venta' && es(x.venta); }); if(a) v = a.venta; }
+    return v || null;
   }
   // Lo que respondió el servidor queda en la venta (se sincroniza con los demás equipos).
   function aplicar(ventaId, doc, extra){

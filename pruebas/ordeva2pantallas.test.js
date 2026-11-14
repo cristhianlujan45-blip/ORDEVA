@@ -126,7 +126,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     });
     chk('7. Libreta: «🎤 Toca y habla» se lee (contraste ≥ 4,5 sobre el botón negro; antes letra casi negra sobre negro)', v.mic >= 4.5, v);
     chk('7. Revisión de factura: los campos ya no tienen el borde del navegador (1px, sin relieve)', v.factura.estilo === 'solid' && v.factura.ancho === '1px', v.factura);
-    chk('7. Historial: «Borrar historial de un día» es un botón (redondeado y con fondo), no un rectángulo suelto', v.borrar && v.borrar.radio === '10px' && v.borrar.fondo !== 'rgba(0, 0, 0, 0)', v.borrar);
+    chk('7. Historial: «Anular las ventas de un día» es un botón (redondeado y con fondo), no un rectángulo suelto', v.borrar && v.borrar.radio === '10px' && v.borrar.fondo !== 'rgba(0, 0, 0, 0)', v.borrar);
 
     // ===== 5. Cocina en otra apariencia: como antes =====
     await p.evaluate(() => { data.theme = 'menta'; applyPalette('menta'); document.querySelector('nav button[data-view="cocina"]').click(); renderCocina(); });

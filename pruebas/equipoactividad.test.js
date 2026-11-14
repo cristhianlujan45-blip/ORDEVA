@@ -114,8 +114,8 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     await pB.fill('#vfClave', '1111'); await pB.click('#vfSi');
     chk('Clave equivocada: no borra y avisa', await esperar(pB, () => /Clave equivocada/.test(document.getElementById('vfErr').textContent), null, 5000) && await pB.evaluate(() => !!data.history.find(h => h.id === 'v-hoy-1')));
     await pB.fill('#vfClave', '4321'); await pB.click('#vfSi');
-    await esperar(pB, () => [...document.querySelectorAll('.overlay.show button')].some(x => /Sí, borrar/.test(x.textContent)), null, 6000);
-    await pB.evaluate(() => { const b = [...document.querySelectorAll('.overlay.show button')].find(x => /Sí, borrar/.test(x.textContent)); if(b) b.click(); });
+    await esperar(pB, () => [...document.querySelectorAll('.overlay.show button')].some(x => /Sí, (borrar|anular)/.test(x.textContent)), null, 6000);
+    await pB.evaluate(() => { const b = [...document.querySelectorAll('.overlay.show button')].find(x => /Sí, (borrar|anular)/.test(x.textContent)); if(b) b.click(); });
     chk('Con la clave del dueño: borra la venta y lo vendido vuelve al inventario', await esperar(pB, () => !data.history.find(h => h.id === 'v-hoy-1') && data.products[0].stock === 12, null, 6000), await pB.evaluate(() => [data.history.map(h => h.id), data.products[0].stock]));
     // Corregir: de 1 a 3 unidades
     pB.evaluate(() => window.ventoVentaFix('corregir', 'v-hoy-2')).catch(() => {});

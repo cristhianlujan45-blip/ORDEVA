@@ -33,6 +33,7 @@
     ov.innerHTML = '<div class="modal" role="dialog" aria-modal="true" style="max-width:420px;width:100%;max-height:calc(100vh - 32px);overflow:auto">' + html + '</div>';
     ov.classList.add('show');
     const cerrar = () => ov.classList.remove('show');
+    ov.oninput = null;
     ov.onclick = ev => { if(ev.target === ov) cerrar(); };
     alAbrir(ov, cerrar);
   }
@@ -77,14 +78,55 @@
     if(p && p.stock != null && p.stock !== '' && isFinite(+p.stock)) p.stock = +p.stock + d;
   }
   function refrescar(){ try{ renderHistorial(); }catch(x){} try{ typeof renderTables === 'function' && renderTables(); }catch(x){} }
+  /* 🚫 1.99.1 · Anular en vez de borrar (plan: puente/egm/PLAN-ANULAR-VENTAS.md). La venta SALE de data.history (por eso
+     ninguna suma cambia: cierres, estadísticas, contabilidad…) y queda guardada en data.anuladas con quién, cuándo y por
+     qué. Los cierres de caja de un día anulado se guardan en la misma lista (tipo 'cierre'). No se recorta. */
+  function anotarAnulada(x, tipo, motivo, como){
+    if(!Array.isArray(data.anuladas)) data.anuladas = [];
+    const base = (tipo === 'cierre' ? 'an-c-' : 'an-v-') + (x && x.id != null ? String(x.id) : 'sin-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7));
+    let id = base, n = 1; while(data.anuladas.some(a => a && a.id === id)) id = base + '-' + (++n);
+    const reg = { id, t: Date.now(), por: typeof authUser !== 'undefined' && authUser ? authUser : null, como: como || 'jefe', motivo: String(motivo || '').trim().slice(0, 140), tipo: tipo === 'cierre' ? 'cierre' : 'venta' };
+    if(reg.tipo === 'venta'){ reg.ventaId = x && x.id != null ? String(x.id) : null; reg.venta = JSON.parse(JSON.stringify(x)); }
+    else reg.cierre = JSON.parse(JSON.stringify(x));
+    data.anuladas.unshift(reg);
+    return reg;
+  }
+  // Una venta anulada en otro equipo no vuelve a «Facturas» porque este equipo todavía la tenía (o la cambió a la vez).
+  function quitarAnuladas(d){
+    if(!d || !Array.isArray(d.anuladas) || !Array.isArray(d.history) || !d.anuladas.length) return 0;
+    const ids = {}; d.anuladas.forEach(a => { if(a && a.tipo === 'venta' && a.ventaId != null) ids[String(a.ventaId)] = 1; });
+    const antes = d.history.length; d.history = d.history.filter(h => !(h && h.id != null && ids[String(h.id)]));
+    return antes - d.history.length;
+  }
+  window.ventoQuitarAnuladas = quitarAnuladas;
+  window.ventoAnotarAnulada = anotarAnulada;
+  // Pregunta con motivo (opcional). Devuelve el motivo ('' si no escribió) o null si canceló.
+  function preguntarMotivo(titulo, mensaje, boton){
+    return new Promise(res => {
+      ventana('<h2 style="margin:0 0 6px">🚫 ' + e(titulo) + '</h2><p style="margin:0 0 10px;font-size:14px;line-height:1.45;white-space:pre-line">' + e(mensaje) + '</p>' +
+        '<label style="display:flex;flex-direction:column;gap:4px;font-size:13px">¿Por qué? (opcional)<input id="vfMotivo" type="text" maxlength="140" autocomplete="off" placeholder="Ej.: se cobró dos veces" style="width:100%;box-sizing:border-box;min-height:44px;font-size:15px"></label>' +
+        '<div class="modal-actions"><button type="button" class="btn-ghost" id="vfNo">Cancelar</button><button type="button" class="btn-primary" id="vfSi">' + e(boton) + '</button></div>', (ov, cerrar) => {
+        let listo = false; const fin = v => { if(listo) return; listo = true; cerrar(); res(v); };
+        ov.querySelector('#vfNo').onclick = () => fin(null);
+        ov.querySelector('#vfSi').onclick = () => fin(String(ov.querySelector('#vfMotivo').value || '').trim());
+        ov.onclick = ev => { if(ev.target === ov) fin(null); };
+      });
+    });
+  }
+  window.ventoPreguntarMotivo = preguntarMotivo;
+  window.ventoAutorizarVenta = que => autorizar(que);
   async function borrar(h){
-    const como = await autorizar('borrar la venta ' + nombreVenta(h)); if(!como) return;
-    if(!await showConfirm({ title: '¿Borrar esta venta?', message: nombreVenta(h) + '\nSale del historial y lo vendido vuelve al inventario. Queda anotado en la actividad del equipo.', confirmText: 'Sí, borrar', icon: '🗑️' })) return;
+    const como = await autorizar('anular la venta ' + nombreVenta(h)); if(!como) return;
+    const abonos = Array.isArray(h.abonosLib) && h.abonosLib.length;
+    const motivo = await preguntarMotivo('¿Anular esta venta?', nombreVenta(h) + '\nSale de las ventas y lo vendido vuelve al inventario. Queda guardada en Facturas → «Anuladas» y en la actividad del equipo.' + (abonos ? '\n⚠️ Esta venta tenía abonos de un fiado: esa plata ya recibida no se devuelve sola.' : ''), 'Sí, anular');
+    if(motivo == null) return;
+    if(data.history.indexOf(h) < 0) return;   // ya no está (otro equipo, doble toque)
+    anotarAnulada(h, 'venta', motivo, como);
     data.history = data.history.filter(x => x !== h);
     try{ window.ventoDian && window.ventoDian.alBorrar(h); }catch(x){}   // 🧾 nota crédito si ya estaba en la DIAN
     (h.items || []).forEach(it => stock(it.name, +it.qty || 0));
-    try{ window.ventoAuditar && window.ventoAuditar('venta borrada a mano', nombreVenta(h) + ' · ' + (h.items || []).map(i => i.qty + ' ' + i.name).join(', ') + ' · por ' + quien(como)); }catch(x){ saveData(); }
-    refrescar(); showToast('🗑️ Venta borrada.');
+    try{ window.ventoAuditar && window.ventoAuditar('venta borrada a mano', nombreVenta(h) + ' · ' + (h.items || []).map(i => i.qty + ' ' + i.name).join(', ') + (motivo ? ' · motivo: ' + motivo : '') + ' · por ' + quien(como)); }catch(x){ saveData(); }
+    refrescar(); showToast('🚫 Venta anulada. Queda en Facturas → «Anuladas».');
   }
   async function liberar(h){
     const t = data.tables && data.tables[h.table];
@@ -113,11 +155,13 @@
       const qs = () => its.map((it, i) => Math.max(0, Math.round(+ov.querySelector('[data-q="' + i + '"]').value || 0)));
       const total = () => qs().reduce((s, q, i) => s + q * its[i].price, 0);
       const pinta = () => { ov.querySelector('#vfTotal').textContent = 'Total: ' + fmt(h.total) + ' → ' + fmt(total()); };
-      ov.addEventListener('input', pinta); pinta();
+      ov.oninput = pinta; pinta();   // (no addEventListener: la ventanita se reutiliza y el anterior seguía vivo)
       ov.querySelector('#vfNo').onclick = cerrar;
       ov.querySelector('#vfSi').onclick = () => {
         const q = qs(), antes = (h.items || []).map(i => i.qty + ' ' + i.name).join(', '), totAntes = h.total, nuevo = total();
         const metodoAntes = unPago ? pagos[0].method : null, metodo = unPago ? ov.querySelector('#vfMetodo').value : null;
+        const fotoAntes = JSON.parse(JSON.stringify({ items: h.items || [], total: h.total, payments: h.payments || [], debt: h.debt || 0 }));
+        const ventaAntes = JSON.parse(JSON.stringify(h));
         its.forEach((it, i) => stock(it.name, (+it.qty || 0) - q[i]));
         h.items = its.map((it, i) => Object.assign(it, { qty: q[i] })).filter(it => it.qty > 0);
         h.total = nuevo;
@@ -125,8 +169,10 @@
         else if(pagos.length){ const dif = nuevo - totAntes, last = pagos[pagos.length - 1]; last.amount = Math.max(0, (+last.amount || 0) + dif); }
         h.debt = pagos.filter(p => p.method === 'debe').reduce((s, p) => s + (+p.amount || 0), 0);
         h.corregida = { t: Date.now(), por: typeof authUser !== 'undefined' ? authUser : null };
+        // 1.99.1: cómo estaba antes de cada corrección queda en la misma venta (se ve en su detalle).
+        h.correcciones = (Array.isArray(h.correcciones) ? h.correcciones : []).concat([{ t: h.corregida.t, por: h.corregida.por, como, antes: fotoAntes }]);
         try{ window.ventoDian && window.ventoDian.alCorregir(h); }catch(x){}   // 🧾 nota crédito del documento viejo + el nuevo
-        if(!h.items.length){ data.history = data.history.filter(x => x !== h); }
+        if(!h.items.length){ anotarAnulada(ventaAntes, 'venta', 'corregida a cero', como); data.history = data.history.filter(x => x !== h); }
         cerrar();
         try{ window.ventoAuditar && window.ventoAuditar('venta corregida', (h.tableName || 'Venta') + ': ' + antes + ' (' + fmt(totAntes) + ') → ' + (h.items.map(i => i.qty + ' ' + i.name).join(', ') || 'nada') + ' (' + fmt(nuevo) + ')' + (metodo && metodo !== metodoAntes ? ' · pago ' + metodoAntes + ' → ' + metodo : '') + ' · por ' + quien(como)); }catch(x){ saveData(); }
         refrescar(); showToast('✅ Venta corregida.');

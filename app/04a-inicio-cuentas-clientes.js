@@ -315,6 +315,8 @@ async function loadData(txtNube){
   if(!data.history) data.history = [];
   if(!data.categories) data.categories = [];
   if(!data.closures) data.closures = [];
+  if(data.anuladas != null && !Array.isArray(data.anuladas)) data.anuladas = [];
+  try{ window.ventoQuitarAnuladas && window.ventoQuitarAnuladas(data); }catch(e){}   // 1.99.1: una venta anulada no vuelve como vendida
   if(!data.theme) data.theme = 'ordeva2';
   // ORDEVA 2.0: todos los negocios pasan UNA vez al diseño nuevo (1.66.6; en la 1.66.0 solo pasaba quien tenía Noche
   // violeta). Lo que tenían (apariencia y decoración: 🎃, 🎄…) queda guardado en data.o2Antes y en Ajustes → Apariencia

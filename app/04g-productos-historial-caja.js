@@ -1381,6 +1381,30 @@ const histFmtHora = new Intl.DateTimeFormat('es-CO', { hour: '2-digit', minute: 
 function histFiltroActual(){ const b = document.querySelector('#histFilter button.on'); return (b && b.dataset.f) || 'todos'; }
 /* 1.99.0 · Facturas mejor organizadas: número y forma de pago a la vista, buscador, por mes, por día con subtotal y el
    libro de facturas para Excel. Nada de esto cambia los datos: solo cómo se muestran. */
+// 1.99.1: cómo estaba la venta antes de cada corrección («antes → ahora»).
+function histCorrecciones(h){
+  const c = Array.isArray(h && h.correcciones) ? h.correcciones : []; if(!c.length) return '';
+  const txt = x => ((x.items || []).map(i => i.qty + ' ' + i.name).join(', ') || 'nada') + ' (' + fmt(x.total) + ')';
+  return c.map((x, i) => { const sig = c[i + 1] ? c[i + 1].antes : h, d = new Date(x.t);
+    return '<div class="hist-antes">✏️ Corregida el ' + (isNaN(d) ? '' : histFmtFecha.format(d) + ' · ' + histFmtHora.format(d)) + (x.por ? ' por ' + invEsc(x.por) : '') + ': antes ' + invEsc(txt(x.antes || {})) + ' → ahora ' + invEsc(txt(sig || {})) + '</div>'; }).join('');
+}
+// 1.99.1: una venta ANULADA (data.anuladas). Solo lectura: se ve, no se corrige ni se borra.
+function histFilaAnulada(a){
+  const row = document.createElement('div'); row.className = 'hist-row anulada'; row.dataset.an = a.id;
+  const d = new Date(a.t), cuando = isNaN(d) ? '' : histFmtFecha.format(d) + ' · ' + histFmtHora.format(d);
+  const pie = '🚫 Anulada el ' + cuando + (a.por ? ' por ' + a.por : '') + (a.como === 'clave' ? ' (con la clave del dueño)' : '') + (a.motivo ? ' · Motivo: ' + a.motivo : '');
+  if(a.tipo === 'cierre'){
+    const c = a.cierre || {}, dc = new Date(c.date);
+    row.innerHTML = '<div class="hist-row-top"><div class="hist-left"><div class="hist-table">🔒 Cierre de caja · <span class="hist-anulada-flag">ANULADO</span></div><div class="hist-date">' + (isNaN(dc) ? '' : histFmtFecha.format(dc) + ' · ' + histFmtHora.format(dc)) + '</div><div class="hist-ref">' + invEsc(pie) + '</div></div><div class="hist-total">' + fmt(Number(c.totalSold) || 0) + '</div></div>';
+    return row;
+  }
+  const h = a.venta || {}, dv = new Date(h.date);
+  const items = (h.items || []).map(it => '<div class="hist-detail-line"><span>' + invEsc(it.name) + (it.person ? ' — ' + invEsc(it.person) : '') + ' ×' + invEsc(it.qty) + '</span><span>' + fmt((Number(it.price) || 0) * (Number(it.qty) || 0)) + '</span></div>').join('') || '<div class="hist-detail-line"><span>Sin productos registrados</span><span></span></div>';
+  row.innerHTML = '<div class="hist-row-top"><div class="hist-left"><div class="hist-table">' + invEsc(h.tableName || ('Mesa ' + h.table)) + (h.person ? ' — ' + invEsc(h.person) : '') + ' · <span class="hist-anulada-flag">ANULADA</span></div>' +
+    '<div class="hist-date">' + (isNaN(dv) ? '' : histFmtFecha.format(dv) + ' · ' + histFmtHora.format(dv)) + '</div>' + (histRef(h) ? '<div class="hist-ref">' + invEsc(histRef(h)) + '</div>' : '') + '<div class="hist-ref">' + invEsc(pie) + '</div></div><div class="hist-total">' + fmt(h.total) + '</div></div>' +
+    '<div class="hist-detail"><div class="hist-detail-title">Productos vendidos</div>' + items + histCorrecciones(h) + '</div>';
+  return row;
+}
 function histNumero(h){ return String((h && h.dian && h.dian.documento) || (h && h.invoiceNo) || ''); }
 function histMedios(h){
   const v = []; ((h && h.payments) || []).forEach(p => { const n = String(CIERRE_MEDIOS[medioDePago(p)] || p.method || '').replace(/^\S+\s/, '').replace(/ \(.*$/, ''); if(n && v.indexOf(n) < 0) v.push(n); });
@@ -1401,9 +1425,9 @@ function histMesDe(h){ const d = new Date(h.date); return isNaN(d) ? '' : d.getF
 function histConsulta(){ const i = document.getElementById('histBuscar'); return String((i && i.value) || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
 function histLibroCsv(lista){
   const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
-  const filas = [['Fecha', 'Hora', 'Número', 'Mesa o cliente', 'Productos', 'Forma de pago', 'Total', 'Propina', 'Descuento', 'Queda debiendo', 'Atendió', 'Corregida']].concat(lista.map(h => { const d = new Date(h.date); return [
+  const filas = [['Fecha', 'Hora', 'Número', 'Mesa o cliente', 'Productos', 'Forma de pago', 'Total', 'Propina', 'Descuento', 'Queda debiendo', 'Atendió', 'Estado']].concat(lista.map(h => { const d = new Date(h.date); return [
     isNaN(d) ? '' : d.toLocaleDateString('es-CO'), isNaN(d) ? '' : histFmtHora.format(d), histNumero(h), (h.tableName || ('Mesa ' + h.table)) + (h.person ? ' — ' + h.person : ''),
-    (h.items || []).map(it => it.name + ' ×' + it.qty).join(', '), histMedios(h), Math.round(Number(h.total) || 0), Math.round(propinaDe(h)), Math.round((h.descuento && Number(h.descuento.valor)) || 0), Math.round(Number(h.debt) || 0), h.by || '', h.corregida ? 'Sí' : '']; }));
+    (h.items || []).map(it => it.name + ' ×' + it.qty).join(', '), histMedios(h), Math.round(Number(h.total) || 0), Math.round(propinaDe(h)), Math.round((h.descuento && Number(h.descuento.valor)) || 0), Math.round(Number(h.debt) || 0), h.by || '', h.__anulada ? 'ANULADA' : h.corregida ? 'Corregida' : '']; }));
   return '\ufeff' + filas.map(f => f.map(q).join(';')).join('\r\n');
 }
 window.histLibroCsv = histLibroCsv;
@@ -1441,6 +1465,7 @@ function histFila(h, idx){
         ${h.descuento && h.descuento.valor > 0 ? `<div class="hist-detail-line"><span>🏷️ Descuento${h.descuento.tipo === '%' ? ' ' + h.descuento.v + ' %' : ''}${h.descuento.por ? ' (' + h.descuento.por + ')' : ''} · antes ${fmt(h.descuento.bruto)}</span><span>−${fmt(h.descuento.valor)}</span></div>` : ''}
         ${(payments.find(p => p.vueltas > 0) || null) ? `<div class="hist-detail-line"><span>💵 Recibió ${fmt(payments.find(p => p.vueltas > 0).recibido)} · cambio</span><span>${fmt(payments.find(p => p.vueltas > 0).vueltas)}</span></div>` : ''}
         ${h.observacion ? `<div class="hist-detail-line"><span>📝 ${invEsc(h.observacion)}</span><span></span></div>` : ''}
+        ${histCorrecciones(h)}
         ${window.ventoDian ? window.ventoDian.bloqueHistorial(h) : ''}
         <div class="hist-share-row">
           <button class="hist-share-image" data-idx="${idx}">🖼️ Enviar captura por WhatsApp</button>
@@ -1449,7 +1474,7 @@ function histFila(h, idx){
           <button type="button" class="hist-fix" data-fix="corregir" data-id="${String(h.id).replace(/"/g, '')}">✏️ Corregir</button>
           ${window.ventoInventario ? `<button type="button" class="hist-fix" data-fix="devolver" data-id="${String(h.id).replace(/"/g, '')}">↩️ Devolución</button>` : ''}
           ${h.table != null && data.tables && data.tables[h.table] ? `<button type="button" class="hist-fix" data-fix="liberar" data-id="${String(h.id).replace(/"/g, '')}">🔓 Liberar</button>` : ''}
-          <button type="button" class="hist-fix peligro" data-fix="borrar" data-id="${String(h.id).replace(/"/g, '')}">🗑️ Borrar</button>
+          <button type="button" class="hist-fix peligro" data-fix="borrar" data-id="${String(h.id).replace(/"/g, '')}">🚫 Anular</button>
         </div>
       </div>
     `;
@@ -1509,6 +1534,24 @@ function renderHistorial(masPagina){
   }
   if(!masPagina) histMostrar = HIST_PAGINA;
   list.innerHTML = '';
+  // 1.99.1: «🚫 Anuladas» (solo quien ve el historial completo). Va antes de la pantalla vacía: puede no quedar ninguna venta.
+  { let sh = false; try{ sh = !!(window.ventoRoles && window.ventoRoles.soloHoy()); }catch(e){}
+    const an = Array.isArray(data.anuladas) ? data.anuladas : [], chip = document.getElementById('histFAnuladas');
+    if(chip){ chip.hidden = sh || !an.length; if(chip.hidden && chip.classList.contains('on')){ chip.classList.remove('on'); const t = document.querySelector('#histFilter [data-f="todos"]'); if(t) t.classList.add('on'); } }
+    if(histFiltroActual() === 'anuladas'){
+      const q = histConsulta(), selMes = document.getElementById('histMes'), mes = (selMes && selMes.value) || '';
+      const vis = an.filter(a => { if(!a) return false; const ref = a.tipo === 'cierre' ? { date: (a.cierre || {}).date, tableName: 'cierre de caja', total: (a.cierre || {}).totalSold } : (a.venta || {});
+        if(mes && histMesDe(ref) !== mes) return false; return !q || histCoincide(ref, q) || String(a.motivo || '').toLowerCase().indexOf(q) >= 0; });
+      window.__histVisibles = []; window.__histAnuladasVisibles = vis;
+      const res = document.getElementById('histBuscarRes'); if(res){ res.hidden = false; res.textContent = vis.length + (vis.length === 1 ? ' anulada' : ' anuladas') + ' · ' + fmt(vis.reduce((t, a) => t + (a.tipo === 'venta' ? Number((a.venta || {}).total) || 0 : 0), 0)) + ' que ya no cuentan'; }
+      const fr = document.createDocumentFragment();
+      vis.slice(0, histMostrar).forEach(a => fr.appendChild(histFilaAnulada(a)));
+      if(!vis.length){ const v = document.createElement('div'); v.className = 'empty-state'; v.textContent = 'No hay anuladas con esa búsqueda.'; fr.appendChild(v); }
+      else if(vis.length > histMostrar){ const b = document.createElement('button'); b.type = 'button'; b.className = 'btn-ghost hist-mas'; b.style.cssText = 'width:100%;margin-top:10px'; b.textContent = 'Ver más (' + (vis.length - histMostrar) + ' anteriores)'; fr.appendChild(b); }
+      list.appendChild(fr); renderClosures(); return;
+    }
+    window.__histAnuladasVisibles = null;
+  }
   if(data.history.length === 0){
     list.innerHTML = '<div class="empty-state">Todavía no has cerrado ninguna cuenta.</div>';
     renderClosures();
@@ -1998,7 +2041,7 @@ function renderDeleteHistoryDays(){
   const list = document.getElementById('deleteHistoryDaysList');
   const days = groupHistoryByDay();
   if(days.length === 0){
-    list.innerHTML = '<div class="empty-state">Todavía no hay historial guardado para borrar.</div>';
+    list.innerHTML = '<div class="empty-state">Todavía no hay ventas guardadas para anular.</div>';
     return;
   }
   list.innerHTML = days.map(d=>{
@@ -2009,7 +2052,7 @@ function renderDeleteHistoryDays(){
           <strong>${dateStr}</strong>
           <span>${d.count} cuenta${d.count===1?'':'s'} cerrada${d.count===1?'':'s'} · ${fmt(d.total)}${d.debt>0 ? ' · Debía ' + fmt(d.debt) : ''}</span>
         </div>
-        <button class="btn-danger-outline" data-key="${d.key}">🗑️ Borrar</button>
+        <button class="btn-danger-outline" data-key="${d.key}">🚫 Anular</button>
       </div>
     `;
   }).join('');
@@ -2023,20 +2066,26 @@ async function deleteHistoryDay(key){
   const day = days.find(d=>d.key === key);
   if(!day) return;
   const dateStr = new Date(day.date).toLocaleDateString('es-CO', {day:'2-digit', month:'long', year:'numeric'});
-  const ok = await showConfirm({
-    title: '¿Borrar el historial del ' + dateStr + '?',
-    message: '⚠️ Vas a borrar ' + day.count + ' cuenta' + (day.count===1?'':'s') + ' cerrada' + (day.count===1?'':'s') + ' (' + fmt(day.total) + ') y los cierres de caja de ese día. Esta acción no se puede deshacer. Verifica bien la fecha antes de confirmar.',
-    confirmText: 'Sí, borrar ese día',
-    cancelText: 'Cancelar',
-    icon: '🗑️'
-  });
-  if(!ok) return;
+  // 1.99.1: ya no se borra sin rastro. Pide la autorización (el equipo, con la clave del dueño), pregunta el motivo, y las
+  // ventas y los cierres de ese día pasan a «Anuladas». El inventario NO se devuelve (igual que antes).
+  let como = 'jefe';
+  try{ if(window.ventoAutorizarVenta){ como = await window.ventoAutorizarVenta('anular las ventas del ' + dateStr); if(!como) return; } }catch(e){}
+  const cierres = (data.closures || []).filter(c => dayKey(c.date) === key);
+  const msg = 'Vas a anular ' + day.count + ' cuenta' + (day.count===1?'':'s') + ' cerrada' + (day.count===1?'':'s') + ' (' + fmt(day.total) + ')' + (cierres.length ? ' y ' + cierres.length + ' cierre' + (cierres.length === 1 ? '' : 's') + ' de caja YA HECHO' + (cierres.length === 1 ? '' : 'S') : '') + ' de ese día.\nDejan de contar en todos los totales y quedan guardados en Facturas → «Anuladas».\n⚠️ El inventario no se devuelve' + (day.debt > 0 ? ' y los fiados de ese día (' + fmt(day.debt) + ') dejan de cobrarse' : '') + '. Verifica bien la fecha.';
+  let motivo = '';
+  if(window.ventoPreguntarMotivo){ motivo = await window.ventoPreguntarMotivo('¿Anular las ventas del ' + dateStr + '?', msg, 'Sí, anular ese día'); if(motivo == null) return; }
+  else if(!await showConfirm({ title: '¿Anular las ventas del ' + dateStr + '?', message: msg, confirmText: 'Sí, anular ese día', cancelText: 'Cancelar', icon: '🚫' })) return;
+  const ventas = (data.history||[]).filter(h=> dayKey(h.date) === key);
+  const mot = 'día anulado' + (motivo ? ': ' + motivo : '');
+  if(window.ventoAnotarAnulada){ ventas.slice().reverse().forEach(h => window.ventoAnotarAnulada(h, 'venta', mot, como)); cierres.forEach(c => window.ventoAnotarAnulada(c, 'cierre', mot, como)); }
   data.history = (data.history||[]).filter(h=> dayKey(h.date) !== key);
   if(data.closures) data.closures = data.closures.filter(c=> dayKey(c.date) !== key);
+  ventas.forEach(h => { try{ window.ventoDian && window.ventoDian.alBorrar(h); }catch(e){} });   // 🧾 nota crédito de cada una, si estaba en la DIAN
+  try{ window.ventoAuditar && window.ventoAuditar('día anulado', dateStr + ': ' + ventas.length + ' venta' + (ventas.length === 1 ? '' : 's') + ' (' + fmt(day.total) + ')' + (cierres.length ? ' y ' + cierres.length + ' cierre(s) de caja' : '') + (motivo ? ' · motivo: ' + motivo : '') + (como === 'clave' ? ' · autorizado con la clave del dueño' : '')); }catch(e){}
   await saveData();
   renderHistorial();
   renderDeleteHistoryDays();
-  showToast('Historial del ' + dateStr + ' borrado.');
+  showToast('🚫 Ventas del ' + dateStr + ' anuladas. Quedan en Facturas → «Anuladas».');
 }
 
 function openDeleteHistory(){
@@ -2054,11 +2103,11 @@ document.getElementById('deleteHistoryDayBtn').addEventListener('click', openDel
   if(i) i.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => renderHistorial(), 180); });
   if(m) m.addEventListener('change', () => renderHistorial());
   if(l) l.addEventListener('click', () => {
-    const idxs = window.__histVisibles || [];
+    const anV = window.__histAnuladasVisibles, idxs = anV ? anV.filter(x => x.tipo === 'venta') : (window.__histVisibles || []);
     if(!idxs.length){ showToast('No hay facturas para descargar con ese filtro.'); return; }
-    const csv = histLibroCsv(idxs.map(x => data.history[x]).filter(Boolean).reverse());
+    const csv = histLibroCsv(anV ? idxs.map(x => Object.assign({}, x.venta, { __anulada: true })).reverse() : idxs.map(x => data.history[x]).filter(Boolean).reverse());
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-    a.download = 'facturas-' + String(data.businessName || 'negocio').replace(/[^\w]+/g, '-') + (m && m.value ? '-' + m.value : '') + '.csv';
+    a.download = (anV ? 'anuladas-' : 'facturas-') + String(data.businessName || 'negocio').replace(/[^\w]+/g, '-') + (m && m.value ? '-' + m.value : '') + '.csv';
     document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
     showToast('⬇️ ' + idxs.length + (idxs.length === 1 ? ' factura descargada' : ' facturas descargadas') + ': ábrelo con Excel o Google Sheets.');
   });

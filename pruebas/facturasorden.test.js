@@ -3,7 +3,7 @@
 //  2. Las ventas salen por día, con cuántas facturas y el subtotal de cada día.
 //  3. El buscador encuentra por número, cliente, producto y valor; el mes filtra; se combina con «Deben».
 //  4. El libro de facturas (Excel) trae una fila por factura, solo las que se ven con el filtro.
-//  5. «Borrar historial de un día» queda al final, lejos de «Cerrar caja». En 390 px nada se sale de lado.
+//  5. «Anular las ventas de un día» queda al final, lejos de «Cerrar caja». En 390 px nada se sale de lado.
 'use strict';
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
@@ -66,7 +66,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     await p.selectOption('#histMes', ''); await pausa(200);
     v = await p.evaluate(() => { const c = document.getElementById('closeDayBtn').getBoundingClientRect(), d = document.getElementById('deleteHistoryDayBtn').getBoundingClientRect(), l = document.getElementById('histList').getBoundingClientRect(), i = document.getElementById('histBuscar').getBoundingClientRect();
       return { abajo: d.top > l.bottom - 1 && d.top > c.bottom + 200, ancho: document.documentElement.scrollWidth <= window.innerWidth + 1, alto: Math.round(i.height), detalle: (() => { const r = document.querySelector('#histList .hist-row .hist-row-top'); r.click(); return document.querySelector('#histList .hist-row').classList.contains('expanded'); })() }; });
-    chk('5. «Borrar historial de un día» queda al final, debajo de la lista y lejos de «Cerrar caja»', v.abajo, v);
+    chk('5. «Anular las ventas de un día» queda al final, debajo de la lista y lejos de «Cerrar caja»', v.abajo, v);
     chk('5. En 390 px nada se sale de lado, el buscador mide 44 px o más y la fila se sigue abriendo al tocarla', v.ancho && v.alto >= 44 && v.detalle, v);
     v = await p.evaluate(() => { const a = JSON.stringify(data.history.map(h => [h.id, h.total, h.invoiceNo || '', h.debt])); return a; });
     chk('5. Buscar, filtrar y descargar no cambian ninguna venta', v === JSON.stringify([['h1', 32000, 'F-105', 0], ['h2', 18500, 'F-104', 0], ['h3', 50000, 'F-103', 50000], ['h4', 12000, '', 0], ['h5', 77700, 'F-050', 0]]), v);
