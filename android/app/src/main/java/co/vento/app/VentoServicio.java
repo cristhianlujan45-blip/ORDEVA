@@ -42,6 +42,7 @@ public class VentoServicio extends Service {
             // pedía reconectar cada 5 s, se revisaba la voz cada 30 s y se barría cada 2,5 s: desde ahí los pagos dejaron de
             // sonar bloqueado (21 desconexiones y avisos leídos hasta 20 min tarde). No volver a tocar sin probarlo bloqueado.
             if (++vueltas % 12 == 0) revisarEscucha();               // cada minuto: ¿sigue leyendo los avisos de los bancos?
+            if (vueltas % 12 == 6) anotarEstado();                   // cada minuto: cómo está el celular (para el registro de avisos)
             if (vueltas % 2 == 0) try { VentoEscucha.barrer(); } catch (Throwable ignorado) { }   // cada 10 s: ¿quedó un pago en la barra sin llegar?
             // Cada 5 min: ¿hay una versión nueva de la app? (revisa cada 30 min; si ya hay una, la instala cuando no se use Vento)
             if (vueltas % 60 == 30) try { Actualizador.revisar(VentoServicio.this, false); } catch (Throwable ignorado) { }
@@ -99,6 +100,25 @@ public class VentoServicio extends Service {
     /** Android a veces desconecta la lectura de avisos (ahorro de batería, actualización) y los pagos dejan de sonar hasta
      *  abrir Vento. Si la lectura de pagos está prendida, hay permiso y no está conectada: se le pide volver a conectarla y,
      *  si sigue sin conectar, se apaga y se prende el componente (así Android la vuelve a conectar). */
+    /** 1.98.3: cómo está el celular, para que el registro de avisos diga de dónde viene una demora (ahorro de batería, sin
+     *  el permiso de batería, pantalla apagada, lectura desconectada). Solo lee; no cambia nada. */
+    static volatile String estadoCel = "";
+    private long apagadaDesde = 0;
+    private void anotarEstado() {
+        try {
+            PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+            if (pm == null) return;
+            boolean prendida = pm.isInteractive();
+            if (prendida) apagadaDesde = 0; else if (apagadaDesde == 0) apagadaDesde = System.currentTimeMillis();
+            StringBuilder x = new StringBuilder();
+            if (Build.VERSION.SDK_INT >= 23 && pm.isDeviceIdleMode()) x.append(" · 😴 el celular estaba en ahorro de batería");
+            if (Build.VERSION.SDK_INT >= 23 && !pm.isIgnoringBatteryOptimizations(getPackageName())) x.append(" · 🔋 ORDEVA sin el permiso de batería");
+            if (!prendida) x.append(" · pantalla apagada hace ").append(Math.max(1, (System.currentTimeMillis() - apagadaDesde) / 60000)).append(" min");
+            if (VentoEscucha.activa == null) x.append(" · lectura de avisos desconectada");
+            estadoCel = x.toString();
+        } catch (Throwable ignorado) { }
+    }
+
     private void revisarEscucha() {
         try {
             if (VentoEscucha.activa != null) { sinEscucha = 0; return; }
@@ -156,7 +176,10 @@ public class VentoServicio extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && DETENER.equals(intent.getAction())) {
-            getSharedPreferences("vento", MODE_PRIVATE).edit().putBoolean("fondo", false).apply();
+            // 1.98.3: con la lectura de pagos prendida, «Detener» para el fondo solo hasta que se vuelva a abrir ORDEVA. Antes
+            // lo apagaba para siempre: un toque sin querer y los avisos de pago solo llegaban al abrir la app.
+            boolean pagos = getSharedPreferences("vento", MODE_PRIVATE).getBoolean(VentoEscucha.PREF_ON, false);
+            if (!pagos) getSharedPreferences("vento", MODE_PRIVATE).edit().putBoolean("fondo", false).apply();
             stopForeground(true);
             stopSelf();
             return START_NOT_STICKY;
@@ -204,8 +227,10 @@ public class VentoServicio extends Service {
                 .setContentTitle("ORDEVA está trabajando")
                 .setContentText("Recibiendo pedidos y mandando la música al TV, aunque cierres la app.")
                 .setOngoing(true)
-                .setContentIntent(abrir)
-                .addAction(new Notification.Action.Builder(null, "Detener", parar).build());
+                .setContentIntent(abrir);
+        // Con la lectura de pagos prendida no se ofrece «Detener» (se apaga en Ajustes, a propósito).
+        if (!getSharedPreferences("vento", MODE_PRIVATE).getBoolean(VentoEscucha.PREF_ON, false))
+            b.addAction(new Notification.Action.Builder(null, "Detener", parar).build());
         if (Build.VERSION.SDK_INT >= 31) b.setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE);
         return b.build();
     }

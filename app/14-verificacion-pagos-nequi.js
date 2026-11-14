@@ -113,6 +113,8 @@ function pagoHuella(t){
     // Un «¿…?» o «bolsillo» junto a un pago de verdad («te envió $20.000. ¿La guardas?») no lo vuelve publicidad.
     if(PG_PROMO.test(t) && !PG_FUERTE.test(t)) return null;
     if(PG_COBRANZA.test(t) && !PG_FUERTE.test(t)) return null;
+    // 1.98.3: abono o pago A una deuda propia, puntos o millas, y el aviso de ingreso a la banca (igual que AvisoPago.NO_ES).
+    if(/a (?:tu|su) (?:cr[eé]dito|tarjeta|pr[eé]stamo|obligaci[oó]n|cuota)|\d\s*(?:puntos|millas)\b|ingres[oó] a (?:la |tu |su )?(?:sucursal|app|banca|portal)|inicio de sesi[oó]n|ingresaste a|pago recibido[^|]{0,40}tarjeta/i.test(t)) return null;
     // Con signo ($20.000), «COP 20.000» o sin él («Recibiste 25.000 pesos», «transferencia por 30.000»)
     // Con signo ($20.000), «COP 20.000», «25.000 pesos» o sin signo como el SMS de DaviPlata («recibiste  100,000»,
     // «Recibiste 140,000.»). Un número de celular (10 cifras) no es el valor.
@@ -847,7 +849,7 @@ function pagoHuella(t){
       if(/^🔇/.test(r)) rep(r.replace(/^\S+\s*/, ''), 'Voz del pago', String(x.txt || '').replace(/\d[\d.,]*/g, '#'));
       // 1.55.4: ⏱ ¿De dónde viene la demora de un pago? (el banco lo mandó tarde o Vento lo leyó tarde) y 🧹 los que Android
       // no le pasó a ORDEVA (los tomó el barrido de la barra). Una vez por aviso (su hora), solo tiempos: sin valores ni nombres.
-      const b = +((r.match(/el banco lo mandó (\d+) s tarde/) || [])[1] || 0), v = +((r.match(/Vento lo leyó (\d+) s después/) || [])[1] || 0);
+      const b = +((r.match(/el banco lo mandó (\d+) s tarde/) || [])[1] || 0), v = +((r.match(/(?:Vento|ORDEVA) lo leyó (\d+) s después/) || [])[1] || 0);
       if((b >= 20 || v >= 5) && !pgDiagVistos.has('t' + x.t)){ pgDiagVistos.add('t' + x.t);
         try{ window.ventoError && window.ventoError('pago', 'Pago avisado tarde: ' + (b >= 20 ? 'el banco lo mandó ' + b + ' s tarde' : '') + (b >= 20 && v >= 5 ? ' y ' : '') + (v >= 5 ? 'Vento lo leyó ' + v + ' s después' : ''), { app: String(x.app || '').slice(0, 40), texto: String(x.txt || '').slice(0, 220), banco_s: b, vento_s: v, app_version: window.ventoAppVersion ? window.ventoAppVersion() : '' }, 'pago|demora|' + (b >= 20 ? 'banco' : 'vento')); }catch(e){} }
       // 1.72.6: 🔌 cuándo Android corta / vuelve a conectar la lectura y si el celular estaba bloqueado (causa del «no suena bloqueado»).

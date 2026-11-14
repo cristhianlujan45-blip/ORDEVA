@@ -132,6 +132,12 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     chk('8. La próxima vez a MAMÁ ya no se anota sola', v.filas === 0 && !v.gasto, v);
 
     // ===== 9. Retiros =====
+    // 1.98.3: el mismo pago avisado por la app del banco y por su SMS se anota UNA vez; dos iguales por el mismo camino, dos.
+    const antesN = await p.evaluate(() => window.ventoSalidas.lista().length), t0 = Date.now();
+    const par = await llegan([{ id: 'dup-app', app: 'Bancolombia', txt: 'Bancolombia | Bancolombia | Transferiste $77.700 a la cuenta 123', t: t0 }, { id: 'dup-sms', app: 'SMS 85540', txt: 'SMS | 85540 | Bancolombia: Transferiste $77.700 a la cuenta 123', t: t0 + 20000 }]);
+    const dos = await llegan([{ id: 'ig-1', app: 'Nequi', txt: 'Nequi | Nequi | Enviaste $3.300 a JUAN', t: t0 }, { id: 'ig-2', app: 'Nequi', txt: 'Nequi | Nequi | Enviaste $3.300 a JUAN', t: t0 + 30000 }]);
+    const despN = await p.evaluate(() => window.ventoSalidas.lista().length);
+    chk('1.98.3 El mismo pago por la app del banco y por SMS se anota una sola vez (dos pagos iguales por el mismo camino siguen siendo dos)', par === 1 && dos === 2 && despN === antesN + 3, { par, dos, antesN, despN });
     // 1.98.1: más formas en que Nequi, DaviPlata y los bancos avisan lo que el dueño pagó o envió.
     const L98 = await p.evaluate(() => { const S = window.ventoSalidas; return [
       'Nequi | Envío exitoso | Tu envío de $35.000 a DISTRIBUIDORA EL SOL fue exitoso', 'Nequi | Nequi | Pago exitoso por $18.500 en TIENDA D1',

@@ -48,6 +48,10 @@ public final class AvisoPago {
             + "|(?:te|le)\\s+(?:envi[oó]|enviaron|pas[oó]|pasaron|mand[oó]|mandaron|transfiri[oó]|transfirieron|consign[oó]|consignaron|gir[oó]|giraron|pag[oó]|pagaron))\\s+(\\d{1,3}(?:[.,]\\d{3})+(?![.,]?\\d)|\\d{1,7}(?!\\d|[.,]\\d))(?!\\s*(?:%|min|seg|horas?|d[ií]as?|veces))", Pattern.CASE_INSENSITIVE);
 
     static final Pattern COBRANZA = Pattern.compile("deuda|obligaci[oó]n|\\bmora\\b|proceso (judicial|jur[ií]dico)|embargo|medidas? cautelar|cobranza|cobro (pre)?jur[ií]dic|(ponte|p[oó]ngase|pongase) al d[ií]a|acuerdo de pago|centrales de riesgo|datacr[eé]dito|saldo (vencido|en mora)|cuota vencida|pago m[ií]nimo|fecha l[ií]mite de pago|contact[aáe]nos", Pattern.CASE_INSENSITIVE);
+    // 1.98.3: otros avisos que NO son plata que llegó aunque usen las mismas palabras: un abono o pago A una deuda propia
+    // («Realizaste un abono de $50.000 a tu crédito»), puntos o millas («Recibiste 500 puntos»), y el aviso de que alguien
+    // entró a la banca («Ingreso a la Sucursal Virtual… de 2026»).
+    static final Pattern NO_ES = Pattern.compile("a (tu|su) (cr[eé]dito|tarjeta|pr[eé]stamo|obligaci[oó]n|cuota)|\\d\\s*(puntos|millas)\\b|ingres[oó] a (la |tu |su )?(sucursal|app|banca|portal)|inicio de sesi[oó]n|ingresaste a|pago recibido[^|]{0,40}tarjeta", Pattern.CASE_INSENSITIVE);
     static boolean esBanco(String app) { return app != null && BANCO.matcher(app).find(); }
 
     // Plata que llega como RECARGA desde un banco (1.55.1): una transferencia de Bancolombia (u otro banco) a Nequi sale en
@@ -65,6 +69,7 @@ public final class AvisoPago {
 
     static boolean esRecibido(String todo) {
         if (todo == null || !(RECIBIDO.matcher(todo).find() || esRecarga(todo)) || NUNCA.matcher(todo).find() || CODIGO.matcher(todo).find()) return false;
+        if (NO_ES.matcher(todo).find()) return false;
         if (PROMO.matcher(todo).find() && !FUERTE.matcher(todo).find()) return false;
         // 1.98.2: una cobranza o deuda no es plata que llegó… salvo que el aviso traiga una frase fuerte de pago recibido
         // («JUAN MORA te envió $20.000»: «mora» ahí es un apellido). Antes vetaba siempre y podía callar un pago de verdad.
@@ -346,6 +351,7 @@ public final class AvisoPago {
         if (SALE.matcher(t).find()) return "plata que SALE (pasaste, enviaste, compra…)";
         if (CODIGO.matcher(t).find()) return "código de seguridad";
         if (COBRANZA.matcher(t).find() && !FUERTE.matcher(t).find()) return "cobranza o deuda (no es plata que llegó)";
+        if (NO_ES.matcher(t).find()) return "abono a una deuda propia, puntos o aviso de ingreso (no es plata que llegó)";
         if (NUNCA.matcher(t).find()) return "solicitud, rechazado o programado";
         if (RECARGA.matcher(t).find() && RECARGA_NO.matcher(t).find()) return "recarga de celular o que no se hizo";
         if (!RECIBIDO.matcher(t).find() && !esRecarga(t)) return "no dice que llegó plata";

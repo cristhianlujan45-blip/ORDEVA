@@ -246,6 +246,11 @@ public class AvisoPagoPrueba {
         String[] conPalabra = { "Nequi | JUAN MORA te envió $20.000", "Nequi | Nequi | CARLOS EMBARGO te pasó $15.000. Contáctanos si tienes dudas", "DaviPlata | MARIA DEUDA le transfirió $8.000 a su DaviPlata", "Bancolombia: Recibiste una transferencia por $50.000 de JOSE MORA. Sin embargo revisa tu saldo" };
         for (String x : conPalabra) chk("Un pago de verdad con una palabra de cobranza (apellido Mora, «contáctanos», «sin embargo») sigue sonando: «" + x + "»", AvisoPago.esRecibido(x) && AvisoPago.monto(x) > 0, AvisoPago.porQueNo(x));
         chk("«Pagaste $50.000 de tu obligación» sí es una salida; «pagando el total de tu deuda» no", AvisoPago.esSalida("Bancolombia: Pagaste $50.000 de tu obligacion 1234") && !AvisoPago.esSalida("PRA: ahorra pagando el total de tu deuda con OCCIDENTE: $ 656.691"), "");
+        // 1.98.3: otros avisos que usan las palabras de un pago y no lo son.
+        String[] noSon983 = { "Bancolombia: Realizaste un abono de $50.000 a tu credito de consumo", "Davivienda: Pago recibido por $120.000 en tu tarjeta de credito terminada en 1234", "Nequi | Nequi | Recibiste 500 puntos por tus compras", "Bancolombia le informa ingreso a la Sucursal Virtual Personas el 13 de 2026 a las 10:15" };
+        for (String x : noSon983) chk("No es plata que llegó: «" + x + "»", !AvisoPago.esRecibido(x) && !AvisoPago.esSmsDePago("85540", x), AvisoPago.porQueNo(x));
+        String[] siSon983 = { "Nequi | Nequi | Ingresó $20.000 a tu cuenta", "Bancolombia: Recibiste un abono de $80.000 en tu cuenta de ahorros", "DaviPlata: Recibiste 140,000. Para saber mas, consulta tus movimientos" };
+        for (String x : siSon983) chk("Sigue siendo plata que llegó: «" + x + "»", AvisoPago.esRecibido(x), AvisoPago.porQueNo(x));
         System.out.println("RESULTADO " + ok + " bien " + mal + " mal");
         System.exit(mal > 0 ? 1 : 0);
     }

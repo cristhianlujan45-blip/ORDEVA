@@ -610,7 +610,9 @@ public class VentoEscucha extends NotificationListenerService {
         long b = tBanco, l = tLlego, ahora = System.currentTimeMillis();
         StringBuilder x = new StringBuilder();
         if (b > 0 && l > 0 && l - b >= 3000 && l - b < 3600_000L) x.append(" · ⏱ el banco lo mandó ").append((l - b) / 1000).append(" s tarde");
-        if (l > 0 && ahora - l >= 3000 && ahora - l < 3600_000L) x.append(" · ⏱ Vento lo leyó ").append((ahora - l) / 1000).append(" s después");
+        if (l > 0 && ahora - l >= 3000 && ahora - l < 3600_000L) x.append(" · ⏱ ORDEVA lo leyó ").append((ahora - l) / 1000).append(" s después");
+        // 1.98.3: si hubo demora, cómo estaba el celular (ahorro de batería, sin permiso de batería, pantalla apagada…).
+        if (x.length() > 0) try { x.append(VentoServicio.estadoCel); } catch (Throwable ignorado) { }
         return x.toString();
     }
 
