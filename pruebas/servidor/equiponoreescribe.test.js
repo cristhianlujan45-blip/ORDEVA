@@ -132,6 +132,33 @@ async function pruebas(sb) {
   r = await guardar(cajero, d); s = await doc();
   chk('1.64.0 · El cajero con el permiso «productos» sí cambia la receta', s.products[0].receta[0].qty === 0.5, s.products[0].receta);
 
+  // ---------- 1.99.2 · El registro de ventas anuladas solo crece para el equipo ----------
+  const A1 = { id: 'an-v-v1', t: 1, por: 'dueno', como: 'jefe', motivo: 'se cobró dos veces', tipo: 'venta', ventaId: 'v1', venta: { id: 'v1', total: 5000, items: [{ name: 'Tinto', qty: 1, price: 5000 }] } };
+  const A2 = { id: 'an-c-c1', t: 2, por: 'dueno', como: 'jefe', motivo: 'día anulado', tipo: 'cierre', cierre: { id: 'c1', totalSold: 9000 } };
+  d = clon(await doc()); d.anuladas = [A1, A2];
+  r = await guardar(dueno, d); s = await doc();
+  chk('1.99.2 · El dueño guarda dos anuladas', r.st === 200 && s.anuladas.length === 2, s.anuladas);
+  d = clon(await doc()); d.anuladas = [d.anuladas[1]];
+  r = await guardar(mesero, d); s = await doc();
+  chk('1.99.2 · El mesero no puede quitar una anulada: vuelve', r.st === 200 && s.anuladas.length === 2 && igual(s.anuladas.find((a) => a.id === 'an-v-v1'), A1), s.anuladas);
+  const audA = await sb.sql("select detalle from auditoria where negocio_id = $1 and accion = 'anuladas_revertidas'", [NEG]);
+  chk('1.99.2 · … y queda en la auditoría', audA.length >= 1 && audA[0].detalle.rol === 'mesero', audA);
+  d = clon(await doc()); d.anuladas.find((a) => a.id === 'an-v-v1').motivo = 'nada'; d.anuladas.find((a) => a.id === 'an-v-v1').venta.total = 1;
+  d.anuladas = [];
+  r = await guardar(empleado, d); s = await doc();
+  chk('1.99.2 · El empleado no puede vaciar la lista: vuelven las dos', s.anuladas.length === 2, s.anuladas);
+  d = clon(await doc()); d.anuladas.find((a) => a.id === 'an-v-v1').motivo = 'otro motivo'; d.anuladas.find((a) => a.id === 'an-c-c1').cierre.totalSold = 1;
+  r = await guardar(mesero, d); s = await doc();
+  chk('1.99.2 · Tampoco puede cambiar el motivo ni los valores de una anulada (venta o cierre)', s.anuladas.find((a) => a.id === 'an-v-v1').motivo === 'se cobró dos veces' && s.anuladas.find((a) => a.id === 'an-c-c1').cierre.totalSold === 9000, s.anuladas);
+  d = clon(await doc()); d.anuladas.unshift({ id: 'an-v-v2', t: 3, por: 'mesero', como: 'clave', motivo: '', tipo: 'venta', ventaId: 'v2', venta: { id: 'v2', total: 2000 } });
+  d.anuladas.find((a) => a.id === 'an-v-v1').venta.dian = { nota: { estado: 'aceptado' }, estado: 'anulado' };
+  r = await guardar(mesero, d); s = await doc();
+  chk('1.99.2 · El mesero sí agrega una anulación nueva (de primera)', s.anuladas.length === 3 && s.anuladas[0].id === 'an-v-v2', s.anuladas.map((a) => a.id));
+  chk('1.99.2 · … y sí puede anotar la respuesta de la DIAN (nota crédito) en una anulada que ya estaba', s.anuladas.find((a) => a.id === 'an-v-v1').venta.dian && s.anuladas.find((a) => a.id === 'an-v-v1').venta.dian.estado === 'anulado', s.anuladas);
+  d = clon(await doc()); d.anuladas = d.anuladas.filter((a) => a.id !== 'an-v-v2');
+  r = await guardar(admin, d); s = await doc();
+  chk('1.99.2 · El administrador sí puede quitar una (como el dueño)', s.anuladas.length === 2 && !s.anuladas.find((a) => a.id === 'an-v-v2'), s.anuladas.map((a) => a.id));
+
   // ---------- Rendimiento: negocio grande ----------
   const grande = clon(await doc());
   grande.history = Array.from({ length: 8000 }, (_, i) => ({ id: 'g' + i, total: 1000, items: [{ name: 'Tinto', qty: 1, price: 1000 }] }));
@@ -148,6 +175,9 @@ async function pruebas(sb) {
   err = null;
   try { await sb.sql(fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', '20261117000000_modulos_negocio.sql'), 'utf8')); } catch (e) { err = e.message; }
   chk('1.64.0 · La migración de las funciones por negocio se vuelve a correr sin errores', !err, err);
+  err = null;
+  try { await sb.sql(fs.readFileSync(path.join(__dirname, '..', '..', 'supabase', 'migrations', '20261205000000_anuladas_protegidas.sql'), 'utf8')); } catch (e) { err = e.message; }
+  chk('1.99.2 · La migración de las anuladas protegidas se vuelve a correr sin errores', !err, err);
 }
 
 (async () => {
