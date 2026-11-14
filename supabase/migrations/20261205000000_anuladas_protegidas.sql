@@ -106,6 +106,7 @@ begin
       end if;
     exception when others then
       nuevo := jsonb_set(nuevo, '{anuladas}', p_viejo->'anuladas');
+      begin perform vento_auditar(p_negocio, p_usuario, null, 'anuladas_error', jsonb_build_object('rol', p_rol, 'error', sqlerrm)); exception when others then null; end;
     end;
   end if;
   return nuevo;
