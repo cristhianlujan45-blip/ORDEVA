@@ -88,7 +88,7 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
     // ---------- 6. Una versión vieja de ORDEVA escribió en localStorage ----------
     await p2.evaluate(() => { const d = JSON.parse(localStorage.getItem('bar-data')); d.businessName = 'Cambio de la versión vieja'; localStorage.setItem('bar-data', JSON.stringify(d)); });
     await p2.reload({ waitUntil: 'load' }); await p2.waitForTimeout(1200); await entrar(p2);
-    chk('6. Lo que escribió una versión vieja (solo en localStorage) no se pierde', await p2.evaluate(() => data.businessName === 'Cambio de la versión vieja'));
+    chk('6. Lo que escribió una versión vieja (solo en localStorage) no se pierde', await p2.evaluate(() => data.businessName === 'Cambio de la versión vieja'), await p2.evaluate(() => [data.businessName, (localStorage.getItem('bar-data') || '').slice(0, 120), Object.keys(localStorage).filter(k => /bar-data|almac/.test(k))]));
     // ---------- 7. Restablecer todo ----------
     await p2.evaluate(async () => { window.showConfirm = () => Promise.resolve(true); window.authIsAdmin = () => true; await resetAll(); });
     await p2.waitForTimeout(400);
