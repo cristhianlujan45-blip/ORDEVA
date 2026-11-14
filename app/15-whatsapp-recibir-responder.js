@@ -123,7 +123,7 @@
       '<li>Pega abajo la dirección de tu Worker (sin <b>/webhook</b> al final) y activa "Escuchar mensajes".</li></ol></details>' +
       '<div class="mz-actions"><button type="button" class="btn-ghost" id="waCopyCode">📋 Copiar código del puente</button></div>' +
       '<div class="settings-row" style="flex-direction:column;align-items:stretch"><div class="settings-row-text"><strong>Dirección de tu puente</strong></div>' +
-      '<input id="waPuente" class="mz-in" style="width:100%" placeholder="https://mesora-whatsapp.tu-usuario.workers.dev"></div>' +
+      '<input id="waPuente" class="mz-in" style="width:100%" placeholder="https://ordeva-whatsapp.tu-usuario.workers.dev"></div>' +
       '<div class="settings-row" style="flex-direction:column;align-items:stretch"><div class="settings-row-text"><strong>VENTO_CANAL</strong><span>Pégalo tal cual en el Worker (es la dirección privada por donde llegan los mensajes a ORDEVA).</span></div><input id="waTopicVal" class="mz-in" style="width:100%" readonly onclick="this.select()"></div>' +
       '<div class="settings-row" style="flex-direction:column;align-items:stretch"><div class="settings-row-text"><strong>MESORA_SECRET</strong><span>No lo compartas: protege que solo ORDEVA pueda mandar mensajes por tu número.</span></div><input id="waSecretoVal" class="mz-in" style="width:100%" readonly onclick="this.select()"></div>' +
       '<div class="settings-row" style="flex-direction:column;align-items:stretch"><div class="settings-row-text"><strong>Mensajes recientes</strong></div><div id="waLista"></div></div></div>';
