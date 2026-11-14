@@ -462,7 +462,8 @@ body.neg-tienda #quickSaleBtn, body:not(.neg-tienda) #fiadosBtn, body:not(.neg-t
     animation: asisUp .24s cubic-bezier(.22,1,.36,1);
   }
   .more-grip{ width:40px; height:4px; border-radius:4px; background:var(--line); margin:0 auto 12px; }
-  .more-title{ font-weight:800; font-size:16px; margin:0 2px 12px; }
+  .more-title{ font-weight:800; font-size:16px; margin:0 2px 12px; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .more-x{ width:44px; height:44px; min-height:44px; flex:none; display:grid; place-items:center; padding:0; border:1px solid var(--line); border-radius:50%; background:var(--surface); color:var(--ink); font-size:18px; cursor:pointer; }
   .more-grid{ display:grid; grid-template-columns:repeat(2, 1fr); gap:10px; }
   .more-tile{
     display:flex; flex-direction:column; align-items:flex-start; gap:3px; text-align:left;
@@ -2742,6 +2743,14 @@ body.neg-tienda #quickSaleBtn, body:not(.neg-tienda) #fiadosBtn, body:not(.neg-t
     padding:16px 16px calc(24px + env(safe-area-inset-bottom, 0px)); background:rgba(0,0,0,.94);
     overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
   .auth-overlay[hidden]{ display:none; }
+  /* 1.99.2 (auditoría de diseño, hallazgo 1): la pantalla de entrar con los colores de ORDEVA 2.0, los mismos de adentro.
+     Antes tomaba la paleta guardada en el equipo (casi siempre la violeta oscura) y parecía otro producto. */
+  .auth-overlay{ --bg:#f4f5f7; --surface:#ffffff; --surface-2:#f1f2f4; --surface-3:#e9ebee; --paper:#ffffff; --paper-2:#f1f2f4;
+    --ink:#0d0e10; --ink-soft:#5f6672; --cream:#111214; --cream-soft:#5f6672; --on-cream:#ffffff; --line:#e4e6ea;
+    --amber:#111214; --amber-deep:#000000; --on-amber:#ffffff; --brick:#dc2626; --brick-soft:#dc2626; --paid:#16a34a;
+    background:#f4f5f7; color:#0d0e10; color-scheme:light; }
+  .auth-overlay .auth-card{ border-radius:22px; box-shadow:0 10px 30px rgba(15,17,20,.08); }
+  .auth-overlay .auth-card a{ color:#111214; font-weight:700; }
   .auth-card{ width:100%; max-width:360px; margin:auto; background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:22px; display:flex; flex-direction:column; gap:12px; box-shadow:0 0 24px color-mix(in srgb, var(--amber) 15%, transparent); }
   .auth-card h2{ margin:0 0 4px; color:var(--ink); font-size:20px; }
   .auth-card label{ display:flex; flex-direction:column; gap:4px; font-size:13px; color:var(--cream-soft); }
@@ -4347,10 +4356,10 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
 <div class="overlay" id="navMoreSheet">
   <div class="more-panel" role="dialog" aria-label="Más secciones">
     <div class="more-grip"></div>
-    <div class="more-title">Más secciones</div>
+    <div class="more-title">Más secciones<button type="button" class="more-x" id="navMoreX" aria-label="Cerrar">✕</button></div>
     <div class="more-grid">
       <button type="button" class="more-tile" data-go="inicio" id="o2InicioMas"><span class="more-ic">🏠</span><strong>Inicio</strong><small>Resumen del negocio de hoy</small></button>
-      <button type="button" class="more-tile" data-go="historial"><span class="more-ic">🧾</span><strong>Historial</strong><small>Cuentas cerradas y fiados</small></button>
+      <button type="button" class="more-tile" data-go="historial"><span class="more-ic">🧾</span><strong>Facturas</strong><small>Ventas cerradas, fiados y anuladas</small></button>
       <button type="button" class="more-tile" data-go="estadisticas"><span class="more-ic">📊</span><strong>Estadísticas</strong><small>Ventas y ganancias</small></button>
       <button type="button" class="more-tile" data-go="contabilidad"><span class="more-ic">💰</span><strong>Contabilidad</strong><small>Entradas, gastos y ganancia</small></button>
       <button type="button" class="more-tile" data-go="libreta"><span class="more-ic">📒</span><strong>Libreta</strong><small>Quién me debe y pagos a empleados</small></button>

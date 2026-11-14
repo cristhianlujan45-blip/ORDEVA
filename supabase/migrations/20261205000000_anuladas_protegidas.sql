@@ -70,33 +70,43 @@ begin
   -- 🚫 1.99.2: el registro de ventas ANULADAS («Facturas → Anuladas») solo crece para el equipo: puede agregar anulaciones
   -- nuevas, pero no quitar ni cambiar las que ya están. Lo único que puede cambiar en una ya guardada es la respuesta de la
   -- DIAN dentro de su copia (venta.dian: la nota crédito llega después y la puede anotar el celular de cualquiera).
-  if jsonb_typeof(p_viejo->'anuladas') = 'array' and jsonb_array_length(p_viejo->'anuladas') > 0 then
-    with v as (
-      select e, o from jsonb_array_elements(p_viejo->'anuladas') with ordinality x(e, o)
-    ), n as (
-      select e, o from jsonb_array_elements(case when jsonb_typeof(nuevo->'anuladas') = 'array' then nuevo->'anuladas' else '[]'::jsonb end) with ordinality x(e, o)
-    ), vid as (
-      select e->>'id' id from v where jsonb_typeof(e) = 'object' and coalesce(e->>'id', '') <> ''
-    ), viejas as (
-      -- cada anulada que ya estaba: la del equipo si quedó igual (fuera de venta.dian); si no, la que estaba
-      select coalesce((select n.e from n where jsonb_typeof(n.e) = 'object' and n.e->>'id' = v.e->>'id'
-                         and (n.e #- '{venta,dian}') = (v.e #- '{venta,dian}')
-                       limit 1), v.e) x,
-             not exists (select 1 from n where jsonb_typeof(n.e) = 'object' and n.e->>'id' = v.e->>'id'
-                         and (n.e #- '{venta,dian}') = (v.e #- '{venta,dian}')) cambio,
-             1000000 + v.o ord
-      from v where jsonb_typeof(v.e) = 'object' and coalesce(v.e->>'id', '') <> ''
-      union all
-      select v.e, false, 1000000 + v.o from v where not (jsonb_typeof(v.e) = 'object' and coalesce(v.e->>'id', '') <> '')
-    ), nuevas as (
-      select n.e x, false cambio, n.o ord from n where not (jsonb_typeof(n.e) = 'object' and n.e->>'id' in (select id from vid))
-        and not exists (select 1 from v where v.e = n.e)
-    ), todo as (select * from nuevas union all select * from viejas)
-    select coalesce(jsonb_agg(x order by ord), '[]'::jsonb), count(*) filter (where cambio) into an, an_rev from todo;
-    if an_rev > 0 then
-      nuevo := jsonb_set(nuevo, '{anuladas}', an);
-      perform vento_auditar(p_negocio, p_usuario, null, 'anuladas_revertidas', jsonb_build_object('rol', p_rol, 'anuladas', an_rev));
-    end if;
+  -- Solo se revisa si la lista cambió, se cruza por id con joins (rápido con miles) y, si algo falla, queda la lista que
+  -- estaba: un error aquí nunca deja pasar el guardado sin las demás protecciones.
+  if jsonb_typeof(p_viejo->'anuladas') = 'array' and jsonb_array_length(p_viejo->'anuladas') > 0
+     and (nuevo->'anuladas') is distinct from (p_viejo->'anuladas') then
+    begin
+      with v as (
+        select e, o, case when jsonb_typeof(e) = 'object' then nullif(e->>'id', '') end id
+        from jsonb_array_elements(p_viejo->'anuladas') with ordinality x(e, o)
+      ), n as (
+        select e, o, case when jsonb_typeof(e) = 'object' then nullif(e->>'id', '') end id
+        from jsonb_array_elements(case when jsonb_typeof(nuevo->'anuladas') = 'array' then nuevo->'anuladas' else '[]'::jsonb end) with ordinality x(e, o)
+      ), vk as (      -- las que ya estaban, con id; «k» = sin la respuesta de la DIAN
+        select distinct on (id) id, e, o, case when jsonb_typeof(e->'venta') = 'object' then e #- '{venta,dian}' else e end k from v where id is not null order by id, o
+      ), nk as (
+        select id, e, o, case when jsonb_typeof(e) = 'object' and jsonb_typeof(e->'venta') = 'object' then e #- '{venta,dian}' else e end k from n
+      ), ok as (      -- la primera copia intacta de cada una que ya estaba
+        select distinct on (vk.id) vk.id, nk.e, nk.o from vk join nk on nk.id = vk.id and nk.k = vk.k order by vk.id, nk.o
+      ), viejas as (
+        select coalesce(ok.e, vk.e) x, (ok.id is null) cambio, 1000000 + vk.o ord from vk left join ok on ok.id = vk.id
+        union all
+        select v.e, false, 1000000 + v.o from v where v.id is null
+      ), sobrantes as (   -- otra copia (cambiada o repetida) de una que ya estaba: no entra
+        select nk.o from nk join vk on vk.id = nk.id left join ok on ok.id = nk.id and ok.o = nk.o where ok.id is null
+      ), nuevas as (
+        select nk.e x, false cambio, nk.o ord from nk left join vk on vk.id = nk.id
+        where vk.id is null and not exists (select 1 from v where v.id is null and v.e = nk.e)
+      ), todo as (select x, cambio, ord from nuevas union all select x, cambio, ord from viejas)
+      select coalesce((select jsonb_agg(x order by ord) from todo), '[]'::jsonb),
+             (select count(*) from todo where cambio) + (select count(*) from sobrantes)
+        into an, an_rev;
+      if an_rev > 0 then
+        nuevo := jsonb_set(nuevo, '{anuladas}', an);
+        perform vento_auditar(p_negocio, p_usuario, null, 'anuladas_revertidas', jsonb_build_object('rol', p_rol, 'anuladas', an_rev));
+      end if;
+    exception when others then
+      nuevo := jsonb_set(nuevo, '{anuladas}', p_viejo->'anuladas');
+    end;
   end if;
   return nuevo;
 end $$;

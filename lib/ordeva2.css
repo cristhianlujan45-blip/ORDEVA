@@ -210,7 +210,7 @@ body.o2 header{ border-bottom-color: transparent; }
   body.o2 .tabbar{ background: #fff !important; border-top: 1px solid var(--line) !important; box-shadow: 0 -6px 24px rgba(16,24,40,.08) !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
   body.o2 nav button.active, body.o2 .nav-more.active{ background: var(--o2-negro); color: #fff; }
   body.o2 nav button.active .nav-ic, body.o2 .nav-more.active .nav-ic{ color: #fff; }
-  .o2-movil{ display: block; background: var(--o2-negro); color: #fff; border-radius: 22px; padding: 16px; box-shadow: var(--o2-sombra-l); }
+  .o2-movil{ display: block; background: var(--o2-negro); color: #fff; border-radius: 22px; padding: 16px; margin: 14px 0; box-shadow: var(--o2-sombra-l); }
   .o2-movil-top{ display: flex; align-items: center; gap: 10px; }
   .o2-movil-top img{ width: 32px; height: 32px; border-radius: 50%; box-shadow: 0 0 0 1px rgba(255,255,255,.16); }
   .o2-movil-top b{ display: block; font-size: 16px; letter-spacing: .04em; }

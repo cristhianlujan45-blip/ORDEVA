@@ -155,9 +155,25 @@ async function pruebas(sb) {
   r = await guardar(mesero, d); s = await doc();
   chk('1.99.2 · El mesero sí agrega una anulación nueva (de primera)', s.anuladas.length === 3 && s.anuladas[0].id === 'an-v-v2', s.anuladas.map((a) => a.id));
   chk('1.99.2 · … y sí puede anotar la respuesta de la DIAN (nota crédito) en una anulada que ya estaba', s.anuladas.find((a) => a.id === 'an-v-v1').venta.dian && s.anuladas.find((a) => a.id === 'an-v-v1').venta.dian.estado === 'anulado', s.anuladas);
-  d = clon(await doc()); d.anuladas = d.anuladas.filter((a) => a.id !== 'an-v-v2');
+  d = clon(await doc()); d.anuladas.push(Object.assign(clon(A1), { motivo: 'copia falsa' }));
+  r = await guardar(mesero, d); s = await doc();
+  chk('1.99.2 · Una copia cambiada con el mismo id de una que ya estaba no entra', s.anuladas.filter((a) => a.id === 'an-v-v1').length === 1 && s.anuladas.find((a) => a.id === 'an-v-v1').motivo === 'se cobró dos veces', s.anuladas);
+  d = clon(await doc()); d.anuladas[1] = { id: 'an-v-v1', venta: [] }; d.permisosEquipo = { empleado: { productos: true } }; const precio = d.products[0].price; d.products[0].price = 1;
+  r = await guardar(empleado, d); s = await doc();   // el empleado NO tiene el permiso de productos
+  chk('1.99.2 · Un dato raro (venta como lista) no apaga las otras protecciones: permisos y precio vuelven, y la anulada también', r.st === 200 && !!s.permisosEquipo.clave && s.permisosEquipo.empleado.productos === false && s.products[0].price === precio && igual(s.anuladas.find((a) => a.id === 'an-v-v1').motivo, 'se cobró dos veces'), { p: s.products[0].price, precio, perm: s.permisosEquipo, an: s.anuladas });
+  d = clon(await doc()); const sinId = { tipo: 'venta', motivo: 'sin id', venta: { id: 'v9', total: 1 } }; d.anuladas = [sinId].concat(d.anuladas.slice(1));
+  r = await guardar(mesero, d); s = await doc();
+  chk('1.99.2 · Si hay que devolver una que quitó, una nueva sin id no se pierde', s.anuladas.length === 4 && s.anuladas.some((a) => a.motivo === 'sin id'), s.anuladas.map((a) => a.id || a.motivo));
+  d = clon(await doc()); d.anuladas = d.anuladas.filter((a) => a.id !== 'an-v-v2' && a.motivo !== 'sin id');
   r = await guardar(admin, d); s = await doc();
   chk('1.99.2 · El administrador sí puede quitar una (como el dueño)', s.anuladas.length === 2 && !s.anuladas.find((a) => a.id === 'an-v-v2'), s.anuladas.map((a) => a.id));
+
+  // Rendimiento: 10.000 anuladas y el mesero agrega una (no debe pasar de unos cientos de ms)
+  { const m = clon(await doc()); m.anuladas = Array.from({ length: 10000 }, (_, i) => ({ id: 'an-v-x' + i, tipo: 'venta', ventaId: 'x' + i, motivo: '', venta: { id: 'x' + i, total: 1000, items: [{ name: 'Tinto', qty: 1, price: 1000 }] } }));
+    await guardar(dueno, m); const m2 = clon(m); m2.anuladas.unshift({ id: 'an-v-nueva', tipo: 'venta', ventaId: 'nueva', venta: { id: 'nueva', total: 1 } }); m2.anuladas.splice(5000, 1);
+    const t0 = Date.now(); r = await guardar(mesero, m2); const ms = Date.now() - t0; const s2 = await doc();
+    console.log('   ⏱  10.000 anuladas, el mesero agrega una y quita otra: ' + ms + ' ms');
+    chk('1.99.2 · Con 10.000 anuladas el guardado del mesero sigue rápido (< 1,5 s) y la que quitó vuelve', r.st === 200 && ms < 1500 && s2.anuladas.length === 10001, { ms, n: s2.anuladas.length }); }
 
   // ---------- Rendimiento: negocio grande ----------
   const grande = clon(await doc());

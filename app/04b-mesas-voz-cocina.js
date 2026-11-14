@@ -1430,6 +1430,7 @@ document.querySelectorAll('nav button').forEach(btn => btn.addEventListener('cli
   syncNavMore();
 }));
 document.getElementById('navMoreBtn').addEventListener('click', () => { syncNavMore(); navMoreSheet.classList.add('show'); });
+{ const x = document.getElementById('navMoreX'); if(x) x.addEventListener('click', e => { e.stopPropagation(); navMoreSheet.classList.remove('show'); }); }   // 1.99.2: ✕ para cerrar
 // Cerrar sesión: guarda todo, pregunta y vuelve a pedir usuario y contraseña. Los datos del negocio no se borran.
 async function cerrarSesion(){
   const ok = await showConfirm({ title: '¿Cerrar sesión?', message: 'Tus datos quedan guardados. Para volver a entrar te pedirá usuario y contraseña (así puede entrar otra persona con su propio usuario).', confirmText: 'Sí, cerrar sesión', icon: '🚪' });
