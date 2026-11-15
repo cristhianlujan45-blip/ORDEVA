@@ -162,8 +162,9 @@ function acRender(){
   if(!c.times.length){l.textContent='Sin horarios. Elige una hora y toca Agregar horario.';return;}
   c.times.forEach(t=>{const b=btn(t+'  ✕',()=>{const x=acCfg();x.times=x.times.filter(y=>y!==t);SS('vito_auto',x);acRender();});b.style.margin='3px';l.appendChild(b);});
 }
+window.ventoCierreAuto = c => cierreAuto(c);   // para las pruebas (cierre automático programado)
 function cierreAuto(c){
-  if(c.open==='cerrar'){const oc=window.confirm;window.confirm=()=>true;try{closeCashRegister({ auto: true });}finally{window.confirm=oc;}return;}
+  if(c.open==='cerrar'){closeCashRegister({ auto: true });return;}   // ya no pregunta en modo automático (1.99.8): no hace falta engañar a confirm()
   const last=data.closures.length?data.closures[0]:null,fromISO=last?last.date:null,toISO=new Date().toISOString();
   const s=computeClosureStats(fromISO,toISO);
   if(!s.tickets.length){showToast('Cierre automático: no había cuentas nuevas.');return;}

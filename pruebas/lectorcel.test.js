@@ -174,9 +174,8 @@ const EAN = '7702535011119', QR_TXT = 'PROD-QR-4471';
     await esperar(cel, () => /Otra vez/.test(document.getElementById('estSub').textContent));
 
     // 5. Desconectar celulares
-    pc.once('dialog', d => d.accept());
     await pc.click('#scanCelBox [data-lcel="ver"]');
-    await pc.click('#scanCelBox [data-lcel="nuevo"]'); await contestar(pc, true);
+    await pc.click('#scanCelBox [data-lcel="nuevo"]'); chk('Pregunta antes de desconectar los celulares (ventana de ORDEVA)', (await contestar(pc, true)) === 'confirm');
     const nuevo = await pc.evaluate(() => window.ventoLectorCel.enlace());
     chk('5. «🔄 Desconectar celulares» cambia el código de emparejar', nuevo !== r2.link && /#c=lc/.test(nuevo), [r2.link, nuevo]);
     await pc.evaluate(() => { window.__leidos = []; });

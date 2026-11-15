@@ -658,9 +658,11 @@
       if(canal === 'otp') return cobroDavi(ov, n, mesa, valor);
       var tel = null;
       if(canal === 'push'){
-        tel = ((await pedir({ icon: '📲', title: 'Celular Nequi del cliente', message: '10 dígitos. Le llega la solicitud de pago en su Nequi.', type: 'tel', inputMode: 'numeric', placeholder: '3001234567', confirmText: 'Enviar cobro' }, 'Celular Nequi del cliente (10 dígitos):')) || '').replace(/\D/g, '');
+        var escrito = await pedir({ icon: '📲', title: 'Celular Nequi del cliente', message: '10 dígitos. Le llega la solicitud de pago en su Nequi.', type: 'tel', inputMode: 'numeric', placeholder: '3001234567', confirmText: 'Enviar cobro' }, 'Celular Nequi del cliente (10 dígitos):');
+        if(escrito == null) return;   // canceló: no se cobra nada
+        tel = String(escrito).replace(/\D/g, '');
         if(!/^3\d{9}$/.test(tel)) return toast('El celular debe tener 10 dígitos y empezar por 3.');
-        if(!ov.isConnected || Math.round(+ov.querySelector('#vpMonto').value || 0) !== valor) return toast('El valor cambió mientras escribías el celular: toca otra vez «Cobrar».');   // se cobra lo que se vio
+        if(!ov.isConnected || !ov.classList.contains('show') || Math.round(+ov.querySelector('#vpMonto').value || 0) !== valor) return toast('El valor cambió mientras escribías el celular: toca otra vez «Cobrar».');   // se cobra lo que se vio
       }
       var res = ov.querySelector('#vpCobroRes');
       res.innerHTML = '<div class="vp-estado"><span class="vp-gira">⏳</span> Creando el cobro…</div>';

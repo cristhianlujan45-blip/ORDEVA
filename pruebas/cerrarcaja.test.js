@@ -130,6 +130,13 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
     await venta(4000, 'efectivo'); n0 = await D(() => data.closures.length);
     await p.click('#closeDayTopBtn'); await p.waitForSelector('#confirmOverlay.show', { timeout: 4000 }); await p.click('#confirmOkBtn'); await sinContar();
     chk('8. «Sin clave»: vuelve a cerrar solo con la pregunta', await D(() => window.ventoCierreClave.modo() === 'no' && !window.ventoRoles.permisos().cierre) && await D(() => data.closures.length) === n0 + 1);
+    // ===== 9 (revisión 1.99.8). Cierre automático programado con una mesa abierta: no pregunta, cierra la mesa (lo no pagado
+    // como deuda) y cierra la caja. Antes la pregunta en la ventana propia se quedaba esperando toda la noche.
+    await D(() => { document.getElementById('closureOverlay').classList.remove('show'); data.tables[2] = { items: [{ productId: 'ag', name: 'Águila', price: 4000, qty: 2 }], people: [], payments: [] }; saveData(); });
+    n0 = await D(() => data.closures.length);
+    await D(() => window.ventoCierreAuto({ open: 'cerrar', on: true, times: [] })); await p.waitForTimeout(800);
+    const r9 = await D(() => ({ preg: document.getElementById('confirmOverlay').classList.contains('show'), mesa: (data.tables[2].items || []).length, n: data.closures.length, debe: data.history.some(h => String(h.table) === '2' && h.total === 8000) }));
+    chk('9. Cierre automático con una mesa abierta: no pregunta, cierra la mesa ($8.000 al historial) y la caja', !r9.preg && r9.mesa === 0 && r9.n === n0 + 1 && r9.debe, r9);
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.stack || e)); }
   chk('Sin errores de página', !errs.length, errs);
   await b.close();

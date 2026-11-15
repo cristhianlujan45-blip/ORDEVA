@@ -325,7 +325,7 @@ const b64u = s => Buffer.from(s).toString('base64url');
     await pB.fill('#nubeEmail', 'ana@barreal.co'); await pB.fill('#nubePass', 'clave123'); await pB.click('#nubeEntrar');
     await pB.waitForSelector('#nubeLista [data-elegir]');
     chk('6. Celular B: «Tus negocios» muestra Bar Real (dueño)', /Bar Real/.test(await pB.textContent('#nubeLista')) && /dueño/.test(await pB.textContent('#nubeLista')));
-    await pB.click('#nubeLista [data-elegir="0"]'); await contestar(pB, true);
+    await pB.click('#nubeLista [data-elegir="0"]'); chk('6. Celular B: pregunta antes de reemplazar sus datos por los del negocio', (await contestar(pB, true)) === 'confirm');
     chk('6. Celular B: entra a la app con el negocio de la nube', await esperar(pB, n => { const x = window.ventoNube.negocio(); return x && x.id === n && document.getElementById('authOverlay').hidden; }, NEG, 15000));
     chk('6. Celular B: recupera el plan PRO del servidor (cambio de celular)', await esperar(pB, () => window.ventoSuscripcion.planEfectivo() === 'pro', null, 15000), JSON.stringify(await est(pB)));
     e = await est(pB);

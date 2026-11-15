@@ -1717,8 +1717,8 @@ async function closeCashRegister(opts){
     if(window.ventoCierreClave && !(await window.ventoCierreClave.pedir())) return;   // 🔑 si el dueño puso clave para cerrar
     cerrarAbiertasConRespaldo(openIds);
   } else if(openIds.length){
-    const ok = await showConfirm({ icon: '🍽️', title: 'Hay ' + openIds.length + ' mesa(s) con cuentas abiertas', message: 'Mesa ' + openIds.join(', Mesa ') + '. Para cerrar el día hay que cerrarlas: lo que no esté abonado quedará registrado como «Debe». ¿Cerrarlas y continuar?', confirmText: 'Sí, cerrarlas y continuar' });   // 1.99.8: ventana propia
-    if(!ok) return;
+    // Cierre automático programado: solo se llega aquí si el dueño eligió en Ajustes «cerrarlas (lo no pagado queda como
+    // deuda)». No se pregunta: nadie está mirando y esperar dejaría la caja sin cerrar toda la noche (revisión 1.99.8).
     cerrarAbiertasConRespaldo(openIds);
   }
   const toISO = new Date().toISOString();
