@@ -35,3 +35,10 @@ equipos 35/0, v189 7/0, salidas 29/0, pinempleado 18/0, diseno199 42/0. La lista
 
 ## No probado
 Teléfonos reales; cobro Nequi y DaviPlata reales (solo con el servidor de pruebas); balanza física.
+
+## Después de publicar
+- GitHub «Pruebas de la app» de la 1.99.8: en verde.
+- La corrida nocturna (todas las pruebas, sobre la 1.99.7) falló solo en `cuentas` 4b: la prueba cambiaba la contraseña
+  reemplazando `window.prompt`, y desde la 1.99.5 eso va en la ventana propia. Arreglada la prueba (no la app): 43/0.
+- Revisadas también las demás pruebas que solo corren de noche y contestan ventanas: mesapersonas 22/0, adminreal 50/0,
+  adminsub 71/0, adminsubreal 39/0, dian 29/0.

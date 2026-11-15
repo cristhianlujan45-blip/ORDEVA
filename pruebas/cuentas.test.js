@@ -10,6 +10,7 @@
 // Sin PostgreSQL en el equipo se omite (como «flujocompleto»).
 'use strict';
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
+const { contestar } = require('./ventanas.js');
 const fs = require('fs');
 const { spawnSync } = require('child_process');
 function hayPostgres(){
@@ -125,11 +126,13 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){
 
     // ===== 4b. Cambiar la contraseña en un celular la cambia en todos =====
     const cambio = await A.p.evaluate(async () => {
-      window.prompt = () => 'nueva999'; accUsuariosPintar();
+      accUsuariosPintar();
       const fila = [...document.querySelectorAll('#accUsersList .acc-user')].find(r => r.textContent.includes('ana@bar.co'));
       const b = fila && [...fila.querySelectorAll('button')].find(x => x.textContent === '🔑'); if(!b) return 'sin botón';
-      b.click(); await new Promise(r => setTimeout(r, 1500)); return 'ok';
+      b.click(); return 'ok';
     });
+    // 1.99.5: la contraseña nueva se escribe en la ventana propia de ORDEVA (antes prompt() del navegador)
+    if(cambio === 'ok') await contestar(A.p, 'nueva999'); await A.p.waitForTimeout(1500);
     chk('4b. Ana cambia su contraseña en A (Ajustes → Usuarios → 🔑)', cambio === 'ok', cambio);
     chk('4b. En la nube quedó la contraseña nueva', Number((await uno("select count(*) n from auth.users where email = 'ana@bar.co' and encrypted_password = extensions.crypt('nueva999', encrypted_password)")).n) === 1);
     await salirApp(C.p);
