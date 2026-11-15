@@ -72,13 +72,13 @@ const AHORA = new Date('2026-10-22T15:30:00-05:00');
     });
     const K = Object.fromEntries(r.kpis.map(k => [k.l, k]));
     // Hoy: 11 ventas; ingresos 14000+14500+6000+27000+7500+8500+7200+10500+5000+10000+6000 = 116200; ayer 60000 en 4
-    chk('Tarjeta «Pedidos totales»: 11, ▲ 175% vs. ayer (4)', K['Pedidos totales'] && K['Pedidos totales'].v === '11' && /▲\s*175%/.test(K['Pedidos totales'].c) && /ayer/.test(K['Pedidos totales'].vs), K['Pedidos totales']);
-    chk('Tarjeta «Ingresos totales»: $116.200, ▲ 94% vs. ayer ($60.000)', K['Ingresos totales'] && K['Ingresos totales'].v === '$116.200' && /▲\s*94%/.test(K['Ingresos totales'].c), K['Ingresos totales']);
+    chk('Tarjeta «Cuentas»: 11, ▲ 175% vs. ayer (4)', K['Cuentas'] && K['Cuentas'].v === '11' && /▲\s*175%/.test(K['Cuentas'].c) && /ayer/.test(K['Cuentas'].vs), K['Cuentas']);
+    chk('Tarjeta «Ventas» (lo vendido, incluye fiado; antes «Ingresos totales»): $116.200, ▲ 94% vs. ayer ($60.000)', K['Ventas'] && K['Ventas'].v === '$116.200' && /▲\s*94%/.test(K['Ventas'].c), K['Ventas']);
     chk('Tarjeta «Ticket promedio»: $10.564 (116200 / 11), ▼ 30% vs. ayer ($15.000)', K['Ticket promedio'] && K['Ticket promedio'].v === '$10.564' && /▼\s*30%/.test(K['Ticket promedio'].c), K['Ticket promedio']);
     // Unidades (sin el domicilio): 4+5+2+6+3+3+4+3+2+2+5 = 39; ayer 25
     chk('Tarjeta «Productos vendidos»: 39 (sin contar el domicilio), ▲ 56% vs. ayer (25)', K['Productos vendidos'] && K['Productos vendidos'].v === '39' && /▲\s*56%/.test(K['Productos vendidos'].c), K['Productos vendidos']);
     // Mesas: 14000+14500+27000+7500+7200+10500+10000+6000 = 96700; caja 6000+8500+5000 = 19500
-    chk('Ingresos en mesas ($96.700) y en caja ($19.500), por separado', r.dos.some(t => /mesas/i.test(t) && t.includes('$96.700')) && r.dos.some(t => /caja/i.test(t) && t.includes('$19.500')), r.dos);
+    chk('Ventas en mesas ($96.700) y en caja ($19.500), por separado', r.dos.some(t => /mesas/i.test(t) && t.includes('$96.700')) && r.dos.some(t => /caja/i.test(t) && t.includes('$19.500')), r.dos);
     chk('ESTIMADO al cierre $146.200 (real $116.200 + $30.000 de los 4 jueves anteriores), marcado «ESTIMADO»', r.dos.some(t => /Estimado al cierre/.test(t) && t.includes('$146.200') && /ESTIMADO/.test(t)), r.dos);
     chk('La gráfica tiene las dos líneas (mesas y caja) y el estimado aparte, punteado, con su nota «no es plata que ya entró»', r.lineas === 2 && r.est && /estimado/.test(r.nota) && /4 jueves/.test(r.nota), r);
     chk('Más vendidos: Águila primero (10 u) y «Otros» al final', /Águila/.test(r.top[0] || '') && /10 u/.test(r.top[0] || '') && /Otros/.test(r.top[r.top.length - 1] || '') && r.top.length === 6, r.top);
