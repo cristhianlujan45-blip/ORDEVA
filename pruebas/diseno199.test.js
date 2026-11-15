@@ -6,7 +6,8 @@
 //  4. (hallazgo 14) En la Caja del celular, con la venta vacía, el carrito ya no tapa los productos.
 //  5. (hallazgo 15) El verde de «pagado» es más oscuro (se lee sobre blanco).
 //  6. (1.99.3, hallazgo 12) Encabezado del celular: sin «Salir» junto a la campana ni reloj; el nombre tiene espacio.
-//  7. (hallazgo 13) La versión en Ajustes se lee «ORDEVA 1.99.3 · 15 nov 2026».
+//  7. (hallazgo 13) La versión en Ajustes se lee «ORDEVA 1.99.3 · 15 nov 2026», solo en la lista de categorías.
+//  8. (1.99.4, hallazgo 5) Ajustes › Negocio: índice arriba, tipo de negocio y funciones plegados, el buscador los despliega.
 'use strict';
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
@@ -83,6 +84,35 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     // 7 · Versión en Ajustes (hallazgo 13)
     v = await p.evaluate(() => document.getElementById('appVersionEl').textContent);
     chk('7. Ajustes: «ORDEVA 1.99.x · 15 nov 2026» (sin «versión v» ni fecha técnica)', /^ORDEVA \d+\.\d+\.\d+ · \d{1,2} (ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic) \d{4}$/.test(v), v);
+    // 8 · Ajustes › Negocio más corto (1.99.4, hallazgo 5) y la versión solo en la lista (hallazgo 13)
+    await p.evaluate(() => { document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')); document.querySelector('nav button[data-view="ajustes"]').click(); }); await pausa(400);
+    chk('8. En la lista de Ajustes se ve la versión', await p.evaluate(() => !!document.getElementById('appVersionEl').offsetParent));
+    const alto0 = 9939;   // medido en 1.99.3 con este mismo negocio de ejemplo (restaurante, 390 px)
+    await p.click('.ajustes-cat[data-cat="negocio"]'); await pausa(900);
+    v = await p.evaluate(() => { const ix = document.getElementById('ajNegIndice'), ch = ix ? [...ix.querySelectorAll('.aj-chip')] : [];
+      const vis = s => { const e = document.querySelector(s); return !!(e && e.offsetParent); };
+      return { indice: !!(ix && ix.offsetParent), chips: ch.map(c => c.textContent), altoChip: Math.min(...ch.map(c => c.getBoundingClientRect().height)), ver: vis('#appVersionEl'),
+        listaTipo: vis('#accTypePick .tp-lista'), tipoActual: vis('#accTypePick .tp-actual'), btnTipo: vis('#ajPlegTipo'), modFilas: vis('#modulosBox > label.settings-row'), modRes: (document.getElementById('ajPlegModRes') || {}).textContent,
+        unidadOtro: vis('#unidadOtro'), alto: document.documentElement.scrollHeight, ancho: document.documentElement.scrollWidth <= window.innerWidth + 1 }; });
+    chk('8. Negocio: índice «En esta sección» con Plan, Mi negocio, Tipo y funciones, Usuarios y seguridad, Caja y personal, Facturación (botones de 44 px)', v.indice && ['Plan', 'Mi negocio', 'Tipo y funciones', 'Usuarios y seguridad', 'Caja y personal', 'Facturación'].every(x => v.chips.includes(x)) && v.altoChip >= 44, v);
+    chk('8. Tipo de negocio plegado: se ve el actual y «Cambiar tipo de negocio», no la lista', !v.listaTipo && v.tipoActual && v.btnTipo, v);
+    chk('8. Funciones plegadas con su resumen «N de M funciones prendidas»', !v.modFilas && /^\d+ de \d+ funciones prendidas\.$/.test(v.modRes || ''), v);
+    chk('8. Dentro de la sección no sale la versión, ni los campos de «unidad propia» escondidos; nada se sale de lado', !v.ver && !v.unidadOtro && v.ancho, v);
+    chk('8. La página es al menos 1.000 px más corta que antes (' + alto0 + ')', v.alto <= alto0 - 1000, v.alto);
+    await p.click('.aj-chip:has-text("Caja y personal")'); await pausa(900);
+    v = await p.evaluate(() => Math.round(document.getElementById('cierreClaveBox').getBoundingClientRect().top));
+    chk('8. «Caja y personal» lleva a la clave para cerrar la caja', v >= 0 && v < 300, v);
+    await p.click('#ajPlegTipo'); await pausa(250);
+    chk('8. «Cambiar tipo de negocio» abre el buscador con la lista', await p.evaluate(() => !!document.querySelector('#accTypePick .tp-lista').offsetParent && !!document.querySelector('#accTypePick .tp-q').offsetParent));
+    await p.click('#ajPlegMod'); await pausa(250);
+    chk('8. «Ver y cambiar funciones» muestra los interruptores', await p.evaluate(() => !!document.querySelector('#modulosBox [data-modulo="r"]').closest('label').offsetParent));
+    await p.click('#ajPlegMod'); await pausa(150);
+    await p.click('#ajustesBackBtn'); await pausa(300);
+    await p.fill('#ajBuscar', 'recetas'); await pausa(400);
+    const res = p.locator('#ajBuscarRes button', { hasText: 'Insumos y recetas' }).first();
+    if(await res.count()){ await res.click(); await pausa(800);
+      chk('8. El 🔎 buscador lleva a «Insumos y recetas» y despliega las funciones solo', await p.evaluate(() => { const l = document.querySelector('#modulosBox [data-modulo="r"]').closest('label'), r = l.getBoundingClientRect(); return !!l.offsetParent && r.top >= 0 && r.bottom <= window.innerHeight; }));
+    } else chk('8. El 🔎 buscador encuentra «Insumos y recetas»', false, await p.evaluate(() => document.getElementById('ajBuscarRes').innerText));
     chk('Sin errores de página', !errs.length, errs);
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.message)); }
   await b.close();
