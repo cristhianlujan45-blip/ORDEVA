@@ -5,6 +5,8 @@
 //  3. (hallazgo 18) En el celular, el Inicio muestra primero las ventas y después el bloque de atajos.
 //  4. (hallazgo 14) En la Caja del celular, con la venta vacía, el carrito ya no tapa los productos.
 //  5. (hallazgo 15) El verde de «pagado» es más oscuro (se lee sobre blanco).
+//  6. (1.99.3, hallazgo 12) Encabezado del celular: sin «Salir» junto a la campana ni reloj; el nombre tiene espacio.
+//  7. (hallazgo 13) La versión en Ajustes se lee «ORDEVA 1.99.3 · 15 nov 2026».
 'use strict';
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
@@ -63,6 +65,24 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     // 5 · Verde
     v = await p.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--paid').trim());
     chk('5. El verde de «pagado» de ORDEVA 2.0 es el más oscuro (#15803d)', v.toLowerCase() === '#15803d', v);
+    // 6 · Encabezado (1.99.3, hallazgo 12)
+    await p.evaluate(() => { const i = document.getElementById('brandName'); i.value = 'Restaurante La Sazón de la Abuela Marina'; });
+    for(const w of [390, 320]){
+      await p.setViewportSize({ width: w, height: 760 }); await pausa(250);
+      v = await p.evaluate(() => { const n = document.getElementById('brandName'), vis = id => { const e = document.getElementById(id); return !!(e && e.offsetParent); };
+        return { nombre: Math.round(n.getBoundingClientRect().width), salir: vis('topSalirBtn'), reloj: vis('liveClock'), ancho: document.documentElement.scrollWidth <= window.innerWidth + 1 }; });
+      chk('6. Celular ' + w + ' px: sin «Salir» junto a la campana ni reloj, y el nombre del negocio tiene al menos 45 % del ancho', !v.salir && !v.reloj && v.nombre >= w * 0.45 && v.ancho, v);
+    }
+    await p.setViewportSize({ width: 1280, height: 800 }); await pausa(300);
+    chk('6. En el computador «Salir» y el reloj siguen arriba', await p.evaluate(() => !!document.getElementById('topSalirBtn').offsetParent && !!document.getElementById('liveClock').offsetParent));
+    await p.click('#navMoreBtn').catch(() => {}); await pausa(200);
+    chk('6. «Cerrar sesión» sigue en Más', await p.evaluate(() => !!document.querySelector('#navMoreSheet [data-go="salir"]')));
+    await p.evaluate(() => document.getElementById('navMoreSheet').classList.remove('show'));
+    await p.setViewportSize({ width: 390, height: 844 });
+
+    // 7 · Versión en Ajustes (hallazgo 13)
+    v = await p.evaluate(() => document.getElementById('appVersionEl').textContent);
+    chk('7. Ajustes: «ORDEVA 1.99.x · 15 nov 2026» (sin «versión v» ni fecha técnica)', /^ORDEVA \d+\.\d+\.\d+ · \d{1,2} (ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic) \d{4}$/.test(v), v);
     chk('Sin errores de página', !errs.length, errs);
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.message)); }
   await b.close();

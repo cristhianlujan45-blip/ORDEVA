@@ -427,9 +427,13 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-11-14 · v1.99.2';
+const MESORA_VERSION = '2026-11-15 · v1.99.3';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
-try{ const ve = document.getElementById('appVersionEl'); if(ve) ve.textContent = 'ORDEVA · versión ' + MESORA_VERSION.split('·').pop().trim() + ' (' + MESORA_VERSION.split('·')[0].trim() + ')'; }catch(e){}
+try{ const ve = document.getElementById('appVersionEl'); if(ve){   // «ORDEVA 1.99.2 · 14 nov 2026» (antes «versión v1.99.2 (2026-11-14)», con la «v» repetida y la fecha en formato técnico)
+  const pz = MESORA_VERSION.split('·'), num = pz.pop().trim().replace(/^v/i, ''), f = (pz[0] || '').trim().split('-');
+  const MES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  const fecha = f.length === 3 && MES[+f[1] - 1] ? (+f[2]) + ' ' + MES[+f[1] - 1] + ' ' + f[0] : (pz[0] || '').trim();
+  ve.textContent = 'ORDEVA ' + num + (fecha ? ' · ' + fecha : ''); } }catch(e){}
 /* 🔄 La app Android se actualiza SOLA (Actualizador): revisa cada 3 h, baja la versión nueva y la instala cuando no se
    está usando ORDEVA. Aquí: el estado en Ajustes y, si falta, el permiso de Android que se da UNA vez («Instalar apps
    desconocidas» para ORDEVA). La página (casi todo ORDEVA) ya se actualiza sola siempre. */
