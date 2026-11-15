@@ -153,6 +153,23 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     chk('10. Borrar la categoría «Bebidas frías» pregunta en la ventana de ORDEVA, con su nombre', del && v.show && /Bebidas frías/.test(v.t), { del, v });
     if(v.show) await p.click('#confirmCancelBtn');
     chk('10. Con «Cancelar» la categoría sigue', await p.evaluate(() => data.categories.some(c => c.id === 'cx')));
+    // Revisión 1.99.5: la ventana tiene que quedar ENCIMA de la pantalla de entrada y de «Recibir pedido» (z-index 99999)
+    v = await p.evaluate(async () => {
+      const encima = () => { const b = document.getElementById('promptOkBtn').getBoundingClientRect(), e = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2); return !!(e && e.closest('#promptOverlay')); };
+      const au = document.getElementById('authOverlay'), antes = au.hidden; au.hidden = false;
+      showAviso({ title: 'Respaldo recibido' }); await new Promise(r => setTimeout(r, 120)); const sobreEntrada = encima(); document.getElementById('promptOkBtn').click(); au.hidden = antes;
+      const d = document.createElement('div'); d.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#fff'; document.body.appendChild(d);
+      showAviso({ title: 'Pedido recibido' }); await new Promise(r => setTimeout(r, 120)); const sobrePedido = encima(); document.getElementById('promptOkBtn').click(); d.remove();
+      return { sobreEntrada, sobrePedido }; });
+    chk('10. El aviso se ve y se puede tocar encima de la pantalla de entrada y de «Recibir pedido»', v.sobreEntrada && v.sobrePedido, v);
+    await p.evaluate(() => { window.__r = 'nada'; showPrompt({ title: 'Contraseña nueva', type: 'password' }).then(v => { window.__r = v; }); }); await pausa(150);
+    await p.fill('#promptInput', 'abc123'); await p.click('#promptVer'); await pausa(80);
+    v = await p.evaluate(() => ({ tipo: document.getElementById('promptInput').type, ac: document.getElementById('promptInput').autocomplete, ver: document.getElementById('promptVer').textContent }));
+    await p.click('#promptOkBtn'); await pausa(120);
+    const tras = await p.evaluate(() => ({ r: window.__r, queda: document.getElementById('promptInput').value }));
+    chk('10. Contraseña: «👁 Ver» la muestra, no se guarda en el navegador (new-password) y al cerrar no queda escrita', v.tipo === 'text' && v.ac === 'new-password' && /Ocultar/.test(v.ver) && tras.r === 'abc123' && tras.queda === '', { v, tras });
+    v = await p.evaluate(async () => { const a = showConfirm({ title: 'Primera' }); const b2 = showConfirm({ title: 'Segunda' }); const r1 = await Promise.race([a, new Promise(r => setTimeout(() => r('colgada'), 300))]); document.getElementById('confirmCancelBtn').click(); return { r1, r2: await b2 }; });
+    chk('10. Si se abre una confirmación encima de otra, la primera cuenta como «Cancelar» (no queda colgada)', v.r1 === false && v.r2 === false, v);
     chk('10. Ninguna ventana del navegador salió en todo esto', !dialogosNav.length, dialogosNav);
     chk('Sin errores de página', !errs.length, errs);
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.message)); }

@@ -791,6 +791,7 @@ function showConfirm({ title = '¿Estás seguro?', message = '¿Deseas continuar
   // Al final del body: queda encima de las ventanas que se crean después (ej. «Fijar mis QR impresos»)
   document.body.appendChild(confirmOverlay);
   confirmOverlay.classList.add('show');
+  if(confirmResolver){ const r0 = confirmResolver; confirmResolver = null; try{ r0(false); }catch(e){} }   // 1.99.5: la pregunta anterior que quedó abierta cuenta como «Cancelar» (antes quedaba colgada)
   return new Promise(resolve=>{
     confirmResolver = resolve;
   });
@@ -822,7 +823,8 @@ function ventoVentanaDato(opt, conCampo){
     ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-labelledby', 'promptTitle');
     ov.innerHTML = '<div class="modal confirm-modal"><div class="confirm-icon" id="promptIcon"></div><h2 id="promptTitle"></h2>' +
       '<label class="modal-sub" id="promptMessage" for="promptInput" style="white-space:pre-line;display:block"></label>' +
-      '<input id="promptInput" class="mz-in" autocomplete="off" style="width:100%;box-sizing:border-box;min-height:48px;font-size:17px;margin:10px 0 4px">' +
+      '<div style="position:relative;margin:10px 0 4px"><input id="promptInput" class="mz-in" autocomplete="off" style="width:100%;box-sizing:border-box;min-height:48px;font-size:17px;padding-right:76px">' +
+      '<button type="button" id="promptVer" class="btn-ghost" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);min-height:44px;min-width:64px;padding:0 8px" aria-label="Ver lo escrito">👁 Ver</button></div>' +
       '<div class="modal-actions"><button type="button" class="btn-close" id="promptCancelBtn">Cancelar</button><button type="button" class="btn-primary" id="promptOkBtn">Aceptar</button></div></div>';
     document.body.appendChild(ov);
   }
@@ -835,6 +837,10 @@ function ventoVentanaDato(opt, conCampo){
   $p('promptMessage').hidden = !opt.message;
   inp.hidden = !conCampo;
   inp.type = opt.type || 'text';
+  // Contraseñas y PIN: el navegador no debe ofrecer guardarlas ni llenarlas con la del dueño; «👁 Ver» para revisar lo escrito.
+  inp.autocomplete = opt.autocomplete || (opt.type === 'password' ? 'new-password' : 'off');
+  const ver = $p('promptVer'); ver.hidden = !conCampo || opt.type !== 'password'; ver.textContent = '👁 Ver';
+  ver.onclick = () => { const v = inp.type === 'password'; inp.type = v ? 'text' : 'password'; ver.textContent = v ? '🙈 Ocultar' : '👁 Ver'; try{ inp.focus(); }catch(e){} };
   inp.inputMode = opt.inputMode || (opt.type === 'number' ? 'numeric' : '');
   inp.placeholder = opt.placeholder || '';
   inp.value = opt.value == null ? '' : String(opt.value);
@@ -845,7 +851,7 @@ function ventoVentanaDato(opt, conCampo){
   ov.classList.add('show');
   setTimeout(() => { try{ (conCampo ? inp : ok).focus(); if(conCampo) inp.select(); }catch(e){} }, 60);
   return new Promise(resolve => {
-    const fin = v => { if(ov._fin !== fin) return; ov._fin = null; ov.classList.remove('show'); ok.onclick = no.onclick = ov.onclick = inp.onkeydown = null; resolve(v); };
+    const fin = v => { if(ov._fin !== fin) return; ov._fin = null; ov.classList.remove('show'); ok.onclick = no.onclick = ov.onclick = inp.onkeydown = null; inp.value = ''; inp.type = 'text'; resolve(v); };   // no queda la contraseña escrita en la página
     ov._fin = fin;
     ok.onclick = () => fin(conCampo ? inp.value : true);
     no.onclick = () => fin(conCampo ? null : false);

@@ -683,7 +683,7 @@ async function authRecoverCorreo(user, code, newPass, newPass2){
 // Ajustes → Negocio: guardar el correo de recuperación (se comprueba con un código antes de guardarlo).
 async function authCorreoGuardar(){
   const users = authUsers(), u = users.find(x => x.user === authUser); if(!u) return;
-  const actual = await showPrompt({ icon: '🔒', title: 'Escribe tu contraseña actual', message: 'Para proteger tu cuenta antes de cambiar el correo.', type: 'password', confirmText: 'Seguir' }); if(actual == null) return;
+  const actual = await showPrompt({ icon: '🔒', title: 'Escribe tu contraseña actual', message: 'Para proteger tu cuenta antes de cambiar el correo.', type: 'password', autocomplete: 'current-password', confirmText: 'Seguir' }); if(actual == null) return;
   if(!(await authClaveOk(u, actual))) return showToast('⚠️ Contraseña incorrecta: no se cambió el correo.');
   const e = ((await showPrompt({ icon: '📧', title: 'Correo de recuperación', message: 'Si olvidas la contraseña, te llega un enlace a este correo.', type: 'email', value: u.email || '', placeholder: 'tucorreo@ejemplo.com', confirmText: 'Guardar correo' })) || '').trim().toLowerCase(); if(!e) return;
   if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) return showToast('⚠️ Ese correo no está bien escrito.');
