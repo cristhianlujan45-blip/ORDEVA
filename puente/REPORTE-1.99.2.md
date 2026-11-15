@@ -42,5 +42,5 @@ proveedor de ORDEVA.)
 - 19 y 20 · Formularios con etiquetas, ventanas propias en vez de las del navegador, Libreta y tipos de negocio.
 
 ## Pruebas
-- **Lista completa:** RESULTADOS_AQUI
+- **Lista completa:** 140 pruebas, 3179 bien y 3 mal. Las 3 eran de las pruebas, no de la app: `vistasencilla` (2, esperaba los grupos viejos de «Más»; actualizada) y `cerrarcaja` (1, buscaba «4321» como subcadena en todo el JSON y una fecha o id al azar lo contenía; ahora busca el valor exacto). Ambas pasan solas después del arreglo (45/0 y 26/0, cerrarcaja dos veces 26/0 antes del arreglo).
 - **No se probó** en un celular de verdad ni con la base de datos de producción.

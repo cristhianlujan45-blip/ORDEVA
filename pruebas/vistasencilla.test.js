@@ -69,7 +69,7 @@ const FOTOS = process.env.VENTO_FOTOS || '';
         const filas = [...document.querySelectorAll('#navMoreSheet .more-grid > *')].filter(x => x.offsetParent !== null).sort((a, b) => (+a.style.order || 0) - (+b.style.order || 0)).map(x => x.classList.contains('vs-grp') ? '#' + x.textContent : x.dataset.go);
         return { g, filas, lista: getComputedStyle(document.querySelector('#navMoreSheet .more-grid')).flexDirection };
       });
-      chk(nom + ' · 2. «Más» en lista por grupos: Mi negocio · Ayudantes · Mi cuenta', v.g.join() === 'Mi negocio,Ayudantes,Mi cuenta' && v.lista === 'column' && v.filas.indexOf('#Mi cuenta') < v.filas.indexOf('ajustes') && v.filas.indexOf('#Ayudantes') < v.filas.indexOf('ia') && v.filas.indexOf('historial') < v.filas.indexOf('#Ayudantes'), v);
+      chk(nom + ' · 2. «Más» en lista por grupos: Cada día · Mi negocio · Extras · Ayudantes · Mi cuenta', v.g.join() === 'Cada día,Mi negocio,Extras,Ayudantes,Mi cuenta' && v.lista === 'column' && v.filas.indexOf('#Mi cuenta') < v.filas.indexOf('ajustes') && v.filas.indexOf('#Ayudantes') < v.filas.indexOf('ia') && v.filas.indexOf('historial') < v.filas.indexOf('#Ayudantes'), v);
       await foto(p, nom + '-mas');
       await p.evaluate(() => document.querySelector('#navMoreSheet .more-tile[data-go="historial"]').click()); await p.waitForTimeout(300);
       v = await p.evaluate(() => ({ hist: document.getElementById('view-historial').classList.contains('active'), mas: document.getElementById('navMoreSheet').classList.contains('show') }));

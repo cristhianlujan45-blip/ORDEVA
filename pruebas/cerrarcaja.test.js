@@ -96,7 +96,7 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
     await D(() => { document.querySelector('#cierreClaveBox input[value="propia"]').click(); document.getElementById('ccIn').value = '4321'; document.getElementById('ccGo').click(); });
     await p.waitForTimeout(800);
     const cc = await D(() => ({ c: window.ventoRoles.permisos().cierre, todo: JSON.stringify(data), modo: window.ventoCierreClave.modo() }));
-    chk('8. Una clave solo para cerrar la caja: se guarda solo su huella (no «4321»)', cc.modo === 'propia' && cc.c.h && cc.c.h.length === 64 && !cc.todo.includes('4321'), cc.c);
+    chk('8. Una clave solo para cerrar la caja: se guarda solo su huella (no «4321»)', cc.modo === 'propia' && cc.c.h && cc.c.h.length === 64 && !/"4321"|:4321[,}\]]/.test(cc.todo), cc.c);  // (no por subcadena: una fecha o id al azar puede tener «4321»)
     const cerrarCon = async (clave) => {
       await p.click('#closeDayTopBtn'); await p.waitForSelector('#confirmOverlay.show', { timeout: 4000 }); await p.click('#confirmOkBtn');
       await p.waitForSelector('#vfOv.show #ccClave', { timeout: 4000 });
