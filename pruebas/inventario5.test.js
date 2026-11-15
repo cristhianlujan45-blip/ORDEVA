@@ -53,7 +53,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
       await p.waitForTimeout(400);
       if(vence) await p.evaluate(ve => { const i = document.querySelector('#invoiceOverlay .iv-vence'); i.value = ve; i.dispatchEvent(new Event('input', { bubbles: true })); i.dispatchEvent(new Event('change', { bubbles: true })); }, vence);
       await p.click('#invoiceApplyBtn'); await p.waitForTimeout(400);
-      for(let k = 0; k < 4; k++){ await p.evaluate(() => { const o = document.getElementById('confirmOverlay'); if(o && o.classList.contains('show')) document.getElementById('confirmOkBtn').click(); }); await p.waitForTimeout(300); }
+      for(let k = 0; k < 4; k++){ await p.evaluate(() => { const o = document.getElementById('confirmOverlay'); if(o && o.classList.contains('show')) document.getElementById('confirmOkBtn').click(); const a = document.getElementById('promptOverlay'); if(a && a.classList.contains('show')) document.getElementById('promptOkBtn').click(); }); await p.waitForTimeout(300); }   // 1.99.5: también el aviso «el proveedor subió el precio» (ventana propia)
     };
     await p.evaluate(() => { data.products = [{ id: 'g', name: 'Gaseosa', price: 3500, cost: 2000, stock: 10 }]; data.purchases = []; saveData(); });
     const hoy = new Date(), ymd = d => new Date(hoy.getTime() + d * 864e5).toISOString().slice(0, 10);

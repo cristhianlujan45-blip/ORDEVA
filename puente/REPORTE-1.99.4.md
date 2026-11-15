@@ -35,7 +35,7 @@ Incluye la 1.99.3, que no se publicó sola: se probaron juntas con una sola list
 - `diseno199`: 29 bien, 0 mal (celular 390 y 320 px, computador 1280 px, versión, Negocio con índice, plegables y buscador, tipos y Libreta).
 - Tipos y Libreta se agregaron después de lanzar la lista completa; aparte pasaron: libreta 24/0, tipofijo 16/0, registrotipo 6/0,
   modulosnegocio 33/0, ajustesequipo 17/0, modulos 12/0, flujocompleto 87/0, daviplatacobro 28/0.
-- **Lista completa:** RESULTADOS_AQUI
+- **Lista completa:** se corrió una sola, junto con la 1.99.5: ver `REPORTE-1.99.5.md`.
 
 ## No probado
 - Teléfonos reales.

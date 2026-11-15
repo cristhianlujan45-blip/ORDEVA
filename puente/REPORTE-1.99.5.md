@@ -25,7 +25,15 @@ Se publica junto con la 1.99.3 y la 1.99.4 (ver `REPORTE-1.99.4.md`), con una so
 - Ajustadas: `pinempleado` 17/0, `usuariosequipo` 27/0, `clavevarios` 24/0, `playtorneo` 23/0, `mejoras` 32/0, `almacen` 15/0.
 - `diseno199` punto 10: 37 bien, 0 mal (contraseña oculta, etiqueta, rol, 44 px, Enter, Escape, aviso de un botón,
   borrar categoría en la ventana propia, ninguna ventana del navegador).
-- **Lista completa (1.99.3 + 1.99.4 + 1.99.5):** RESULTADOS_AQUI
+- **Lista completa (1.99.3 + 1.99.4 + 1.99.5, commit 296d7e5, antes de los arreglos de la revisión):** 146 pruebas, 3.341 bien
+  y 3 mal. Las 3 son de la primera corrida de `pinempleado`, mientras yo corría otras 4 pruebas a la vez: «juan» no alcanzó a
+  crearse en 10 s. La segunda corrida en la misma lista salió 17/0; sola, 17/0 dos veces. La prueba ahora espera hasta 30 s y
+  dice si «juan» no se creó (18/0).
+- **Después de los arreglos de la revisión** (uno por uno): diseno199 40/0, almacen 15/0, mejoras 32/0, pinempleado 18/0,
+  clavevarios 24/0, usuariosequipo 27/0, playtorneo 23/0, cerrarcaja 26/0, anularventas 27/0, facturasorden 21/0,
+  equipoactividad 32/0, cajapos 27/0, libreta 24/0, v186 15/0, inventario5 15/0 (tuvo que cerrar el aviso «el proveedor
+  subió el precio», que ahora sale encima de todo como debe), esquinas 22/0, facturacantidad 10/0, facturacategorias 11/0,
+  facturascan 35/0, guia 47/0, sincroniza 27/0.
 - **Revisión independiente (goldfish, contexto nuevo):** 1 bloqueante, 1 mayor, 2 menores; todos arreglados:
   - BLOQUEANTE: la ventana nueva quedaba detrás de la pantalla de entrada (respaldo: el aviso «Recargar» no se podía tocar
     y la app no se recargaba) y de «Recibir pedido». → `#promptOverlay` con z-index 100010; prueba con `elementFromPoint`.
