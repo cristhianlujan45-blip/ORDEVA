@@ -96,12 +96,16 @@ h1{
 .order-extrainfo{margin:6px 0 0;color:var(--ink2);font-size:12.5px;line-height:1.4}
 
 /* Pestañas */
-.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:4px;border-radius:18px;background:var(--card);border:1px solid var(--line);margin-top:14px}
+.tabs{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:4px;padding:4px;border-radius:18px;background:var(--card);border:1px solid var(--line);margin-top:14px}
 .t{
   display:flex;align-items:center;justify-content:center;gap:7px;padding:12px 4px;border:0;border-radius:14px;
   background:none;color:var(--ink2);font:600 14px var(--sans);transition:background .2s,color .2s,box-shadow .2s;
 }
 .t svg{width:18px;height:18px;flex:none}
+.t span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 1.99.7 (auditoría de diseño, hallazgo 17): con la pestaña 🎮 Play son 4 y se reparten en una sola fila (antes Play bajaba a un
+   segundo renglón); en celulares angostos el ícono va arriba del nombre para que quepa completo. */
+@media (max-width:430px){ .tabs:has(> #tg:not([hidden])) .t{flex-direction:column;gap:3px;padding:8px 2px;font-size:12.5px;min-height:52px} }
 .t.on{
   color:var(--on-gold,#fff);background:linear-gradient(180deg,var(--gold-hi),var(--gold-lo));
   box-shadow:0 6px 18px rgba(236,72,153,.32),inset 0 1px 0 rgba(255,255,255,.35);
@@ -270,8 +274,8 @@ h1{
 .pcard .pimg{display:block;width:100%;aspect-ratio:1;object-fit:contain;background:#fff;border-radius:12px;margin-bottom:2px}
 .pcard .pn{font:600 14.5px/1.25 var(--sans);overflow-wrap:anywhere;padding-right:26px}
 .pcard .pp{font-size:13.5px;color:var(--gold-hi);font-weight:700}
-.pcard .plo{color:var(--gold-hi);font-size:11.5px;font-weight:600}
-.pcard .pagot{color:var(--ink2);font-size:11.5px;font-weight:600}
+.pcard .plo{color:var(--gold-hi);font-size:12.5px;font-weight:600}
+.pcard .pagot{color:var(--ink2);font-size:12.5px;font-weight:600}
 .pcard.ag{opacity:.5}
 .pcard .padd{position:absolute;top:10px;right:10px;width:32px;height:32px;border-radius:10px;border:1px solid var(--line);background:var(--card2);color:var(--gold-hi);font:700 19px var(--sans);display:grid;place-items:center}
 .pcard.ag .padd{display:none}
@@ -1261,8 +1265,8 @@ let playCargado=null;
 function cargarPlay(){
   if(playCargado)return playCargado;
   playCargado=new Promise((res,rej)=>{
-    const l=document.createElement('link');l.rel='stylesheet';l.href='play/play.css?v=1.99.6';document.head.appendChild(l);
-    const sc=document.createElement('script');sc.src='play/ordeva-play.js?v=1.99.6';sc.onload=()=>res(window.ordevaPlay);sc.onerror=()=>{playCargado=null;rej(new Error('play'))};document.head.appendChild(sc);
+    const l=document.createElement('link');l.rel='stylesheet';l.href='play/play.css?v=1.99.7';document.head.appendChild(l);
+    const sc=document.createElement('script');sc.src='play/ordeva-play.js?v=1.99.7';sc.onload=()=>res(window.ordevaPlay);sc.onerror=()=>{playCargado=null;rej(new Error('play'))};document.head.appendChild(sc);
   });
   return playCargado;
 }

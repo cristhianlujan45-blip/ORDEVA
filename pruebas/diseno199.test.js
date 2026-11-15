@@ -8,6 +8,7 @@
 //  6. (1.99.3, hallazgo 12) Encabezado del celular: sin «Salir» junto a la campana ni reloj; el nombre tiene espacio.
 //  7. (hallazgo 13) La versión en Ajustes se lee «ORDEVA 1.99.3 · 15 nov 2026», solo en la lista de categorías.
 //  9. (hallazgo 20) Tipos de negocio más comunes primero; la Libreta con 2 ejemplos a la vista y el resto plegado.
+// 11. (1.99.7, hallazgo 17) Página del QR: con 🎮 Play las 4 pestañas en una sola fila.
 // 10. (1.99.5, hallazgo 19) Ventanas propias para escribir un dato y para avisar; borrar categoría pregunta en la de ORDEVA.
 //  8. (1.99.4, hallazgo 5) Ajustes › Negocio: índice arriba, tipo de negocio y funciones plegados, el buscador los despliega.
 'use strict';
@@ -171,6 +172,17 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     v = await p.evaluate(async () => { const a = showConfirm({ title: 'Primera' }); const b2 = showConfirm({ title: 'Segunda' }); const r1 = await Promise.race([a, new Promise(r => setTimeout(() => r('colgada'), 300))]); document.getElementById('confirmCancelBtn').click(); return { r1, r2: await b2 }; });
     chk('10. Si se abre una confirmación encima de otra, la primera cuenta como «Cancelar» (no queda colgada)', v.r1 === false && v.r2 === false, v);
     chk('10. Ninguna ventana del navegador salió en todo esto', !dialogosNav.length, dialogosNav);
+    // 11 · Hallazgo 17 (1.99.7): en la página del cliente (QR) las 4 pestañas con 🎮 Play van en una sola fila
+    for(const w of [320, 390]){
+      const cq = await b.newContext({ viewport: { width: w, height: 700 }, locale: 'es-CO' });
+      await cq.route('**/*', r => new URL(r.request().url()).hostname === 'localhost' ? r.continue() : r.abort());
+      const q = await cq.newPage(); await q.goto(BASE + '/pedido.html?m=1', { waitUntil: 'load' }); await pausa(900);
+      const tres = await q.evaluate(() => [...document.querySelectorAll('.tabs > .t')].filter(x => x.offsetParent).map(x => Math.round(x.getBoundingClientRect().top)));
+      await q.evaluate(() => { const g = document.getElementById('tg'); g.hidden = false; const s = g.querySelector('span'); if(s && !s.textContent) s.textContent = 'Play'; });
+      const cuatro = await q.evaluate(() => [...document.querySelectorAll('.tabs > .t')].filter(x => x.offsetParent).map(x => ({ top: Math.round(x.getBoundingClientRect().top), cortado: x.scrollWidth > x.clientWidth + 1 })));
+      chk('11. Página del QR a ' + w + ' px: 3 pestañas en una fila y, con Play, las 4 en una sola fila sin cortarse', tres.length === 3 && new Set(tres).size === 1 && cuatro.length === 4 && new Set(cuatro.map(x => x.top)).size === 1 && !cuatro.some(x => x.cortado), { tres, cuatro });
+      await cq.close();
+    }
     chk('Sin errores de página', !errs.length, errs);
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.message)); }
   await b.close();
