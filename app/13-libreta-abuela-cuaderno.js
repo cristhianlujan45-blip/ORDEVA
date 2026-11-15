@@ -502,7 +502,7 @@
     ov.className = 'overlay'; ov.id = 'libretaOverlay';
     ov.innerHTML = '<div class="modal lb-modal"><div class="modal-title-row"><h2>📒 Mi libreta</h2><button class="rename-table-btn" id="lbCerrar" title="Cerrar">✕</button></div>' +
       '<button type="button" class="lb-mic" id="lbMic">🎤 Toca y habla</button>' +
-      '<div class="lb-ej">Di, por ejemplo:<br>«Juan me debe 20 mil» · «Juan me pagó 10 mil»<br>«Agrégame a la lista negra 30 mil para Julián» · «Julián quedó debiendo 30 mil»<br>«Saca a Pedro de la lista negra» (pagó todo)<br>«Le pagué a Pedro 50 mil» · «¿Quién me debe?»<br>«Le pagué a Postobón 200 mil» · «Le debo a Alpina 80 mil» · «¿Cuánto le debo a los proveedores?»<br>«Cuánto es 20 mil más 15 mil» (cuenta suelta)<br>«Súmame 13.400», y después «súmame 15.200» (se va sumando solo)<br>«Cuánto llevo» · «Réstame» o «corrige» (si algo quedó mal)</div>' +
+      '<div class="lb-ej">Di, por ejemplo: «Juan me debe 20 mil» · «Juan me pagó 10 mil»<details class="lb-ej-mas"><summary>Ver más ejemplos</summary>«Agrégame a la lista negra 30 mil para Julián» · «Julián quedó debiendo 30 mil»<br>«Saca a Pedro de la lista negra» (pagó todo)<br>«Le pagué a Pedro 50 mil» · «¿Quién me debe?»<br>«Le pagué a Postobón 200 mil» · «Le debo a Alpina 80 mil» · «¿Cuánto le debo a los proveedores?»<br>«Cuánto es 20 mil más 15 mil» (cuenta suelta)<br>«Súmame 13.400», y después «súmame 15.200» (se va sumando solo)<br>«Cuánto llevo» · «Réstame» o «corrige» (si algo quedó mal)</details></div>' +   // 1.99.4: solo 2 ejemplos a la vista, el resto plegado (auditoría de diseño, hallazgo 20)
       '<div class="lb-resp" id="lbRespuesta" hidden></div>' +
       '<div class="lb-btns"><button type="button" class="lb-b lb-debe" data-t="debe">📕 Alguien<br>me debe</button><button type="button" class="lb-b lb-abono" data-t="abono">✅ Me<br>pagaron</button><button type="button" class="lb-b lb-emp" data-t="emp">👷 Pagué a un<br>empleado</button>' +
       '<button type="button" class="lb-b lb-prov" data-t="prov">📦 Pagué a un<br>proveedor</button><button type="button" class="lb-b lb-pdeb" data-t="pdeb">🧾 Le debo a un<br>proveedor</button></div>' +
@@ -687,6 +687,8 @@
     '.lb-mic{display:block;width:100%;padding:22px 12px;margin:6px 0 8px;border-radius:18px;border:0;font:700 24px system-ui;background:var(--amber,#c8a24a);color:var(--on-amber,#1a1410);cursor:pointer}' +
     '.lb-mic.on{background:#c0392b;color:#fff;animation:lbPulso 1s infinite}@keyframes lbPulso{50%{transform:scale(.97)}}' +
     '.lb-ej{font-size:14px;text-align:center;opacity:.8;line-height:1.5;margin-bottom:8px}' +
+    '.lb-ej-mas summary{cursor:pointer;font-weight:700;min-height:44px;display:flex;align-items:center;justify-content:center;gap:6px;color:var(--ink)}.lb-ej-mas[open] summary{min-height:36px}' +
+    '#lbCerrar{min-width:44px;min-height:44px;font-size:18px;margin-left:auto}' +
     '.lb-resp{font-size:19px;font-weight:700;padding:14px;border-radius:14px;background:rgba(200,162,74,.15);margin:8px 0;line-height:1.4}' +
     '.lb-btns{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}' +
     '.lb-calc-btn{display:block;width:100%;padding:14px;border-radius:14px;border:2px solid var(--amber,#c8a24a);background:transparent;color:inherit;font:700 17px system-ui;cursor:pointer;margin-bottom:8px}' +

@@ -7,6 +7,7 @@
 //  5. (hallazgo 15) El verde de «pagado» es más oscuro (se lee sobre blanco).
 //  6. (1.99.3, hallazgo 12) Encabezado del celular: sin «Salir» junto a la campana ni reloj; el nombre tiene espacio.
 //  7. (hallazgo 13) La versión en Ajustes se lee «ORDEVA 1.99.3 · 15 nov 2026», solo en la lista de categorías.
+//  9. (hallazgo 20) Tipos de negocio más comunes primero; la Libreta con 2 ejemplos a la vista y el resto plegado.
 //  8. (1.99.4, hallazgo 5) Ajustes › Negocio: índice arriba, tipo de negocio y funciones plegados, el buscador los despliega.
 'use strict';
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
@@ -113,6 +114,18 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     if(await res.count()){ await res.click(); await pausa(800);
       chk('8. El 🔎 buscador lleva a «Insumos y recetas» y despliega las funciones solo', await p.evaluate(() => { const l = document.querySelector('#modulosBox [data-modulo="r"]').closest('label'), r = l.getBoundingClientRect(); return !!l.offsetParent && r.top >= 0 && r.bottom <= window.innerHeight; }));
     } else chk('8. El 🔎 buscador encuentra «Insumos y recetas»', false, await p.evaluate(() => document.getElementById('ajBuscarRes').innerText));
+    // 9 · Hallazgo 20: tipos de negocio comunes primero y la Libreta con los ejemplos plegados
+    v = await p.evaluate(() => window.VENTO_NEGOCIOS.buscar('').slice(0, 6).map(t => t.k));
+    chk('9. Sin escribir nada, la lista de tipos empieza por Restaurante, Tienda de barrio, Comidas rápidas, Cafetería, Bar y Barbería', v.join() === 'restaurante,tienda,comidas_rapidas,cafeteria,bar,barberia', v);
+    v = await p.evaluate(() => { const r = window.VENTO_NEGOCIOS.buscar(''), a = r.slice(6).map(t => t.nombre); return { total: r.length, cat: window.VENTO_NEGOCIOS.CAT.length, unicos: new Set(r.map(t => t.k)).size }; });
+    chk('9. …y están todos los tipos, sin repetir', v.total === v.cat && v.unicos === v.cat, v);
+    await p.evaluate(() => { document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')); window.libretaAbrir(); }); await pausa(500);
+    v = await p.evaluate(() => { const e = document.querySelector('#libretaOverlay .lb-ej'), d = e && e.querySelector('details'), x = document.getElementById('lbCerrar').getBoundingClientRect();
+      return { alto: e ? Math.round(e.getBoundingClientRect().height) : -1, plegado: !!d && !d.open, x: Math.round(Math.min(x.width, x.height)) }; });
+    chk('9. Libreta: ejemplos plegados (el bloque mide menos de 120 px) y la ✕ de 44 px', v.plegado && v.alto > 0 && v.alto < 120 && v.x >= 44, v);
+    await p.click('#libretaOverlay .lb-ej summary'); await pausa(200);
+    chk('9. «Ver más ejemplos» los muestra todos', await p.evaluate(() => /Postobón/.test(document.querySelector('#libretaOverlay .lb-ej').innerText)));
+    await p.click('#lbCerrar'); await pausa(200);
     chk('Sin errores de página', !errs.length, errs);
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.message)); }
   await b.close();

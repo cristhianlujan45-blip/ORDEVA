@@ -196,11 +196,15 @@
   });
   // Claves viejas que ya pueden estar guardadas en los negocios
   const ALIAS = { cerveceria: 'bar', farmacia: 'drogueria', licorera: 'estanco', medico: 'consultorio', spa: 'estetica', ropa_nueva_bar: 'ropa', ropa_segunda_bar: 'ropa_segunda' };
+  // 1.99.4 (auditoría de diseño, hallazgo 20): sin escribir nada, la lista empieza por los negocios más comunes y después
+  // el resto en orden alfabético (antes empezaba por «Academia» / «Abogados»).
+  const COMUNES = ['restaurante', 'tienda', 'comidas_rapidas', 'cafeteria', 'bar', 'barberia'];
+  const comunesPrimero = () => COMUNES.map(k => CAT.find(x => x.k === k)).filter(Boolean).concat(CAT.filter(x => COMUNES.indexOf(x.k) < 0));
   const buscarTipo = k => CAT.find(x => x.k === (ALIAS[k] || k)) || null;
   window.VENTO_NEGOCIOS = { CAT, G, F, IC, ALIAS, norm, get: buscarTipo,
     buscar(q){
-      const t = norm(q).replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim(); if(!t) return CAT.slice();
-      const STOP = ' de la el los las del y o un una mi mis para con en por que es tengo negocio venta ventas vendo '; const pal = t.split(' ').filter(p => p.length > 1 && !STOP.includes(' ' + p + ' ')); if(!pal.length) return CAT.slice();
+      const t = norm(q).replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim(); if(!t) return comunesPrimero();
+      const STOP = ' de la el los las del y o un una mi mis para con en por que es tengo negocio venta ventas vendo '; const pal = t.split(' ').filter(p => p.length > 1 && !STOP.includes(' ' + p + ' ')); if(!pal.length) return comunesPrimero();
       return CAT.map(x => { const n = norm(x.nombre); let s = 0;
         if(n.startsWith(t)) s += 100; else if(n.includes(t)) s += 60;
         pal.forEach(p => { if(n.includes(p)) s += 30; if(x.buscar.includes(p)) s += 20; if(new RegExp('(^|[ ,])' + p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).test(x.buscar)) s += 10; });
