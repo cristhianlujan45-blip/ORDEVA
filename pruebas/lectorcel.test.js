@@ -10,6 +10,7 @@
 // El servidor de canales se simula aquí mismo (canal_publicar / canal_leer en memoria, como en Supabase).
 'use strict';
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
+const { contestar } = require('./ventanas.js');   // 1.99.8: contestar las ventanas propias de ORDEVA
 const fs = require('fs'), os = require('os'), path = require('path');
 const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 const EAN = '7702535011119', QR_TXT = 'PROD-QR-4471';
@@ -175,7 +176,7 @@ const EAN = '7702535011119', QR_TXT = 'PROD-QR-4471';
     // 5. Desconectar celulares
     pc.once('dialog', d => d.accept());
     await pc.click('#scanCelBox [data-lcel="ver"]');
-    await pc.click('#scanCelBox [data-lcel="nuevo"]');
+    await pc.click('#scanCelBox [data-lcel="nuevo"]'); await contestar(pc, true);
     const nuevo = await pc.evaluate(() => window.ventoLectorCel.enlace());
     chk('5. «🔄 Desconectar celulares» cambia el código de emparejar', nuevo !== r2.link && /#c=lc/.test(nuevo), [r2.link, nuevo]);
     await pc.evaluate(() => { window.__leidos = []; });

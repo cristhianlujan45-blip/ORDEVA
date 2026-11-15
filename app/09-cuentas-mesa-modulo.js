@@ -604,14 +604,14 @@ function iniPrep(){
   otro.onchange=()=>{const v=otro.value.replace(/[<>]/g,'').trim().slice(0,24);if(v)guardar({nombre:v});};
   $('pedAutoOn').onchange=e=>{data.pedidosAuto=e.target.checked;saveData();pintar();};
   $('prepCopy').onclick=()=>{const u=prepUrl();if(!u)return;(navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(()=>showToast('📋 Link de la pantalla copiado.'),()=>{$('prepLink').select();showToast('Copia el link a mano.');});};
-  $('prepNuevo').onclick=()=>{if(!confirm('¿Crear un link nuevo? La pantalla que tenga el link anterior dejará de recibir pedidos.'))return;const c=LS(PKEYP,{});delete c.code;SS(PKEYP,c);pCfgP();pintar();conectar();prepPublicar(true);};
+  $('prepNuevo').onclick=async()=>{if(!(await showConfirm({icon:'🔗',title:'¿Crear un link nuevo?',message:'La pantalla que tenga el link anterior dejará de recibir pedidos.',confirmText:'Sí, link nuevo'})))return;const c=LS(PKEYP,{});delete c.code;SS(PKEYP,c);pCfgP();pintar();conectar();prepPublicar(true);};
   document.querySelectorAll('.ajustes-cat[data-cat="pedidos"]').forEach(b=>b.addEventListener('click',()=>setTimeout(pintar,50)));
   // Control en la misma pantalla: cambiarle el nombre u ocultarla sin ir a Ajustes.
   const vNom=$('prepNomVista'),vOff=$('prepApagar');
   const pintarVista=()=>{if(!vNom)return;const n=prepNombre();
     vNom.innerHTML=(PREP_NOMBRES.includes(n)?'':'<option>'+esc(n)+'</option>')+PREP_NOMBRES.map(x=>'<option>'+esc(x)+'</option>').join('')+'<option value="__otro">Otro nombre…</option>';vNom.value=n;};
-  if(vNom){vNom.onchange=()=>{let v=vNom.value;if(v==='__otro'){v=(prompt('¿Cómo se llama esta pantalla en tu negocio?',prepNombre())||'').replace(/[<>]/g,'').trim().slice(0,24);if(!v){pintarVista();return;}}guardar({nombre:v});pintarVista();showToast('✅ Ahora se llama «'+v+'».');};}
-  if(vOff){vOff.onclick=()=>{if(!confirm('¿Ocultar la pantalla «'+prepNombre()+'»? Los pedidos siguen llegando a las cuentas. La vuelves a activar en Ajustes → Pedidos, QR y caja.'))return;guardar({on:false});const b=document.querySelector('nav button[data-view="mesas"]');if(b)b.click();showToast('Pantalla «'+prepNombre()+'» oculta.');};}
+  if(vNom){vNom.onchange=async()=>{let v=vNom.value;if(v==='__otro'){v=((await showPrompt({icon:'🖥️',title:'¿Cómo se llama esta pantalla?',message:'El nombre que usan en tu negocio (cocina, barra, producción…).',value:prepNombre(),confirmText:'Guardar nombre'}))||'').replace(/[<>]/g,'').trim().slice(0,24);if(!v){pintarVista();return;}}guardar({nombre:v});pintarVista();showToast('✅ Ahora se llama «'+v+'».');};}
+  if(vOff){vOff.onclick=async()=>{if(!(await showConfirm({icon:'🙈',title:'¿Ocultar la pantalla «'+prepNombre()+'»?',message:'Los pedidos siguen llegando a las cuentas. La vuelves a activar en Ajustes → Pedidos, QR y caja.',confirmText:'Sí, ocultar'})))return;guardar({on:false});const b=document.querySelector('nav button[data-view="mesas"]');if(b)b.click();showToast('Pantalla «'+prepNombre()+'» oculta.');};}
   const navP=document.querySelector('nav button[data-view="cocina"]');if(navP)navP.addEventListener('click',()=>setTimeout(pintarVista,30));
   pintarVista();
   pintar();
@@ -2410,7 +2410,7 @@ function iniTVPantalla(){
   };
   $('tvpCopy').onclick=()=>{const u=tvUrl();if(!u)return showToast('⚠️ Abre ORDEVA desde su dirección https para tener el link del TV.');
     (navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(()=>showToast('📋 Link del TV copiado.'),()=>{$('tvpLink').select();showToast('Copia el link a mano.');});};
-  $('tvpNew').onclick=()=>{if(!confirm('¿Crear un link nuevo para el TV? El link anterior dejará de funcionar.'))return;const c=LS(TVP_KEY,{});delete c.code;SS(TVP_KEY,c);tvCfg();tvEscuchar();tvPublicar(true);pintar();};
+  $('tvpNew').onclick=async()=>{if(!(await showConfirm({icon:'📺',title:'¿Crear un link nuevo para el TV?',message:'El link anterior dejará de funcionar.',confirmText:'Sí, link nuevo'})))return;const c=LS(TVP_KEY,{});delete c.code;SS(TVP_KEY,c);tvCfg();tvEscuchar();tvPublicar(true);pintar();};
   pintar();tvEscuchar();tvPublicar(true);
   // El canal por el que el TV avisa (qué suena, cuándo terminó) se reabre si el navegador lo cerró.
   setInterval(()=>{if(tvOn()&&(!tvES||tvES.readyState===2))tvEscuchar();tvPublicar();tvEstado();},20000);

@@ -7,6 +7,7 @@
 //  4. Vuelve a prenderla: el siguiente pago sí suena en la tablet.
 'use strict';
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
+const { contestar } = require('./ventanas.js');   // 1.99.8: contestar las ventanas propias de ORDEVA
 const fs = require('fs');
 const { spawnSync } = require('child_process');
 function hayPostgres(){ if(process.env.VENTO_PG_URL || fs.existsSync('/usr/lib/postgresql')) return true; return spawnSync('bash', ['-c', 'command -v psql || command -v pg_ctl'], { stdio: 'ignore' }).status === 0; }
@@ -86,7 +87,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
 
     chk('1. «ESTE EQUIPO» / «ESTE CELULAR» marca solo al equipo donde se mira, y cada uno dice si está conectado', await PC.p.evaluate(() => (document.getElementById('vpDevs').textContent.match(/ESTE (CELULAR|EQUIPO)/g) || []).length === 1 && /Conectado ahora/.test(document.getElementById('vpDevs').textContent)));
     // ===== 2. Nombre y «no suena» para la tablet =====
-    await PC.p.evaluate(id => document.querySelector('#vpDevs [data-nom="' + id + '"]').click(), devTab);
+    await PC.p.evaluate(id => document.querySelector('#vpDevs [data-nom="' + id + '"]').click(), devTab); await contestar(PC.p, 'Tablet de la barra');
     chk('2. ✏️ Le pone nombre a la tablet', await esperar(PC.p, () => /Tablet de la barra/.test(document.getElementById('vpDevs').textContent), null, 10000));
     await PC.p.evaluate(id => document.querySelector('#vpDevs [data-suena="' + id + '"]').click(), devTab);
     chk('2. La elige para que NO suene', await esperar(PC.p, id => { const b = document.querySelector('#vpDevs [data-suena="' + id + '"]'); return !!b && /NO SUENA/.test(b.textContent); }, devTab, 10000) &&

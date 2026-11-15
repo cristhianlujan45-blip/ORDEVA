@@ -11,6 +11,7 @@
 //  5. Sin errores de página.
 'use strict';
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
+const { contestar } = require('./ventanas.js');   // 1.99.8: contestar las ventanas propias de ORDEVA
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -83,7 +84,7 @@ const RAIZ = path.resolve(__dirname, '..');
     await p.fill('#nubeEmail', 'dora@bardavi.co'); await p.fill('#nubePass', 'clave123'); await p.fill('#nubeNombre', 'Dora');
     await p.click('#nubeCrear'); await p.waitForSelector('#nubeSubirEste', { state: 'visible' });
     respuestas.push('Bar Davi');
-    await p.click('#nubeSubirEste');
+    await p.click('#nubeSubirEste'); await contestar(p, respuestas.shift());
     const subido = await esperar(() => { const x = window.ventoNube.negocio(); return !!x && /quedó en tu cuenta/.test(document.getElementById('nubeMsg').textContent); });
     const NEG = await p.evaluate(() => (window.ventoNube.negocio() || {}).id);
     chk('1. Negocio subido a ORDEVA Nube (dueña)', subido && /^[0-9a-f-]{36}$/.test(NEG || ''), NEG);

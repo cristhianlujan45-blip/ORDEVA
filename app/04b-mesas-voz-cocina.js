@@ -1529,15 +1529,18 @@ document.getElementById('atencionSel').addEventListener('click', e => {
   setTimeout(() => location.reload(), 900);
 });
 document.getElementById('tableCountToggle').addEventListener('click', pintarAtencion);
-document.getElementById('applyTableCount').addEventListener('click', ()=>{
+document.getElementById('applyTableCount').addEventListener('click', async ()=>{
   const n = parseInt(document.getElementById('tableCountInput').value, 10);
   if(!n || n < 1) return;
-  const current = Object.keys(data.tables).map(Number);
-  const toRemove = current.filter(id => id > n);
-  const withOpenTabs = toRemove.filter(id => data.tables[id].items && data.tables[id].items.length);
+  const abiertasSobre = () => Object.keys(data.tables).map(Number).filter(id => id > n && data.tables[id] && data.tables[id].items && data.tables[id].items.length);
+  const withOpenTabs = abiertasSobre();
   if(withOpenTabs.length){
-    if(!confirm('Las mesas ' + withOpenTabs.join(', ') + ' tienen cuentas abiertas. ¿Reducir igual las mesas? Esas cuentas pasan al historial (lo no pagado, como deuda).')) return;
+    // 1.99.8: ventana propia (antes confirm() del navegador). Mientras pregunta la app sigue viva: al volver se mira otra vez
+    // y, si otra mesa de las que se quitan abrió cuenta en ese rato, no se cierra sin preguntar por ella.
+    if(!(await showConfirm({ icon: '🍽️', title: '¿Reducir las mesas?', message: 'Las mesas ' + withOpenTabs.join(', ') + ' tienen cuentas abiertas. Esas cuentas pasan al historial (lo no pagado, como deuda).', confirmText: 'Sí, reducir' }))) return;
+    if(abiertasSobre().some(id => withOpenTabs.indexOf(id) < 0)){ showToast('⚠️ Otra mesa abrió cuenta mientras preguntaba. Vuelve a tocar «Aplicar».'); return; }
   }
+  const toRemove = Object.keys(data.tables).map(Number).filter(id => id > n);
   toRemove.forEach(id => { try{ closeTableToHistory(id); }catch(e){} delete data.tables[id]; });
   for(let i=1;i<=n;i++){
     if(!data.tables[i]) data.tables[i] = { items: [], people: [] };

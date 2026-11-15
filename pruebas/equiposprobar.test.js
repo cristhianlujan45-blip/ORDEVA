@@ -11,6 +11,7 @@
 //  5. Otra vez «🔊 SUENA» → Probar → suena otra vez.
 'use strict';
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
+const { contestar } = require('./ventanas.js');   // 1.99.8: contestar las ventanas propias de ORDEVA
 const fs = require('fs');
 const { spawnSync } = require('child_process');
 function hayPostgres(){ if(process.env.VENTO_PG_URL || fs.existsSync('/usr/lib/postgresql')) return true; return spawnSync('bash', ['-c', 'command -v psql || command -v pg_ctl'], { stdio: 'ignore' }).status === 0; }
@@ -165,7 +166,7 @@ const UA = {
     chk('2. «Tus equipos»: solo los tres que se usan, cada uno con su nombre', L && L.arriba.length === 3 && L.arriba.includes(nombres[id.celular]) && L.arriba.includes(nombres[id.computador]) && L.arriba.includes(nombres[id.tableta]), L);
     chk('2. Ninguno sale «Dueño · Android», y «ESTE EQUIPO» marca solo al computador', L && !/Dueño · Android/.test(L.txt) && (L.txt.match(/ESTE (EQUIPO|CELULAR)/g) || []).length === 1 && /ESTE EQUIPO/.test(L.txt), L && L.txt);
     chk('2. Los 3 viejos (repetido, 60 días, cuenta que ya no está) van aparte y cerrados', L && L.viejos.length === 3 && L.abierto === false && /Repetido/.test(L.txt) && /ya no está en el negocio/.test(L.txt), L);
-    await PC.p.evaluate(() => document.querySelector('#vpDevs [data-rev-viejos]').click());
+    await PC.p.evaluate(() => document.querySelector('#vpDevs [data-rev-viejos]').click()); await contestar(PC.p, true);
     const revocados = async () => (await sb.sql('select count(*)::int n from dispositivos where id = any($1) and revocado_en is not null', [viejos.map(v => v.id)]))[0].n;
     let rv = 0; for(let i = 0; i < 40 && rv < 3; i++){ rv = await revocados(); if(rv < 3) await new Promise(r => setTimeout(r, 250)); }
     chk('2. «🧹 Retirar los viejos» los retira de verdad', rv === 3, rv);

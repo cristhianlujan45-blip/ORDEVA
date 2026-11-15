@@ -22,6 +22,9 @@
   function lsGet(k, d){ try{ var v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; }catch(e){ return d; } }
   function lsSet(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
   function toast(t, ms){ try{ window.showToast && window.showToast(t, ms || 5000); }catch(e){} }
+  // 1.99.8: ventanas propias de ORDEVA (si no han cargado, las del navegador)
+  function siNo(o, txt){ return window.showConfirm ? window.showConfirm(o) : Promise.resolve(confirm(txt)); }
+  function pedir(o, txt, def){ return window.showPrompt ? window.showPrompt(o) : Promise.resolve(prompt(txt, def || '')); }
   function hablar(t){ try{ (window.ventoHablar || window.speakVoice || function(){})(t); }catch(e){} }
   // Los avisos de PAGOS con la voz de los pagos (su volumen propio; en la app Android, aunque esté minimizada).
   function hablarPago(t){ try{ if(window.ventoDecirPago) return window.ventoDecirPago(t); }catch(e){} hablar(t); }
@@ -649,12 +652,16 @@
     ov.classList.add('show');
     ov.querySelector('#vpCobroX').onclick = function(){ cerrarVentana(ov); };
     var clave = 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-    ov.querySelectorAll('[data-c]').forEach(function(b){ b.onclick = function(){
+    ov.querySelectorAll('[data-c]').forEach(function(b){ b.onclick = async function(){
       var canal = b.dataset.c, valor = Math.round(+ov.querySelector('#vpMonto').value || 0);
       if(valor < 100) return toast('Escribe el valor a cobrar.');
       if(canal === 'otp') return cobroDavi(ov, n, mesa, valor);
       var tel = null;
-      if(canal === 'push'){ tel = (prompt('Celular Nequi del cliente (10 dígitos):') || '').replace(/\D/g, ''); if(!/^3\d{9}$/.test(tel)) return toast('El celular debe tener 10 dígitos y empezar por 3.'); }
+      if(canal === 'push'){
+        tel = ((await pedir({ icon: '📲', title: 'Celular Nequi del cliente', message: '10 dígitos. Le llega la solicitud de pago en su Nequi.', type: 'tel', inputMode: 'numeric', placeholder: '3001234567', confirmText: 'Enviar cobro' }, 'Celular Nequi del cliente (10 dígitos):')) || '').replace(/\D/g, '');
+        if(!/^3\d{9}$/.test(tel)) return toast('El celular debe tener 10 dígitos y empezar por 3.');
+        if(!ov.isConnected || Math.round(+ov.querySelector('#vpMonto').value || 0) !== valor) return toast('El valor cambió mientras escribías el celular: toca otra vez «Cobrar».');   // se cobra lo que se vio
+      }
       var res = ov.querySelector('#vpCobroRes');
       res.innerHTML = '<div class="vp-estado"><span class="vp-gira">⏳</span> Creando el cobro…</div>';
       ov.querySelectorAll('[data-c]').forEach(function(x){ x.disabled = true; });
@@ -894,7 +901,7 @@
           '<button type="button" class="btn-ghost" data-rev-viejos="' + esc(viejos.map(function(d){ return d.id; }).join(',')) + '">🧹 Retirar los ' + viejos.length + ' viejos</button>' + viejos.map(viejaFila).join('') + '</details>' : '');
       var av = document.getElementById('vpDevsAviso');
       if(av) av.textContent = conSuena && (l || []).length && !(l || []).some(function(d){ return d.suena !== false; }) ? '⚠️ Ningún equipo va a sonar con los pagos: elige al menos uno.' : '';
-      el.onclick = function(e){
+      el.onclick = async function(e){
         var bs = e.target.closest('[data-suena]'), bn = e.target.closest('[data-nom]'), b = e.target.closest('[data-rev]'), bp = e.target.closest('[data-probar]'), bv = e.target.closest('[data-rev-viejos]');
         if(bp){
           bp.disabled = true;
@@ -905,7 +912,7 @@
         }
         if(bv){
           var ids = bv.dataset.revViejos.split(',').filter(Boolean);
-          if(!ids.length || !confirm('¿Retirar los ' + ids.length + ' equipos viejos o repetidos? No se usan: no suenan ni reciben pagos.')) return;
+          if(!ids.length || !(await siNo({ icon: '🧹', title: '¿Retirar los ' + ids.length + ' equipos viejos o repetidos?', message: 'No se usan: no suenan ni reciben pagos.', confirmText: 'Sí, retirar' }, '¿Retirar los ' + ids.length + ' equipos viejos o repetidos? No se usan: no suenan ni reciben pagos.'))) return;
           bv.disabled = true;
           Promise.all(ids.map(function(id){ return rpc('revocar_dispositivo', { p_dispositivo: id }).catch(function(){ return null; }); }))
             .then(function(){ toast('🧹 Listo: ' + ids.length + ' equipos viejos retirados.'); pintarDispositivos(); });
@@ -921,11 +928,11 @@
           return;
         }
         if(bn){
-          var nom = prompt('Nombre para reconocer este equipo (ej. Caja, Barra, Celular de Ana):', bn.dataset.actual || ''); if(nom == null || !nom.trim()) return;
+          var nom = await pedir({ icon: '✏️', title: 'Nombre de este equipo', message: 'Para reconocerlo (ej. Caja, Barra, Celular de Ana).', value: bn.dataset.actual || '', confirmText: 'Guardar nombre' }, 'Nombre para reconocer este equipo (ej. Caja, Barra, Celular de Ana):', bn.dataset.actual || ''); if(nom == null || !nom.trim()) return;
           rpc('dispositivo_nombre', { p_dispositivo: bn.dataset.nom, p_nombre: nom.trim().slice(0, 60) }).then(function(){ pintarDispositivos(); }, function(x){ toast('⚠️ No se pudo: ' + (x && x.message || x), 6000); });
           return;
         }
-        if(!b || !confirm('¿Retirar este equipo? Dejará de recibir y mandar avisos de pagos.')) return;
+        if(!b || !(await siNo({ icon: '📵', title: '¿Retirar este equipo?', message: 'Dejará de recibir y mandar avisos de pagos.', confirmText: 'Sí, retirar' }, '¿Retirar este equipo? Dejará de recibir y mandar avisos de pagos.'))) return;
         rpc('revocar_dispositivo', { p_dispositivo: b.dataset.rev }).then(function(){ toast('Equipo retirado.'); pintarDispositivos(); });
       };
     }).catch(function(){ el.textContent = 'No se pudo cargar la lista.'; });
@@ -1121,8 +1128,8 @@
       }
       enviar(q('vpDok'), c);
     };
-    if(q('vpDquitar')) q('vpDquitar').onclick = function(){
-      if(!confirm('¿Desconectar la API de DaviPlata? Se borran sus credenciales del servidor.')) return;
+    if(q('vpDquitar')) q('vpDquitar').onclick = async function(){
+      if(!(await siNo({ icon: '🔌', title: '¿Desconectar la API de DaviPlata?', message: 'Se borran sus credenciales del servidor.', confirmText: 'Sí, desconectar' }, '¿Desconectar la API de DaviPlata? Se borran sus credenciales del servidor.'))) return;
       var n = negocio();
       api('config', { negocio: n.id, accion: 'desconectar', proveedor: 'daviplata' }).then(function(j){ est.info = j; est.resumen = j.resumen; msg('DaviPlata (API) desconectado.'); })
         .catch(function(e){ msg('⚠️ ' + esc(e.message), true); });

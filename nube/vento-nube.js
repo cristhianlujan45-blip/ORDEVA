@@ -1080,13 +1080,13 @@
         var box = q('nubeLista'); if(!box) return;
         if(!l || !l.length){ box.textContent = 'Todavía no perteneces a ningún negocio: únete con el código que te dieron o crea el tuyo.'; return; }
         box.innerHTML = '<b>Tus negocios:</b>' + l.map(function(n, i){ return '<div class="nube-li"><span>' + esc(n.nombre) + ' <small>· ' + ROLES[n.rol] + '</small></span><button type="button" class="btn-ghost" data-elegir="' + i + '">Usar este</button></div>'; }).join('');
-        box.querySelectorAll('[data-elegir]').forEach(function(b){ b.onclick = function(){
-          var n = l[+b.dataset.elegir];
-          if(!confirm('Se cargarán en este celular los datos de «' + n.nombre + '». Lo que hay ahora en este celular se reemplaza (queda un punto de restauración local). ¿Seguir?')) return;
+        box.querySelectorAll('[data-elegir]').forEach(function(b){ b.onclick = async function(){
+          var n = l[+b.dataset.elegir], txt = 'Se cargarán en este celular los datos de «' + n.nombre + '». Lo que hay ahora en este celular se reemplaza (queda un punto de restauración local). ¿Seguir?';
+          if(!(await siNo({ icon: '☁️', title: '¿Usar «' + n.nombre + '» en este celular?', message: 'Lo que hay ahora en este celular se reemplaza por los datos de ese negocio (queda un punto de restauración local).', confirmText: 'Sí, usar este' }, txt))) return;
           accion(b, function(){ return elegir(n).then(function(){ pintar(); msg('✅ Listo: este celular ya usa «' + n.nombre + '».'); entrarApp(); }); });
         }; });
       }).catch(function(e){ var box = q('nubeLista'); if(box) box.textContent = msgError(e); });
-      q('nubeSubirEste').onclick = function(){ var d = datosApp() || {}; var nom = prompt('Nombre de tu negocio:', d.businessName || 'Mi negocio'); if(!nom) return;
+      q('nubeSubirEste').onclick = async function(){ var d = datosApp() || {}; var nom = await pedir({ icon: '🏪', title: 'Nombre de tu negocio', message: 'Así lo verá tu equipo cuando lo invites.', value: d.businessName || 'Mi negocio', confirmText: 'Crear negocio' }, 'Nombre de tu negocio:', d.businessName || 'Mi negocio'); if(!nom || !nom.trim()) return;
         accion(this, function(){ return crearNegocio(nom.trim()).then(function(){ pintar(); msg('✅ Listo: tu negocio quedó en tu cuenta. Ahora invita a tu equipo.'); entrarApp(); }); }); };
       q('nubeUnirme').onclick = function(){ var cod = q('nubeCodigo').value.trim(); if(!cod) return msg('Escribe el código que te dio el dueño.', true);
         accion(this, function(){ return unirse(cod, st.nombre).then(function(){ pintar(); msg('✅ Te uniste a «' + st.negocio.nombre + '».'); entrarApp(); }); }); };
@@ -1113,11 +1113,14 @@
           (puede && st.negocio.rol === 'dueno' ? '<select data-rol="' + esc(m.usuario_id) + '">' + opcionesRol(m.rol, true) + '</select>' : '') +
           (puede ? '<button type="button" class="btn-ghost" data-quitar="' + esc(m.usuario_id) + '">Quitar</button>' : '') + '</div>';
       }).join('');
-      b.querySelectorAll('[data-quitar]').forEach(function(x){ x.onclick = function(){ if(!confirm('¿Quitarle el acceso a esta persona? Ya no verá el negocio.')) return; accion(x, function(){ return quitar(x.dataset.quitar).then(pintar); }); }; });
+      b.querySelectorAll('[data-quitar]').forEach(function(x){ x.onclick = async function(){ if(!(await siNo({ icon: '🚫', title: '¿Quitarle el acceso a esta persona?', message: 'Ya no verá el negocio.', confirmText: 'Sí, quitar acceso' }, '¿Quitarle el acceso a esta persona? Ya no verá el negocio.'))) return; accion(x, function(){ return quitar(x.dataset.quitar).then(pintar); }); }; });
       b.querySelectorAll('[data-rol]').forEach(function(x){ x.onchange = function(){ accion(null, function(){ return cambiarRol(x.dataset.rol, x.value).then(function(){ msg('✅ Rol cambiado.'); }); }); }; });
     }).catch(function(e){ var b = q('nubeMiembros'); if(b) b.textContent = msgError(e); });
-    q('nubeSalir').onclick = function(){ if(!confirm('¿Cerrar sesión en este celular? Tus datos quedan guardados en tu cuenta.')) return; accion(this, function(){ var p = st.sucio ? subir().catch(function(){}) : Promise.resolve(); return p.then(salir).then(function(){ try{ if(window.ventoSalir){ window.ventoSalir(); return; } }catch(e){} pintar(); }); }); };
+    q('nubeSalir').onclick = async function(){ if(!(await siNo({ icon: '🚪', title: '¿Cerrar sesión en este celular?', message: 'Tus datos quedan guardados en tu cuenta.', confirmText: 'Sí, cerrar sesión' }, '¿Cerrar sesión en este celular? Tus datos quedan guardados en tu cuenta.'))) return; accion(this, function(){ var p = st.sucio ? subir().catch(function(){}) : Promise.resolve(); return p.then(salir).then(function(){ try{ if(window.ventoSalir){ window.ventoSalir(); return; } }catch(e){} pintar(); }); }); };
   }
+  // 1.99.8: ventanas propias de ORDEVA (si no han cargado, las del navegador)
+  function siNo(o, txt){ return window.showConfirm ? window.showConfirm(o) : Promise.resolve(confirm(txt)); }
+  function pedir(o, txt, def){ return window.showPrompt ? window.showPrompt(o) : Promise.resolve(prompt(txt, def || '')); }
   function entrarApp(){ if(typeof alEntrar === 'function'){ var f = alEntrar; alEntrar = null; setTimeout(function(){ cerrar(); f(st.email); }, 700); } }
 
   // ---------- API para la app ----------

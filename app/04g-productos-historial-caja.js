@@ -1717,7 +1717,7 @@ async function closeCashRegister(opts){
     if(window.ventoCierreClave && !(await window.ventoCierreClave.pedir())) return;   // 🔑 si el dueño puso clave para cerrar
     cerrarAbiertasConRespaldo(openIds);
   } else if(openIds.length){
-    const ok = confirm('Hay ' + openIds.length + ' mesa(s) con cuentas abiertas (Mesa ' + openIds.join(', Mesa ') + '). Para cerrar el día hay que cerrarlas: lo que no esté abonado quedará registrado como "Debe". ¿Cerrarlas y continuar?');
+    const ok = await showConfirm({ icon: '🍽️', title: 'Hay ' + openIds.length + ' mesa(s) con cuentas abiertas', message: 'Mesa ' + openIds.join(', Mesa ') + '. Para cerrar el día hay que cerrarlas: lo que no esté abonado quedará registrado como «Debe». ¿Cerrarlas y continuar?', confirmText: 'Sí, cerrarlas y continuar' });   // 1.99.8: ventana propia
     if(!ok) return;
     cerrarAbiertasConRespaldo(openIds);
   }

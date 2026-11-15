@@ -5,6 +5,7 @@
 //  3. 💲 Precio por cantidad (mayorista) en la caja.
 //  4. ↩️ Devolución desde el historial: inventario de vuelta, la venta baja y el efectivo sale de la caja.
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
+const { contestar } = require('./ventanas.js');   // 1.99.8: contestar las ventanas propias de ORDEVA
 const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html';
 (async () => {
   const b = await chromium.launch(); let ok = 0, mal = 0;
@@ -31,9 +32,9 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
     await p.fill('#vtBase', '100.000'); await p.click('#vtAbrir');
     chk('1. Abrir caja con base de $100.000', await D(() => data.turno && data.turno.base === 100000));
     await p.click('.vt-ov [data-m="salida"]');
-    await p.fill('#vtMonto', '30000'); await p.click('.vt-ov [data-ej="Pago a proveedor"]'); await p.click('#vtOk');
+    await p.fill('#vtMonto', '30000'); await p.click('.vt-ov [data-ej="Pago a proveedor"]'); await p.click('#vtOk'); await contestar(p, true, 1500);
     await p.click('.vt-ov [data-m="entrada"]');
-    await p.fill('#vtMonto', '20000'); await p.fill('#vtMotivo', 'Sencillo'); await p.click('#vtOk');
+    await p.fill('#vtMonto', '20000'); await p.fill('#vtMotivo', 'Sencillo'); await p.click('#vtOk'); await contestar(p, true, 1500);
     const r1 = await D(() => ventoTurno.resumen());
     chk('1. Salida de $30.000 (pago a proveedor) y entrada de $20.000 (sencillo) guardadas con motivo', r1.salidas === 30000 && r1.entradas === 20000 && r1.movs[0].motivo === 'Pago a proveedor' && r1.movs[1].motivo === 'Sencillo', r1);
     chk('1. El panel muestra el efectivo que debe haber ($90.000)', /Efectivo que debe haber\s*\$\s?90\.000/.test(await p.textContent('.vt-ov')), await p.textContent('.vt-ov'));

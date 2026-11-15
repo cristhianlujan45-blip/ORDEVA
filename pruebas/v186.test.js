@@ -6,6 +6,7 @@
 //  5. Deshacer la venta devuelve el domicilio a «por facturar». Descartar.
 'use strict';
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
+const { contestar } = require('./ventanas.js');   // 1.99.8: contestar las ventanas propias de ORDEVA
 const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 (async () => {
   const b = await chromium.launch(); let ok = 0, mal = 0; const errs = [];
@@ -57,8 +58,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     chk('4. El tablero: «Por facturar (1)» con Rosa y «Preparando (1)» con Luis', v && /Por facturar \(1\)/i.test(v) && /Rosa/.test(v) && /Preparando \(1\)/i.test(v) && /Luis Pérez/.test(v) && /Paga al recibir/.test(v), v);
     v = await p.evaluate(() => { const a = document.querySelector('.dm-ov [data-dm="wa"]'); return a ? decodeURIComponent(a.href) : null; });
     chk('4. «📲 Avisar» va al WhatsApp del cliente (+57 310…) con «lo estamos preparando»', v && /wa\.me\/573109876543/.test(v) && /preparando/.test(v), v);
-    p.once('dialog', d => d.accept('Carlos'));
-    await p.click('.dm-ov [data-dm="sig"]'); await pausa(300);
+    await p.click('.dm-ov [data-dm="sig"]'); await contestar(p, 'Carlos'); await pausa(300);
     v = await p.evaluate(() => { const h = data.history[0], a = document.querySelector('.dm-ov [data-dm="wa"]'); return { e: h.delivery.estado, rep: h.delivery.repartidor, hist: h.delivery.hist.map(x => x.e).join('>'), wa: a ? decodeURIComponent(a.href) : '', txt: document.querySelector('.dm-ov').innerText }; });
     chk('4. «🛵 Salió» (lo lleva Carlos): queda «En camino» con su historial', v.e === 'en_camino' && v.rep === 'Carlos' && v.hist === 'preparando>en_camino' && /En camino \(1\)/i.test(v.txt), v);
     chk('4. … y el WhatsApp dice «va en camino con Carlos» y «se paga al recibir»', /va en camino/.test(v.wa) && /con Carlos/.test(v.wa) && /se paga al recibir/.test(v.wa), v.wa);
