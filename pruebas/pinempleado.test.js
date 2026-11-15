@@ -30,7 +30,8 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     await p.fill('#authBiz', 'Bar PIN'); await entrar('dueno', 'clave-dueno-1');
     chk('El dueño entra', await dentro());
     await p.evaluate(() => { document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')); document.getElementById('accNewUser').value = 'juan'; document.getElementById('accNewPass').value = 'juan-clave-1'; document.getElementById('accNewRole').value = 'staff'; document.getElementById('accAddBtn').click(); accUsuariosPintar(); });
-    await esperar(() => document.querySelectorAll('#accUsersList .acc-user').length === 2);
+    // (con la máquina cargada, crear el usuario —calcula la huella de la clave— puede tardar más de 10 s)
+    chk('El dueño crea a «juan» (equipo)', await esperar(() => document.querySelectorAll('#accUsersList .acc-user').length === 2 && JSON.parse(localStorage.getItem('cm-users') || '[]').some(u => u.user === 'juan'), null, 30000));
 
     // 1. Ponerle el PIN
     chk('1. El administrador no tiene botón de PIN (solo el equipo)', !(await p.evaluate(() => { const r = [...document.querySelectorAll('#accUsersList .acc-user')].find(x => x.querySelector('b').textContent.startsWith('dueno')); return [...r.querySelectorAll('button')].some(x => /🔢/.test(x.textContent)); })));
