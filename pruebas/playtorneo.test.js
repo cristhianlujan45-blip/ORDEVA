@@ -110,6 +110,10 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     // ===== 5 · El panel del negocio =====
     chk('5. El panel del negocio muestra la tabla (se refresca solo): Mesa 1 y Mesa 2', await esperar(A, () => { const t = (document.querySelector('.pla-t-tabla') || {}).textContent || ''; return /👑 Mesa 1/.test(t) && /2\. Mesa 2/.test(t); }, null, 25000), await A.evaluate(() => (document.querySelector('.pla-t-tabla') || {}).textContent));
     await A.click('.pla-t-fin');
+    // 1.99.5: la pregunta sale en la ventana propia de ORDEVA (no en la del navegador)
+    await A.waitForSelector('#confirmOverlay.show', { timeout: 5000 }).catch(() => {});
+    dialogos.push(await A.evaluate(() => document.getElementById('confirmOverlay').classList.contains('show') ? document.getElementById('confirmTitle').textContent + ' ' + document.getElementById('confirmMessage').textContent : ''));
+    await A.click('#confirmOkBtn').catch(() => {});
     chk('5. «Terminar ahora» pregunta antes y avisa que las partidas sin terminar no suman', dialogos.some(d => /Terminar el torneo ahora/.test(d) && /no suman/.test(d)), dialogos);
     chk('5. El panel muestra el resultado: «Último torneo: ganó la Mesa 1 · Ana» y deja empezar otro', await esperar(A, () => /Último torneo: ganó la Mesa 1 · Ana/.test((document.querySelector('.pla-t-res') || {}).textContent || '') && !!document.querySelector('.pla-t-ini'), null, 15000), await A.evaluate(() => (document.querySelector('.pla-torneo') || {}).textContent));
 

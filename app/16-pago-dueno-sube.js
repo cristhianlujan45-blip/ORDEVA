@@ -125,7 +125,7 @@
     };
     $q('qpTipo').onchange = () => { const q = QP(); if(q){ q.tipo = $q('qpTipo').value; saveData(); qpPintar(); qpPublicar(true); } };
     $q('qpLlave').onchange = () => { const q = QP(); if(q){ q.llave = $q('qpLlave').value.trim(); saveData(); qpPintar(); qpPublicar(true); } };
-    $q('qpQuitar').onclick = () => { if(!confirm('¿Quitar tu QR de pago? Tus clientes dejarán de verlo.')) return; data.qrPago = null; saveData(); qpPintar(); qpPublicar(true); };
+    $q('qpQuitar').onclick = async () => { if(!(await showConfirm({ icon: '🧾', title: '¿Quitar tu QR de pago?', message: 'Tus clientes dejarán de verlo.', confirmText: 'Sí, quitar' }))) return; data.qrPago = null; saveData(); qpPintar(); qpPublicar(true); };
     $q('qpBajar').onclick = async () => { const q = QP(); if(!q) return; const a = document.createElement('a'); a.href = q.orig || q.img; a.download = 'qr-pago-' + (q.tipo || 'mesora').toLowerCase() + '.jpg'; document.body.appendChild(a); a.click(); a.remove(); };
     $q('qpCompartir').onclick = async () => {
       const q = QP(); if(!q) return;

@@ -51,17 +51,19 @@ function renderPeople(){
     box.appendChild(chip);
   });
   box.querySelectorAll('.chip-del').forEach(btn=>{
-    btn.addEventListener('click', (e)=>{
+    btn.addEventListener('click', async (e)=>{
       e.stopPropagation();
-      const id = btn.dataset.id;
+      const id = btn.dataset.id, mesa = currentTable;
       const person = t.people.find(p=>p.id === id);
-      if(person && !confirm('¿Quitar a ' + person.name + ' de la mesa? Sus productos pasarán a la cuenta general.')) return;
-      (t.items||[]).forEach(it=>{ if(it.personId === id) it.personId = null; });
-      (t.payments||[]).forEach(p=>{ if(p.personId === id) p.personId = null; });
-      t.people = t.people.filter(p=>p.id !== id);
+      if(!person) return;
+      // 1.99.5: ventana propia en vez del confirm() del navegador; al volver se lee la mesa otra vez (pudo cambiar mientras preguntaba)
+      if(!(await showConfirm({ icon: '👤', title: '¿Quitar a ' + person.name + ' de la mesa?', message: 'Sus productos pasarán a la cuenta general.', confirmText: 'Sí, quitar' }))) return;
+      const m = data.tables[mesa]; if(!m || !(m.people || []).some(p => p.id === id)) return;
+      (m.items||[]).forEach(it=>{ if(it.personId === id) it.personId = null; });
+      (m.payments||[]).forEach(p=>{ if(p.personId === id) p.personId = null; });
+      m.people = m.people.filter(p=>p.id !== id);
       saveData();
-      renderPeople();
-      renderModalItems();
+      if(currentTable === mesa){ renderPeople(); renderModalItems(); }
     });
   });
 }

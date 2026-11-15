@@ -8,6 +8,7 @@
 //  6. (1.99.3, hallazgo 12) Encabezado del celular: sin «Salir» junto a la campana ni reloj; el nombre tiene espacio.
 //  7. (hallazgo 13) La versión en Ajustes se lee «ORDEVA 1.99.3 · 15 nov 2026», solo en la lista de categorías.
 //  9. (hallazgo 20) Tipos de negocio más comunes primero; la Libreta con 2 ejemplos a la vista y el resto plegado.
+// 10. (1.99.5, hallazgo 19) Ventanas propias para escribir un dato y para avisar; borrar categoría pregunta en la de ORDEVA.
 //  8. (1.99.4, hallazgo 5) Ajustes › Negocio: índice arriba, tipo de negocio y funciones plegados, el buscador los despliega.
 'use strict';
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
@@ -126,6 +127,33 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     await p.click('#libretaOverlay .lb-ej summary'); await pausa(200);
     chk('9. «Ver más ejemplos» los muestra todos', await p.evaluate(() => /Postobón/.test(document.querySelector('#libretaOverlay .lb-ej').innerText)));
     await p.click('#lbCerrar'); await pausa(200);
+    // 10 · Hallazgo 19 (1.99.5): ventanas propias en vez de prompt()/alert()/confirm() del navegador
+    const dialogosNav = []; p.on('dialog', d => { dialogosNav.push(d.type() + ': ' + d.message()); d.dismiss().catch(() => {}); });
+    await p.evaluate(() => { window.__r = 'nada'; showPrompt({ title: 'Contraseña nueva para juan', message: 'Mínimo 6 caracteres.', type: 'password' }).then(v => { window.__r = v; }); });
+    await pausa(200);
+    v = await p.evaluate(() => { const o = document.getElementById('promptOverlay'), i = document.getElementById('promptInput'), l = document.getElementById('promptMessage'), b = [document.getElementById('promptOkBtn'), document.getElementById('promptCancelBtn')].map(x => Math.round(x.getBoundingClientRect().height));
+      return { show: o.classList.contains('show'), tipo: i.type, etiqueta: l.tagName === 'LABEL' && l.htmlFor === 'promptInput', rol: o.getAttribute('role'), modal: o.getAttribute('aria-modal'), foco: document.activeElement === i, botones: b }; });
+    chk('10. «Escribe el dato» es una ventana de ORDEVA: campo de contraseña oculto, con etiqueta, rol de diálogo y botones de 44 px', v.show && v.tipo === 'password' && v.etiqueta && v.rol === 'dialog' && v.modal === 'true' && v.foco && v.botones.every(h => h >= 44), v);
+    await p.fill('#promptInput', 'secreta1'); await p.press('#promptInput', 'Enter'); await pausa(150);
+    chk('10. Enter acepta y devuelve lo escrito', await p.evaluate(() => window.__r === 'secreta1' && !document.getElementById('promptOverlay').classList.contains('show')));
+    await p.evaluate(() => { window.__r = 'nada'; showPrompt({ title: 'PIN' }).then(v => { window.__r = v; }); }); await pausa(150);
+    await p.press('#promptInput', 'Escape'); await pausa(150);
+    chk('10. Escape cancela (devuelve nada)', await p.evaluate(() => window.__r === null));
+    await p.evaluate(() => { window.__r = 'nada'; showAviso({ title: 'Respaldo recibido', message: 'ORDEVA se va a recargar.' }).then(v => { window.__r = v; }); }); await pausa(150);
+    v = await p.evaluate(() => ({ campo: !document.getElementById('promptInput').hidden, cancelar: !document.getElementById('promptCancelBtn').hidden, ok: document.getElementById('promptOkBtn').textContent }));
+    chk('10. El aviso tiene un solo botón «Entendido» y no pide nada', !v.campo && !v.cancelar && v.ok === 'Entendido', v);
+    await p.click('#promptOkBtn'); await pausa(120);
+    chk('10. …y se cierra al tocarlo', await p.evaluate(() => window.__r === true));
+    // Borrar una categoría pregunta en la ventana propia (antes confirm() del navegador)
+    await p.evaluate(async () => { document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')); data.categories = [{ id: 'cx', name: 'Bebidas frías' }]; await saveData(); const b = document.querySelector('nav button[data-view="productos"]'); if(b) b.click(); try{ renderProductos(); }catch(e){} });
+    await pausa(500);
+    const del = await p.evaluate(() => { const b = document.querySelector('.chip-del[data-id="cx"]'); if(b){ b.click(); return true; } return false; });
+    await pausa(300);
+    v = await p.evaluate(() => ({ show: document.getElementById('confirmOverlay').classList.contains('show'), t: document.getElementById('confirmTitle').textContent }));
+    chk('10. Borrar la categoría «Bebidas frías» pregunta en la ventana de ORDEVA, con su nombre', del && v.show && /Bebidas frías/.test(v.t), { del, v });
+    if(v.show) await p.click('#confirmCancelBtn');
+    chk('10. Con «Cancelar» la categoría sigue', await p.evaluate(() => data.categories.some(c => c.id === 'cx')));
+    chk('10. Ninguna ventana del navegador salió en todo esto', !dialogosNav.length, dialogosNav);
     chk('Sin errores de página', !errs.length, errs);
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.message)); }
   await b.close();

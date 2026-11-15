@@ -9,6 +9,7 @@
 //     «Seguir con la que acabo de usar» deja esa en todos los equipos.
 'use strict';
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
+const { contestar } = require('./ventanas.js');
 if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const o = console[k].bind(console); console[k] = (...a) => { if(typeof a[0] === 'string' && a[0].startsWith('{"t":"')) return; o(...a); }; }
 (async () => {
   const { iniciar, enrutar } = require('./servidor/supabase-local');
@@ -57,6 +58,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const o = 
     await A.p.evaluate(() => { document.querySelector('nav button[data-view="ajustes"]').click(); try{ accUsuariosPintar(); }catch(e){} });
     await A.p.waitForTimeout(500);
     const pw = await A.p.evaluate(() => { const b = [...document.querySelectorAll('button[title="Poner contraseña nueva"]')].find(x => x.closest('div') && x.closest('div').textContent.includes('dueno@clave.co')); if(b){ b.click(); return true; } return false; });
+    if(pw) await contestar(A.p, A.p.__clave);   // 1.99.5: la contraseña nueva se escribe en la ventana propia
     await pausa(3000);
     chk('1. A cambia la contraseña en Ajustes → Usuarios (🔑)', pw, pw);
     await revisar(B.p);

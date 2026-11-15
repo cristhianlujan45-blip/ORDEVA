@@ -6,6 +6,7 @@
 //  5. El PIN no se guarda: solo su huella. Quitar el PIN.
 'use strict';
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
+const { contestar } = require('./ventanas.js');
 const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 (async () => {
   let ok = 0, mal = 0; const errs = [];
@@ -33,9 +34,9 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 
     // 1. Ponerle el PIN
     chk('1. El administrador no tiene botón de PIN (solo el equipo)', !(await p.evaluate(() => { const r = [...document.querySelectorAll('#accUsersList .acc-user')].find(x => x.querySelector('b').textContent.startsWith('dueno')); return [...r.querySelectorAll('button')].some(x => /🔢/.test(x.textContent)); })));
-    respuesta = '12a4'; await fila('juan', '🔢');
+    respuesta = '12a4'; await fila('juan', '🔢'); await contestar(p, respuesta);   // 1.99.5: ventana propia
     chk('1. Un PIN con letras no se acepta', await esperar(() => /4 a 6 números/.test(document.getElementById('toast').textContent)) && !(await p.evaluate(() => !!JSON.parse(localStorage.getItem('cm-users')).find(u => u.user === 'juan').pin)));
-    respuesta = '2468'; await fila('juan', '🔢');
+    respuesta = '2468'; await fila('juan', '🔢'); await contestar(p, respuesta);   // 1.99.5: ventana propia
     chk('1. «🔢» le pone el PIN 2468 a juan', await esperar(() => { const u = JSON.parse(localStorage.getItem('cm-users')).find(x => x.user === 'juan'); return !!(u && u.pin && u.pin.h); }));
     chk('5. El PIN no se guarda en el equipo: solo su huella', await p.evaluate(() => { const u = JSON.parse(localStorage.getItem('cm-users')).find(x => x.user === 'juan'); const vals = []; const ver = o => { if(o && typeof o === 'object') Object.values(o).forEach(ver); else vals.push(String(o)); }; ver(u); return !vals.includes('2468') && !!(u.pin && u.pin.h) && u.pin.h !== '2468'; }));   // la huella puede traer «2468» por casualidad
 
@@ -69,7 +70,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     await p.evaluate(() => { localStorage.removeItem('cm-session'); }); await p.reload(); await afuera();
     await entrar('dueno', 'clave-dueno-1'); await dentro();
     await p.evaluate(() => { document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')); accUsuariosPintar(); });
-    respuesta = ''; await fila('juan', '🔢');
+    respuesta = ''; await fila('juan', '🔢'); await contestar(p, respuesta);   // 1.99.5: ventana propia
     chk('5. Dejarlo vacío quita el PIN', await esperar(() => !JSON.parse(localStorage.getItem('cm-users')).find(x => x.user === 'juan').pin));
     await p.evaluate(() => { localStorage.removeItem('cm-session'); }); await p.reload(); await afuera();
     await entrar('juan', '2468');

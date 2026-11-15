@@ -810,6 +810,53 @@ confirmOverlay.addEventListener('click', (e)=>{
   if(e.target === confirmOverlay) closeConfirm(false);
 });
 
+/* ---------- 1.99.5 · Ventanas propias para escribir un dato y para avisar (reemplazan prompt() y alert() del navegador)
+   (auditoría de diseño, hallazgo 19). Se ven como el resto de ORDEVA, con letra grande, etiqueta visible y botones de 44 px.
+   showPrompt({ title, message, value, placeholder, type, confirmText }) → Promise con el texto, o null si cancela.
+   showAviso({ title, message, icon, okText }) → Promise que se cumple al tocar «Entendido». ---------- */
+function ventoVentanaDato(opt, conCampo){
+  opt = opt || {};
+  let ov = document.getElementById('promptOverlay');
+  if(!ov){
+    ov = document.createElement('div'); ov.className = 'overlay'; ov.id = 'promptOverlay';
+    ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-labelledby', 'promptTitle');
+    ov.innerHTML = '<div class="modal confirm-modal"><div class="confirm-icon" id="promptIcon"></div><h2 id="promptTitle"></h2>' +
+      '<label class="modal-sub" id="promptMessage" for="promptInput" style="white-space:pre-line;display:block"></label>' +
+      '<input id="promptInput" class="mz-in" autocomplete="off" style="width:100%;box-sizing:border-box;min-height:48px;font-size:17px;margin:10px 0 4px">' +
+      '<div class="modal-actions"><button type="button" class="btn-close" id="promptCancelBtn">Cancelar</button><button type="button" class="btn-primary" id="promptOkBtn">Aceptar</button></div></div>';
+    document.body.appendChild(ov);
+  }
+  const $p = id => document.getElementById(id), inp = $p('promptInput'), ok = $p('promptOkBtn'), no = $p('promptCancelBtn');
+  const tx = t => { try{ return vocabTexto(String(t == null ? '' : t)); }catch(e){ return String(t == null ? '' : t); } };
+  if(ov._fin) ov._fin(null);   // si había otra abierta, se cierra como «Cancelar»
+  $p('promptIcon').textContent = opt.icon || (conCampo ? '✏️' : 'ℹ️');
+  $p('promptTitle').textContent = tx(opt.title || (conCampo ? 'Escribe el dato' : 'Aviso'));
+  $p('promptMessage').textContent = tx(opt.message || '');
+  $p('promptMessage').hidden = !opt.message;
+  inp.hidden = !conCampo;
+  inp.type = opt.type || 'text';
+  inp.inputMode = opt.inputMode || (opt.type === 'number' ? 'numeric' : '');
+  inp.placeholder = opt.placeholder || '';
+  inp.value = opt.value == null ? '' : String(opt.value);
+  ok.textContent = tx(opt.confirmText || (conCampo ? 'Aceptar' : 'Entendido'));
+  no.textContent = opt.cancelText || 'Cancelar';
+  no.hidden = !conCampo && !opt.cancelText;
+  document.body.appendChild(ov);
+  ov.classList.add('show');
+  setTimeout(() => { try{ (conCampo ? inp : ok).focus(); if(conCampo) inp.select(); }catch(e){} }, 60);
+  return new Promise(resolve => {
+    const fin = v => { if(ov._fin !== fin) return; ov._fin = null; ov.classList.remove('show'); ok.onclick = no.onclick = ov.onclick = inp.onkeydown = null; resolve(v); };
+    ov._fin = fin;
+    ok.onclick = () => fin(conCampo ? inp.value : true);
+    no.onclick = () => fin(conCampo ? null : false);
+    ov.onclick = e => { if(e.target === ov) fin(conCampo ? null : true); };
+    inp.onkeydown = e => { if(e.key === 'Enter'){ e.preventDefault(); fin(inp.value); } else if(e.key === 'Escape'){ e.preventDefault(); fin(null); } };
+  });
+}
+function showPrompt(opt){ return ventoVentanaDato(opt, true); }
+function showAviso(opt){ if(typeof opt === 'string') opt = { message: opt }; return ventoVentanaDato(opt, false); }
+window.showPrompt = showPrompt; window.showAviso = showAviso; window.showConfirm = showConfirm;
+
 function tableTotal(tableId){
   const t = data.tables[tableId];
   if(!t || !t.items) return 0;

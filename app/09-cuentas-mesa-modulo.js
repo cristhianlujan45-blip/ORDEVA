@@ -1479,7 +1479,7 @@ function mzVerHistorial(){
 function iniMusica(){
   $('mzNext').onclick=()=>{const o=ordenJusto(cola());if(!o.length)return showToast('No hay canciones en cola.');reproducir(o[0]);};
   const ma=$('mzAutoNext');if(ma){ma.checked=mzAutoOn();ma.onchange=()=>{SS(MZ_AUTO_KEY,{on:ma.checked});if(!ma.checked)SS(MZ_T_KEY,null);mzCronoPintar();showToast(ma.checked?'⏱️ Listo: cuando se acabe cada canción pongo la siguiente sola.':'Cronómetro apagado: la siguiente la pones tú.');};}
-  $('mzClear').onclick=()=>{if(confirm('¿Vaciar la cola de música?')){cola().filter(x=>!x.done).forEach(x=>mzTermino(x.id,'cancelled'));tvPublicar(true);renderMusica();}};
+  $('mzClear').onclick=async()=>{if(await showConfirm({icon:'🎵',title:'¿Vaciar la cola de música?',message:'Se quitan las canciones que faltan por sonar.',confirmText:'Sí, vaciar'})){cola().filter(x=>!x.done).forEach(x=>mzTermino(x.id,'cancelled'));tvPublicar(true);renderMusica();}};
   $('mzSkip').onclick=mzSaltar;
   $('mzHistBtn').onclick=mzVerHistorial;
   // Si el navegador borró el almacenamiento rápido, la cola y el historial vuelven del respaldo.

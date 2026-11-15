@@ -593,8 +593,11 @@
       if(pt){ const r = lbEntender(pt.dataset.pagotodo + ' pagó todo'); if(r) lbResponder(r.texto); return; }
       const del = e.target.closest('[data-borrar]');
       if(del){
-        const l = LB().movs, i = l.findIndex(m => m.id === del.dataset.borrar);
-        if(i >= 0 && confirm('¿Borrar este apunte?')){ lbQuitarMov(l[i]); l.splice(i, 1); saveData(); lbPintar(); }
+        const idB = del.dataset.borrar;
+        if(LB().movs.some(m => m.id === idB)) showConfirm({ icon: '📒', title: '¿Borrar este apunte?', message: 'Se quita de la libreta.', confirmText: 'Sí, borrar' }).then(si => {
+          const l = LB().movs, i = l.findIndex(m => m.id === idB);   // se busca otra vez: pudo cambiar mientras preguntaba
+          if(si && i >= 0){ lbQuitarMov(l[i]); l.splice(i, 1); saveData(); lbPintar(); }
+        });
       }
     });
     $l('lbMic').onclick = lbEscuchar;

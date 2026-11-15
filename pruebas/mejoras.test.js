@@ -88,6 +88,7 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
     chk('2. 📋 Conteo: compara con el sistema (Águila 17 de 20 → −3, Gaseosa 3 de 5 → −2) y dice cuánto falta en plata', /−?-3/.test(z) && /-2/.test(z) && /faltan \$\s?11\.100/.test(z), z);
     chk('2. El conteo se guarda aunque se cierre la app', await D(() => !!JSON.parse(localStorage.getItem('vento_conteo:local'))));
     await p.click('#viAplicar');
+    await p.waitForSelector('#confirmOverlay.show', { timeout: 4000 }); await p.click('#confirmOkBtn'); await p.waitForTimeout(200);   // 1.99.5: pregunta en la ventana propia
     const st3 = await D(() => data.products.map(x => x.stock).join());
     chk('2. «Aplicar ajustes»: existencias = lo contado (17, 20, 3)', st3 === '17,20,3', st3);
     // Kárdex

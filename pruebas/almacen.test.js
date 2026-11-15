@@ -80,7 +80,7 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
     await p2.goto(BASE, { waitUntil: 'load' }); await p2.waitForTimeout(1000); await entrar(p2);
     await p2.evaluate(async () => { data.businessName = 'Otro Negocio'; data.history = []; await saveData(); });
     await Promise.all([p2.waitForNavigation({ waitUntil: 'load' }), p2.evaluate(bk => {
-      window.confirm = () => true; window.alert = () => {};
+      window.confirm = () => true; window.alert = () => {}; window.showConfirm = () => Promise.resolve(true); window.showAviso = () => Promise.resolve(true);   // 1.99.5: ventanas propias
       window.importBackup(new File([JSON.stringify(bk)], 'respaldo.json', { type: 'application/json' }));   // recibe y recarga ORDEVA
     }, bk)]);
     await p2.waitForTimeout(1200); await entrar(p2);

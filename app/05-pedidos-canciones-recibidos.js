@@ -154,7 +154,7 @@
       });
     }
     b.appendChild(btn(musica?'Agregar a la cola':'Recibir pedido (queda pendiente)',()=>{
-      try{const msg=importar(ta.value);alert(msg);ta.value='';render();renderPend();if(msg.charAt(0)==='🧾')o.remove();}catch(e){alert('Error: '+e.message);}
+      try{const msg=importar(ta.value);showAviso({message:msg});ta.value='';render();renderPend();if(msg.charAt(0)==='🧾')o.remove();}catch(e){showAviso({icon:'⚠️',title:'No se pudo recibir',message:e.message});}
     }));
     b.appendChild(btn('Cerrar',()=>o.remove()));
     b.appendChild(list);render();renderPend();

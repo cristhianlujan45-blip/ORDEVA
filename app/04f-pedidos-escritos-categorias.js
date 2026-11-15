@@ -224,10 +224,10 @@ function renderCategoryBar(){
   bar.appendChild(addChip);
 
   bar.querySelectorAll('.chip-del').forEach(btn=>{
-    btn.addEventListener('click', (e)=>{
+    btn.addEventListener('click', async (e)=>{
       e.stopPropagation();
-      const id = btn.dataset.id;
-      if(!confirm('¿Eliminar esta categoría? Los productos que la usan quedarán sin categoría.')) return;
+      const id = btn.dataset.id, cat = (data.categories || []).find(c => c.id === id);
+      if(!(await showConfirm({ icon: '🗂️', title: '¿Eliminar la categoría' + (cat && cat.name ? ' «' + cat.name + '»' : '') + '?', message: 'Los productos que la usan quedarán sin categoría. Los productos no se borran.', confirmText: 'Sí, eliminar' }))) return;
       data.categories = data.categories.filter(c=>c.id !== id);
       data.products.forEach(p=>{ if(p.categoryId === id) p.categoryId = null; });
       if(currentCategoryFilter === id) currentCategoryFilter = null;

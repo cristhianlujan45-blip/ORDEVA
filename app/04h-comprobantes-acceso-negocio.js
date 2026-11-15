@@ -304,7 +304,8 @@ function accUsuariosPintar(){
       const bPw = document.createElement('button'); bPw.type = 'button'; bPw.className = 'btn-ghost'; bPw.textContent = '🔑';
       bPw.title = 'Poner contraseña nueva';
       bPw.onclick = async () => {
-        const np = prompt('Contraseña nueva para ' + u.user + ' (mínimo 6):'); if(np == null) return;
+        // 1.99.5: ventana propia con el campo de contraseña oculto (el prompt() del navegador la mostraba a la vista)
+        const np = await showPrompt({ icon: '🔑', title: 'Contraseña nueva para ' + u.user, message: 'Mínimo 6 caracteres.', type: 'password', confirmText: 'Cambiar contraseña' }); if(np == null) return;
         if(np.length < 6){ showToast('⚠️ La contraseña debe tener al menos 6 caracteres.'); return; }
         const l = authUsers(), x = l.find(y => y.user === u.user); if(!x) return;
         x.salt = Math.random().toString(36).slice(2) + Date.now().toString(36); x.hash = await authHashClave(np, x.salt);
@@ -319,7 +320,7 @@ function accUsuariosPintar(){
         const bPin = document.createElement('button'); bPin.type = 'button'; bPin.className = 'btn-ghost'; bPin.textContent = u.pin && u.pin.h ? '🔢✓' : '🔢';
         bPin.title = u.pin && u.pin.h ? 'Cambiar o quitar su PIN' : 'Ponerle un PIN para entrar rápido';
         bPin.onclick = async () => {
-          const np = prompt('PIN de 4 a 6 números para ' + u.user + (u.pin && u.pin.h ? ' (déjalo vacío para quitarlo)' : '') + ':'); if(np == null) return;
+          const np = await showPrompt({ icon: '🔢', title: 'PIN para ' + u.user, message: 'De 4 a 6 números' + (u.pin && u.pin.h ? '. Déjalo vacío para quitarlo.' : '.'), type: 'password', inputMode: 'numeric', confirmText: u.pin && u.pin.h ? 'Guardar' : 'Poner PIN' }); if(np == null) return;
           const pin = np.replace(/\s+/g, '');
           if(pin && !/^\d{4,6}$/.test(pin)){ showToast('⚠️ El PIN son de 4 a 6 números.'); return; }
           if(!pin && !(u.pin && u.pin.h)) return;
@@ -682,9 +683,9 @@ async function authRecoverCorreo(user, code, newPass, newPass2){
 // Ajustes → Negocio: guardar el correo de recuperación (se comprueba con un código antes de guardarlo).
 async function authCorreoGuardar(){
   const users = authUsers(), u = users.find(x => x.user === authUser); if(!u) return;
-  const actual = prompt('Para proteger tu cuenta, escribe tu contraseña actual:'); if(actual == null) return;
+  const actual = await showPrompt({ icon: '🔒', title: 'Escribe tu contraseña actual', message: 'Para proteger tu cuenta antes de cambiar el correo.', type: 'password', confirmText: 'Seguir' }); if(actual == null) return;
   if(!(await authClaveOk(u, actual))) return showToast('⚠️ Contraseña incorrecta: no se cambió el correo.');
-  const e = (prompt('Tu correo para recuperar la contraseña:', u.email || '') || '').trim().toLowerCase(); if(!e) return;
+  const e = ((await showPrompt({ icon: '📧', title: 'Correo de recuperación', message: 'Si olvidas la contraseña, te llega un enlace a este correo.', type: 'email', value: u.email || '', placeholder: 'tucorreo@ejemplo.com', confirmText: 'Guardar correo' })) || '').trim().toLowerCase(); if(!e) return;
   if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) return showToast('⚠️ Ese correo no está bien escrito.');
   u.email = e; u.emailAt = Date.now(); localStorage.setItem(AUTH_USERS_KEY, JSON.stringify(users));
   showToast('✅ Correo guardado: si olvidas la contraseña, te llega un enlace a ' + authMascara(e) + '.', 7000);

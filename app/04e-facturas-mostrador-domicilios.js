@@ -1498,7 +1498,7 @@ document.getElementById('invoiceApplyBtn').addEventListener('click', async () =>
   if(raisedDetail.length){
     const lines = raisedDetail.map(r => '• ' + r.name + ': ' + fmt(r.from) + ' → ' + fmt(r.to) + (r.pct != null ? ' (+' + r.pct + '%)' : ''));
     setTimeout(() => {
-      alert('📈 El proveedor subió el precio de:\n\n' + lines.join('\n') + '\n\nRevisa si también te toca subir el precio de venta.');
+      showAviso({ icon: '📈', title: 'El proveedor subió el precio', message: lines.join('\n') + '\n\nRevisa si también te toca subir el precio de venta.' });   // 1.99.5: ventana propia
     }, 300);
   }
 });

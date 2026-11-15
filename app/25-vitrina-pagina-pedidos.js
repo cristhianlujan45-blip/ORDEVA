@@ -59,7 +59,7 @@
     g.querySelector('#vitPromos').addEventListener('click', e => {
       const b = e.target.closest('[data-pr]'); if(!b) return;
       const v = V(), i = v.promos.findIndex(x => x.id === b.dataset.pr); if(i < 0) return;
-      if(b.dataset.a === 'del'){ if(!confirm('¿Quitar esta promoción?')) return; v.promos.splice(i, 1); guardar(); pintar(); }
+      if(b.dataset.a === 'del'){ const idP = b.dataset.pr; showConfirm({ icon: '🎁', title: '¿Quitar esta promoción?', message: 'Tus clientes dejarán de verla en tu página.', confirmText: 'Sí, quitar' }).then(si => { const v2 = V(), j = v2.promos.findIndex(x => x.id === idP); if(si && j >= 0){ v2.promos.splice(j, 1); guardar(); pintar(); } }); return; }
       else if(b.dataset.a === 'up' && i > 0){ [v.promos[i - 1], v.promos[i]] = [v.promos[i], v.promos[i - 1]]; guardar(); pintar(); }
       else if(b.dataset.a === 'ed') editar(v.promos[i]);
     });
