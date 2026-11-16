@@ -299,6 +299,16 @@ async function admin(req: Request, env: Env, accion: string, b: Record<string, u
       return { ok: true, negocios: await db.rpc("srv_admin_negocios") };
     case "negocio":
       return { ok: true, ...(await db.rpc<Record<string, unknown>>("srv_admin_negocio", { p_negocio: negocioDe(b) })) };
+    // 1.99.13: respaldos en la nube de un negocio (cuántas ventas y productos tenía cada uno) y restaurar uno.
+    case "respaldos":
+      return { ok: true, ...(await db.rpc<Record<string, unknown>>("srv_admin_respaldos", { p_negocio: negocioDe(b) })) };
+    case "respaldo_restaurar": {
+      const id = Number(b.respaldo);
+      if (!Number.isSafeInteger(id) || id <= 0) throw new ErrorVento("dato", "Falta el respaldo.", 400);
+      const r = await db.rpc<Record<string, unknown>>("srv_admin_respaldo_restaurar", { p_negocio: negocioDe(b), p_respaldo: id, p_admin: a });
+      log("info", "respaldo_restaurado_admin", { negocio: String(b.negocio), respaldo: id, admin: a });
+      return { ok: true, ...r };
+    }
     // 🧾 Facturación electrónica DIAN: cada negocio con su empresa (NIT) en MATIAS
     case "dian_lista":
       return { ok: true, servidor: DIAN.configurado(env), ambiente: DIAN.esPruebas(env) ? "pruebas" : "produccion", negocios: await db.rpc("srv_dian_admin_lista") };

@@ -73,7 +73,9 @@ async function pruebas(sb) {
   ver = Number((await uno('select version from datos_negocio where negocio_id = $1', [NEG])).version);
   await sb.sql("update respaldos set creado_en = now() - interval '2 hours' where negocio_id = $1", [NEG]);
   await rpc('guardar_datos', { p_negocio: NEG, p_datos: { businessName: 'Bar Respaldos' }, p_version: ver }, dueno.token);
-  chk('Con más de 48 respaldos se quedan los 48 más nuevos', Number((await uno('select count(*) n from respaldos where negocio_id = $1', [NEG])).n) === 48);
+  // 1.99.13: además de los 48 más nuevos se queda el primero de cada día (todos estos son del mismo día): 48 o 49.
+  const nR = Number((await uno('select count(*) n from respaldos where negocio_id = $1', [NEG])).n);
+  chk('Con más de 48 respaldos se quedan los 48 más nuevos (y el primero del día)', nR === 48 || nR === 49, nR);
 }
 
 (async () => {

@@ -990,7 +990,7 @@
    Si después de recargar el servidor todavía entrega la versión vieja, no se queda recargando: deja el aviso. */
 (function(){
   'use strict';
-  var ADMIN_VERSION = '2026-11-16 · v1.99.12';
+  var ADMIN_VERSION = '2026-11-16 · v1.99.13';
   var ultima = 0, oculto = 0, inicio = Date.now();
   function corta(v){ return String(v).split('·').pop().trim(); }
   function libre(){
@@ -1912,6 +1912,7 @@
           '<button class="b" type="button" data-sxa="dar" data-id="' + nid + '">🎁 Dar meses</button><button class="b" type="button" data-sxa="prueba" data-id="' + nid + '">🎬 Dar prueba</button>' + (s && s.status !== 'canceled' ? '<button class="b no" type="button" data-sxa="cancelar" data-id="' + nid + '">⛔ Cancelar</button>' : '') +
           (n.bloqueado_en ? '<button class="b p" type="button" data-sxa="desbloquear" data-id="' + nid + '">🔓 Desbloquear negocio</button>' : '<button class="b no" type="button" data-sxa="bloquear" data-id="' + nid + '">🔒 Bloquear negocio</button>') + '</div>' +
         '<div class="sx-sec"><h3>Datos del negocio</h3>' + sxStats(j.resumen) + '</div>' +
+        '<div class="sx-sec" id="sxResp"><h3>☁️ Respaldos en la nube</h3><p class="soft" style="margin:0 0 8px">Copias automáticas de los datos de este negocio (una por hora de los últimos 2 días y una por día de los últimos 60). Sirven para recuperar ventas, productos o inventario que se perdieron.</p><button class="b" type="button" data-sxa="respaldos" data-id="' + nid + '">☁️ Ver respaldos</button></div>' +
         '<div class="sx-sec"><h3>Lo que puede usar hoy</h3><div class="chips">' + (Object.keys(ents).map(k => '<span class="chip' + (ents[k] ? '' : ' no') + '">' + (ents[k] ? '✓ ' : '') + esc(nomEnt(k)) + '</span>').join('') || '<span class="soft">—</span>') + '</div></div>' +
         '<div class="sx-sec"><h3>Equipo</h3><div class="list">' + (miembros || '<div class="soft">Sin personas.</div>') + '</div></div>' +
         '<div class="sx-sec"><h3>Pagos</h3><div class="list">' + (pagos || '<div class="soft">Todavía no ha enviado pagos.</div>') + '</div></div>' +
@@ -2013,7 +2014,51 @@
     else if(a === 'plan' || a === 'dar' || a === 'prueba' || a === 'cancelar' || a === 'activar') sxAbrirAccion(a, id);
     else if(a === 'editarplan') sxAbrirPlan(id);
     else if(a === 'bloquear' || a === 'desbloquear') sxBloquearNegocio(id, a === 'bloquear', b);
+    else if(a === 'respaldos') sxPintarRespaldos(id, b);
+    else if(a === 'restaurar') sxRestaurarRespaldo(id, b.dataset.r, b);
     else if(a === 'dianconectar' || a === 'diandesconectar') sxDianConectar(id, a === 'dianconectar' ? (b.dataset.cu || ($('sxDianCu') || {}).value || '') : '', b);
+  }
+  // ---- ☁️ 1.99.13: respaldos en la nube de un negocio. Se ve cuántas ventas y productos tenía cada copia (para encontrar
+  //      cuándo se perdieron) y se puede restaurar una: lo de ahora queda primero como respaldo, así que se puede deshacer.
+  async function sxPintarRespaldos(id, btn){
+    const box = $('sxResp'); if(!box) return;
+    if(btn) btn.disabled = true;
+    try{
+      const j = await sxApi('respaldos', { negocio: id }), a = j.actual || {}, L = j.respaldos || [];
+      const num = x => (+x || 0).toLocaleString('es-CO');
+      const fila = r => {
+        return '<tr><td>' + esc(fCoHora(r.creado_en)) + '</td><td style="text-align:right">' + num(r.ventas) + '</td><td style="text-align:right">' + num(r.productos) +
+          '</td><td style="text-align:right">' + num(r.inventario) + '</td><td style="text-align:right">' + num(r.compras) + '</td><td style="text-align:right">' + num(r.gastos) + '</td><td class="soft" style="font-size:12px">' + esc(r.por || '—') +
+          '</td><td><button class="b" type="button" data-sxa="restaurar" data-id="' + esc(id) + '" data-r="' + esc(r.id) + '" data-res="' + esc(fCoHora(r.creado_en) + ' · ' + num(r.ventas) + ' ventas · ' + num(r.productos) + ' productos') + '">↩️ Restaurar</button></td></tr>';
+      };
+      box.innerHTML = '<h3>☁️ Respaldos en la nube</h3>' +
+        '<p style="margin:0 0 8px"><b>Hoy:</b> ' + num(a.ventas) + ' ventas · ' + num(a.productos) + ' productos · ' + num(a.inventario) + ' con inventario · ' + num(a.compras) + ' facturas · ' + num(a.gastos) + ' gastos' +
+          (a.actualizado_en ? ' <span class="soft">(guardado ' + esc(fCoHora(a.actualizado_en)) + (a.por ? ' por ' + esc(a.por) : '') + ')</span>' : '') + '</p>' +
+        (L.length ? '<div style="overflow-x:auto"><table class="tbl" style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr><th style="text-align:left">Copia</th><th>Ventas</th><th>Productos</th><th>Inventario</th><th>Facturas</th><th>Gastos</th><th style="text-align:left">Guardó</th><th></th></tr></thead><tbody>' +
+          L.map(fila).join('') + '</tbody></table></div>' +
+          '<p class="soft" style="margin:8px 0 0">Las filas resaltadas tenían bastante más ventas o productos que la copia más nueva siguiente: ahí puede estar lo que se perdió. Al restaurar, lo de hoy queda como una copia más (se puede volver a él).</p>'
+          : '<div class="soft">Este negocio todavía no tiene respaldos en la nube.</div>');
+      // Resaltar dónde bajaron mucho las cifras (comparando cada copia con la más nueva siguiente).
+      const filas = box.querySelectorAll('tbody tr');
+      L.forEach((r, i) => { const nuevo = i ? L[i - 1] : a; if(nuevo && ((+r.ventas || 0) > (+nuevo.ventas || 0) + 5 || (+r.productos || 0) > (+nuevo.productos || 0) + 5)) filas[i].style.background = 'var(--card2)'; });
+    }catch(e){
+      if(e.codigo === 'no_admin' || e.status === 401){ sxFallo(e); return; }
+      box.innerHTML = '<h3>☁️ Respaldos en la nube</h3><div class="empty bad-t">⚠️ ' + esc(sxMsgError(e)) + '</div>';
+    }
+  }
+  async function sxRestaurarRespaldo(id, respaldo, btn){
+    const n = (sx.negAct && sx.negAct.negocio && sx.negAct.negocio.nombre) || 'este negocio';
+    const txt = btn.dataset.res || '';
+    if(!confirm('¿Restaurar los datos de «' + n + '» a la copia del ' + txt + '?\n\nLo que tiene hoy queda guardado como una copia más (se puede volver a él). Los celulares del negocio bajan los datos restaurados al conectarse.')) return;
+    const escrito = prompt('Para confirmar, escribe RESTAURAR');
+    if(String(escrito || '').trim().toUpperCase() !== 'RESTAURAR'){ toast('No se restauró nada.', 4000); return; }
+    btn.disabled = true;
+    try{
+      const r = await sxApi('respaldo_restaurar', { negocio: id, respaldo: respaldo });
+      const x = r.restaurado || {};
+      toast('✅ Restaurado: ' + (+x.ventas || 0).toLocaleString('es-CO') + ' ventas y ' + (+x.productos || 0).toLocaleString('es-CO') + ' productos.', 7000);
+      sxAbrirNegocio(id, true).then(() => sxPintarRespaldos(id));
+    }catch(e){ btn.disabled = false; toast('⚠️ ' + sxMsgError(e), 7000); }
   }
   // ---- 🧾 Facturación electrónica DIAN del negocio: su empresa (NIT) en MATIAS y sus documentos ----
   const SX_DIAN = { aceptado: ['✅ Validado', 'ok'], pendiente: ['⏳ Por enviar', 'soft'], en_proceso: ['⏳ En proceso', 'soft'], rechazado: ['❌ Rechazado', 'bad'], anulado: ['↩️ Anulado', 'soft'] };

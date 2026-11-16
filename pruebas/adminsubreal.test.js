@@ -195,6 +195,23 @@ const hoy = () => new Date(Date.now() - 5 * 3600e3).toISOString().slice(0, 10);
     chk('🔓 Desbloquear: vuelve a funcionar (y el botón vuelve a «Bloquear»)', await esperar(() => !!document.querySelector('#sxNegCuerpo [data-sxa="bloquear"]')) &&
       !(await uno('select bloqueado_en from negocios where id = $1', [NEG1])).bloqueado_en && !!(await api('/estado', { negocio: NEG1 }, dueno.token)).j.token);
     respPrompt = null;
+    // ☁️ 1.99.13: respaldos en la nube del negocio. Una copia vieja con más ventas se ve resaltada y se restaura (pide
+    // confirmar y escribir RESTAURAR); lo de antes queda como respaldo.
+    const datosBuenos = { businessName: 'Bar Real', products: [{ id: 'r1', name: 'Club', price: 6000 }, { id: 'r2', name: 'Poker', price: 4500 }], history: [1, 2, 3, 4, 5, 6, 7].map(i => ({ id: 'rv' + i, total: 6000 })) };
+    for(let i = 0; i < 7; i++) datosBuenos.products.push({ id: 'rx' + i, name: 'Prod ' + i, price: 1000 });
+    const RESP = Number((await uno("insert into respaldos(negocio_id, datos, version, creado_en) values ($1, $2::jsonb, 3, now() - interval '30 hours') returning id", [NEG1, JSON.stringify(datosBuenos)])).id);
+    await p.click('#sxNegCuerpo [data-sxa="respaldos"]');
+    await esperar(R => !!document.querySelector('#sxResp [data-r="' + R + '"]'), RESP, 12000);
+    const filaR = await p.evaluate(R => { const b = document.getElementById('sxResp'), f = [...b.querySelectorAll('tbody tr')].find(r => r.querySelector('[data-r="' + R + '"]'));
+      return { hoy: /Hoy:\s*4 ventas/.test(b.textContent), v: f && f.cells[1].textContent.trim(), pr: f && f.cells[2].textContent.trim(), res: !!(f && f.style.background) }; }, RESP);
+    chk('☁️ Respaldos: muestra lo de hoy (4 ventas) y la copia vieja con 7 ventas y 9 productos, resaltada', filaR.hoy && filaR.v === '7' && filaR.pr === '9' && filaR.res, filaR);
+    dialogos.length = 0; respPrompt = 'RESTAURAR';
+    const vAntes = Number((await uno('select version from datos_negocio where negocio_id = $1', [NEG1])).version);
+    await p.click('#sxResp [data-r="' + RESP + '"]');
+    const restaurado = await (async () => { for(let i = 0; i < 40; i++){ const d = await uno('select datos, version from datos_negocio where negocio_id = $1', [NEG1]); if(Number(d.version) > vAntes) return d; await new Promise(r => setTimeout(r, 250)); } return null; })();
+    chk('☁️ Restaurar: pide confirmar y escribir RESTAURAR, y el negocio queda con las 7 ventas y 9 productos de la copia', dialogos.join(',') === 'confirm,prompt' && restaurado && restaurado.datos.history.length === 7 && restaurado.datos.products.length === 9, { dialogos, v: restaurado && restaurado.version });
+    chk('☁️ …lo de antes quedó como respaldo (se puede deshacer)', Number((await uno("select count(*) n from respaldos where negocio_id = $1 and creado_en > now() - interval '5 minutes'", [NEG1])).n) >= 1);
+    respPrompt = null;
     await p.click('#dlgSxNeg [data-cerrar]');
 
     // Planes y configuración: lo que se guarda llega a la base
