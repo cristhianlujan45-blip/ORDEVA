@@ -67,7 +67,8 @@ begin
     where negocio_id = r.negocio_id returning version into v;
   if v is null then raise exception 'no_existe'; end if;
   begin perform public.canal_privado_anotar(r.negocio_id, d); exception when others then null; end;
-  begin perform vento_auditar(r.negocio_id, p_admin, null, 'respaldo_restaurado_admin', jsonb_build_object('respaldo', p_respaldo, 'version_respaldo', r.version, 'creado_en', r.creado_en)); exception when others then null; end;
+  -- Sin «exception»: si no queda en la auditoría, no se restaura (revisión 1.99.13).
+  perform vento_auditar(r.negocio_id, p_admin, null, 'respaldo_restaurado_admin', jsonb_build_object('respaldo', p_respaldo, 'version_respaldo', r.version, 'creado_en', r.creado_en));
   return jsonb_build_object('version', v, 'restaurado', sub_resumen(d));
 end $$;
 
