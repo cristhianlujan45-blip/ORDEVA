@@ -8,6 +8,7 @@
 //  6. (1.99.3, hallazgo 12) Encabezado del celular: sin «Salir» junto a la campana ni reloj; el nombre tiene espacio.
 //  7. (hallazgo 13) La versión en Ajustes se lee «ORDEVA 1.99.3 · 15 nov 2026», solo en la lista de categorías.
 //  9. (hallazgo 20) Tipos de negocio más comunes primero; la Libreta con 2 ejemplos a la vista y el resto plegado.
+// 14. (1.99.12, hallazgo 7) Facturas, Contabilidad y Ajustes › Negocio: 44 px en el celular.
 // 13. (1.99.11, hallazgo 7) Cuenta de la mesa e Inventario: 44 px en el celular.
 // 12. (1.99.10, hallazgo 7) Mesas y Caja: botones de 44 px en el celular; herramientas de la venta en una fila.
 // 11. (1.99.7, hallazgo 17) Página del QR: con 🎮 Play las 4 pestañas en una sola fila.
@@ -200,6 +201,16 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     await p.evaluate(() => { const b = document.querySelector('nav button[data-view="inventario"]') || document.querySelector('.more-tile[data-go="inventario"]'); b && b.click(); }); await pausa(600);
     v = await chicosEn('#view-inventario');
     chk('13. Inventario en el celular: herramientas, categorías, formulario y botones de cada producto de 44 px o más', !v.length, v);
+
+    // 14 · Hallazgo 7 (1.99.12): Facturas, Contabilidad y Ajustes › Negocio, 44 px en el celular
+    for(const [nom, vista, cat] of [['Facturas', 'historial'], ['Contabilidad', 'contabilidad'], ['Ajustes › Negocio', 'ajustes', 'negocio']]){
+      await p.evaluate(v => { document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')); const b = document.querySelector('nav button[data-view="' + v + '"]') || document.querySelector('.more-tile[data-go="' + v + '"]'); b && b.click(); }, vista); await pausa(600);
+      if(cat){ await p.click('.ajustes-cat[data-cat="' + cat + '"]'); await pausa(900); }
+      v = await p.evaluate(r => [...document.querySelector(r).querySelectorAll('button, select, summary, input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=hidden]):not([type=range]):not([type=color])')].filter(b => b.offsetParent)
+        .map(b => { const x = b.getBoundingClientRect(); return { t: (b.innerText || b.placeholder || b.id || '').trim().slice(0, 14), h: Math.round(x.height) }; }).filter(x => x.h > 0 && x.h < 44), '#view-' + vista);
+      chk('14. ' + nom + ' en el celular: botones, campos y listas de 44 px o más', !v.length, v);
+    }
+    await p.evaluate(() => { const b = document.getElementById('ajustesBackBtn'); if(b && !b.hidden) b.click(); });
 
     // 11 · Hallazgo 17 (1.99.7): en la página del cliente (QR) las 4 pestañas con 🎮 Play van en una sola fila
     for(const w of [320, 390]){
