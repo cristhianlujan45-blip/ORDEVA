@@ -8,6 +8,7 @@
 //  6. (1.99.3, hallazgo 12) Encabezado del celular: sin «Salir» junto a la campana ni reloj; el nombre tiene espacio.
 //  7. (hallazgo 13) La versión en Ajustes se lee «ORDEVA 1.99.3 · 15 nov 2026», solo en la lista de categorías.
 //  9. (hallazgo 20) Tipos de negocio más comunes primero; la Libreta con 2 ejemplos a la vista y el resto plegado.
+// 12. (1.99.10, hallazgo 7) Mesas y Caja: botones de 44 px en el celular; herramientas de la venta en una fila.
 // 11. (1.99.7, hallazgo 17) Página del QR: con 🎮 Play las 4 pestañas en una sola fila.
 // 10. (1.99.5, hallazgo 19) Ventanas propias para escribir un dato y para avisar; borrar categoría pregunta en la de ORDEVA.
 //  8. (1.99.4, hallazgo 5) Ajustes › Negocio: índice arriba, tipo de negocio y funciones plegados, el buscador los despliega.
@@ -172,6 +173,21 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     v = await p.evaluate(async () => { const a = showConfirm({ title: 'Primera' }); const b2 = showConfirm({ title: 'Segunda' }); const r1 = await Promise.race([a, new Promise(r => setTimeout(() => r('colgada'), 300))]); document.getElementById('confirmCancelBtn').click(); return { r1, r2: await b2 }; });
     chk('10. Si se abre una confirmación encima de otra, la primera cuenta como «Cancelar» (no queda colgada)', v.r1 === false && v.r2 === false, v);
     chk('10. Ninguna ventana del navegador salió en todo esto', !dialogosNav.length, dialogosNav);
+    // 12 · Hallazgo 7 (1.99.10): en el celular los botones de uso diario de Mesas y Caja miden al menos 44 px
+    await p.setViewportSize({ width: 390, height: 844 });
+    await p.evaluate(() => { document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')); document.querySelector('nav button[data-view="mesas"]').click(); }); await pausa(400);
+    const chicos = () => p.evaluate(() => [...document.querySelectorAll('#view-mesas .config-row > button, .pl-seg > button, .pz-caja-top > button, .pz-cats > button, .pz-herr2 > button, .pz-est-btn, .pz-step > button, .pz-linea .pz-x')]
+      .filter(b => b.offsetParent).map(b => { const r = b.getBoundingClientRect(); return { t: b.innerText.trim().slice(0, 14), h: Math.round(r.height), w: Math.round(r.width) }; }).filter(x => x.h < 44 || x.w < 44));
+    v = await chicos();
+    chk('12. Mesas en el celular: «Venta rápida», «Caja (POS)», Lista/Plano… todos de 44 px o más', !v.length, v);
+    await p.click('#posNav'); await pausa(800);
+    await p.locator('.pz-grid .pz-tile:visible').first().click(); await pausa(400);
+    v = await chicos();
+    chk('12. Caja en el celular: categorías, + y −, Descuento/Nota/Suspender… todos de 44 px o más', !v.length, v);
+    v = await p.evaluate(() => { const h = document.querySelector('.pz-herr2'), bs = h ? [...h.children].filter(x => x.offsetParent) : []; return { filas: new Set(bs.map(b => Math.round(b.getBoundingClientRect().top))).size, ancho: document.documentElement.scrollWidth <= window.innerWidth + 1 }; });
+    chk('12. Las herramientas de la venta van en una sola fila (no tapan los productos) y nada se sale de lado', v.filas === 1 && v.ancho, v);
+    await p.evaluate(() => document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')));
+
     // 11 · Hallazgo 17 (1.99.7): en la página del cliente (QR) las 4 pestañas con 🎮 Play van en una sola fila
     for(const w of [320, 390]){
       const cq = await b.newContext({ viewport: { width: w, height: 700 }, locale: 'es-CO' });
