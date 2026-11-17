@@ -47,6 +47,17 @@ jobs:
                        (n.creado_en at time zone 'America/Bogota')::date::text creado,
                        (d.actualizado_en at time zone 'America/Bogota')::text guardado
                 from negocios n left join datos_negocio d on d.negocio_id = n.id) x),
+            'negocios_y_equipos', (select coalesce(json_agg(x order by x.creado), '[]') from (
+                -- Cada negocio con su nombre (el del negocio, no de personas) y los equipos que lo usan (marca/sistema, sin nombres).
+                select left(n.id::text, 8) neg, left(n.nombre, 40) nombre_nube, left(coalesce(d.datos->>'businessName', ''), 40) nombre_en_datos,
+                       (select regexp_replace(lower(u.email), '^(.{2})[^@]*@(.).*\.([a-z]+)$', '\1***@\2***.\3') from auth.users u where u.id = n.creado_por) dueno,
+                       sub_largo(d.datos->'products') productos, sub_largo(d.datos->'history') ventas,
+                       (n.creado_en at time zone 'America/Bogota')::date::text creado,
+                       (select coalesce(json_agg(json_build_object('equipo', left(coalesce(e.plataforma, '?'), 70), 'rol', coalesce(m.rol, '?'),
+                                                                   'visto', (e.ultimo_visto at time zone 'America/Bogota')::text) order by e.ultimo_visto desc), '[]')
+                          from dispositivos e left join miembros m on m.negocio_id = e.negocio_id and m.usuario_id = e.usuario_id
+                          where e.negocio_id = n.id and e.revocado_en is null) equipos
+                from negocios n left join datos_negocio d on d.negocio_id = n.id) x),
             'cuentas_por_semana', (select coalesce(json_agg(x order by x.semana desc), '[]') from (
                 select to_char(date_trunc('week', u.created_at at time zone 'America/Bogota'), 'YYYY-MM-DD') semana, count(*) creadas,
                        count(*) filter (where u.email_confirmed_at is null) sin_confirmar,
