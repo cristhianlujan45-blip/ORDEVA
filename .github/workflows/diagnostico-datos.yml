@@ -1,0 +1,93 @@
+# ORDEVA · 🔎 Diagnóstico de los datos de una cuenta (SOLO LECTURA, se corre a mano).
+# Para cuando un dueño dice «se perdieron mis ventas / mis productos». Responde, para los negocios de UNA cuenta:
+#   • cuántas ventas, productos e inventario tiene hoy cada negocio, y cuándo se guardó por última vez (y con qué rol);
+#   • los respaldos en la nube (cuántas ventas y productos tenía cada copia): ahí se ve cuándo bajaron;
+#   • los últimos cambios guardados de ventas y productos (cuántos se borraron o se reemplazaron, quién por rol);
+#   • lo que dice la auditoría del negocio (solo el tipo de acción y cuántas veces).
+# Sin correos, nombres ni datos de clientes: la cuenta se busca por su HUELLA (md5 del correo en minúsculas), que se
+# pasa al correrlo; los negocios salen por los primeros 8 caracteres de su id. No cambia nada (una sola consulta select).
+name: Diagnóstico de datos de una cuenta
+
+on:
+  workflow_dispatch:
+    inputs:
+      huella:
+        description: 'md5 del correo en minúsculas (32 letras/números)'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostico:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Consultar (solo lectura)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          HUELLA: ${{ github.event.inputs.huella }}
+        run: |
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ] || [ -z "$PROJECT_REF" ]; then echo "Faltan los secretos"; exit 1; fi
+          if ! printf '%s' "$HUELLA" | grep -Eq '^[0-9a-f]{32}$'; then echo "La huella debe ser 32 letras/números (md5)"; exit 1; fi
+          cat > /tmp/q.sql <<'SQL'
+          with u as (select id, created_at, last_sign_in_at from auth.users where md5(lower(email)) = '__HUELLA__' limit 1),
+          negs as (
+            select n.id, n.creado_en, n.creado_por = u.id as la_creo, m.rol
+            from negocios n cross join u
+            left join miembros m on m.negocio_id = n.id and m.usuario_id = u.id
+            where m.usuario_id is not null or n.creado_por = u.id
+          ),
+          rol_de as (select negocio_id, usuario_id, rol from miembros)
+          select json_build_object(
+            'ahora_bogota', (now() at time zone 'America/Bogota')::text,
+            'cuenta', (select json_build_object('existe', true, 'creada', (created_at at time zone 'America/Bogota')::text,
+                                                'ultimo_ingreso', (last_sign_in_at at time zone 'America/Bogota')::text) from u),
+            'negocios', (select coalesce(json_agg(x order by x.creado), '[]') from (
+                select left(g.id::text, 8) neg, g.rol, g.la_creo, (g.creado_en at time zone 'America/Bogota')::text creado,
+                       (select count(*) from miembros m where m.negocio_id = g.id) personas,
+                       sub_resumen(coalesce(d.datos, '{}'::jsonb)) hoy, d.version,
+                       (d.actualizado_en at time zone 'America/Bogota')::text guardado,
+                       coalesce((select r.rol from rol_de r where r.negocio_id = g.id and r.usuario_id = d.actualizado_por), case when d.actualizado_por is null then null else 'otro' end) guardado_por_rol,
+                       (select count(*) from respaldos rs where rs.negocio_id = g.id) respaldos
+                from negs g left join datos_negocio d on d.negocio_id = g.id) x),
+            'respaldos', (select coalesce(json_agg(x order by x.neg, x.creado desc), '[]') from (
+                select left(r.negocio_id::text, 8) neg, (r.creado_en at time zone 'America/Bogota')::text creado, r.version,
+                       sub_resumen(coalesce(r.datos, '{}'::jsonb)) tenia,
+                       coalesce((select x.rol from rol_de x where x.negocio_id = r.negocio_id and x.usuario_id = r.creado_por), case when r.creado_por is null then null else 'otro' end) por_rol
+                from respaldos r where r.negocio_id in (select id from negs)) x),
+            'cambios_ventas_productos', (select coalesce(json_agg(x order by x.neg, x.version desc), '[]') from (
+                select left(c.negocio_id::text, 8) neg, c.version, (c.creado_en at time zone 'America/Bogota')::text cuando,
+                       coalesce((select x.rol from rol_de x where x.negocio_id = c.negocio_id and x.usuario_id = c.creado_por), case when c.creado_por is null then null else 'otro' end) por_rol,
+                       (select json_object_agg(k, case when v ? 'x' then json_build_object('borrado_todo', true)
+                                                       when v ? 'v' then json_build_object('reemplazado_con', case when jsonb_typeof(v->'v') = 'array' then jsonb_array_length(v->'v') else -1 end)
+                                                       when v ? 'l' then json_build_object('quitados', jsonb_array_length(coalesce(v->'l'->'del', '[]'::jsonb)),
+                                                                                           'cambiados', jsonb_array_length(coalesce(v->'l'->'set', '[]'::jsonb)),
+                                                                                           'nuevos', jsonb_array_length(coalesce(v->'l'->'pre', '[]'::jsonb)))
+                                                       else json_build_object('otro', true) end)
+                          from jsonb_each(c.cambios) e(k, v) where k in ('products', 'history', 'purchases', 'closures', 'anuladas')) que
+                from datos_cambios c
+                where c.negocio_id in (select id from negs)
+                  and exists (select 1 from jsonb_object_keys(c.cambios) k where k in ('products', 'history', 'purchases', 'closures', 'anuladas'))
+                order by c.version desc limit 150) x),
+            'auditoria', (select coalesce(json_agg(x order by x.ultimo desc), '[]') from (
+                select left(a.negocio_id::text, 8) neg, a.accion, count(*) veces,
+                       (min(a.creado_en) at time zone 'America/Bogota')::text primero, (max(a.creado_en) at time zone 'America/Bogota')::text ultimo
+                from auditoria a where a.negocio_id in (select id from negs) and a.creado_en > now() - interval '30 days'
+                group by 1, 2) x),
+            'negocios_que_bajaron_mucho', (select coalesce(json_agg(x order by x.max_productos desc), '[]') from (
+                -- De TODOS los negocios (sin nombres): los que en algún respaldo tenían bastante más productos o ventas que hoy.
+                select left(n.id::text, 8) neg, max(sub_largo(r.datos->'products')) max_productos, sub_largo(d.datos->'products') productos_hoy,
+                       max(sub_largo(r.datos->'history')) max_ventas, sub_largo(d.datos->'history') ventas_hoy,
+                       (d.actualizado_en at time zone 'America/Bogota')::text guardado
+                from negocios n join datos_negocio d on d.negocio_id = n.id join respaldos r on r.negocio_id = n.id
+                group by n.id, d.datos, d.actualizado_en
+                having max(sub_largo(r.datos->'products')) > sub_largo(d.datos->'products') + 10 or max(sub_largo(r.datos->'history')) > sub_largo(d.datos->'history') + 10
+                limit 30) x)
+          ) resultado;
+          SQL
+          sed -i "s/__HUELLA__/$HUELLA/" /tmp/q.sql
+          jq -n --rawfile q /tmp/q.sql '{query: $q}' > /tmp/q.json
+          curl -sS -X POST "https://api.supabase.com/v1/projects/$PROJECT_REF/database/query" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H 'Content-Type: application/json' --data @/tmp/q.json > /tmp/r.json
+          jq '.[0].resultado // .' /tmp/r.json
