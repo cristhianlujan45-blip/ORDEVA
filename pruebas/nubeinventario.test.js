@@ -29,11 +29,12 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
   async function pruebas(){
     const esperar = (p, fn, arg, ms) => p.waitForFunction(([f, a]) => { try{ return (0, eval)('(' + f + ')')(a); }catch(e){ return false; } }, [String(fn), arg], { timeout: ms || 15000, polling: 250 }).then(() => true, () => false);
     const uno = async (q, pr) => (await sb.sql(q, pr))[0];
-    async function equipo(nombre, cfgInicial){
+    async function equipo(nombre, cfgInicial, exigirCorreo){
       const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
       await ctx.route('**/*', rt => { const u = new URL(rt.request().url()); return (u.hostname === 'localhost' || u.hostname === '127.0.0.1') ? rt.continue() : rt.abort(); });
       await enrutar(ctx, sb);
       await ctx.addInitScript(c => { try{ localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento-hola', '0'); if(c && !sessionStorage.getItem('cfg-puesta')){ localStorage.setItem('vento_nube_cfg', JSON.stringify(c)); sessionStorage.setItem('cfg-puesta', '1'); } }catch(e){} }, cfgInicial || null);
+      if(exigirCorreo) await ctx.addInitScript(() => { window.__ventoExigirCorreo = true; });
       const p = await ctx.newPage(); p.on('pageerror', e => errs.push(nombre + ': ' + e.message));
       await p.goto(BASE + '/index.html');
       await p.waitForSelector('#authOverlay:not([hidden])', { timeout: 15000 });
@@ -48,7 +49,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     chk('1. Con una conexión vacía guardada, ORDEVA usa la que viene con la app (no pide Supabase)', await A.p.evaluate(() => window.ventoNube.configurada()));
     await A.p.fill('#authBiz', 'Tienda Inventario'); await entrar(A.p, 'dueno@inventario.co', 'clave-dueno-1');
     chk('Celular A: crea la cuenta y su negocio queda en la nube', await dentro(A.p) && await esperar(A.p, () => !!window.ventoNube.negocio(), null, 20000));
-    await A.p.evaluate(async () => { document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')); data.products = [{ id: 'nube1', name: 'Arroz', price: 3000, stock: 4 }, { id: 'nube2', name: 'Aceite', price: 9000, stock: 2 }]; await saveData(); });
+    await A.p.evaluate(async () => { document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')); data.products = [{ id: 'nube1', name: 'Arroz', price: 3000, stock: 4 }, { id: 'nube2', name: 'Aceite', price: 9000, stock: 2 }]; data.categories = [{ id: 'cat-inv', name: 'Entradas' }]; await saveData(); });   // «cat-inv» con OTRO nombre
     chk('Celular A: la nube queda con 2 productos', await (async () => { for(let i = 0; i < 60; i++){ const d = await datosNube('dueno@inventario.co'); if(d && (d.products || []).length === 2) return true; await new Promise(r => setTimeout(r, 500)); } return false; })());
     await A.ctx.close();
 
@@ -59,7 +60,8 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     await B.p.evaluate(async () => {
       document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show'));
       const P = Array.from({ length: 30 }, (_, i) => ({ id: 'inv' + i, name: 'Producto inventariado ' + i, price: 1000 + i, stock: 10 + i, categoryId: 'cat-inv' }));
-      P.push({ id: 'prod-muestra-1', name: 'Hamburguesa de muestra', price: 1 });            // de muestra: no sube
+      P.push({ id: 'prod-muestra-1', name: 'Hamburguesa de muestra', price: 1 });            // de muestra y sin usar: no sube
+      P.push({ id: 'prod-cerveza', name: 'Cerveza Club', price: 4000, stock: 24 });           // de muestra PERO inventariada: sube
       P.push({ id: 'otroId', name: 'arroz', price: 3100 });                                   // mismo nombre que en la nube: no se repite
       data.products = P; data.categories = [{ id: 'cat-inv', name: 'Inventario' }];
       const ahora = Date.now();
@@ -72,16 +74,17 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     chk('Celular B: al actualizar, la nube queda encendida sola', await B.p.evaluate(() => window.ventoNube.configurada()));
     await entrar(B.p, 'dueno@inventario.co', 'clave-dueno-1');
     chk('Celular B: entra y se vincula a la cuenta', await dentro(B.p) && await esperar(B.p, () => !!window.ventoNube.negocio(), null, 25000));
-    const listo = await (async () => { for(let i = 0; i < 80; i++){ const d = await datosNube('dueno@inventario.co'); if(d && (d.products || []).length >= 32 && (d.history || []).length >= 3) return d; await new Promise(r => setTimeout(r, 500)); } return datosNube('dueno@inventario.co'); })();
+    const listo = await (async () => { for(let i = 0; i < 80; i++){ const d = await datosNube('dueno@inventario.co'); if(d && (d.products || []).length >= 33 && (d.history || []).length >= 3) return d; await new Promise(r => setTimeout(r, 500)); } return datosNube('dueno@inventario.co'); })();
     const ids = (listo.products || []).map(x => x.id);
-    chk('2. En la nube: los 30 productos inventariados de B + los 2 que ya estaban (32), con su stock', ids.length === 32 && ids.includes('nube1') && ids.includes('nube2') && Array.from({ length: 30 }, (_, i) => 'inv' + i).every(x => ids.includes(x)) && (listo.products.find(x => x.id === 'inv5') || {}).stock === 15, { n: ids.length, ids: ids.slice(0, 40) });
+    chk('2. En la nube: los 30 productos inventariados de B + la cerveza de muestra inventariada + los 2 que ya estaban (33), con su stock', ids.length === 33 && ids.includes('prod-cerveza') && ids.includes('nube1') && ids.includes('nube2') && Array.from({ length: 30 }, (_, i) => 'inv' + i).every(x => ids.includes(x)) && (listo.products.find(x => x.id === 'inv5') || {}).stock === 15, { n: ids.length, ids: ids.slice(0, 40) });
     chk('2. …y las 3 ventas de B', ['vb1', 'vb2', 'vb3'].every(x => (listo.history || []).some(h => h.id === x)), (listo.history || []).map(h => h.id));
-    chk('2. …y la categoría de esos productos', (listo.categories || []).some(c => c.id === 'cat-inv'), listo.categories);
+    const catInv = (listo.categories || []).find(c => c.name === 'Inventario'), p5 = (listo.products || []).find(x => x.id === 'inv5') || {};
+    chk('2. …y su categoría «Inventario»: como en la nube «cat-inv» es «Entradas», va con otro id y los productos apuntan a ella (no quedan en «Entradas»)', !!catInv && catInv.id !== 'cat-inv' && p5.categoryId === catInv.id && (listo.categories || []).some(c => c.id === 'cat-inv' && c.name === 'Entradas'), { cats: listo.categories, cat5: p5.categoryId });
     chk('3. El de muestra no subió y «arroz» (mismo nombre que «Arroz») no se repitió', !ids.includes('prod-muestra-1') && !ids.includes('otroId'), ids.filter(x => !/^inv/.test(x)));
-    chk('2. El celular B también ve los 32', await esperar(B.p, () => data.products.filter(p => !/^prod-/.test(p.id)).length >= 32, null, 10000), await B.p.evaluate(() => data.products.length));
+    chk('2. El celular B también ve los 33', await esperar(B.p, () => data.products.filter(p => !/^prod-/.test(p.id) || p.id === 'prod-cerveza').length >= 33, null, 10000), await B.p.evaluate(() => data.products.length));
 
     // ===== 4. Crear una cuenta nueva con un usuario sin correo, con la nube disponible: pide el correo =====
-    const D = await equipo('celular D');
+    const D = await equipo('celular D', null, true);
     await D.p.fill('#authBiz', 'Otro Negocio'); await entrar(D.p, 'pepito', 'clave-pepito-1');
     chk('4. Con la nube disponible, crear un negocio con un usuario sin correo pide el correo (no queda solo en el equipo)', await esperar(D.p, () => /Escribe tu correo/.test(document.getElementById('authErr').textContent), null, 5000) && !(await D.p.evaluate(() => document.getElementById('authOverlay').hidden)));
     await D.ctx.close();
@@ -90,7 +93,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     const C = await equipo('celular C');
     await C.p.click('#authTabs [data-tab="entrar"]').catch(() => {});
     await entrar(C.p, 'dueno@inventario.co', 'clave-dueno-1');
-    chk('Un celular nuevo: entra con el correo y tiene los 32 productos y las 3 ventas', await dentro(C.p) && await esperar(C.p, () => data.products.filter(p => !/^prod-/.test(p.id)).length >= 32 && ['vb1', 'vb2', 'vb3'].every(x => data.history.some(h => h.id === x)), null, 25000),
+    chk('Un celular nuevo: entra con el correo y tiene los 33 productos y las 3 ventas', await dentro(C.p) && await esperar(C.p, () => data.products.filter(p => !/^prod-/.test(p.id) || p.id === 'prod-cerveza').length >= 33 && ['vb1', 'vb2', 'vb3'].every(x => data.history.some(h => h.id === x)), null, 25000),
       await C.p.evaluate(() => ({ p: data.products.length, h: data.history.length })));
   }
 })();

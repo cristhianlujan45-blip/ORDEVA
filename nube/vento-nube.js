@@ -108,10 +108,12 @@
 
   // ---------- Copia «base» (lo último que se sincronizó) para poder mezclar ----------
   var idb = null;
+  var baseTarde = false;   // 1.99.15: la última lectura de la copia de referencia se agotó (no es lo mismo que «no hay copia»)
   function base(op, val){
     return new Promise(function(ok0){
       var listo = false, ok = function(v){ if(!listo){ listo = true; ok0(v); } };
-      setTimeout(function(){ ok(null); }, T.base);   // 1.65.10: si IndexedDB no contesta, se sigue sin la copia (no se traba)
+      if(op === 'get') baseTarde = false;
+      setTimeout(function(){ if(!listo && op === 'get') baseTarde = true; ok(null); }, T.base);   // 1.65.10: si IndexedDB no contesta, se sigue sin la copia (no se traba)
       try{
         var abrir = idb ? Promise.resolve(idb) : new Promise(function(a, b){ var r = indexedDB.open('vento-nube', 1); r.onupgradeneeded = function(){ r.result.createObjectStore('kv'); }; r.onsuccess = function(){ idb = r.result; a(idb); }; r.onerror = b; });
         abrir.then(function(db){
@@ -940,8 +942,9 @@
       // 1.99.15: «se perdieron los productos inventariados». Sin copia de referencia mandaba la nube también en los
       // productos: un equipo con su inventario que se vinculaba a una cuenta cuyo negocio en la nube tenía otros (o
       // pocos) productos los perdía. Ahora los productos y categorías de este equipo que la nube no tiene se agregan.
-      var agregados = (!b && local) ? unirCatalogo(mezcla, local) : 0;
-      if(agregados) st.sucio = true;
+      // Solo el dueño o el administrador suman productos (no el celular de un empleado), y solo si de verdad no hay copia
+      // de referencia (si leerla tardó demasiado, no: podrían volver productos que se borraron en la nube).
+      var agregados = (!b && !baseTarde && local && (n.rol === 'dueno' || n.rol === 'admin')) ? unirCatalogo(mezcla, local) : 0;
       traza('vincular', mezcla, { conBase: !!b, reiniciado: reiniciado, vr: nube.version, productosDeAqui: agregados });
       st.version = nube.version; st.sucio = !!agregados; guardarSt();
       return aplicarProtegido(mezcla, true).then(function(){
@@ -985,19 +988,34 @@
   // 1.99.15: productos y categorías de este equipo que la nube no tiene (por id, y sin repetir un producto con el mismo
   // nombre). No se agregan los de muestra que la app pone al crear el negocio (id «prod-…»). Devuelve cuántos productos.
   function unirCatalogo(destino, local){
-    var n = 0, norm = function(t){ return String(t || '').trim().toLowerCase(); };
-    if(Array.isArray(local.products) && local.products.length){
-      var P = Array.isArray(destino.products) ? destino.products : (destino.products = []);
-      var ids = {}, nombres = {}; P.forEach(function(x){ if(x){ if(x.id != null) ids[x.id] = 1; if(x.name) nombres[norm(x.name)] = 1; } });
-      local.products.forEach(function(x){
-        if(!x || x.id == null || ids[x.id] || /^prod-/.test(String(x.id)) || (x.name && nombres[norm(x.name)])) return;
-        P.push(clonar(x)); ids[x.id] = 1; if(x.name) nombres[norm(x.name)] = 1; n++;
-      });
-    }
-    if(n && Array.isArray(local.categories) && local.categories.length){
+    var n = 0, norm = function(t){ return String(t || '').trim().toLowerCase(); }, usadas = {};
+    if(!Array.isArray(local.products) || !local.products.length) return 0;
+    // Nombres que se vendieron en este equipo: un producto de muestra que el dueño SÍ usa (lo vendió o le puso stock) se queda.
+    var vendidos = {}; (Array.isArray(local.history) ? local.history : []).forEach(function(h){ (h && Array.isArray(h.items) ? h.items : []).forEach(function(it){ if(it && it.name) vendidos[norm(it.name)] = 1; }); });
+    var P = Array.isArray(destino.products) ? destino.products : (destino.products = []);
+    var ids = {}, nombres = {}; P.forEach(function(x){ if(x){ if(x.id != null) ids[x.id] = 1; if(x.name) nombres[norm(x.name)] = 1; } });
+    var nuevos = [];
+    local.products.forEach(function(x){
+      if(!x || x.id == null || ids[x.id] || (x.name && nombres[norm(x.name)])) return;
+      if(/^prod-/.test(String(x.id)) && typeof x.stock !== 'number' && !vendidos[norm(x.name)]) return;   // de muestra y sin usar
+      var y = clonar(x); P.push(y); nuevos.push(y); ids[x.id] = 1; if(x.name) nombres[norm(x.name)] = 1; n++;
+      if(y.categoryId != null) usadas[y.categoryId] = 1;
+    });
+    // Categorías: solo las que usan los productos agregados; se emparejan por nombre con las de la nube (las plantillas
+    // repiten ids como «cat-p1» con nombres distintos según el negocio).
+    if(n && Array.isArray(local.categories)){
       var C = Array.isArray(destino.categories) ? destino.categories : (destino.categories = []);
-      var ci = {}; C.forEach(function(x){ if(x && x.id != null) ci[x.id] = 1; });
-      local.categories.forEach(function(x){ if(x && x.id != null && !ci[x.id]){ C.push(clonar(x)); ci[x.id] = 1; } });
+      var porId = {}, porNombre = {}; C.forEach(function(c){ if(c){ if(c.id != null) porId[c.id] = c; if(c.name) porNombre[norm(c.name)] = c; } });
+      var cambio = {};
+      local.categories.forEach(function(c){
+        if(!c || c.id == null || !usadas[c.id]) return;
+        var mismo = porNombre[norm(c.name)];
+        if(mismo){ if(mismo.id !== c.id) cambio[c.id] = mismo.id; return; }                 // ya está (por nombre): se usa la de la nube
+        var nc = clonar(c);
+        if(porId[c.id]) nc.id = 'cat-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);   // mismo id, otro nombre
+        C.push(nc); porId[nc.id] = nc; if(nc.name) porNombre[norm(nc.name)] = nc; if(nc.id !== c.id) cambio[c.id] = nc.id;
+      });
+      nuevos.forEach(function(y){ if(y.categoryId != null && cambio[y.categoryId]) y.categoryId = cambio[y.categoryId]; });
     }
     return n;
   }

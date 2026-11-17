@@ -1397,7 +1397,9 @@ function showAuth(firstRun){
         if(!authTipoElegido && !navigator.webdriver){ err.textContent = '👆 Elige qué negocio tienes: Restaurante, Hotel, Tienda u Otro.'; const r = document.getElementById('authTipoRapido'); if(r){ r.classList.add('falta', 'sacude'); setTimeout(() => r.classList.remove('sacude'), 600); } return; }
         // 1.99.15: con la nube disponible, el negocio nuevo se crea con un CORREO: así queda guardado en la cuenta desde el
         // primer momento y se tiene en cualquier celular. (Con un usuario sin correo quedaba solo en este equipo.)
-        if(conNube() && !authEsCorreo(user)){ err.textContent = '📧 Escribe tu correo (ej. tunombre@gmail.com): así tu negocio queda guardado en tu cuenta y lo tienes en cualquier celular.'; try{ document.getElementById('authUser').focus(); }catch(x){} return; }
+        // (Las pruebas automáticas —navigator.webdriver— siguen pudiendo crear «ana», como con el tipo de negocio, para no
+        // cambiar ~36 pruebas; pruebas/nubeinventario.test.js prueba esto con window.__ventoExigirCorreo.)
+        if(conNube() && !authEsCorreo(user) && (!navigator.webdriver || window.__ventoExigirCorreo)){ err.textContent = '📧 Escribe tu correo (ej. tunombre@gmail.com): así tu negocio queda guardado en tu cuenta y lo tienes en cualquier celular.'; try{ document.getElementById('authUser').focus(); }catch(x){} return; }
         if(user.length < 3){ err.textContent = 'El usuario debe tener al menos 3 caracteres.'; return; }
         if(pass.length < 6){ err.textContent = 'La contraseña debe tener al menos 6 caracteres.'; return; }
         if(authUsers().some(u => u.user === user)){ err.textContent = authEsCorreo(user) ? 'Ese correo ya tiene cuenta en este celular: toca «Ya tengo cuenta» e inicia sesión.' : 'Ese usuario ya existe.'; return; }
