@@ -15,7 +15,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
   try{
     const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
     await ctx.route('**/*', r => new URL(r.request().url()).hostname === 'localhost' ? r.continue() : r.abort());
-    await ctx.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); }catch(e){} });
+    await ctx.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '', off: true })); }catch(e){} });   // sin nube: esta prueba no la usa (con la nube bloqueada, con la máquina cargada tardaba en crear a «juan»)
     const p = await ctx.newPage(); p.on('pageerror', e => errs.push(e.message));
     let respuesta = '2468'; p.on('dialog', d => d.type() === 'prompt' ? d.accept(respuesta) : d.accept());
     // Si la página se recarga justo mientras se espera (al sacar la sesión), lo de adentro todavía no existe: se sigue esperando.
