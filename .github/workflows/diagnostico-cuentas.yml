@@ -34,6 +34,19 @@ jobs:
             'negocios', (select count(*) from negocios),
             'negocios_vacios', (select count(*) from negocios n join datos_negocio d on d.negocio_id = n.id where coalesce(jsonb_array_length(case when jsonb_typeof(d.datos->'products') = 'array' then d.datos->'products' end), 0) = 0
                                   and coalesce(jsonb_array_length(case when jsonb_typeof(d.datos->'history') = 'array' then d.datos->'history' end), 0) = 0),
+            'negocios_por_productos', (select coalesce(json_agg(x order by x.productos_hoy desc, x.max_productos desc), '[]') from (
+                -- Cada negocio de la nube: lo que tiene hoy y lo máximo que tuvo en sus respaldos. Correo del dueño ENMASCARADO.
+                select left(n.id::text, 8) neg,
+                       (select regexp_replace(lower(u.email), '^(.{2})[^@]*@(.).*\.([a-z]+)$', '\1***@\2***.\3') from auth.users u where u.id = n.creado_por) dueno,
+                       sub_largo(d.datos->'products') productos_hoy,
+                       (select count(*) from jsonb_array_elements(case when jsonb_typeof(d.datos->'products') = 'array' then d.datos->'products' else '[]'::jsonb end) e where jsonb_typeof(e->'stock') = 'number') inventario_hoy,
+                       sub_largo(d.datos->'history') ventas_hoy,
+                       coalesce((select max(sub_largo(r.datos->'products')) from respaldos r where r.negocio_id = n.id), 0) max_productos,
+                       coalesce((select max(sub_largo(r.datos->'history')) from respaldos r where r.negocio_id = n.id), 0) max_ventas,
+                       (select count(*) from miembros m where m.negocio_id = n.id) personas,
+                       (n.creado_en at time zone 'America/Bogota')::date::text creado,
+                       (d.actualizado_en at time zone 'America/Bogota')::text guardado
+                from negocios n left join datos_negocio d on d.negocio_id = n.id) x),
             'cuentas_por_semana', (select coalesce(json_agg(x order by x.semana desc), '[]') from (
                 select to_char(date_trunc('week', u.created_at at time zone 'America/Bogota'), 'YYYY-MM-DD') semana, count(*) creadas,
                        count(*) filter (where u.email_confirmed_at is null) sin_confirmar,
