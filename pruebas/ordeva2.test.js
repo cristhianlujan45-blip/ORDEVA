@@ -17,7 +17,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
   const abrir = async (ancho, alto, extra) => {
     const ctx = await b.newContext({ viewport: { width: ancho, height: alto } });
     await ctx.route('**/*', r => new URL(r.request().url()).hostname === 'localhost' ? r.continue() : r.abort());
-    await ctx.addInitScript(x => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '' })); if(x) Object.entries(x).forEach(([k, v]) => localStorage.setItem(k, v)); }catch(e){} }, extra || null);
+    await ctx.addInitScript(x => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '', off: true })); if(x) Object.entries(x).forEach(([k, v]) => localStorage.setItem(k, v)); }catch(e){} }, extra || null);
     const p = await ctx.newPage(); p.on('pageerror', e => errs.push(e.message));
     await p.goto(BASE + '/index.html'); await p.waitForTimeout(1200);
     await p.fill('#authBiz', 'Bar Dos'); await p.fill('#authUser', 'ana'); await p.fill('#authPass', 'clave123'); await p.click('#authBtn'); await p.waitForTimeout(1500);

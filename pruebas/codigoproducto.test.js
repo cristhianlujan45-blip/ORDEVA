@@ -26,7 +26,7 @@ const COD = '7702004003300', COD2 = '7709999999999', COD3 = '7701234567897', OTR
       }
       return r.abort();
     });
-    await ctx.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '' })); }catch(e){} });
+    await ctx.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '', off: true })); }catch(e){} });
     const p = await ctx.newPage(); p.on('pageerror', e => errs.push(e.message));
     await p.goto(BASE + '/index.html'); await p.waitForTimeout(1200);
     await p.fill('#authBiz', 'Tienda Código'); await p.fill('#authUser', 'ana'); await p.fill('#authPass', 'clave123'); await p.click('#authBtn'); await p.waitForTimeout(1500);

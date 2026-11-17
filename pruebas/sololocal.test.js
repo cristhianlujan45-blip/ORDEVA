@@ -19,7 +19,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     const p = await ctx.newPage(); p.on('pageerror', e => errs.push(e.message));
     await p.goto(BASE + '/index.html'); await pausa(1000);
     await p.evaluate(() => { const s = document.getElementById('authType'); s.value = 'tienda'; s.dispatchEvent(new Event('change')); });
-    await p.fill('#authBiz', 'Tienda Inventario'); await p.fill('#authUser', 'ana'); await p.fill('#authPass', 'clave123'); await p.click('#authBtn'); await pausa(1500);
+    await p.fill('#authBiz', 'Tienda Inventario'); await p.fill('#authUser', 'ana@tienda.co'); await p.fill('#authPass', 'clave123'); await p.click('#authBtn'); await pausa(2500);   // 1.99.15: con la nube disponible se pide correo (aquí la nube no responde: queda en el equipo)
     await p.click('#onbSaltar', { timeout: 3000 }).catch(() => {});
     const inicio = () => p.evaluate(() => { document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')); const b2 = document.querySelector('nav button[data-view="inicio"]') || document.querySelector('.more-tile[data-go="inicio"]'); b2 && b2.click(); });
     const aviso = () => p.evaluate(() => { window.ventoSoloLocal.pintar(); const a = document.getElementById('soloLocalAviso'); return a && a.offsetParent ? a.innerText.replace(/\s+/g, ' ') : null; });

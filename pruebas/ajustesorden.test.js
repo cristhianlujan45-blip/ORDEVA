@@ -13,7 +13,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
   try{
     const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
     await ctx.route('**/*', r => new URL(r.request().url()).hostname === 'localhost' ? r.continue() : r.abort());
-    await ctx.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '' })); }catch(e){}
+    await ctx.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '', off: true })); }catch(e){}
       window.__cel = []; window.VentoAndroid = { notificar: (t, x, c, s) => { window.__cel.push({ t, x, c, s }); return true; }, avisosEstado: () => '{"prendidos":true,"permiso":true,"canales":{}}', info: () => '{}' }; });
     const p = await ctx.newPage(); p.on('pageerror', e => errs.push(e.message));
     await p.goto(BASE + '/index.html'); await p.waitForTimeout(1200);

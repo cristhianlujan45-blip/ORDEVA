@@ -15,7 +15,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     const ctx = await b.newContext({ viewport: { width: 390, height: 700 } });
     await ctx.route('**/*', r => new URL(r.request().url()).hostname === 'localhost' ? r.continue() : r.abort());
     await ctx.addInitScript(() => {
-      try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '' }));
+      try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '', off: true }));
         const l = []; for(let i = 0; i < 40; i++) l.push({ id: 'c' + i, song: 'Canción ' + i, title: 'Canción ' + i, vid: ('vid' + i + 'xxxxxxxxxx').slice(0, 11), mesa: 1, t: Date.now() - (40 - i) * 1000 });
         localStorage.setItem('vito_cola', JSON.stringify(l)); }catch(e){}
       const A = window.__and = { on: true, permiso: false };

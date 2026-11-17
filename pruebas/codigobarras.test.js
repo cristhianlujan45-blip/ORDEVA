@@ -28,7 +28,7 @@ const ARROZ = '7701111111111', LECHE = '7702222222222', NUEVO = '7709999999991',
   async function equipo(movil){
     const ctx = await b.newContext(movil ? { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, permissions: ['camera'] } : { viewport: { width: 1280, height: 800 }, permissions: ['camera'] });
     await ctx.route('**/*', r => new URL(r.request().url()).hostname === 'localhost' ? r.continue() : r.abort());   // sin internet
-    await ctx.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '' })); }catch(e){}
+    await ctx.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '', off: true })); }catch(e){}
       window.__enCamara = [];
       const poner = () => { if(window.ventoCodigos && !window.ventoCodigos.__sim){ window.ventoCodigos.__sim = true; window.ventoCodigos.detector = () => Promise.resolve({ detect: async () => (window.__enCamara || []).map(r => ({ rawValue: r, format: 'ean_13' })) }); } };
       document.addEventListener('DOMContentLoaded', poner); setInterval(poner, 50); });

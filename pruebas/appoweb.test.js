@@ -20,7 +20,7 @@ const UA_APP = UA_CHROME.replace('Mobile Safari/537.36', 'Mobile Safari/537.36 V
     const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, userAgent: ua });
     await ctx.route('**/*', r => new URL(r.request().url()).hostname === 'localhost' ? r.continue() : r.abort());
     await ctx.addInitScript(([app]) => {
-      try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '' })); }catch(e){}
+      try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '', off: true })); }catch(e){}
       window.__abrir = []; window.__errores = [];
       if(app){ const A = window.__and = { on: true, permiso: true };
         window.VentoAndroid = { pagosAvisos: v => { A.on = !!v; }, pagosAvisosEstado: () => JSON.stringify({ on: A.on, permiso: A.permiso }), pagosAvisosTomar: () => '[]', mediosPermiso: () => {}, notificar: () => true, pagosNotif: () => {}, pagosVolumen: () => {} }; }
@@ -80,7 +80,7 @@ const UA_APP = UA_CHROME.replace('Mobile Safari/537.36', 'Mobile Safari/537.36 V
     {
       const c = await b.newContext({ viewport: { width: 390, height: 844 }, userAgent: UA_APP.replace('1.0.25', '1.0.9') });
       await c.route('**/*', r => new URL(r.request().url()).hostname === 'localhost' ? r.continue() : r.abort());
-      await c.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '' })); }catch(e){} window.VentoAndroid = { notificar: () => true, hablar: () => {}, callar: () => {} }; window.__abrir = []; window.__errores = []; });
+      await c.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '', off: true })); }catch(e){} window.VentoAndroid = { notificar: () => true, hablar: () => {}, callar: () => {} }; window.__abrir = []; window.__errores = []; });
       const pv = await c.newPage(); pv.on('pageerror', e => errs.push(e.message));
       await pv.goto(BASE + '/index.html', { waitUntil: 'domcontentloaded' }); await pv.waitForTimeout(1500);
       await entrar(pv, 'Bar Vieja');

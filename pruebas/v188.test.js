@@ -13,7 +13,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
   const abrir = async (escala, pagina) => {
     const ctx = await b.newContext({ viewport: { width: 360, height: 780 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
     await ctx.route('**/*', r => new URL(r.request().url()).hostname === 'localhost' ? r.continue() : r.abort());
-    await ctx.addInitScript(e => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '' })); }catch(x){}
+    await ctx.addInitScript(e => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '', off: true })); }catch(x){}
       if(e != null) window.VentoAndroid = { escalaPantalla: () => e, notificar(){}, erroresNativos: () => '[]' }; }, escala);
     const p = await ctx.newPage(); p.on('pageerror', e => errs.push(e.message));
     await p.goto(BASE + '/' + (pagina || 'index.html')); await p.waitForTimeout(800);

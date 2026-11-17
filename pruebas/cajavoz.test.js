@@ -21,7 +21,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     const ctx = await b.newContext({ viewport: { width: 1366, height: 900 } });
     await ctx.route('**/*', r => new URL(r.request().url()).hostname === 'localhost' ? r.continue() : r.abort());
     await ctx.addInitScript(() => {
-      try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '' })); }catch(e){}
+      try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '', off: true })); }catch(e){}
       // Reconocedor de voz falso: «__decir(texto)» entrega la frase como la entregaría Chrome o Android.
       window.__sr = { modo: 'ok', creados: 0, inst: null };
       class SRFalso {

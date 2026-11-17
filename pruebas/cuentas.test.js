@@ -147,7 +147,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){
 
     // ===== 5. Cuenta vieja con correo que solo estaba en un celular =====
     const D = await celular('celular D');
-    await D.p.evaluate(() => localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '' })));   // como antes: sin nube
+    await D.p.evaluate(() => localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '', off: true })));   // como antes: sin nube
     await D.p.reload(); await D.p.waitForSelector('#authOverlay:not([hidden])');
     await crear(D.p, 'Tienda Vieja', 'viejo@tienda.co', 'clave456');
     chk('5. Sin nube: la cuenta se crea solo en el celular (como antes)', await dentro(D.p));

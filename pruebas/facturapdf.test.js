@@ -45,7 +45,7 @@ const FACTURA = ['DISTRIBUIDORA EL PROVEEDOR S.A.S.', 'NIT 900.123.456-7', 'FACT
       }
       return u.hostname === 'localhost' ? r.continue() : r.abort();
     });
-    await ctx.addInitScript(conIA => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '' }));
+    await ctx.addInitScript(conIA => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '', off: true }));
       if(conIA) localStorage.setItem('bar-gemini-api-key', 'AIzaPrueba_0123456789abcdefghijklmnop'); localStorage.setItem('vento-ia-ofrecida', new Date().toDateString()); }catch(e){} }, conIA);
     const p = await ctx.newPage(); p.on('pageerror', e => errs.push(e.message));
     await p.goto(BASE + '/index.html'); await p.waitForTimeout(1200);

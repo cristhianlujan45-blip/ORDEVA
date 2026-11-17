@@ -15,7 +15,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
     await ctx.route('**/*', r => new URL(r.request().url()).hostname === 'localhost' ? r.continue() : r.abort());
     await ctx.addInitScript(conApp => {
-      try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '' })); }catch(e){}
+      try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '', off: true })); }catch(e){}
       if(!conApp) return;
       const P = window.__parl = { dev: [{ id: 7, nombre: 'JBL Flip 5', clase: 'bluetooth' }, { id: 9, nombre: 'Parlante por cable', clase: 'cable' }, { id: 2, nombre: 'Parlante del celular', clase: 'celular' }],
         elegido: '', conectado: true, tipos: 'pagos,pedidos,cuenta,domicilios', dichos: [], notifs: [] };

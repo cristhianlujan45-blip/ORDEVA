@@ -43,5 +43,5 @@ module.exports = function(){
       else { limpiar(); setTimeout(() => error('nomatch'), 80); } },
     vozCancelar(){ S.cancelaciones++; limpiar(); S.sesion++; S.vivo = false; if(!S.trabado) setTimeout(() => V('end'), 20); }
   };
-  try{ localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento-hola', '0'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '' })); }catch(e){}
+  try{ localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento-hola', '0'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '', off: true })); }catch(e){}
 };

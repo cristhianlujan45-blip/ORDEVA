@@ -17,7 +17,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
     await ctx.route('**/*', r => new URL(r.request().url()).hostname === 'localhost' ? r.continue() : r.abort());
     await ctx.addInitScript(() => {
-      try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento-pp-oculta', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '' })); }catch(e){}
+      try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento-pp-oculta', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '', off: true })); }catch(e){}
       window.__dicho = [];
       // Micrófono simulado: lo que «dice» la persona sale de window.__voz
       window.__voz = [];

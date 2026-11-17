@@ -35,7 +35,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
     await ctx.route('**/*', r => new URL(r.request().url()).hostname === 'localhost' ? r.continue() : r.abort());
     await ctx.addInitScript(() => {
-      try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '' })); }catch(e){}
+      try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '', off: true })); }catch(e){}
       const A = window.__and = { on: true, permiso: true, cola: [], notifs: [], voz: [], sonidos: 0, notifPagos: [], reenvios: [] };
       window.VentoAndroid = {
         pagosAvisos: v => { A.on = !!v; }, pagosAvisosEstado: () => JSON.stringify({ on: A.on, permiso: A.permiso }),
@@ -520,7 +520,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     // 11. Navegador (sin la app): la voz sale con el volumen elegido (hasta 100 %)
     const ctx2 = await b.newContext({ viewport: { width: 1200, height: 900 } });
     await ctx2.route('**/*', r => new URL(r.request().url()).hostname === 'localhost' ? r.continue() : r.abort());
-    await ctx2.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '' })); localStorage.setItem('vento_pagos_vol', '50'); }catch(e){} });
+    await ctx2.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '', off: true })); localStorage.setItem('vento_pagos_vol', '50'); }catch(e){} });
     const p2 = await ctx2.newPage(); p2.on('pageerror', e => errs.push(e.message));
     await p2.goto(BASE + '/index.html'); await p2.waitForTimeout(1500);
     await p2.fill('#authBiz', 'Bar Web'); await p2.fill('#authUser', 'leo'); await p2.fill('#authPass', 'clave123'); await p2.click('#authBtn'); await p2.waitForTimeout(1500);

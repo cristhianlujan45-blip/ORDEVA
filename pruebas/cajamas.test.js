@@ -31,7 +31,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     // corrida entre las 12 y la 1 de la madrugada, esos caían en el día anterior y fallaba sin que nada estuviera mal.
     { const m = new Date(); m.setHours(12, 0, 0, 0); await ctx.clock.setSystemTime(m); }
     await ctx.route('**/*', r => new URL(r.request().url()).hostname === 'localhost' ? r.continue() : r.abort());
-    await ctx.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '' })); }catch(e){} });
+    await ctx.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '', off: true })); }catch(e){} });
     const p = await ctx.newPage(); p.on('pageerror', e => errs.push(e.message));
     await p.goto(BASE + '/index.html'); await pausa(1100);
     await p.fill('#authBiz', 'Tienda Completa'); await p.fill('#authUser', 'ana'); await p.fill('#authPass', 'clave123'); await p.click('#authBtn'); await pausa(1400);

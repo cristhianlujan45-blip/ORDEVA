@@ -19,7 +19,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
       const ctx = await b.newContext({ viewport: vp, ...(ua ? { userAgent: ua } : {}) });
       await ctx.route('**/*', r => new URL(r.request().url()).hostname === 'localhost' ? r.continue() : r.abort());
       await ctx.addInitScript(() => {
-        try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '' })); }catch(e){}
+        try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '', off: true })); }catch(e){}
         const A = window.__and = { cola: [], notifs: [], pagos: [], decir: [] };
         window.VentoAndroid = {
           pagosAvisos: () => {}, pagosAvisosEstado: () => JSON.stringify({ on: true, permiso: true, vivo: true }),

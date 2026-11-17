@@ -18,7 +18,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
       if(version && /\/version\.txt$/.test(u.pathname)) return r.fulfill({ status: 200, contentType: 'text/plain', body: version });
       return r.continue();
     });
-    await ctx.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '' })); }catch(e){} });
+    await ctx.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '', off: true })); }catch(e){} });
     const p = await ctx.newPage(); p.on('pageerror', e => errs.push(e.message));
     let cargas = 0; p.on('load', () => cargas++);
     await p.goto(BASE + '/index.html'); await p.waitForTimeout(1200);

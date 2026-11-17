@@ -26,7 +26,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     return p;
   };
   const pulsar = (p, k) => p.evaluate(k => document.querySelector('#pgAlertas [data-pga="' + k + '"]').click(), k);
-  const base = () => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '' })); }catch(e){} };
+  const base = () => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '', off: true })); }catch(e){} };
   try{
     // ---------- 1-3. App Android ----------
     let ctx = await b.newContext({ viewport: { width: 390, height: 844 } });

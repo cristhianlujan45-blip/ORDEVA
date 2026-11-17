@@ -45,7 +45,7 @@ function videoY4m(bits){
     const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, permissions: ['camera'] });
     await ctx.route('**/*', r => new URL(r.request().url()).hostname === 'localhost' ? r.continue() : r.abort());
     await ctx.addInitScript(() => {
-      try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '' })); }catch(e){}
+      try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '', off: true })); }catch(e){}
       // Se cuentan las cámaras abiertas (y las que siguen prendidas) y se puede simular un celular lento, ocupado o sin permiso.
       window.__cam = { pedidas: 0, vivas: () => (window.__cam.tracks || []).filter(t => t.readyState === 'live').length, tracks: [], espera: 0, fallar: [] };
       const md = navigator.mediaDevices, orig = md.getUserMedia.bind(md);

@@ -23,7 +23,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     const ctx = await b.newContext({ viewport: { width: 1366, height: 900 } });
     const permitidos = ['localhost', 'cdn.jsdelivr.net', 'ccoreilly.github.io'];
     await ctx.route('**/*', r => permitidos.includes(new URL(r.request().url()).hostname) ? r.continue() : r.abort());
-    await ctx.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '' }));
+    await ctx.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '', off: true }));
       localStorage.setItem('vento_caja_voz', JSON.stringify({ local: true, privacidad: false })); }catch(e){} });
     const p = await ctx.newPage(); p.on('pageerror', e => errs.push(e.message));
     await p.goto(BASE + '/index.html'); await p.waitForTimeout(1200);

@@ -20,7 +20,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
   try{
     const ctx = await b.newContext({ viewport: { width: 1366, height: 800 } });
     await ctx.route('**/*', r => new URL(r.request().url()).hostname === 'localhost' ? r.continue() : r.abort());
-    await ctx.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '' })); }catch(e){}
+    await ctx.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '', off: true })); }catch(e){}
       // App Android con una impresora de mentira: guarda lo que se le manda (texto legible) y responde «ok».
       window.__impreso = [];
       window.VentoEquipos = { imprimir: (cfg, b64, cb) => { const c = JSON.parse(cfg), t = atob(b64).replace(/[^\x20-\x7e\n]/g, ''); window.__impreso.push({ via: c.via, host: c.host || '', t });

@@ -16,7 +16,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
   try{
     const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, permissions: ['camera'] });
     await ctx.route('**/*', r => new URL(r.request().url()).hostname === 'localhost' ? r.continue() : r.abort());
-    await ctx.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '' })); }catch(e){}
+    await ctx.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '', off: true })); }catch(e){}
       // Lector simulado: lo que «está frente a la cámara» lo decide la prueba (window.__enCamara).
       window.__enCamara = [];
       const poner = () => { if(window.ventoCodigos && !window.ventoCodigos.__sim){ window.ventoCodigos.__sim = true; window.ventoCodigos.detector = () => Promise.resolve({ detect: async () => (window.__enCamara || []).map(r => ({ rawValue: r, format: 'ean_13' })), zxing: true }); } else if(!window.ventoCodigos) setTimeout(poner, 50); };

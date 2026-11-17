@@ -84,7 +84,7 @@ const CANALES = [ch('UCkarolg000000000000000a', 'KAROL G'), ch('UCkarolgtopic000
     // ===== 3. App =====
     usos.api.length = 0;
     const c2 = await b.newContext({ viewport: { width: 390, height: 844 } }); await enrutar(c2);
-    await c2.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '' })); localStorage.setItem('vito_yt', JSON.stringify({ key: 'AIzaClaveSinCupo000000000000000000000' })); }catch(e){} });
+    await c2.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '', off: true })); localStorage.setItem('vito_yt', JSON.stringify({ key: 'AIzaClaveSinCupo000000000000000000000' })); }catch(e){} });
     const p = await c2.newPage(); p.on('pageerror', e => errs.push('app: ' + e.message));
     await p.goto(BASE + '/index.html'); await p.waitForTimeout(1500);
     await p.fill('#authBiz', 'Bar Y'); await p.fill('#authUser', 'ana'); await p.fill('#authPass', 'clave123'); await p.click('#authBtn'); await p.waitForTimeout(1200);

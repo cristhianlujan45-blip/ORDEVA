@@ -39,7 +39,16 @@
   // ---------- Estado guardado en el celular ----------
   function lsGet(k, d){ try{ var v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; }catch(e){ return d; } }
   function lsSet(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
-  function cfg(){ var c = lsGet(K_CFG, null) || (window.VENTO_NUBE_DEFAULT || {}); return { url: String(c.url || '').trim().replace(/\/+$/, ''), key: String(c.key || '').trim() }; }
+  // 1.99.15: la conexión que viene con la app (nube/config.js) se usa SIEMPRE que lo guardado en este equipo no sirva
+  // (vacío, a medias o de una versión vieja). Antes, un equipo con algo vacío guardado se quedaba «sin nube» y pedía los
+  // datos de Supabase: el negocio quedaba solo en ese equipo. Para apagar la nube a propósito (modo demo, pruebas): { off: true }.
+  function cfgValida(c){ return !!c && /^https:\/\/[\w.-]+$/.test(String(c.url || '').trim().replace(/\/+$/, '')) && String(c.key || '').trim().length > 20; }
+  function cfg(){
+    var c = lsGet(K_CFG, null);
+    if(c && c.off) return { url: '', key: '' };
+    if(!cfgValida(c)) c = window.VENTO_NUBE_DEFAULT || {};
+    return { url: String(c.url || '').trim().replace(/\/+$/, ''), key: String(c.key || '').trim() };
+  }
   function configurada(){ var c = cfg(); return /^https:\/\/[\w.-]+$/.test(c.url) && c.key.length > 20; }
   var st = lsGet(K_ST, {});            // { email, negocio:{id,nombre,rol}, version, sucio, ultimo }
   function guardarSt(){ lsSet(K_ST, st); }
@@ -928,8 +937,13 @@
       if(!local) mezcla = nube.datos;
       else if(b && !reiniciado) mezcla = fusionar(b, local, nube.datos);
       else mezcla = registrosNuevos(local, nube.datos);
-      traza('vincular', mezcla, { conBase: !!b, reiniciado: reiniciado, vr: nube.version });
-      st.version = nube.version; st.sucio = false; guardarSt();
+      // 1.99.15: «se perdieron los productos inventariados». Sin copia de referencia mandaba la nube también en los
+      // productos: un equipo con su inventario que se vinculaba a una cuenta cuyo negocio en la nube tenía otros (o
+      // pocos) productos los perdía. Ahora los productos y categorías de este equipo que la nube no tiene se agregan.
+      var agregados = (!b && local) ? unirCatalogo(mezcla, local) : 0;
+      if(agregados) st.sucio = true;
+      traza('vincular', mezcla, { conBase: !!b, reiniciado: reiniciado, vr: nube.version, productosDeAqui: agregados });
+      st.version = nube.version; st.sucio = !!agregados; guardarSt();
       return aplicarProtegido(mezcla, true).then(function(){
         baseMem = nube.datos; baseMemDe = negId(); baseVer = nube.version; enNubeTxt = '';
         return basePut(nube.datos, nube.version);
@@ -968,6 +982,25 @@
     return antes - d.history.length;
   }
   window.ventoQuitarAnuladas = quitarAnuladas;
+  // 1.99.15: productos y categorías de este equipo que la nube no tiene (por id, y sin repetir un producto con el mismo
+  // nombre). No se agregan los de muestra que la app pone al crear el negocio (id «prod-…»). Devuelve cuántos productos.
+  function unirCatalogo(destino, local){
+    var n = 0, norm = function(t){ return String(t || '').trim().toLowerCase(); };
+    if(Array.isArray(local.products) && local.products.length){
+      var P = Array.isArray(destino.products) ? destino.products : (destino.products = []);
+      var ids = {}, nombres = {}; P.forEach(function(x){ if(x){ if(x.id != null) ids[x.id] = 1; if(x.name) nombres[norm(x.name)] = 1; } });
+      local.products.forEach(function(x){
+        if(!x || x.id == null || ids[x.id] || /^prod-/.test(String(x.id)) || (x.name && nombres[norm(x.name)])) return;
+        P.push(clonar(x)); ids[x.id] = 1; if(x.name) nombres[norm(x.name)] = 1; n++;
+      });
+    }
+    if(n && Array.isArray(local.categories) && local.categories.length){
+      var C = Array.isArray(destino.categories) ? destino.categories : (destino.categories = []);
+      var ci = {}; C.forEach(function(x){ if(x && x.id != null) ci[x.id] = 1; });
+      local.categories.forEach(function(x){ if(x && x.id != null && !ci[x.id]){ C.push(clonar(x)); ci[x.id] = 1; } });
+    }
+    return n;
+  }
   // Sin copia de referencia: los datos de la nube + los registros de este equipo que la nube no tiene (por id).
   var REGISTROS = ['history', 'closures', 'purchases', 'contab', 'anuladas'];   // 1.99.1: + las ventas anuladas
   function registrosNuevos(local, nube){
