@@ -319,12 +319,17 @@ async function loadData(txtNube){
   if(!data || typeof data !== 'object' || Array.isArray(data)){ data = defaultData(); danado = true; }
   let conectado = false;
   try{ const N = window.ventoNube; conectado = !!(N && N.negocio && N.negocio() && N.sede && N.sede() === (localStorage.getItem('bar-current-sede') || 'default')); }catch(x){}
-  const vacio = typeof txtNube !== 'string' && conectado && (danado || !res);
+  // La marca se guarda (por negocio del equipo) hasta que la nube de verdad baje los datos: si se cierra la app o no hay
+  // internet, al volver a abrir los datos de muestra que se alcanzaron a guardar tampoco se suben.
+  const kVacio = 'vento_datos_vacios:' + STORAGE_KEY;
+  let marcado = false; try{ marcado = localStorage.getItem(kVacio) === '1'; }catch(x){}
+  const vacio = typeof txtNube !== 'string' && conectado && (danado || !res || marcado);
+  try{ if(vacio) localStorage.setItem(kVacio, '1'); else if(typeof txtNube === 'string') localStorage.removeItem(kVacio); }catch(x){}
   window.__ventoDatosVacios = vacio;
-  if(danado || vacio){
+  if(danado || (vacio && !res)){
     try{ window.ventoError && window.ventoError('otro', 'Los datos guardados en este equipo estaban ' + (res ? 'dañados («' + String(res.value).slice(0, 20) + '»)' : 'borrados') + (vacio ? ': se bajan de la nube' : ': arrancó vacío')); }catch(x){}
-    if(vacio) setTimeout(() => { try{ const N = window.ventoNube; N && N.revisar && N.revisar(); }catch(x){} }, 1500);
   }
+  if(vacio) setTimeout(() => { try{ const N = window.ventoNube; N && N.revisar && N.revisar(); }catch(x){} }, 1500);
   if(!data.tables) data.tables = {};
   if(!data.products) data.products = [];
   if(!data.history) data.history = [];

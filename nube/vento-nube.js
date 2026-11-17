@@ -353,7 +353,9 @@
     traza('vacio-recuperar', datosApp());
     st.sucio = false; guardarSt(); clearTimeout(tSubir);
     bajando = true; bajandoDesde = Date.now();
-    return bajar(false, true).then(function(){ window.__ventoDatosVacios = false; finBajar(); pintarEstado(); },
+    aviso('☁️ Recuperando los datos de tu negocio desde la nube…');
+    // Con punto de restauración: si sin internet se alcanzó a vender algo sobre los datos de muestra, queda en Respaldos.
+    return bajar(true, true).then(function(){ window.__ventoDatosVacios = false; finBajar(); pintarEstado(); },
       function(e){ finBajar(); ultimoError = msgError(e); pintarEstado(); reintentar(luego()); });
   }
   // 1.68.1: cambiosN cuenta los guardados de la app: «sucio» solo se apaga si no hubo cambios mientras se subía (antes un
@@ -458,12 +460,18 @@
   function subirFoto(version){
     // 1.99.16: al abrir la app la copia de referencia solo está en IndexedDB: se lee antes de subir, para que la red de
     // seguridad («se borraron los datos de este equipo») funcione también en la primera subida después de abrir.
-    if(!(baseMem && baseMemDe === negId()) && st.negocio){
-      var de = negId();
-      return base('get').then(function(b){ if(b && de === negId() && !(baseMem && baseMemDe === negId())){ baseMem = b; baseMemDe = de; baseVer = -1; } return subirFoto0(version); });
+    if(!(baseMem && baseMemDe === negId()) && st.negocio && baseLeidaDe !== negId()){
+      var de = negId(), bt = baseTarde; baseLeidaDe = de;
+      return base('get').then(function(b){
+        baseTarde = bt;
+        if(de !== negId()) return null;                     // se cambió de negocio mientras se leía: no se sube nada aquí
+        if(b && !(baseMem && baseMemDe === negId())){ baseMem = b; baseMemDe = de; baseVer = -1; }
+        return subirFoto0(version);
+      });
     }
     return subirFoto0(version);
   }
+  var baseLeidaDe = '';
   function subirFoto0(version){
     var d = datosApp(); if(!d) return Promise.resolve(null);
     var txt = JSON.stringify(d), n0 = cambiosN;
@@ -877,8 +885,15 @@
     try{ if(canal && sb) sb.removeChannel(canal); }catch(e){} canal = null; canalDe = '';
     var p = st.sucio ? subir() : Promise.resolve();
     return p.then(function(){ return cliente(); }).then(function(c){ return c.auth.signOut(); }).catch(function(){})
-      .then(function(){ st = {}; guardarSt(); pintarEstado(); });
+      .then(function(){
+        // 1.99.16: lo que queda en este equipo sigue siendo de ese negocio: se anota, para que al entrar con OTRA cuenta
+        // no se mezcle con la suya ni se suba como si fuera de ella (app/04h authVinculoCuenta).
+        if(st.negocio) lsSet(K_PREVIO, { id: st.negocio.id, sede: st.sede || sedeActual(), t: Date.now() });
+        st = {}; guardarSt(); pintarEstado();
+      });
   }
+  var K_PREVIO = 'vento_nube_previo';
+  function previo(){ var p = lsGet(K_PREVIO, null); return p && p.id ? p : null; }
   function misNegocios(){ return rpc('mis_negocios'); }
   function crearNegocio(nombre){
     // 1.72.4: una FOTO de los datos al mandarlos (antes eran los datos vivos de la app). La copia de referencia se tomaba al
@@ -998,6 +1013,8 @@
     var ids = {}, n = 0; hb.forEach(function(x){ if(x && x.id != null && !ids[x.id]){ ids[x.id] = 1; n++; } });
     if(n < 3) return false;
     var hay = 0; hl.forEach(function(x){ if(x && ids[x.id]){ hay++; ids[x.id] = 0; } });
+    // 1.99.16: las ventas ANULADAS a propósito (data.anuladas) no cuentan como «se borraron».
+    (l && Array.isArray(l.anuladas) ? l.anuladas : []).forEach(function(a){ if(a && a.tipo === 'venta' && a.ventaId != null && ids[a.ventaId]){ hay++; ids[a.ventaId] = 0; } });
     return (n - hay) / n > 0.5;
   }
   // 🚫 1.99.1: una venta ANULADA (data.anuladas, tipo 'venta') no puede seguir en history: si otro equipo todavía la tenía,
@@ -1200,7 +1217,7 @@
 
   // ---------- API para la app ----------
   window.ventoNube = {
-    configurada: configurada, abrir: abrir, cambio: cambio, subir: subir, bajar: bajar, revisar: revisarNube, estado: textoEstado, estadoSync: estadoSync,
+    configurada: configurada, abrir: abrir, cambio: cambio, subir: subir, bajar: bajar, revisar: revisarNube, previo: previo, estado: textoEstado, estadoSync: estadoSync,
     correo: function(){ return st.negocio ? st.email : null; },
     rolActivo: function(){ return st.negocio ? st.negocio.rol : null; },
     sede: function(){ return st.negocio ? (st.sede || 'default') : null; },      // espacio de este equipo donde está ese negocio

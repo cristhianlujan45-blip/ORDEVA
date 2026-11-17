@@ -1079,13 +1079,23 @@ async function authPonerClaveLocal(user, pass){
 }
 // Deja este celular conectado al negocio de la cuenta (después de entrar). Si la cuenta todavía no tiene
 // negocio en la nube, sube el de este celular. Sin internet no pasa nada: se intenta en la próxima entrada.
+// 1.99.16: «entré con la cuenta de Cristian WKH en el Xiaomi y me salen otros datos». ¿A qué negocio de la cuenta se
+// conecta este equipo y si lo de aquí se junta o se reemplaza? Si este espacio del equipo estaba conectado (ahora o antes de
+// cerrar esa cuenta: ventoNube.previo, que sobrevive a una contraseña mal puesta) a un negocio que NO es de esta cuenta, lo
+// que hay aquí es de ese negocio y ya está en su nube: se BAJA el de esta cuenta en vez de juntarlos, y si la cuenta no
+// tiene negocio no se crea uno con los datos del otro (deOtro). Si la cuenta también es del negocio conectado, sigue en él.
+function authVinculoCuenta(nb, lista, previo){
+  let sede = 'default'; try{ sede = localStorage.getItem('bar-current-sede') || 'default'; }catch(e){}
+  const antes = previo && previo.sede === sede ? previo : null;
+  const mismo = antes ? lista.find(x => x.id === antes.id) : null;
+  const n = mismo || lista[0] || null;
+  return { n, deOtro: !!(antes && !mismo) };
+}
+const authPrevioNube = nb => { try{ const n = nb.negocio(); if(n) return { id: n.id, sede: nb.sede() || 'default' }; return nb.previo ? nb.previo() : null; }catch(e){ return null; } };
+const authAvisoSinNegocio = email => showToast('⚠️ ' + email + ' todavía no tiene negocio en la nube, y lo que hay en este celular es de otra cuenta. Crea el negocio de esta cuenta desde «Crear cuenta».', 9000);
 async function authConectarNube(email, pass, crearSiFalta){
   const nb = authNubeCuentas(); if(!nb || nb.conectado(email)) return;
-  // 1.99.16: «entré con la cuenta de Cristian WKH en el Xiaomi y me salen otros datos». Si este equipo ya estaba
-  // conectado a OTRO negocio de la nube en este mismo espacio, lo que hay aquí es de ese negocio (y ya está en su nube):
-  // se BAJA el de esta cuenta en vez de juntarlos (antes podía quedarse con el otro, o mezclar los dos negocios).
-  const antes = nb.negocio(), sedeAntes = nb.sede ? nb.sede() : null;
-  let sedeAhora = 'default'; try{ sedeAhora = localStorage.getItem('bar-current-sede') || 'default'; }catch(e){}
+  const previo = authPrevioNube(nb);     // antes de entrar: entrar con otra cuenta cierra la conexión de esta
   try{
     let lista;
     try{ lista = await nb.entrarCuenta(email, pass); }
@@ -1098,9 +1108,9 @@ async function authConectarNube(email, pass, crearSiFalta){
         throw e2;
       }
     }
-    const deOtro = !!(antes && sedeAntes === sedeAhora && (!lista.length || antes.id !== lista[0].id));
-    if(lista.length) await nb.vincular(lista[0], deOtro || authDatosPristinos(data));
-    else if(deOtro){ showToast('⚠️ ' + email + ' todavía no tiene negocio en la nube, y lo que hay en este celular es de otra cuenta. Crea el negocio de esta cuenta desde «Crear cuenta».', 9000); return; }
+    const { n, deOtro } = authVinculoCuenta(nb, lista, previo);
+    if(n) await nb.vincular(n, deOtro || authDatosPristinos(data));
+    else if(deOtro){ authAvisoSinNegocio(email); return; }
     else await nb.crearNegocio((data && data.businessName) || 'Mi negocio');
     showToast('✅ Cuenta conectada: con ' + email + ' ves los mismos datos en cualquier celular.', 5000);
   }catch(e){
@@ -1151,13 +1161,17 @@ window.ventoSacarUsuario = async function(user, motivo){
 window.addEventListener('vento-usuarios', () => { try{ accUsuariosPintar(); }catch(e){} });
 async function authEntrarDesdeNube(email, pass, listaCodigo){
   const nb = authNubeCuentas();
+  const previo = authPrevioNube(nb);
   const lista = listaCodigo || await nb.entrarCuenta(email, pass);
   const n = lista[0] || null;
   const yaEstaba = authUsers().some(x => x.user === email);
   if(yaEstaba){
     if(pass) await authPonerClaveLocal(email, pass);
     await enterApp(email, null);
-    if(n){ if(!nb.conectado(email)) await nb.vincular(n, authDatosPristinos(data)); }
+    if(nb.conectado(email)) return;
+    const v = authVinculoCuenta(nb, lista, previo);   // 1.99.16: igual que authConectarNube (no junta dos negocios)
+    if(v.n) await nb.vincular(v.n, v.deOtro || authDatosPristinos(data));
+    else if(v.deOtro) authAvisoSinNegocio(email);
     else await nb.crearNegocio((data && data.businessName) || 'Mi negocio');
     return;
   }

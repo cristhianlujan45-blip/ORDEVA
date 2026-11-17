@@ -32,9 +32,24 @@ la que tiene más productos».
 - `lib/vento-solo-local.js`: si se entró con un correo y el equipo está conectado a otro, aviso arriba de Inicio
   «☁️ Este celular está conectado a otra cuenta» con «Ver los datos de …» (pide la contraseña y conecta).
 
+## Revisión independiente (goldfish)
+- Bloqueante: la marca «datos vacíos» vivía solo en memoria. Sin internet al abrir, lo que se guardaba sobre los datos de
+  muestra quedaba como válido y al volver a abrir se subía encima del negocio. → La marca se guarda por negocio del equipo
+  (`vento_datos_vacios:<clave>`) hasta que la nube de verdad baja los datos. Probado: sin esto la prueba 2b falla (12/3).
+- Mayor: una contraseña mal puesta soltaba la conexión y el siguiente intento ya no sabía que lo de aquí era de otro
+  negocio (volvía a mezclar). → `ventoNube.previo()`: al soltar una conexión se anota a qué negocio pertenece lo del
+  equipo; `authVinculoCuenta` lo usa en los dos caminos de entrada (también `authEntrarDesdeNube`, que no estaba cubierto).
+- Mayor: lo hecho sobre los datos de muestra se perdía sin respaldo. → La recuperación deja punto de restauración y avisa
+  «Recuperando los datos de tu negocio desde la nube…».
+- Menores: si la cuenta también es del negocio conectado, sigue en él (no salta al primero de la lista); leer la copia de
+  referencia ya no sube nada si mientras tanto se cambió de negocio, se lee una vez por negocio y no toca `baseTarde`;
+  las ventas anuladas a propósito no cuentan como «se borraron»; el aviso de otra cuenta solo para dueño/administrador,
+  solo en el espacio conectado y con «Hoy no».
+
 ## Pruebas
-- Nueva `pruebas/nubecambiocuenta.test.js` (Supabase local real, 12/12): el caso del Xiaomi; lo guardado en «null»
-  vuelve a bajar «Tienda Vito» y la nube NO se pisa; el aviso de otra cuenta. Agregada a la lista de CI.
+- Nueva `pruebas/nubecambiocuenta.test.js` (Supabase local real, 18/18): el caso del Xiaomi; lo guardado en «null»
+  vuelve a bajar «Tienda Vito» y la nube NO se pisa (con solo 2 ventas, donde la red vieja no alcanzaba); lo mismo sin
+  internet al abrir y vuelta a abrir; el aviso de otra cuenta; contraseña mal y luego bien. Agregada a la lista de CI.
 
 ## Para el Xiaomi, después de actualizar
 Abrir la app: si sale el aviso «Este celular está conectado a otra cuenta», tocar «Ver los datos de
