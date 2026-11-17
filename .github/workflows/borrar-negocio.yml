@@ -1,0 +1,129 @@
+# ORDEVA · 🗑️ Borrar UN negocio de la nube (se corre a mano, solo con autorización expresa del dueño).
+# Modo «revisar» (por defecto): NO cambia nada. Dice qué hay ligado a ese negocio en cada tabla.
+# Modo «borrar»: guarda primero una copia COMPLETA (el negocio y todas sus filas en las tablas que lo usan) en
+# public.negocios_borrados, y luego borra el negocio, todo en UNA transacción (si algo falla, no se borra nada).
+# Candados: el negocio se busca por los 8 primeros caracteres de su id Y por la huella (md5 del correo en minúsculas) de
+# quien lo creó; tiene que coincidir exactamente uno. No borra la cuenta (el usuario sigue existiendo) ni otros negocios.
+# No imprime correos, nombres ni datos del negocio.
+name: Borrar un negocio de la nube
+
+on:
+  workflow_dispatch:
+    inputs:
+      negocio:
+        description: 'Primeros 8 caracteres del id del negocio'
+        required: true
+      huella:
+        description: 'md5 del correo (minúsculas) de quien lo creó'
+        required: true
+      modo:
+        description: 'revisar (no cambia nada) o borrar'
+        required: true
+        default: 'revisar'
+      max_productos:
+        description: 'Candado: no borra si el negocio tiene más productos que esto'
+        required: true
+        default: '10'
+
+permissions:
+  contents: read
+
+jobs:
+  negocio:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Revisar o borrar
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          NEG: ${{ github.event.inputs.negocio }}
+          HUELLA: ${{ github.event.inputs.huella }}
+          MODO: ${{ github.event.inputs.modo }}
+          MAXP: ${{ github.event.inputs.max_productos }}
+        run: |
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ] || [ -z "$PROJECT_REF" ]; then echo "Faltan los secretos"; exit 1; fi
+          printf '%s' "$NEG" | grep -Eq '^[0-9a-f]{8}$' || { echo "negocio: 8 letras/números del id"; exit 1; }
+          printf '%s' "$HUELLA" | grep -Eq '^[0-9a-f]{32}$' || { echo "huella: md5 (32 letras/números)"; exit 1; }
+          printf '%s' "$MAXP" | grep -Eq '^[0-9]{1,5}$' || { echo "max_productos: un número"; exit 1; }
+          case "$MODO" in revisar|borrar) ;; *) echo "modo: revisar o borrar"; exit 1;; esac
+          q() { jq -n --rawfile q "$1" '{query: $q}' > /tmp/q.json
+                curl -sS -X POST "https://api.supabase.com/v1/projects/$PROJECT_REF/database/query" \
+                  -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H 'Content-Type: application/json' --data @/tmp/q.json; }
+          # ---- Revisión (solo lectura): el negocio y lo que tiene en cada tabla que lo usa ----
+          cat > /tmp/rev.sql <<'SQL'
+          create temp table if not exists _r(tabla text, columna text, al_borrar text, filas bigint);
+          truncate _r;
+          do $$
+          declare c record; v_id uuid; v_n int; k bigint;
+          begin
+            select count(*) into v_n from negocios n join auth.users u on u.id = n.creado_por
+              where left(n.id::text, 8) = '__NEG__' and md5(lower(u.email)) = '__HUELLA__';
+            if v_n <> 1 then raise exception 'Coinciden % negocios (tiene que ser exactamente 1)', v_n; end if;
+            select n.id into v_id from negocios n join auth.users u on u.id = n.creado_por
+              where left(n.id::text, 8) = '__NEG__' and md5(lower(u.email)) = '__HUELLA__';
+            for c in select con.conrelid::regclass::text tabla, a.attname col,
+                            case con.confdeltype when 'c' then 'se borra' when 'n' then 'queda vacío' when 'd' then 'valor por defecto' else 'BLOQUEA' end regla
+                     from pg_constraint con join pg_attribute a on a.attrelid = con.conrelid and a.attnum = con.conkey[1]
+                     where con.contype = 'f' and con.confrelid = 'public.negocios'::regclass and array_length(con.conkey, 1) = 1
+            loop
+              execute format('select count(*) from %s where %I = $1', c.tabla, c.col) into k using v_id;
+              insert into _r values (c.tabla, c.col, c.regla, k);
+            end loop;
+          end $$;
+          select json_build_object(
+            'negocio', (select json_build_object('neg', left(n.id::text, 8), 'creado', (n.creado_en at time zone 'America/Bogota')::text,
+                         'productos', sub_largo(d.datos->'products'), 'ventas', sub_largo(d.datos->'history'),
+                         'personas', (select count(*) from miembros m where m.negocio_id = n.id),
+                         'equipos_activos', (select count(*) from dispositivos e where e.negocio_id = n.id and e.revocado_en is null))
+                        from negocios n left join datos_negocio d on d.negocio_id = n.id where left(n.id::text, 8) = '__NEG__'),
+            'tablas', (select coalesce(json_agg(json_build_object('tabla', tabla, 'columna', columna, 'al_borrar', al_borrar, 'filas', filas) order by filas desc, tabla), '[]') from _r where filas > 0),
+            'bloquean', (select coalesce(json_agg(tabla), '[]') from _r where filas > 0 and al_borrar = 'BLOQUEA')
+          ) resultado;
+          SQL
+          sed -i "s/__NEG__/$NEG/g; s/__HUELLA__/$HUELLA/g" /tmp/rev.sql
+          echo "== Revisión (no cambia nada)"
+          q /tmp/rev.sql > /tmp/r.json; jq '.[0].resultado // .' /tmp/r.json
+          jq -e '.[0].resultado' /tmp/r.json > /dev/null || exit 1
+          [ "$MODO" = "borrar" ] || { echo "Modo revisar: no se cambió nada."; exit 0; }
+          # ---- Borrar: copia completa y borrado en UNA transacción ----
+          cat > /tmp/borrar.sql <<'SQL'
+          begin;
+          create table if not exists public.negocios_borrados (
+            negocio_id uuid primary key, copia jsonb not null, borrado_en timestamptz not null default now(), motivo text);
+          alter table public.negocios_borrados enable row level security;   -- sin políticas: solo el servidor la ve
+          revoke all on public.negocios_borrados from anon, authenticated;
+          do $$
+          declare c record; v_id uuid; v_n int; v_p int; copia jsonb := '{}'::jsonb; filas jsonb; bloquea text;
+          begin
+            select count(*) into v_n from negocios n join auth.users u on u.id = n.creado_por
+              where left(n.id::text, 8) = '__NEG__' and md5(lower(u.email)) = '__HUELLA__';
+            if v_n <> 1 then raise exception 'Coinciden % negocios (tiene que ser exactamente 1)', v_n; end if;
+            select n.id into v_id from negocios n join auth.users u on u.id = n.creado_por
+              where left(n.id::text, 8) = '__NEG__' and md5(lower(u.email)) = '__HUELLA__';
+            select coalesce(sub_largo(datos->'products'), 0) into v_p from datos_negocio where negocio_id = v_id;
+            if coalesce(v_p, 0) > __MAXP__ then raise exception 'El negocio tiene % productos (más que el candado %): no se borra', v_p, __MAXP__; end if;
+            copia := jsonb_build_object('negocios', (select jsonb_agg(to_jsonb(n)) from negocios n where n.id = v_id));
+            for c in select con.conrelid::regclass::text tabla, a.attname col, con.confdeltype regla
+                     from pg_constraint con join pg_attribute a on a.attrelid = con.conrelid and a.attnum = con.conkey[1]
+                     where con.contype = 'f' and con.confrelid = 'public.negocios'::regclass and array_length(con.conkey, 1) = 1
+            loop
+              execute format('select jsonb_agg(to_jsonb(t)) from %s t where %I = $1', c.tabla, c.col) into filas using v_id;
+              if filas is not null then
+                copia := copia || jsonb_build_object(c.tabla || '.' || c.col, filas);
+                if c.regla not in ('c', 'n', 'd') then bloquea := coalesce(bloquea || ', ', '') || c.tabla; end if;
+              end if;
+            end loop;
+            if bloquea is not null then raise exception 'Hay datos que impiden borrar (sin borrado en cascada): %', bloquea; end if;
+            insert into public.negocios_borrados(negocio_id, copia, motivo) values (v_id, copia, 'Pedido del dueño (17/11): no necesita este negocio');
+            delete from negocios where id = v_id;
+            raise notice 'Borrado; copia guardada en negocios_borrados (% tablas)', (select count(*) from jsonb_object_keys(copia));
+          end $$;
+          commit;
+          select json_build_object('borrado', not exists (select 1 from negocios where left(id::text, 8) = '__NEG__'),
+                                   'copia_guardada', exists (select 1 from negocios_borrados where left(negocio_id::text, 8) = '__NEG__'),
+                                   'negocios_que_quedan', (select count(*) from negocios)) resultado;
+          SQL
+          sed -i "s/__NEG__/$NEG/g; s/__HUELLA__/$HUELLA/g; s/__MAXP__/$MAXP/g" /tmp/borrar.sql
+          echo "== Borrar"
+          q /tmp/borrar.sql > /tmp/b.json; jq '.[0].resultado // .' /tmp/b.json
+          jq -e '.[0].resultado.borrado == true and .[0].resultado.copia_guardada == true' /tmp/b.json > /dev/null || exit 1
