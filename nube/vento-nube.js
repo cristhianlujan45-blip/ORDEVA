@@ -344,6 +344,18 @@
   // apenas termine la bajada (antes, con la espera de 300 ms, casi nunca se cruzaban; ahora se sube a los 25 ms).
   var subirTrasBajar = false;
   function finBajar(){ bajando = false; if(subirTrasBajar){ subirTrasBajar = false; reintentar(0); } }
+  // 1.99.16: lo guardado en este equipo estaba vacío o dañado («null») y la app arrancó con los datos de muestra
+  // (window.__ventoDatosVacios lo pone loadData). Esos datos de muestra NUNCA se suben: antes la subida pisaba el negocio
+  // de la nube («Tienda Vito» quedaba como «Cervecería»). Se baja la nube y manda ella.
+  function vacioPendiente(){ return !!(window.__ventoDatosVacios && st.negocio && configurada() && enSede()); }
+  function recuperarVacio(){
+    if(subiendo || bajando){ remotoPendiente = true; return Promise.resolve(); }
+    traza('vacio-recuperar', datosApp());
+    st.sucio = false; guardarSt(); clearTimeout(tSubir);
+    bajando = true; bajandoDesde = Date.now();
+    return bajar(false, true).then(function(){ window.__ventoDatosVacios = false; finBajar(); pintarEstado(); },
+      function(e){ finBajar(); ultimoError = msgError(e); pintarEstado(); reintentar(luego()); });
+  }
   // 1.68.1: cambiosN cuenta los guardados de la app: «sucio» solo se apaga si no hubo cambios mientras se subía (antes un
   // toque durante la subida quedaba marcado como subido). enNube = el texto de lo que la nube ya tiene de este equipo:
   // si no cambió nada, no se sube otra vez (evita subidas de eco que hacían esperar a los demás).
@@ -419,6 +431,7 @@
   function enSede(){ return !st.sede || st.sede === sedeActual(); }
   function cambio(){                     // la app acaba de guardar
     if(!st.negocio || !configurada() || !enSede()) return;
+    if(vacioPendiente()){ clearTimeout(tSubir); tSubir = setTimeout(subir, 300); return; }   // 1.99.16: primero se baja la nube
     cambiosN++; traza('cambio', datosApp());
     st.sucio = true; guardarSt(); pintarEstado();
     clearTimeout(tSubir); tSubir = setTimeout(subir, SUBIR_MS);
@@ -443,6 +456,15 @@
     }).catch(function(){});
   }
   function subirFoto(version){
+    // 1.99.16: al abrir la app la copia de referencia solo está en IndexedDB: se lee antes de subir, para que la red de
+    // seguridad («se borraron los datos de este equipo») funcione también en la primera subida después de abrir.
+    if(!(baseMem && baseMemDe === negId()) && st.negocio){
+      var de = negId();
+      return base('get').then(function(b){ if(b && de === negId() && !(baseMem && baseMemDe === negId())){ baseMem = b; baseMemDe = de; baseVer = -1; } return subirFoto0(version); });
+    }
+    return subirFoto0(version);
+  }
+  function subirFoto0(version){
     var d = datosApp(); if(!d) return Promise.resolve(null);
     var txt = JSON.stringify(d), n0 = cambiosN;
     if(txt === enNubeTxt && enNubeDe === negId() && version === (st.version || 0)){ traza('igual', d); if(cambiosN === n0){ st.sucio = false; guardarSt(); } return Promise.resolve('igual'); }
@@ -486,6 +508,7 @@
   }
   function subir(){
     if(!st.negocio || !enSede()) return Promise.resolve();
+    if(vacioPendiente()) return recuperarVacio();
     if(subiendo){ otraVez = true; return Promise.resolve(); }
     if(bajando){ subirTrasBajar = true; return Promise.resolve(); }
     if(!datosApp()) return Promise.resolve();
@@ -574,6 +597,7 @@
     destrabar();
     if(subiendo || bajando){ remotoPendiente = true; return; }
     if(!st.negocio || !configurada() || document.hidden || !enSede()) return;
+    if(vacioPendiente()){ recuperarVacio(); return; }
     conTiempo(cliente().then(function(c){ return c.from('datos_negocio').select('version').eq('negocio_id', st.negocio.id).maybeSingle(); }), T.rpc, 'revisar')
       .then(function(r){
         if(r.error) throw r.error;
@@ -1176,7 +1200,7 @@
 
   // ---------- API para la app ----------
   window.ventoNube = {
-    configurada: configurada, abrir: abrir, cambio: cambio, subir: subir, bajar: bajar, estado: textoEstado, estadoSync: estadoSync,
+    configurada: configurada, abrir: abrir, cambio: cambio, subir: subir, bajar: bajar, revisar: revisarNube, estado: textoEstado, estadoSync: estadoSync,
     correo: function(){ return st.negocio ? st.email : null; },
     rolActivo: function(){ return st.negocio ? st.negocio.rol : null; },
     sede: function(){ return st.negocio ? (st.sede || 'default') : null; },      // espacio de este equipo donde está ese negocio

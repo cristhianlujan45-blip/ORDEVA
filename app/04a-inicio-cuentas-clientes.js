@@ -303,12 +303,27 @@ function defaultData(){
 let currentCategoryFilter = null; // null = Todas
 
 async function loadData(txtNube){
+  let res = null, danado = false;
   try{
     // 1.69.1: con los datos que llegan de otro equipo ya en texto, no se vuelven a leer del almacenamiento (más rápido).
-    const res = typeof txtNube === 'string' ? { value: txtNube } : await storageGet(STORAGE_KEY);
+    res = typeof txtNube === 'string' ? { value: txtNube } : await storageGet(STORAGE_KEY);
     data = res ? JSON.parse(res.value) : defaultData();
   }catch(e){
-    data = defaultData();
+    data = defaultData(); danado = !!res;
+  }
+  // 1.99.16: «entro en el Xiaomi y no me salen los datos». Si lo guardado era «null» (o algo que no es un negocio), la app
+  // quedaba con data = null y se caía en cada arranque («Cannot read properties of null (reading 'tables')»): no mostraba
+  // nada ni podía bajar el negocio de la nube. Ahora arranca con los datos de muestra y, si este equipo está conectado a un
+  // negocio de la nube, la nube lo baja completo y manda ella: esos datos de muestra NUNCA se suben (nube/vento-nube.js,
+  // window.__ventoDatosVacios). Lo mismo si lo guardado se borró del todo estando conectado.
+  if(!data || typeof data !== 'object' || Array.isArray(data)){ data = defaultData(); danado = true; }
+  let conectado = false;
+  try{ const N = window.ventoNube; conectado = !!(N && N.negocio && N.negocio() && N.sede && N.sede() === (localStorage.getItem('bar-current-sede') || 'default')); }catch(x){}
+  const vacio = typeof txtNube !== 'string' && conectado && (danado || !res);
+  window.__ventoDatosVacios = vacio;
+  if(danado || vacio){
+    try{ window.ventoError && window.ventoError('otro', 'Los datos guardados en este equipo estaban ' + (res ? 'dañados («' + String(res.value).slice(0, 20) + '»)' : 'borrados') + (vacio ? ': se bajan de la nube' : ': arrancó vacío')); }catch(x){}
+    if(vacio) setTimeout(() => { try{ const N = window.ventoNube; N && N.revisar && N.revisar(); }catch(x){} }, 1500);
   }
   if(!data.tables) data.tables = {};
   if(!data.products) data.products = [];
@@ -454,6 +469,7 @@ setTimeout(() => { try{ window.ventoNube && window.ventoNube.archivos && window.
 let guardadoPend = null;
 function saveData(){
   const key = STORAGE_KEY, obj = data;
+  if(!obj || typeof obj !== 'object') return Promise.resolve();   // 1.99.16: nunca se guarda un negocio vacío («null»)
   if(guardadoPend && guardadoPend.key === key && guardadoPend.obj === obj) return guardadoPend.p;
   if(guardadoPend) guardadoAhora();                       // otra sede u otros datos: lo pendiente se guarda ya, con su llave
   let listo; const p = new Promise(r => { listo = r; });

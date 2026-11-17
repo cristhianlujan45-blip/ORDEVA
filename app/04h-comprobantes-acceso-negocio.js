@@ -1081,6 +1081,11 @@ async function authPonerClaveLocal(user, pass){
 // negocio en la nube, sube el de este celular. Sin internet no pasa nada: se intenta en la próxima entrada.
 async function authConectarNube(email, pass, crearSiFalta){
   const nb = authNubeCuentas(); if(!nb || nb.conectado(email)) return;
+  // 1.99.16: «entré con la cuenta de Cristian WKH en el Xiaomi y me salen otros datos». Si este equipo ya estaba
+  // conectado a OTRO negocio de la nube en este mismo espacio, lo que hay aquí es de ese negocio (y ya está en su nube):
+  // se BAJA el de esta cuenta en vez de juntarlos (antes podía quedarse con el otro, o mezclar los dos negocios).
+  const antes = nb.negocio(), sedeAntes = nb.sede ? nb.sede() : null;
+  let sedeAhora = 'default'; try{ sedeAhora = localStorage.getItem('bar-current-sede') || 'default'; }catch(e){}
   try{
     let lista;
     try{ lista = await nb.entrarCuenta(email, pass); }
@@ -1093,7 +1098,9 @@ async function authConectarNube(email, pass, crearSiFalta){
         throw e2;
       }
     }
-    if(lista.length) await nb.vincular(lista[0], authDatosPristinos(data));
+    const deOtro = !!(antes && sedeAntes === sedeAhora && (!lista.length || antes.id !== lista[0].id));
+    if(lista.length) await nb.vincular(lista[0], deOtro || authDatosPristinos(data));
+    else if(deOtro){ showToast('⚠️ ' + email + ' todavía no tiene negocio en la nube, y lo que hay en este celular es de otra cuenta. Crea el negocio de esta cuenta desde «Crear cuenta».', 9000); return; }
     else await nb.crearNegocio((data && data.businessName) || 'Mi negocio');
     showToast('✅ Cuenta conectada: con ' + email + ' ves los mismos datos en cualquier celular.', 5000);
   }catch(e){
