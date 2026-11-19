@@ -1,0 +1,45 @@
+# ORDEVA · 🔎 Diagnóstico de errores de la app (SOLO LECTURA, se corre a mano).
+# Los errores que mandan los equipos (app_errores) de los últimos días, con DÓNDE pasaron (archivo, línea y pila del
+# código) para poder arreglarlos. Sin correos, nombres ni datos de clientes: solo el mensaje del error, la versión, el
+# modelo de equipo y el detalle técnico. No cambia nada (una sola consulta select).
+name: Diagnóstico de errores
+
+on:
+  workflow_dispatch:
+    inputs:
+      horas:
+        description: 'Cuántas horas hacia atrás (1 a 720)'
+        required: true
+        default: '96'
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostico:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Consultar (solo lectura)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          HORAS: ${{ github.event.inputs.horas }}
+        run: |
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ] || [ -z "$PROJECT_REF" ]; then echo "Faltan los secretos"; exit 1; fi
+          printf '%s' "$HORAS" | grep -Eq '^[0-9]{1,3}$' || { echo "horas: un número"; exit 1; }
+          cat > /tmp/q.sql <<'SQL'
+          select coalesce(json_agg(x order by x.ultimo desc), '[]') resultado from (
+            select tipo, left(mensaje, 200) mensaje, version, left(coalesce(modelo, ''), 40) modelo, veces,
+                   (primero at time zone 'America/Bogota')::text primero, (ultimo at time zone 'America/Bogota')::text ultimo,
+                   left(coalesce(pagina, ''), 30) pagina,
+                   -- solo lo técnico del detalle (dónde pasó); el resto del detalle no se muestra
+                   case when detalle is null then null else jsonb_strip_nulls(jsonb_build_object(
+                     'archivo', left(detalle->>'archivo', 120), 'linea', detalle->>'linea', 'columna', detalle->>'columna',
+                     'pila', left(detalle->>'pila', 900), 'motivo', left(detalle->>'motivo', 200))) end detalle
+            from app_errores where ultimo > now() - make_interval(hours => __HORAS__) order by ultimo desc limit 80) x;
+          SQL
+          sed -i "s/__HORAS__/$HORAS/" /tmp/q.sql
+          jq -n --rawfile q /tmp/q.sql '{query: $q}' > /tmp/q.json
+          curl -sS -X POST "https://api.supabase.com/v1/projects/$PROJECT_REF/database/query" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H 'Content-Type: application/json' --data @/tmp/q.json > /tmp/r.json
+          jq '.[0].resultado // .' /tmp/r.json
