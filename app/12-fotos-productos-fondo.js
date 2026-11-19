@@ -2002,7 +2002,11 @@ async function lngSync(forzar){
   try{
     const c = lngCfg();
     let forzarInicio = lng.forzar;
-    const pend = vm().ordenJusto(vm().cola()).filter(x => x.vid && !x.lng);
+    // 🎵 1.99.18 (auditoría): de la MÚSICA DE FONDO (tu lista) al TV se le mandan como mucho 2 canciones por delante. Antes
+    // se le mandaba toda la lista (20 canciones en un minuto) y la canción nueva del QR quedaba de 20.ª, a más de una hora:
+    // «nunca suena». Las de las mesas se siguen mandando enseguida; las de fondo entran a medida que suenan.
+    const LNG_ADELANTE = 2; let hay = lngEnTV().length;
+    const pend = vm().ordenJusto(vm().cola()).filter(x => x.vid && !x.lng).filter(x => !x.fondo || (hay < LNG_ADELANTE && ++hay));
     if(!pend.length && forzarInicio && (lngEnTV().length || (lng.porPersona && vm().cola().some(y => y.status === 'playing' && y.fuente === 'tvyt')))){
       // «▶» con canciones ya mandadas que el TV no está sonando: se le vuelven a poner.
       lng.forzar = false; lng.reinicios = 0;
@@ -2031,7 +2035,10 @@ async function lngSync(forzar){
       // TV que no informa: manda el reloj de ORDEVA. Mientras, según la duración real, siga sonando una
       // canción de ORDEVA (o haya mandadas esperando), la nueva SOLO se agrega al final: nunca se corta
       // la que suena. Se dejan 30 s de margen por si el TV tardó en cargar.
-      const relojOcupado = !lngReporta() && Date.now() < lngOcupadoHasta() + 30000;
+      // 🎵 1.99.18 (auditoría): el reloj solo suma la duración de los videos, no los comerciales de YouTube ni las pausas: en un
+      // TV sin Premium se adelantaba y a las 2-3 canciones una del QR mandaba «lista nueva» y cortaba la que sonaba. Ahora,
+      // hasta 10 min después de lo calculado, la nueva solo se AGREGA (y se le da «play»); pasado eso sí se arranca la cola.
+      const relojOcupado = !lngReporta() && Date.now() < lngOcupadoHasta() + 10 * 60000;
       // 1.99.17: terminó una canción de ORDEVA y el TV tiene más de ORDEVA detrás: está pasando a la siguiente, no quieto.
       const avanzando = lng.tvSt === 0 && deVento && lngEnTV().some(y => y.vid !== lng.tvVid);
       const quedaCola = arrancando || relojOcupado || avanzando || (lng.tvPlay === false ? false : probado);

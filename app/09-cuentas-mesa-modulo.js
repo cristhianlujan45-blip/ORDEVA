@@ -1067,7 +1067,7 @@ function mzLimpiarPedido(t){
   else if(/(cancion|tema|algo)\s+(de|del)\s/.test(base)) artist=q; else title=q;
   return {query:q||String(t||'').trim(),title,artist};
 }
-function mzCambiar(id,cambios){const l=cola(),it=l.find(y=>y.id===id);if(!it)return null;Object.assign(it,cambios);SS('vito_cola',l);mzRespaldo();return it;}
+function mzCambiar(id,cambios,sinRespaldo){const l=cola(),it=l.find(y=>y.id===id);if(!it)return null;Object.assign(it,cambios);SS('vito_cola',l);if(!sinRespaldo)mzRespaldo();return it;}
 function mzAlHistorial(it){
   if(!it)return;
   const h=mzHist().filter(x=>x.id!==it.id);
@@ -1081,14 +1081,15 @@ function mzEmpezo(id,fuente){
   l.filter(y=>y.status==='playing'&&y.id!==id).forEach(y=>{               // la que sonaba antes se cierra
     const fin=y.dur&&y.playedSeconds>=y.dur*0.9;y.status=fin?'played':'skipped';y.endedAt=now;
     if(y.startedAt&&(y.fuente==='ytmusic'||!y.playedSeconds))y.playedSeconds=Math.round((now-y.startedAt)/1000);
-    if(y.dur)y.playedSeconds=Math.min(y.playedSeconds,y.dur);y.status=y.dur&&y.playedSeconds>=y.dur*0.9?'played':'skipped';mzAlHistorial(y);mzAvisarCliente(y,'sono');});
+    if(y.dur)y.playedSeconds=Math.min(y.playedSeconds,y.dur);y.status=y.dur&&y.playedSeconds>=y.dur*0.9?'played':'skipped';mzAlHistorial(y);mzAvisarFin(y);});
   const it=l.find(y=>y.id===id);
   if(it){it.done=true;it.status='playing';it.startedAt=now;it.endedAt=null;it.playedSeconds=0;it.fuente=fuente||it.fuente||'';mzAvisarCliente(it,'sonando');}
   SS('vito_cola',l);mzRespaldo();return it;
 }
 // Progreso real que manda el reproductor (segundos sonados y duración del video)
 function mzProgreso(id,t,d){
-  const it=mzCambiar(id,Object.assign({playedSeconds:Math.max(0,Math.round(t||0)),progresoAt:Date.now()},d>0?{dur:Math.round(d)}:{}));
+  // (1.99.18: el avance de cada 5 s no rehace el respaldo completo de la cola y el historial: eso se hace al cambiar de canción)
+  const it=mzCambiar(id,Object.assign({playedSeconds:Math.max(0,Math.round(t||0)),progresoAt:Date.now()},d>0?{dur:Math.round(d)}:{}),true);
   if(it&&it.status!=='playing'&&!['played','skipped','cancelled'].includes(it.status)){mzCambiar(id,{status:'playing',done:true,startedAt:it.startedAt||Date.now()-1000*(t||0)});mzAvisarCliente(it,'sonando');}
   mzPintarSonando();
 }
@@ -1098,7 +1099,7 @@ function mzTermino(id,estado,t){
   it.done=true;it.status=estado||'played';it.endedAt=Date.now();
   if(t!=null)it.playedSeconds=Math.round(t);else if(it.startedAt&&!it.playedSeconds)it.playedSeconds=Math.round((it.endedAt-it.startedAt)/1000);
   SS('vito_cola',l);mzAlHistorial(it);mzPintarSonando();
-  if(!['played','skipped','cancelled'].includes(antes))mzAvisarCliente(it,it.status==='cancelled'?'quitada':it.status==='error'?'novid':'sono');
+  if(!['played','skipped','cancelled'].includes(antes)){if(it.status==='cancelled'||it.status==='error')mzAvisarCliente(it,it.status==='cancelled'?'quitada':'novid');else mzAvisarFin(it);}
 }
 const mzActual=()=>cola().find(y=>y.status==='playing')||null;
 const mmss=s=>{s=Math.max(0,Math.round(s||0));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
@@ -1116,7 +1117,8 @@ function mzPintarSonando(){
     '<div class="mzs-bar"><i style="width:'+pct.toFixed(1)+'%"></i></div><div class="mzs-time">'+mmss(t)+' / '+(x.dur?mmss(x.dur):'--:--')+(x.dur?' · faltan '+mmss(x.dur-t):'')+
     (x.fuente==='ytmusic'?' · (en YouTube Music: tiempo aproximado)':'')+'</div>';
 }
-setInterval(()=>{try{mzPintarSonando();}catch(e){}},1000);
+// 1.99.18 (auditoría, memoria): solo con la app a la vista y la sección de Música abierta (antes se rehacía cada segundo, escondida).
+setInterval(()=>{try{if(document.hidden||window.__ventoAlFrente===false)return;const e=$('mzSonando');if(e&&!e.offsetParent&&!e.hidden)return;mzPintarSonando();}catch(e){}},1000);
 // Respaldo en IndexedDB (además de localStorage): si el navegador borra el almacenamiento rápido,
 // la cola y el historial se recuperan al abrir ORDEVA.
 let mzRespT=null;
@@ -1135,6 +1137,15 @@ function mzResponder(rid,e,mesa,extra,canal){
 }
 // Solo el equipo de la música le contesta al cliente cómo va su canción (un solo dueño de la cola: sin estados cruzados).
 const mzAvisarCliente=(it,e)=>{try{if(it&&it.reqId&&!it.fondo&&!mqOtro())mzResponder(it.reqId,e,it.mesa,null,it.canal);}catch(err){}};
+// 🎵 1.99.18 (auditoría): al terminar, «✅ Ya sonó» solo si de verdad sonó (más de la mitad); si la pasaron antes, se le dice
+// «⏭ La saltaron» (antes también decía «Ya sonó» y parecía que se la habían quitado sin razón).
+function mzAvisarFin(it){
+  try{
+    if(!it||!it.reqId||it.fondo||mqOtro())return;
+    const corta=it.status==='skipped'&&it.dur&&(it.playedSeconds||0)<it.dur*0.5;
+    mzResponder(it.reqId,'sono',it.mesa,corta?{i:'⏭',n:'La saltaron (sonó un ratico)'}:null,it.canal);
+  }catch(err){}
+}
 function agregarCancion(mesa,song,reqId,op){
   op=op||{};
   if(!song)return{msg:'⚠️ Canción vacía',nuevo:false};
@@ -1144,8 +1155,9 @@ function agregarCancion(mesa,song,reqId,op){
   // dejaba la canción en su cola sin mandarla («la pone el equipo de la música»), y si ese equipo no recibía los pedidos
   // del QR (cada equipo decide si los recibe), la canción se perdía. Ahora se le manda; si ese equipo no responde,
   // este equipo toma la música para que no quede en silencio.
-  if(mqOtro()&&Date.now()-mqDesde>15e3&&Date.now()-mqVisto>9e4){const era=mqNombre();try{mqElegir(true);}catch(e){}
-    try{showToast('🎶 «'+era+'» no respondía: ahora la música suena en este equipo.',8000);}catch(e){}}
+  // 🎵 1.99.18 (auditoría): ya NO se toma la música aquí (al llegar una canción). Bastaba con que el equipo de la música
+  // tardara 90 s en dar señales (Android cerró su página, un corte de internet) para que este la tomara y aquel cortara la
+  // canción que sonaba. Ahora la canción se le manda siempre; si de verdad no responde, lo decide mqVigilarEquipo (5 min).
   // 1.95.4 (revisión goldfish): si otro equipo pone la música, este solo se la manda. El cupo y las respuestas al cliente
   // los decide el equipo de la música (este equipo solo ve una copia de su cola y contaba mal).
   const reenviar=mqOtro();
@@ -1265,7 +1277,8 @@ function mzFondoQuitar(silencio){
 }
 function mzFondoRellenar(){
   const f=mzF();if(!f.on||!Array.isArray(f.vids)||!f.vids.length)return;
-  const l=cola();let falta=2-l.filter(x=>x.fondo&&!x.done).length,nuevos=0,vueltas=0;
+  // (1.99.18: las ya mandadas al TV que todavía no suenan —status «tv»— cuentan como pendientes: si no, se rellenaba sin fin)
+  const l=cola();let falta=2-l.filter(x=>x.fondo&&(!x.done||x.status==='tv')).length,nuevos=0,vueltas=0;
   while(falta>0&&vueltas++<f.vids.length*2){
     if(f.pos>=f.vids.length){
       if(!f.repetir){f.on=false;showToast('🎶 Terminó tu playlist «'+f.nombre+'».');break;}
@@ -1519,7 +1532,7 @@ function yEstado(){
   const a=$('autoEstado');if(a)a.textContent=AUTO()?((c.key||yTok())?'🟢 Activo: suena solo y las nuevas entran solas.':'🟠 Falta la API key para buscar las canciones.'):'⚪ Apagado.';
 }
 async function yApi(path,opt){
-  const r=await fetch('https://www.googleapis.com/youtube/v3/'+path,Object.assign({headers:{Authorization:'Bearer '+yTok(),'Content-Type':'application/json'}},opt));
+  const r=await fetch('https://www.googleapis.com/youtube/v3/'+path,Object.assign({headers:{Authorization:'Bearer '+yTok(),'Content-Type':'application/json'},signal:ySenal(15000)},opt));
   if(!r.ok){const j=await r.json().catch(()=>({}));throw new Error((j.error&&j.error.message)||('Error '+r.status));}
   return r.json();
 }
@@ -1528,7 +1541,10 @@ async function yLista(){
   const j=await yApi('playlists?part=snippet,status',{method:'POST',body:JSON.stringify({snippet:{title:'Música '+(data.businessName||'del local')},status:{privacyStatus:'private'}})});
   c.pl=j.id;c.len=0;SS('vito_yt',c);$('ytPl').value=c.pl;return c.pl;
 }
-function ytAgregar(id){cadena=cadena.then(()=>ytUno(id)).catch(()=>{});}
+// 🎵 1.99.18 (auditoría): una búsqueda que se queda colgada (internet malo) ya no traba a todas las que vienen detrás (se
+// quedaban «En la cola» para siempre): a los 45 s la fila sigue con la siguiente; la colgada se reintenta después.
+const ySenal=ms=>{try{return AbortSignal.timeout?AbortSignal.timeout(ms):undefined;}catch(e){return undefined;}};
+function ytAgregar(id){cadena=cadena.then(()=>Promise.race([ytUno(id),new Promise(r=>setTimeout(r,45000))])).catch(()=>{});}
 // Solo versiones que se pueden poner en un reproductor fuera de youtube.com:
 // 1) la búsqueda pide videos "embeddable" y "syndicated";
 // 2) se revisa cada candidato con la API (público, se deja insertar, sin +18, no bloqueado en
@@ -1540,6 +1556,7 @@ const YT_BAD_KEY='vito_yt_bad', YT_REGION=((navigator.language||'').split('-')[1
 const ytBad=()=>LS(YT_BAD_KEY,[]);
 // La lista negra vieja tenía canciones buenas marcadas por error (cuando YouTube pasaba comerciales): se limpia una vez.
 try{if(!LS('vito_yt_bad_v2',0)){SS(YT_BAD_KEY,[]);SS('vito_yt_bad_v2',1);}}catch(e){}
+const YT_NO_SE_DEJA=[100,101,150];
 function ytMarcarBad(v){ if(!v)return; const b=ytBad(); if(!b.includes(v)){ b.push(v); SS(YT_BAD_KEY,b.slice(-400)); } }
 const SELLO_RE=/vevo|\s-\stopic$|warner|wmg|atlantic|elektra|parlophone|reprise|rhino|asylum|nonesuch|sire records/i;
 /* Buscar en YouTube, con respaldos. Antes, si la clave compartida se quedaba sin cupo del día
@@ -1601,7 +1618,7 @@ async function yGet(u){
     if(q){const j=await ySrvBuscar(q);if(j){yFuente='servidor';window.ytFallo=null;return j;}}
   }
   if(c.key){
-    try{const r=await fetch('https://www.googleapis.com/youtube/v3/'+u+'&key='+encodeURIComponent(c.key));const j=await r.json();
+    try{const r=await fetch('https://www.googleapis.com/youtube/v3/'+u+'&key='+encodeURIComponent(c.key),{signal:ySenal(15000)});const j=await r.json();
       if(r.ok){yFuente='clave';window.ytFallo=null;return j;}
       err=new Error((j.error&&j.error.message)||('Error '+r.status));}
     catch(e){err=e;}
@@ -1986,7 +2003,22 @@ function mqNombreEquipo(){const u=navigator.userAgent||'';return (window.VentoAn
 function mqCanal(){if(typeof data==='undefined'||!data)return '';if(!/^vmus[a-z0-9]{20,}$/.test(data.musicaCanal||'')){data.musicaCanal='vmus'+Array.from(crypto.getRandomValues(new Uint8Array(20)),b=>(b%36).toString(36)).join('');saveData();}return data.musicaCanal;}
 function mqPub(o){const c=mqCanal();if(!c)return;try{fetch('https://canal.vento.local/'+c,{method:'POST',body:JSON.stringify(Object.assign({de:mqEq(),n:mqNombreEquipo(),at:Date.now()},o))}).catch(()=>{});}catch(e){}}
 let mqES=null,mqESCanal='',mqVisto=0,mqHash='',mqHashT=0,mqEra=null;
-const mqHechos=new Set(),mqDesde=Date.now();
+const mqDesde=Date.now();
+// 🎵 1.99.18 (auditoría): lo que ya se hizo (saltar, pausar, poner…) se recuerda aunque la página se vuelva a abrir. Antes vivía
+// solo en memoria: Android cerraba la página, al volver se leían otra vez los mensajes de los últimos 2 min y el «⏭» se
+// repetía (saltaba la canción que se acababa de retomar), la pausa se volvía a aplicar, etc.
+const MQ_HECHOS_K='vito_mq_hechos';
+const mqHechos={_m:(()=>{try{const o=JSON.parse(localStorage.getItem(MQ_HECHOS_K)||'{}');const t=Date.now();Object.keys(o).forEach(k=>{if(t-o[k]>15*6e4)delete o[k];});return o;}catch(e){return {};}})(),
+  has(k){return !!this._m[k];},add(k){this._m[k]=Date.now();const ks=Object.keys(this._m);if(ks.length>300)ks.sort((a,b)=>this._m[a]-this._m[b]).slice(0,ks.length-300).forEach(x=>delete this._m[x]);try{localStorage.setItem(MQ_HECHOS_K,JSON.stringify(this._m));}catch(e){}}};
+// El equipo de la música lleva 5 min sin dar señales (ni con la app abierta en él): se avisa aquí, una vez; la música la
+// toma una persona tocando «Que suene aquí» (o sola si pasan 10 min y aquí hay canciones esperando).
+let mqAvisoMudo=0;
+function mqVigilarEquipo(){
+  if(!mqOtro()||Date.now()-mqDesde<5*6e4)return;
+  const mudo=Date.now()-mqVisto;
+  if(mudo>5*6e4&&Date.now()-mqAvisoMudo>15*6e4){mqAvisoMudo=Date.now();try{showToast('🎶 «'+mqNombre()+'» (el equipo de la música) no da señales hace '+Math.round(mudo/6e4)+' min. Si se apagó, en Música toca «Que suene aquí».',10000);}catch(e){}}
+  if(mudo>10*6e4&&cola().some(x=>!x.done&&x.status!=='playing')){const era=mqNombre();try{mqElegir(true);}catch(e){}try{showToast('🎶 «'+era+'» no respondía hace 10 min: ahora la música suena en este equipo.',9000);}catch(e){}}
+}
 function mqEscuchar(){
   const c=mqCfg()?mqCanal():'';
   if(c===mqESCanal&&(mqES||!c))return;
@@ -2066,7 +2098,7 @@ function mqRevisar(){
     mqPintar();
   }catch(e){}
 }
-setInterval(mqRevisar,3000);setTimeout(mqRevisar,1500);
+setInterval(mqRevisar,3000);setTimeout(mqRevisar,1500);setInterval(()=>{try{mqVigilarEquipo();}catch(e){}},60e3);
 function mqElegir(si){
   if(typeof data==='undefined'||!data)return;
   if(si){data.musicaEquipo={id:mqEq(),nombre:mqNombreEquipo(),at:Date.now()};mqCanal();saveData();
@@ -2115,7 +2147,9 @@ async function reemplazarBloqueada(motivo,codigo){
   try{
     const now=LS('vito_now',null);
     if(now&&now.song){
-      if(motivo==='error')ytMarcarBad(now.vid);
+      // 1.99.18 (auditoría): a la lista negra solo lo que YouTube dice que no se deja poner fuera de YouTube (100 no existe,
+      // 101/150 bloqueado por el dueño). Los errores pasajeros (2, 5: memoria, red) no condenan una versión buena para siempre.
+      if(motivo==='error'&&YT_NO_SE_DEJA.includes(+codigo))ytMarcarBad(now.vid);
       const probados=(now.probados||[]).concat(now.vid?[now.vid]:[]);
       if(probados.length<=3){
         const qs=[now.song,now.song+' audio',now.song+' letra'];
@@ -2154,7 +2188,8 @@ function crearTest(){
     onStateChange:e=>{if(!verificando)return;let vd=null;try{vd=e.target.getVideoData().video_id;}catch(x){}
       if(vd&&vd!==verificando.v)return;                                   // 1.99.17: respuesta tardía de OTRO video (p. ej. el anterior)
       if(e.data===1||(verificando.cue&&e.data===5))verificando.fin(true);},
-    onError:()=>{if(verificando)verificando.fin(false);}}});
+    onError:e=>{if(!verificando)return;let vd=null;try{vd=e.target.getVideoData().video_id;}catch(x){}
+      if(vd&&vd!==verificando.v)return;verificando.codigo=e&&e.data;verificando.fin(false);}}});
 }
 // 🎵 1.99.17: «cuando alguien pone una canción del QR se quita la que está sonando». El probador REPRODUCÍA la canción nueva
 // (en silencio, escondido) mientras sonaba la otra: dos videos a la vez. En el celular eso gasta mucha memoria y Android
@@ -2165,13 +2200,14 @@ const ySonandoAqui=()=>{try{return !!(sonando||(yPl&&yPl.getPlayerState&&[1,3].i
 function probarVideo(v){
   return new Promise(res=>{
     if(!yTestListo){res(true);return;}                      // sin probador: el reproductor principal igual cambia de versión si falla
-    let t=null;const cue=ySonandoAqui();
-    verificando={cue,v,fin:ok=>{clearTimeout(t);verificando=null;try{yTest.stopVideo();}catch(e){}res(ok);}};
+    // 1.99.18: también solo se carga (sin reproducir) en la app de Android y si la música suena en el TV: ahorra memoria.
+    let t=null;const cue=ySonandoAqui()||!!window.VentoAndroid||tvOn()||(typeof lngOn==='function'&&lngOn());
+    verificando={cue,v,fin:ok=>{const cod=verificando&&verificando.codigo;clearTimeout(t);verificando=null;try{yTest.stopVideo();}catch(e){}ytPruebaCodigo=cod==null?null:+cod;res(ok);}};
     t=setTimeout(()=>verificando&&verificando.fin(true),9000);   // no respondió: se da por buena
     try{yTest.mute();if(cue)yTest.cueVideoById(v);else yTest.loadVideoById(v);}catch(e){verificando.fin(true);}
   });
 }
-let verifCorriendo=false;
+let verifCorriendo=false,ytPruebaCodigo=null;
 async function verificarCola(){
   if(verifCorriendo||!(AUTO()||tvOn()))return;
   const x=ordenJusto(cola()).find(y=>y.vid&&!y.ok);
@@ -2182,7 +2218,7 @@ async function verificarCola(){
     const ok=await probarVideo(x.vid);
     const l=cola(),it=l.find(y=>y.id===x.id);if(!it)return;
     if(ok){it.ok=true;if(it.status==='pending')it.status='approved';SS('vito_cola',l);tvPublicar();renderMusica();try{siguienteAuto();}catch(e){}return;}
-    ytMarcarBad(it.vid);
+    if(ytPruebaCodigo==null||YT_NO_SE_DEJA.includes(ytPruebaCodigo))ytMarcarBad(it.vid);   // 1.99.18: no por un error pasajero
     it.probados=(it.probados||[]).concat(it.vid);it.vid=null;it.ok=false;
     if(it.probados.length>=5){it.novid=true;it.sinVersion=true;it.status='error';it.done=true;it.endedAt=Date.now();SS('vito_cola',l);try{mzAlHistorial(it);}catch(e){}mzAvisarCliente(it,'novid');showToast('⚠️ «'+it.song+'» no tiene ninguna versión que se deje reproducir aquí; la salto.');renderMusica();return;}
     SS('vito_cola',l);
@@ -2308,6 +2344,7 @@ const fondoMusica=()=>window.__ventoAlFrente===false||document.hidden;
 /* Música con la app minimizada (app de Android): el servicio de fondo despierta a ORDEVA cada 5 s (ventoLatido) y
    aquí se revisa que siga sonando: si el celular frenó el video se le da play; si terminó, pone la siguiente. */
 window.vitoMusicaLatido=()=>{
+  try{mqPublicarEstado(false);}catch(e){}   // 1.99.18: el «sigo aquí» del equipo de la música también con la app minimizada
   try{
     if(!AUTO()||tvOn())return;
     if(!yPl||!yListo){cargarAPI();return;}
@@ -2784,8 +2821,7 @@ function ypAgregar(v,primero,callado,idFijo){
     title:String(v.title||'').slice(0,80),artist:String(v.artist||'').slice(0,60),vid:v.vid,dur:v.dur||ytDurCache[v.vid]||null,ts:now,done:false,status:'pending',panel:true};
   if(primero)it.primero=now;
   // El equipo que pone la música no responde (cerrado o sin internet): este equipo la toma, para que no quede en silencio.
-  if(mqOtro()&&Date.now()-mqDesde>15e3&&Date.now()-mqVisto>9e4){const era=mqNombre();try{mqElegir(true);}catch(e){}
-    showToast('🎶 «'+era+'» no respondía: ahora la música suena en este equipo.',8000);}
+  // (1.99.18: ya no se toma la música aquí; ver mqVigilarEquipo)
   // Nada suena en este equipo y la elegiste con «Que siga»: suena YA, dentro del mismo toque (sin esperar la revisión
   // de fondo). Así el navegador (Brave, Chrome…) deja sonar con audio; si la versión no se deja poner, se cambia sola.
   const yaSuena=mzActual();
