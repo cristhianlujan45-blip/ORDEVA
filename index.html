@@ -5599,8 +5599,11 @@ window.mesoraCelebrar = function(emojis){
     const a = A(); if(!a) return false;
     const t = tipoDe(titulo); if(!t || t === 'pagos') return false;
     const e = est(); if(!e.nombre || !e.conectado || !tiposDe(e).includes(t)) return false;
-    // 1.99.19 (auditoría): de las canciones solo se dice el aviso (la mesa), no el texto que escribió el cliente.
-    const frase = (limpiar(titulo) + (texto && t !== 'soporte' && t !== 'ia' && t !== 'musica' ? '. ' + limpiar(texto) : '')).slice(0, 180);
+    // 1.99.19 (auditoría): de las canciones, el nombre de la canción se dice solo si es corto y no tiene ninguna de las
+    // palabras que el dueño no deja pedir (Ajustes → Música); si no, solo el aviso con la mesa.
+    let tx = texto && t !== 'soporte' && t !== 'ia' ? limpiar(texto) : '';
+    if(tx && t === 'musica'){ try{ if(tx.length > 60 || (window.ventoMusicaProhibida && window.ventoMusicaProhibida(tx))) tx = ''; }catch(x){ tx = ''; } }
+    const frase = (limpiar(titulo) + (tx ? '. ' + tx : '')).slice(0, 180);
     try{ return !!a.parlanteDecir(frase); }catch(x){ return false; }
   };
   function pintar(){

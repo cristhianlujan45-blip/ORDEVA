@@ -1601,6 +1601,7 @@ const YT_NO_SE_DEJA=[100,101,150];
 // coma) y, si el dueño lo enciende, «revisar las canciones del QR antes de que suenen» (se aprueban con ✅ en Música).
 const mzPalabras=()=>{try{return String((data&&data.musicaPalabras)||'').split(/[,\n;]+/).map(w=>normVoiceText(w).trim()).filter(w=>w.length>=2).slice(0,200);}catch(e){return [];}};
 const mzProhibida=t=>{const n=' '+normVoiceText(String(t||''))+' ';return mzPalabras().find(w=>n.includes(' '+w+' ')||(w.includes(' ')&&n.includes(w)))||null;};
+window.ventoMusicaProhibida=t=>mzProhibida(t);   // (lo usa el parlante de avisos)
 const mzRevisarQR=()=>{try{return !!(data&&data.musicaRevisar);}catch(e){return false;}};
 const mzMaxDur=()=>{try{const m=+(data&&data.musicaMaxMin);return (m>=3&&m<=180?m:12)*60;}catch(e){return 720;}};
 function ytMarcarBad(v){ if(!v)return; const b=ytBad(); if(!b.includes(v)){ b.push(v); SS(YT_BAD_KEY,b.slice(-400)); } }
