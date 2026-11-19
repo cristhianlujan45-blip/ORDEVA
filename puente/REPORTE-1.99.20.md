@@ -20,3 +20,9 @@ contrario de lo elegido. Ahora los guardados van uno detrás del otro.
 ## Diagnóstico de errores (últimas 48 h)
 Ningún error nuevo de la app. «Android cerró la página por falta de memoria»: el último fue el 18/11 a las 13:50, en la
 versión 1.99.16; desde la 1.99.17 no ha vuelto a aparecer (todavía es poco tiempo para darlo por resuelto).
+
+## 1.99.21 (la misma noche)
+La corrida de GitHub de 1.99.20 falló solo en `diseno199`, punto 8. Ajustes → Negocio debe medir al menos 1.000 px menos
+que antes del rediseño (9.939 px), y con las tres filas nuevas de música (1.99.19) medía 9.215. Esas tres opciones
+avanzadas (tope de duración, revisar las canciones del QR, palabras bloqueadas) quedan ahora plegadas en «🛡️ Más opciones
+de las canciones del QR», que se abre con un toque. `diseno199` pasa 50/50 y `musicapendientes` 17/17.
