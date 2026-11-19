@@ -5,8 +5,9 @@
 //     fondo y arrancaba sin toque: el navegador lo dejaba en silencio.
 //  2. Primera vez (reproductor apagado): si el navegador no lo deja arrancar solo, sale «▶ Toca aquí para que suene» y
 //     al tocarlo suena.
-//  3. «Este equipo pone la música» en otro equipo que no responde: el panel lo dice y este equipo toma la música al
-//     poner una canción (antes quedaba todo en silencio). «🎶 Que suene aquí» también la toma.
+//  3. «Este equipo pone la música» en otro equipo que no responde: el panel lo dice. 1.99.18 (auditoría): al poner una
+//     canción ya NO se toma la música (eso cortaba la canción en el otro equipo cuando solo tardaba en dar señales): se le
+//     manda. Si a los 10 min sigue sin dar señales y hay canciones esperando, este equipo la toma solo.
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 const video = (id, t) => ({ id: { videoId: id }, snippet: { title: t, channelTitle: 'Artista' }, duracion: 200 });
@@ -80,7 +81,12 @@ const video = (id, t) => ({ id: { videoId: id }, snippet: { title: t, channelTit
     await p.mouse.click(5, 5);
     await buscarYPoner(p, 'salsa');
     await p.waitForTimeout(800);
-    chk('3. Al poner una canción: este equipo toma la música («no respondía») y suena aquí', await p.evaluate(() => window.__toasts.some(t => /no respondía: ahora la música suena en este equipo/.test(t))) && await suena(p), await p.evaluate(() => [window.__toasts.slice(-3), window.__yt.main && window.__yt.main.st]));
+    chk('3. Al poner una canción: se le MANDA al equipo de la música (no se le quita la música por tardar en responder)', await p.evaluate(() => window.__toasts.some(t => /suena en «App Android de ana · K7QX»/.test(t)) && !window.__toasts.some(t => /no respondía/.test(t))), await p.evaluate(() => window.__toasts.slice(-3)));
+    // Pasan 11 minutos sin señales del otro equipo (se adelanta el reloj de la página)
+    await p.evaluate(() => { const n0 = Date.now.bind(Date); Date.now = () => n0() + 11 * 6e4; window.__mqVigilar(); });
+    await p.waitForTimeout(800);
+    // (en un navegador sin toque no deja sonar solo —este simulador lo imita—; en la app de Android sí suena sola)
+    chk('3. A los 10 min sin señales y con canciones esperando, este equipo toma la música y la pone aquí', await p.evaluate(() => window.__toasts.some(t => /no respondía hace 10 min: ahora la música suena en este equipo/.test(t)) && window.__yt.cargados.includes('salsaxxxxxx')), await p.evaluate(() => [window.__toasts.slice(-3), window.__yt.cargados]));
     chk('3. … y ya no sale el aviso de otro equipo', !(await p.isVisible('#ypMq')));
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.stack || e)); }
   chk('Sin errores de página', !errs.length, errs);

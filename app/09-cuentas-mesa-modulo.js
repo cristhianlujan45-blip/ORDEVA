@@ -2015,9 +2015,10 @@ const mqHechos={_m:(()=>{try{const o=JSON.parse(localStorage.getItem(MQ_HECHOS_K
 let mqAvisoMudo=0;
 function mqVigilarEquipo(){
   if(!mqOtro()||Date.now()-mqDesde<5*6e4)return;
-  const mudo=Date.now()-mqVisto;
+  const mudo=Date.now()-(mqVisto||mqDesde);   // si nunca dio señales desde que se abrió aquí, se cuenta desde entonces
   if(mudo>5*6e4&&Date.now()-mqAvisoMudo>15*6e4){mqAvisoMudo=Date.now();try{showToast('🎶 «'+mqNombre()+'» (el equipo de la música) no da señales hace '+Math.round(mudo/6e4)+' min. Si se apagó, en Música toca «Que suene aquí».',10000);}catch(e){}}
-  if(mudo>10*6e4&&cola().some(x=>!x.done&&x.status!=='playing')){const era=mqNombre();try{mqElegir(true);}catch(e){}try{showToast('🎶 «'+era+'» no respondía hace 10 min: ahora la música suena en este equipo.',9000);}catch(e){}}
+  if(mudo>10*6e4&&cola().some(x=>!x.done&&x.status!=='playing')){const era=mqNombre();try{mqElegir(true);}catch(e){}try{showToast('🎶 «'+era+'» no respondía hace 10 min: ahora la música suena en este equipo.',9000);}catch(e){}
+    try{siguienteAuto();verificarCola();}catch(e){}}
 }
 function mqEscuchar(){
   const c=mqCfg()?mqCanal():'';
@@ -2099,6 +2100,7 @@ function mqRevisar(){
   }catch(e){}
 }
 setInterval(mqRevisar,3000);setTimeout(mqRevisar,1500);setInterval(()=>{try{mqVigilarEquipo();}catch(e){}},60e3);
+window.__mqVigilar=()=>mqVigilarEquipo();   // para las pruebas
 function mqElegir(si){
   if(typeof data==='undefined'||!data)return;
   if(si){data.musicaEquipo={id:mqEq(),nombre:mqNombreEquipo(),at:Date.now()};mqCanal();saveData();
