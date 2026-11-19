@@ -3773,8 +3773,12 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
         <div class="settings-row-text"><strong>🔒 Bloqueo automático</strong><span>Si nadie usa la app un rato, se tapa y pide la contraseña para seguir. Debajo sigue trabajando: los pedidos y la música siguen llegando.</span></div>
         <select id="accAutoLock" class="mz-in" style="max-width:150px"><option value="0">Nunca</option><option value="5">5 min</option><option value="15">15 min</option><option value="30">30 min</option><option value="60">1 hora</option></select>
       </div>
+      <div class="settings-row" id="accHuellaRow" hidden>
+        <div class="settings-row-text"><strong>👆 Entrar con huella</strong><span>En este equipo entras con tu huella (o tu cara) en vez de escribir la contraseña. También desbloquea la app. Cualquier huella guardada en este celular podrá entrar con tu usuario.</span><span id="accHuellaTxt" style="margin-top:4px;font-weight:700"></span></div>
+        <button class="btn-ghost" id="accHuellaBtn" type="button">👆 Activar</button>
+      </div>
       <div class="settings-row">
-        <div class="settings-row-text"><strong>Cerrar sesión</strong><span>Te pedirá usuario y contraseña al volver a entrar.</span></div>
+        <div class="settings-row-text"><strong>Cerrar sesión</strong><span>Te pedirá usuario y contraseña (o tu huella) al volver a entrar.</span></div>
         <button class="btn-danger-outline" id="accLogoutBtn" type="button">Salir</button>
       </div>
     </div>
@@ -5220,7 +5224,7 @@ export default {
 <script src="nube/config.js"></script>
 <script src="nube/vento-nube.js?v=1.99.16"></script>
 <script src="nube/vento-usuarios.js?v=1.99.16" defer></script><!-- usuarios del equipo (solo con nombre) en todos los equipos del negocio -->
-<script src="nube/vento-pagos.js?v=1.99.16" defer></script><script src="lib/vento-solo-local.js?v=1.99.16" defer></script><!-- 📱 1.99.14: aviso «este negocio está solo en este equipo» -->
+<script src="nube/vento-pagos.js?v=1.99.16" defer></script><script src="lib/vento-solo-local.js?v=1.99.16" defer></script><script src="lib/vento-huella.js?v=1.99.16" defer></script><!-- 👆 1.99.17: entrar con la huella --><!-- 📱 1.99.14: aviso «este negocio está solo en este equipo» -->
 <script src="nube/vento-dian.js?v=1.99.16" defer></script><!-- 🧾 Facturación electrónica DIAN (P.O.S. electrónico, factura y notas crédito) -->
 <script src="nube/vento-suscripcion.js?v=1.99.16" defer></script>
 <script src="lib/vento-puerta.js?v=1.99.16" defer></script><!-- Puerta: la app solo funciona conectada a la base de datos de ORDEVA -->

@@ -875,6 +875,16 @@ public class VentoApp extends Application {
 
         /** 1.88.0: cuánto agrandó la pantalla el «tamaño de pantalla» (zoom) del celular: 1 = normal, 1.2 = 20 % más grande.
          *  La página lo usa para verse igual que con el tamaño normal (ver lib/vento-igual.js). */
+        /** 👆 1.99.17: entrar con la huella (Huella.java). "ok", "sin-huella" o "no-soporta". */
+        @JavascriptInterface
+        public String huellaEstado() { return Huella.estado(VentoApp.this); }
+
+        /** Pide la huella; responde con window.__ventoHuellaRespuesta(id, ok, motivo). */
+        @JavascriptInterface
+        public void huellaPedir(final String id, final String titulo, final String subtitulo) {
+            ui.post(() -> Huella.pedir(id, titulo, subtitulo));
+        }
+
         @JavascriptInterface
         public double escalaPantalla() {
             try {

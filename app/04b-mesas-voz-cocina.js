@@ -1433,9 +1433,10 @@ document.getElementById('navMoreBtn').addEventListener('click', () => { syncNavM
 { const x = document.getElementById('navMoreX'); if(x) x.addEventListener('click', e => { e.stopPropagation(); navMoreSheet.classList.remove('show'); }); }   // 1.99.2: ✕ para cerrar
 // Cerrar sesión: guarda todo, pregunta y vuelve a pedir usuario y contraseña. Los datos del negocio no se borran.
 async function cerrarSesion(){
-  const ok = await showConfirm({ title: '¿Cerrar sesión?', message: 'Tus datos quedan guardados. Para volver a entrar te pedirá usuario y contraseña (así puede entrar otra persona con su propio usuario).', confirmText: 'Sí, cerrar sesión', icon: '🚪' });
+  const ok = await showConfirm({ title: '¿Cerrar sesión?', message: 'Tus datos quedan guardados. Para volver a entrar te pedirá usuario y contraseña, o tu huella si la activaste (así puede entrar otra persona con su propio usuario).', confirmText: 'Sí, cerrar sesión', icon: '🚪' });
   if(!ok) return;
   try{ saveData(); }catch(e){}
+  try{ sessionStorage.setItem('vento-salio', '1'); }catch(e){}   // 👆 1.99.17: al volver a la entrada no se pide la huella sola
   localStorage.removeItem(AUTH_SESSION_KEY);
   location.reload();
 }
@@ -1446,6 +1447,7 @@ window.cerrarSesion = cerrarSesion;
 window.ventoSalir = async function(){
   try{ saveData(); }catch(e){}
   try{ if(window.ventoNube && window.ventoNube.salir) await Promise.race([window.ventoNube.salir(), new Promise(r => setTimeout(r, 4000))]); }catch(e){}
+  try{ sessionStorage.setItem('vento-salio', '1'); }catch(e){}   // 👆 1.99.17: al volver a la entrada no se pide la huella sola
   try{ localStorage.removeItem(AUTH_SESSION_KEY); }catch(e){}
   location.reload();
 };

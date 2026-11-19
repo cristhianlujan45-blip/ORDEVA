@@ -995,19 +995,26 @@ function bloquearApp(){
   ov.style.cssText = 'position:fixed;inset:0;z-index:2147483000;background:var(--bg,#0b0b0b);display:flex;align-items:center;justify-content:center;padding:20px';
   ov.innerHTML = '<form style="width:100%;max-width:340px;display:flex;flex-direction:column;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px">' +
     '<div style="font-size:40px;text-align:center">🔒</div><b style="text-align:center;font-size:18px">ORDEVA bloqueado</b><div class="auth-hint" style="text-align:center">Usuario: <b></b></div>' +
-    '<label>Contraseña<input id="lockPass" type="password" autocomplete="current-password"></label><div class="auth-err" id="lockErr"></div>' +
+    '<label id="lockPassTxt">Contraseña<input id="lockPass" type="password" autocomplete="current-password"></label><div class="auth-err" id="lockErr"></div>' +
     '<button class="btn-primary" type="submit">Desbloquear</button><button class="auth-link" type="button" id="lockOtro">Entrar con otro usuario</button></form>';
   ov.querySelector('.auth-hint b').textContent = authUser;
+  // 1.99.17: el empleado con PIN también desbloquea con su PIN (antes solo con la contraseña).
+  { const u0 = authUsers().find(x => x.user === authUser); if(authPinPuede(u0)){ ov.querySelector('#lockPassTxt').firstChild.textContent = 'PIN o contraseña'; ov.querySelector('#lockPass').inputMode = 'numeric'; } }
   document.body.appendChild(ov);
   const f = ov.querySelector('form'), inp = ov.querySelector('#lockPass'), err = ov.querySelector('#lockErr');
   f.onsubmit = async e => {
     e.preventDefault(); err.textContent = '';
     const espera = authLoginLocked(authUser); if(espera){ err.textContent = '🔒 Demasiados intentos. Espera ' + espera + ' min.'; return; }
     const u = authUsers().find(x => x.user === authUser);
-    if(!u || !(await authClaveOk(u, inp.value))){ authLoginFail(authUser); err.textContent = 'Contraseña incorrecta.'; inp.value = ''; return; }
-    authLoginClear(authUser); ov.remove();
+    let ok = !!u && await authClaveOk(u, inp.value);
+    if(!ok && u && authPinPuede(u) && /^\d{4,6}$/.test(inp.value) && authPinFallos(authUser) < PIN_MAX_FALLOS){
+      ok = await authPinOk(u, inp.value);
+      if(!ok) authPinFallo(authUser, authPinFallos(authUser) + 1);
+    }
+    if(!ok){ authLoginFail(authUser); err.textContent = authPinPuede(u) ? 'PIN o contraseña incorrectos.' : 'Contraseña incorrecta.'; inp.value = ''; return; }
+    authPinFallo(authUser, 0); authLoginClear(authUser); ov.remove();
   };
-  ov.querySelector('#lockOtro').onclick = () => { try{ saveData(); }catch(e){} localStorage.removeItem(AUTH_SESSION_KEY); location.reload(); };
+  ov.querySelector('#lockOtro').onclick = () => { try{ saveData(); }catch(e){} try{ sessionStorage.setItem('vento-salio', '1'); }catch(e){} localStorage.removeItem(AUTH_SESSION_KEY); location.reload(); };
   setTimeout(() => inp.focus(), 100);
 }
 window.bloquearApp = bloquearApp;
@@ -1478,13 +1485,14 @@ function showAuth(firstRun){
           document.getElementById('authPass').value = '';
           await enterApp(user, null);
           if(nb){ if(nb.conectado(user)) authRevisarClave(user, pass); else authConectarNube(user, pass, true); }
+          try{ window.ventoHuella && window.ventoHuella.ofrecer(user); }catch(x){}   // 👆 1.99.17: «¿Entrar con tu huella la próxima vez?»
           return;
         }
         // Correo que no está en este celular (celular nuevo) o con la contraseña cambiada en otro celular:
         // se busca la cuenta en la nube.
         if(nb){
           ocupado('⏳ Buscando tu cuenta…');
-          try{ await authEntrarDesdeNube(user, pass); authLoginClear(user); authGuardarEnEquipo(user, pass); document.getElementById('authPass').value = ''; return; }
+          try{ await authEntrarDesdeNube(user, pass); authLoginClear(user); authGuardarEnEquipo(user, pass); document.getElementById('authPass').value = ''; try{ window.ventoHuella && window.ventoHuella.ofrecer(user); }catch(x){} return; }
           catch(x){ if(!authClaveMala(x)){ err.textContent = nb.msgError(x); return; } }
         }
         authLoginFail(user);
