@@ -79,12 +79,27 @@ por falta de memoria» 47 veces en un día en el Xiaomi** (1.99.16). En el códi
   - Después de agregar, solo se manda «play», sin reemplazar la cola.
 - **Chromecast:** no se corta una canción que según su duración todavía suena.
 
+### Revisión independiente de la música (goldfish)
+- **Bloqueante:** si el TV dejaba de decir qué hacía (se reinició YouTube en el TV), la canción nueva solo se «agregaba» a
+  una cola que ya no existía y no sonaba.
+  → La excepción quedó solo para «cambiando de canción» y comerciales; el resto se recupera como antes.
+- **Mayor:** «cambiando de canción» (-1) y los comerciales no tenían tope de tiempo. Un TV pegado ahí se quedaba callado.
+  → Tope de 15 s en -1 y de 3 min en comerciales, con el mismo video. Pasado el tope se trata como quieto: «play», y si no
+  arranca, se le vuelve a poner la cola. El canal en vivo usa la misma regla.
+- **Menores corregidos:**
+  - La canción retomada guarda su posición desde el primer momento: si la página se cae otra vez, no vuelve a empezar.
+  - Solo se retoma si este celular sigue siendo el que pone la música (no si pasó al TV o a otro equipo).
+  - El probador no acepta la respuesta tardía de otro video.
+- **Queda por comprobar en un celular real:** que YouTube avise «no se deja poner» al solo cargar (cue). Si alguna versión
+  bloqueada se escapa, el reproductor principal ya busca otra versión al llegar a ella.
+
 ## Pruebas
 - Nueva `pruebas/huella.test.js` (35/35): navegador con lector de huella de prueba de Chromium, app de Android con puente
   simulado y los casos de la revisión.
-- Nueva `pruebas/musicacorte.test.js` (16/16):
+- Nueva `pruebas/musicacorte.test.js` (18/18):
   - TV simulado con comercial y con cambio de canción: la nueva se agrega, sin lista nueva.
   - Reproductor del celular simulado: la nueva solo se carga sin reproducir, y al volver a abrir se retoma desde donde iba.
+  - Regresiones: un TV que ya no dice qué hace igual recibe la cola, y un TV pegado en -1 se recupera.
 - Las dos se agregaron a la lista de CI.
 - El Java de la huella se compiló contra Android 34 (`javac` con `android.jar`). El APK completo lo compila GitHub.
 

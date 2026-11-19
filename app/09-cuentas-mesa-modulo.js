@@ -2151,7 +2151,9 @@ function crearTest(){
     const i=document.createElement('div');i.id='ytTestIn';d.appendChild(i);document.body.appendChild(d);}
   yTest=new YT.Player('ytTestIn',{width:'200',height:'113',playerVars:{playsinline:1,mute:1,controls:0},events:{
     onReady:()=>{yTestListo=true;try{yTest.mute();}catch(e){}},
-    onStateChange:e=>{if(verificando&&(e.data===1||(verificando.cue&&e.data===5)))verificando.fin(true);},
+    onStateChange:e=>{if(!verificando)return;let vd=null;try{vd=e.target.getVideoData().video_id;}catch(x){}
+      if(vd&&vd!==verificando.v)return;                                   // 1.99.17: respuesta tardía de OTRO video (p. ej. el anterior)
+      if(e.data===1||(verificando.cue&&e.data===5))verificando.fin(true);},
     onError:()=>{if(verificando)verificando.fin(false);}}});
 }
 // 🎵 1.99.17: «cuando alguien pone una canción del QR se quita la que está sonando». El probador REPRODUCÍA la canción nueva
@@ -2164,7 +2166,7 @@ function probarVideo(v){
   return new Promise(res=>{
     if(!yTestListo){res(true);return;}                      // sin probador: el reproductor principal igual cambia de versión si falla
     let t=null;const cue=ySonandoAqui();
-    verificando={cue,fin:ok=>{clearTimeout(t);verificando=null;try{yTest.stopVideo();}catch(e){}res(ok);}};
+    verificando={cue,v,fin:ok=>{clearTimeout(t);verificando=null;try{yTest.stopVideo();}catch(e){}res(ok);}};
     t=setTimeout(()=>verificando&&verificando.fin(true),9000);   // no respondió: se da por buena
     try{yTest.mute();if(cue)yTest.cueVideoById(v);else yTest.loadVideoById(v);}catch(e){verificando.fin(true);}
   });
@@ -2261,7 +2263,7 @@ function siguienteAuto(){
   if(tvOn())return;                                   // el TV es el reproductor
   const x=mzOrdenParaSonar()[0];if(!x)return;        // solo versiones ya comprobadas, y lo pedido antes que el fondo
   const desde=x.retomarEn>5?x.retomarEn:0;
-  mzEmpezo(x.id,'app');if(x.retomarEn!=null||x.primero)mzCambiar(x.id,{retomarEn:null,primero:0});
+  mzEmpezo(x.id,'app');if(x.retomarEn!=null||x.primero)mzCambiar(x.id,Object.assign({retomarEn:null,primero:0},desde?{playedSeconds:desde,progresoAt:Date.now()}:{}));
   SS('vito_now',x);sonando=true;cargadoEn=Date.now();ytMostrar(true);
   if(desde)yPl.loadVideoById({videoId:x.vid,startSeconds:desde});else yPl.loadVideoById(x.vid);   // retomada: sigue donde iba
   renderMusica();
@@ -2333,7 +2335,8 @@ function iniAutoPlay(){
   // «se quitaba la canción que estaba sonando»). Si ya casi terminaba o pasó mucho rato, se da por terminada como antes.
   try{cola().filter(x=>x.status==='playing'&&x.fuente==='app').forEach(x=>{
     const casi=x.dur&&x.playedSeconds>=x.dur*0.9,hace=Date.now()-(x.progresoAt||x.startedAt||0);
-    if(!casi&&x.vid&&!x.sinVersion&&hace<10*6e4)mzCambiar(x.id,{status:'approved',done:false,ok:true,retomarEn:Math.max(0,(x.playedSeconds||0)-3),primero:Date.now()});
+    const aqui=AUTO()&&!tvOn()&&!(typeof lngOn==='function'?lngOn():!!(LS('vito_ytlounge',{})||{}).on)&&!(typeof mqOtro==='function'&&mqOtro());   // este celular sigue siendo el que suena
+    if(aqui&&!casi&&x.vid&&!x.sinVersion&&hace<10*6e4)mzCambiar(x.id,{status:'approved',done:false,ok:true,retomarEn:Math.max(0,(x.playedSeconds||0)-3),primero:Date.now()});
     else mzTermino(x.id,casi?'played':'skipped');
   });}catch(e){}
   const go=$('mzAutoGo');

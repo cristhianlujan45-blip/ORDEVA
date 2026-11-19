@@ -30,7 +30,9 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     const resp = (ruta, query, cuerpo) => {
       const qs = new URLSearchParams(query), f = new URLSearchParams(cuerpo);
       if(/get_lounge_token_batch/.test(ruta)) return { st: 200, b: JSON.stringify({ screens: [{ screenId: 'scr-lg', loungeToken: 'tok-lg', expiration: Date.now() + 864e5 }] }) };
-      if(!qs.get('SID')){ tv.binds++; const np = tv.cola.length ? { videoId: tv.cola[0], state: tv.estado, currentTime: '5', duration: '200' } : {}; return { st: 200, b: JSON.stringify([[0, ['c', 'SID' + tv.binds, '', 8]], [1, ['S', 'gs']], [2, ['nowPlaying', np]]]) }; }
+      if(!qs.get('SID')){ tv.binds++; const np = tv.cola.length ? { videoId: tv.cola[0], state: tv.estado, currentTime: '5', duration: '200' } : {};
+        const ev = [[0, ['c', 'SID' + tv.binds, '', 8]], [1, ['S', 'gs']]]; if(!tv.sinNada) ev.push([2, ['nowPlaying', np]]);
+        return { st: 200, b: JSON.stringify(ev) }; }
       const sc = f.get('req0__sc'), v = f.get('req0_videoId'); tv.cmds.push(sc + ':' + (v || ''));
       if(sc === 'setPlaylist') tv.cola = [v]; if(sc === 'addVideo') tv.cola.push(v);
       return { st: 200, b: '[]' };
@@ -73,12 +75,28 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     chk('2. Con el TV en un comercial, la canción nueva se AGREGA al final (addVideo)', await esperarCmd(/^addVideo:v_DependeJa/), JSON.stringify(tv.cmds));
     chk('2. …y NO se manda lista nueva (no corta lo que suena)', tv.cmds.filter(c => /^setPlaylist/.test(c)).length === n1, JSON.stringify(tv.cmds));
     // 3. El TV pasando de una canción a otra
-    tv.estado = '-1';
+    tv.estado = '1';                                            // la canción suena…
     await p.waitForTimeout(23000);
+    tv.estado = '-1';                                           // …y justo cuando llega la nueva, el TV está cambiando de canción
     await pedir(3, 'Sin poderte hablar Willie Colon');
     chk('3. Con el TV cambiando de canción (-1), la nueva también se agrega', await esperarCmd(/^addVideo:v_Sinpodert/), JSON.stringify(tv.cmds));
     chk('3. …y sigue sin lista nueva', tv.cmds.filter(c => /^setPlaylist/.test(c)).length === n1, JSON.stringify(tv.cmds));
-    chk('A. Las tres canciones quedaron en la cola del TV, en orden', tv.cola.join(',') === ['v_Vivirmivi', 'v_DependeJar', 'v_Sinpoderte'].map(x => x.slice(0, 11)).join(','), JSON.stringify(tv.cola));
+    tv.estado = '1';
+    const colaTres = tv.cola.join(',');
+    // Regresión (revisión): el TV deja de decir qué hace (se reinició YouTube en el TV) con la cola de ORDEVA «viva» según
+    // el reloj. Una canción nueva NO se puede quedar solo «agregada» a una cola que ya no existe: hay que ponerle la cola.
+    const sp0 = tv.cmds.filter(c => /^setPlaylist/.test(c)).length;
+    tv.cola = []; tv.sinNada = true;
+    await p.waitForTimeout(21000);
+    await pedir(4, 'La rebelion Joe Arroyo');
+    chk('R1. Si el TV ya no dice qué hace, la canción nueva igual suena (se le pone la cola, no queda muda)', await (async () => { const t0 = Date.now(); while(Date.now() - t0 < 30000){ if(tv.cmds.filter(c => /^setPlaylist/.test(c)).length > sp0 && tv.cola.some(v => /^v_Larebelio/.test(v))) return true; await p.waitForTimeout(500); } return false; })(), JSON.stringify(tv.cmds.slice(-8)));
+    // Regresión (revisión): el TV queda quieto en -1 con una canción de ORDEVA y no hace caso al «play»: pasados unos
+    // segundos se trata como quieto y se le vuelve a poner la cola (no se queda callado para siempre).
+    tv.sinNada = false; tv.estado = '-1';
+    const sp1 = tv.cmds.filter(c => /^setPlaylist/.test(c)).length;
+    chk('R2. Si el TV se queda pegado «cambiando de canción», ORDEVA le vuelve a poner la cola', await (async () => { const t0 = Date.now(); while(Date.now() - t0 < 75000){ if(tv.cmds.filter(c => /^setPlaylist/.test(c)).length > sp1) return true; await p.waitForTimeout(1000); } return false; })(), JSON.stringify(tv.cmds.slice(-8)));
+    tv.estado = '1';
+    chk('A. Las tres canciones quedaron en la cola del TV, en orden', colaTres === ['v_Vivirmivi', 'v_DependeJar', 'v_Sinpoderte'].map(x => x.slice(0, 11)).join(','), colaTres);
     await ctx.close();
   }
 

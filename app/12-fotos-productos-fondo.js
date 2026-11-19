@@ -1825,6 +1825,7 @@ async function lngBind(){
   lng.sid = sid; lng.gs = gs || ''; lng.t = Date.now(); lng.pantallaFuera = 0; lng.error = '';
   lng.fallas = 0; lng.pausaHasta = 0;   // el TV respondió: se olvidan los errores de antes (no se espera nada)
   lng.tvPlay = lngEstadoTV(t); lngLeerTV(t);
+  lngRaroMarcar(); if(lngRaro(lng.tvSt)) lng.tvPlay = lngPlayDe(lng.tvSt);   // 1.99.17: transición o comercial, con tope de tiempo
   // Prueba de que el TV DE VERDAD llegó a reproducir. Sin esta prueba no se puede dar por
   // hecho que hay una cola viva: es lo que hacía que la canción entrara como «agregada»
   // a una cola que nunca existió y se quedara callada.
@@ -1893,6 +1894,23 @@ function lngEstadoTV(t){
 }
 // Códigos normales del TV; cualquier otro es un comercial (o algo de YouTube que no es «quieto»).
 const LNG_ESTADOS = [-1, 0, 1, 2, 3, 5];
+// -1 (cambiando de canción) y los comerciales duran poco: si el TV se queda ahí con el MISMO video más de 15 s (-1) o
+// 3 min (comercial), ya no es una transición: se trata como quieto y ORDEVA lo recupera como siempre.
+const lngRaro = st => st === -1 || (st != null && !LNG_ESTADOS.includes(st));
+function lngRaroMarcar(){
+  const st = lng.tvSt, k = (lng.tvVid || '') + '|' + st;
+  if(!lngRaro(st)){ lng.raro = null; return; }
+  if(!lng.raro || lng.raro.k !== k) lng.raro = { k, t: Date.now() };
+}
+const lngRaroViejo = () => !!lng.raro && lngRaro(lng.tvSt) && Date.now() - lng.raro.t > (lng.tvSt === -1 ? 15000 : 180000);
+// Lo que se cree del TV según su estado: true sonando, false quieto, null no se sabe.
+function lngPlayDe(st){
+  if(st == null) return null;
+  if(st === 1 || st === 2 || st === 3) return true;
+  if(st === 0 || st === 5) return false;
+  if(lngRaroViejo()) return false;
+  return st === -1 ? null : true;
+}
 /* La sesión del TV se cae sola en menos de un minuto si nadie la sostiene (ORDEVA no
    mantiene el canal de vuelta abierto). Por eso, antes de cada canción, se saluda de
    nuevo: sale barato, garantiza que el envío no se pierda y de paso trae el estado real
@@ -1953,7 +1971,7 @@ async function lngArrancar(videoId, encolada){
     if(lng.tvPlay === true){ lngOk(); return; }
     // 🎵 1.99.17: si la canción solo se AGREGÓ a una cola viva y el TV no dice «quieto» (está cambiando de canción, -1),
     // no se le vuelve a poner la cola: eso reemplaza y corta lo que suena. Solo «play», por si acaso.
-    if(encolada && lng.tvPlay !== false){ if(i === 0){ lngLog('   el TV está cambiando de canción → «play» y se deja seguir su cola'); try{ await lngCmd('play', {}); }catch(e){} } return; }
+    if(encolada && lngRaro(lng.tvSt) && !lngRaroViejo()){ if(i === 0){ lngLog('   el TV está cambiando de canción o en un comercial → «play» y se deja seguir su cola'); try{ await lngCmd('play', {}); }catch(e){} } continue; }
     if(!lngReporta() && lng.tvPlay === null){
       if(i === 0){ lngLog('   este TV no informa su estado → «play» por si acaso y se deja sonar'); try{ await lngCmd('play', {}); }catch(e){} }
       return;
@@ -1967,6 +1985,7 @@ async function lngArrancar(videoId, encolada){
   try{
     await lngAsegurar(true);
     if(lng.tvPlay === true){ lngOk(); return; }
+    if(encolada && lngRaro(lng.tvSt) && !lngRaroViejo()) return;   // 1.99.17: sigue cambiando de canción: lo revisa lngVigilar
     lngLog('   ❌ el TV recibió las canciones pero no se puso a sonar (quedó: ' + lngEstadoNombre(lng.tvPlay) + ')');
     lng.error = 'El TV recibe las canciones pero no las reproduce. En el TV abre la app de YouTube y déjala en su pantalla de inicio (no en un video ni en el protector de pantalla), y toca ▶ en ORDEVA. Si sigue igual, vuelve a vincular con el código del TV.';
   }catch(e){}
@@ -2068,7 +2087,7 @@ async function lngVigilar(){
     await lngAsegurar(true);
     const vid = lng.tvVid, st = lng.tvSt, reciente = Date.now() - (lng.ultimoEnvio || 0) < 25000;
     lngResultado(true);
-    if(st !== null && !LNG_ESTADOS.includes(st)){ lngLog('   el TV está pasando un comercial → se espera'); return; }   // 1.99.17: no se le cambia la cola
+    if(st !== null && !LNG_ESTADOS.includes(st) && !lngRaroViejo()){ lngLog('   el TV está pasando un comercial → se espera'); return; }   // 1.99.17: no se le cambia la cola
     if(!lngReporta()){ lngPorTiempo(lngEnTV()); return; }
     // Canciones mandadas hace más de 3 h (el TV se apagó, cerraron ORDEVA…): no se reponen.
     enTV.filter(x => Date.now() - (x.lngAt || 0) > 3 * 36e5).forEach(x => vm().mzTermino(x.id, 'skipped'));
@@ -2096,8 +2115,11 @@ async function lngVigilar(){
           lngLog('▶ en el TV suena «' + String(it.title || it.song || '').slice(0, 40) + '»');
         }
         if(lng.tvT != null && st === 1) vm().mzProgreso(it.id, lng.tvT, lng.tvD || 0);
-        if((st === -1 || st === 5) && !reciente){ lngLog('   el TV tiene la canción quieta → play'); await lngCmd('play', {}); }
-        return;
+        if((st === -1 || st === 5) && !reciente){
+          // 1.99.17: si ya lleva rato quieta (más de 15 s en -1) y el «play» no la arrancó, se le pone la cola que falta.
+          if(st === -1 && lngRaroViejo() && lng.raroPlay === lng.raro.k){ lngLog('   el TV sigue quieto después del «play» → le pongo la cola que falta'); }
+          else { lngLog('   el TV tiene la canción quieta → play'); if(lng.raro) lng.raroPlay = lng.raro.k; await lngCmd('play', {}); return; }
+        } else return;
       }
     } else if(suena && (st === 0 || st === -1 || st === 5 || vid === '' || !!vid)){
       // Sonaba una de ORDEVA y el TV ya no la tiene: terminó (o se fue a un recomendado).
@@ -2238,7 +2260,7 @@ window.__ventoTVev = (id, txt) => {
   // el resto (aparatos conectados, lista del TV) con el mismo lector del saludo
   try{ lngLeerMas(JSON.stringify(ev.map(([n, d, k]) => [k, [n, d]]))); }catch(e){}
   lng.tvAt = Date.now();
-  if(lng.tvSt != null) lng.tvPlay = lng.tvSt === 1 || lng.tvSt === 2 || lng.tvSt === 3;
+  lngRaroMarcar(); if(lng.tvSt != null) lng.tvPlay = lngPlayDe(lng.tvSt);   // 1.99.17: igual que el saludo (comercial = sonando)
   if((lng.tvSt !== null || lng.tvVid) && !lngCfg().reporta) SS(LNG_KEY, Object.assign(lngCfg(), { reporta: Date.now() }));
   try{ lngVivoPintar(); }catch(e){}
   // Cambió la canción o su estado: ORDEVA pone al día su cola (sonando / terminada / siguiente) enseguida.
