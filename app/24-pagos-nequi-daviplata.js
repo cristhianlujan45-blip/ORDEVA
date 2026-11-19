@@ -94,6 +94,7 @@
         const v = e.target.closest('[data-vi]'); if(v){ const x = lista().find(y => y.id === v.dataset.vi); if(x){ x.estado = 'ok'; saveData(); pintar(); window.pagoLlego(x, true); } }
       }); }
     function pintar(){
+      if(typeof data === 'undefined' || !data) return;   // 1.99.17: sin datos todavía
       const on = data.pagos && data.pagos.on, hoy = new Date().setHours(0, 0, 0, 0), l = lista().slice(0, 40), hoyL = lista().filter(x => x.t >= hoy);
       const ok = hoyL.filter(confirmado), porApp = {}; ok.forEach(x => { porApp[x.app] = (porApp[x.app] || 0) + x.monto; });
       const sello = x => x.estado === 'falso' ? '<span class="pp-s pp-f">🚨 Falso</span>' : x.estado === 'revisar' ? '<span class="pp-s pp-r">⚠️ Revisar</span>' : '<span class="pp-s pp-ok">✅</span>';

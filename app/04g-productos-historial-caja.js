@@ -1502,6 +1502,7 @@ function histReceiptData(h){
   };
 }
 function renderHistorial(masPagina){
+  if(typeof data === 'undefined' || !data) return;   // 1.99.17: sin datos todavía (la página recién abierta)
   const list = document.getElementById('histList');
   const summary = document.getElementById('histSummary');
   let totalSum = 0, debtSum = 0;

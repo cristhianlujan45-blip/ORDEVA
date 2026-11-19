@@ -511,6 +511,8 @@ async function iniciar(opts = {}) {
         usr = (await sql('select * from auth.users where lower(email) = lower($1)', [String(b.email).trim()]))[0] || null;
       } else throw errAuth(400, 'validation_failed', 'You must provide either an email or phone number.');
       if (!usr && b.create_user === false) throw errAuth(422, 'otp_disabled', 'Signups not allowed for otp');
+      // Como GoTrue: con create_user (por defecto) y un correo nuevo, se crea la cuenta SIN confirmar y le llega el código.
+      if (!usr && b.email && b.create_user !== false) usr = await crearUsuario(String(b.email).trim().toLowerCase(), crypto.randomBytes(12).toString('hex'), {}, false);
       const cod = nuevoCodigo();
       if (usr) codigos.set(clave, { codigo: cod, hasta: Date.now() + 900e3, uid: usr.id });
       recuperaciones.push({ ruta: r, email: b.email || null, phone: b.phone ? normTel(b.phone) : null, volver, codigo: usr ? cod : null, en: Date.now() });

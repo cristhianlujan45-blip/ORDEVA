@@ -687,6 +687,8 @@ async function authCorreoGuardar(){
   if(!(await authClaveOk(u, actual))) return showToast('⚠️ Contraseña incorrecta: no se cambió el correo.');
   const e = ((await showPrompt({ icon: '📧', title: 'Correo de recuperación', message: 'Si olvidas la contraseña, te llega un enlace a este correo.', type: 'email', value: u.email || '', placeholder: 'tucorreo@ejemplo.com', confirmText: 'Guardar correo' })) || '').trim().toLowerCase(); if(!e) return;
   if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) return showToast('⚠️ Ese correo no está bien escrito.');
+  // 📧 1.99.18: que el correo exista (dominio real, sin errores de dedo, no desechable)
+  if(window.ventoCorreo){ const rc = await window.ventoCorreo.revisar(e); if(!rc.ok) return showToast('⚠️ ' + window.ventoCorreo.mensaje(rc).replace(/^📧 /, ''), 9000); }
   u.email = e; u.emailAt = Date.now(); localStorage.setItem(AUTH_USERS_KEY, JSON.stringify(users));
   showToast('✅ Correo guardado: si olvidas la contraseña, te llega un enlace a ' + authMascara(e) + '.', 7000);
   try{ authCorreoEstado(); }catch(x){}
@@ -1058,6 +1060,17 @@ window.bloquearApp = bloquearApp;
 // celular), así no se puede crear otra cuenta con el mismo correo y en otro celular se ven los mismos datos.
 // Los usuarios sin correo (ej. «mesero1») siguen siendo de este celular, como siempre.
 const authEsCorreo = t => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(t || '').trim());
+// 📧 1.99.18: el aviso de «ese correo no existe»; con un error de dedo, un botón para corregirlo de un toque.
+function authCorreoMal(err, rc, user){
+  err.textContent = window.ventoCorreo ? window.ventoCorreo.mensaje(rc, user) : 'Ese correo no está bien escrito.';
+  if(rc && rc.sugerencia){
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'auth-link'; b.style.cssText = 'display:block;margin-top:6px;min-height:44px;font-weight:700';
+    b.textContent = '✏️ Usar ' + rc.sugerencia;
+    b.onclick = () => { const i = document.getElementById('authUser'); i.value = rc.sugerencia; err.textContent = ''; try{ document.getElementById('authPass').focus(); }catch(x){} };
+    err.appendChild(b);
+  }
+  try{ document.getElementById('authUser').focus(); }catch(x){}
+}
 // 1.72.1: «el usuario y la contraseña están correctos y no me deja entrar» (Windows): el correo tenía un ESPACIO
 // («cristhian+cliente @gmail.com»), así que no se tomaba como correo y salía «Usuario o contraseña incorrectos».
 // Un correo nunca lleva espacios: se quitan (también los invisibles que dejan algunos teclados al pegar) y va en minúsculas.
@@ -1430,9 +1443,39 @@ function showAuth(firstRun){
         if(conNube() && !authEsCorreo(user) && (!navigator.webdriver || window.__ventoExigirCorreo)){ err.textContent = '📧 Escribe tu correo (ej. tunombre@gmail.com): así tu negocio queda guardado en tu cuenta y lo tienes en cualquier celular.'; try{ document.getElementById('authUser').focus(); }catch(x){} return; }
         if(user.length < 3){ err.textContent = 'El usuario debe tener al menos 3 caracteres.'; return; }
         if(pass.length < 6){ err.textContent = 'La contraseña debe tener al menos 6 caracteres.'; return; }
+        // 📧 1.99.18: «el usuario puede entrar con cualquier cosa que escriba ahí». El correo tiene que existir (dominio real
+        // que recibe correos, sin errores de dedo, no desechable) antes de crear la cuenta (lib/vento-correo.js).
+        if(authEsCorreo(user) && window.ventoCorreo){
+          ocupado('⏳ Revisando el correo…');
+          const rc = await window.ventoCorreo.revisar(user);
+          ocupado('');
+          if(!rc.ok){ authCorreoMal(err, rc, user); return; }
+        }
         if(authUsers().some(u => u.user === user)){ err.textContent = authEsCorreo(user) ? 'Ese correo ya tiene cuenta en este celular: toca «Ya tengo cuenta» e inicia sesión.' : 'Ese usuario ya existe.'; return; }
         let enNube = false;
-        if(nb){
+        // 📧 1.99.18: con «verificarCorreo» encendido (ORDEVA Admin → configuración, cuando el servidor ya tiene con qué
+        // mandar correos), la cuenta nueva se crea SOLO si llega el código al correo: así el buzón existe de verdad.
+        const conCodigo = !!(nb && typeof ventoCfg !== 'undefined' && ventoCfg && ventoCfg.verificarCorreo === true);
+        if(conCodigo){
+          ocupado('⏳ Mandando un código a tu correo…');
+          let mandado = false;
+          try{ await nb.codigoCorreo(user); mandado = true; }
+          catch(x){ if(!authSinRed(x)){ err.textContent = '📧 No se pudo mandar el código a ' + user + ': ' + nb.msgError(x); return; } }
+          if(mandado){
+            ocupado('');
+            const cod = await showPrompt({ icon: '📧', title: 'Escribe el código del correo', message: 'Te mandamos un código de 6 números a ' + user + ' (revisa también «Spam» o «Promociones»). Así sabemos que ese correo es tuyo.', inputMode: 'numeric', autocomplete: 'one-time-code', placeholder: '123456', confirmText: 'Verificar' });
+            if(!cod){ err.textContent = '📧 Sin el código del correo no se crea la cuenta. Toca otra vez «Crear cuenta» para que te llegue uno nuevo.'; return; }
+            ocupado('⏳ Verificando el código…');
+            let r;
+            try{ r = await nb.entrarConCodigo(user, cod, false); }
+            catch(x){ err.textContent = '📧 ' + (/expired|invalid/i.test(String(x && x.message)) ? 'El código no es correcto o ya venció. Toca otra vez «Crear cuenta» para que te llegue uno nuevo.' : nb.msgError(x)); return; }
+            // El correo YA tenía cuenta con negocio: se entra a esa cuenta (no se crea otra).
+            if(r.negocios && r.negocios.length){ try{ await nb.nuevaClave(pass); }catch(x){} await authEntrarDesdeNube(user, null, r.negocios); try{ await authPonerClaveLocal(user, pass); }catch(x){} return; }
+            try{ await nb.nuevaClave(pass); enNube = 'ok'; }
+            catch(x){ err.textContent = '📧 El correo quedó verificado, pero no se pudo poner la contraseña: ' + nb.msgError(x); return; }
+          }
+        }
+        if(nb && !conCodigo){
           ocupado('⏳ Creando tu cuenta…');
           try{ enNube = (await nb.crearCuenta(user, pass, '')).sesion ? 'ok' : 'confirmar'; }
           catch(x){
@@ -1498,6 +1541,8 @@ function showAuth(firstRun){
         }
         authLoginFail(user);
         err.textContent = authEsCorreo(user) ? 'Correo o contraseña incorrectos.' : 'Usuario o contraseña incorrectos.';
+        // 📧 1.99.18: si el correo tiene un error de dedo, se ofrece corregirlo
+        { const sg = window.ventoCorreo && authEsCorreo(user) ? window.ventoCorreo.sugerir(user) : null; if(sg) authCorreoMal(err, { ok: false, motivo: 'dedo', sugerencia: sg }, user); }
       }
     }finally{ ocupado(''); }
   };

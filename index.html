@@ -5224,7 +5224,7 @@ export default {
 <script src="nube/config.js"></script>
 <script src="nube/vento-nube.js?v=1.99.17"></script>
 <script src="nube/vento-usuarios.js?v=1.99.17" defer></script><!-- usuarios del equipo (solo con nombre) en todos los equipos del negocio -->
-<script src="nube/vento-pagos.js?v=1.99.17" defer></script><script src="lib/vento-solo-local.js?v=1.99.17" defer></script><script src="lib/vento-huella.js?v=1.99.17" defer></script><!-- 👆 1.99.17: entrar con la huella --><!-- 📱 1.99.14: aviso «este negocio está solo en este equipo» -->
+<script src="nube/vento-pagos.js?v=1.99.17" defer></script><script src="lib/vento-solo-local.js?v=1.99.17" defer></script><script src="lib/vento-huella.js?v=1.99.17" defer></script><script src="lib/vento-correo.js?v=1.99.17" defer></script><!-- 📧 1.99.18: que el correo exista --><!-- 👆 1.99.17: entrar con la huella --><!-- 📱 1.99.14: aviso «este negocio está solo en este equipo» -->
 <script src="nube/vento-dian.js?v=1.99.17" defer></script><!-- 🧾 Facturación electrónica DIAN (P.O.S. electrónico, factura y notas crédito) -->
 <script src="nube/vento-suscripcion.js?v=1.99.17" defer></script>
 <script src="lib/vento-puerta.js?v=1.99.17" defer></script><!-- Puerta: la app solo funciona conectada a la base de datos de ORDEVA -->
@@ -5442,10 +5442,15 @@ window.mesoraCelebrar = function(emojis){
   }, true);
   var v = null; try{ v = sessionStorage.getItem(K); }catch(e){}
   if(!v || v === 'mesas') return;
-  window.addEventListener('load', function(){ setTimeout(function(){
+  // 1.99.17: se espera a que ORDEVA haya entrado y tenga los datos (antes se tocaba a los 0,6 s y, con la página recién
+  // abierta por Android, «Inventario» o «Estadísticas» se caían: «Cannot read properties of null (reading 'products')»).
+  window.addEventListener('load', function(){ var n = 0, t = setInterval(function(){
+    var ov = document.getElementById('authOverlay'), listo = typeof data !== 'undefined' && data && ov && ov.hidden;
+    if(!listo){ if(++n > 60) clearInterval(t); return; }
+    clearInterval(t);
     var b = document.querySelector('nav button[data-view="' + v + '"]');
     if(b && b.offsetParent !== null && !document.querySelector('nav button.active[data-view="' + v + '"]')) b.click();
-  }, 600); });
+  }, 500); });
 })();
 </script>
 <script>

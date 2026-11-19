@@ -398,6 +398,7 @@ document.getElementById('exportClosureBtn').addEventListener('click', () => {
 });
 
 function renderStats(){
+  if(typeof data === 'undefined' || !data) return;   // 1.99.17: sin datos todavía (la página recién abierta)
   const box = document.getElementById('statsBody'); if(!box) return;
   document.querySelectorAll('#stPer button').forEach(b => b.classList.toggle('on', b.dataset.p === stPer));
   const d0 = new Date(); d0.setHours(0, 0, 0, 0);
@@ -516,6 +517,7 @@ function cartaData(q){                          // [[categoría, [productos]]] e
 }
 const cartaNom = p => p.name + (p.size ? ' ' + p.size : '');
 function renderCarta(){
+  if(typeof data === 'undefined' || !data) return;   // 1.99.17: sin datos todavía (la página recién abierta)
   cartaLabel();
   document.getElementById('cartaT').textContent = i18nPut(cartaIcon() + ' ' + cartaTab()) + (data.businessName ? ' · ' + data.businessName : '');
   const q = cartaNrm(document.getElementById('cartaQ').value.trim()), gs = cartaData(q);
@@ -630,6 +632,7 @@ function hbarrasGanPerd(t, rows, f){
   }).join('') + '</div>';
 }
 function renderMarginTable(){
+  if(typeof data === 'undefined' || !data) return;   // 1.99.17: sin datos todavía (la página recién abierta)
   const wrap = document.getElementById('marginTableWrap'), block = document.getElementById('marginBlock'), chartWrap = document.getElementById('marginChartWrap');
   if(!wrap || !block) return;
   // Las cuentas salen de cuentasProducto(): descuentan el IVA y multiplican por la
@@ -663,6 +666,7 @@ function renderMarginTable(){
   if(chartWrap) chartWrap.innerHTML = hbarrasGanPerd('📊 Ganancia o pérdida por unidad (sin IVA)', chartRows, fmt);
 }
 function renderInventario(){
+  if(typeof data === 'undefined' || !data) return;   // 1.99.17: sin datos todavía (la página recién abierta)
   // Productos e inventario son una sola pantalla: aquí solo se arma el resumen de
   // arriba, los avisos y la tabla de márgenes; la lista la pinta renderProductos().
   renderMarginTable();
