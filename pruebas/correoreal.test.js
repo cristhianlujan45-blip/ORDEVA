@@ -4,7 +4,7 @@
 //  3. Correo desechable (mailinator): no.
 //  4. Correo con dominio real (el DNS dice que recibe correos): crea la cuenta y su negocio queda en la nube.
 //  5. Al entrar con un correo con error de dedo y no encontrarlo: ofrece la corrección.
-//  6. Con «verificarCorreo» encendido (ORDEVA Admin): la cuenta se crea SOLO con el código que llega al correo; con un
+//  6. Con «el servidor ya manda correos» encendido (ORDEVA Admin): la cuenta se crea SOLO con el código que llega al correo; con un
 //     código malo no; con el bueno sí, y después se entra con la contraseña que se escribió.
 'use strict';
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
@@ -77,9 +77,9 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     await E.ctx.close();
 
     // 6. Con código al correo
-    const C = await equipo('C', { verificarCorreo: true });
+    const C = await equipo('C', { correos: true });
     await crear(C.p, 'nuevo@tienda-real.com', 'clave-nueva-1');
-    chk('6. Con «verificarCorreo», pide el código que llegó al correo', await esperar(C.p, () => document.querySelector('#promptOverlay.show') && /código/i.test(document.getElementById('promptTitle').textContent), null, 15000));
+    chk('6. Con «el servidor ya manda correos», pide el código que llegó al correo', await esperar(C.p, () => document.querySelector('#promptOverlay.show') && /código/i.test(document.getElementById('promptTitle').textContent), null, 15000));
     await C.p.fill('#promptInput', '000000'); await C.p.click('#promptOkBtn');
     chk('6. Con un código malo no crea la cuenta', await esperar(C.p, () => /no es correcto|venció/.test(document.getElementById('authErr').textContent), null, 15000) && await fuera(C.p), await err(C.p));
     await crear(C.p, 'nuevo@tienda-real.com', 'clave-nueva-1');

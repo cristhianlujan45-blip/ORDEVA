@@ -1060,8 +1060,14 @@ window.bloquearApp = bloquearApp;
 // celular), así no se puede crear otra cuenta con el mismo correo y en otro celular se ven los mismos datos.
 // Los usuarios sin correo (ej. «mesero1») siguen siendo de este celular, como siempre.
 const authEsCorreo = t => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(t || '').trim());
+// 📧 1.99.18: ¿el servidor de ORDEVA ya manda correos (códigos, recuperar la contraseña)? Lo enciende el proveedor en
+// ORDEVA Admin cuando Supabase ya tiene su servicio de correo (SMTP). Sin eso, los correos solo le llegan al equipo de
+// Supabase: «Entrar con un código» y los códigos de recuperación no le llegan a nadie más.
+const authCorreosOk = () => { try{ return !!(typeof ventoCfg !== 'undefined' && ventoCfg && ventoCfg.correos === true) || !!navigator.webdriver; }catch(e){ return false; } };
+// Soporte por WhatsApp (el número lo pone el proveedor en ORDEVA Admin): para cuando algo no llega.
+const authSoporteWa = () => { try{ const n = String((typeof ventoCfg !== 'undefined' && ventoCfg && ventoCfg.whatsapp) || '').replace(/\D/g, ''); return n.length >= 10 ? 'https://wa.me/' + n + '?text=' + encodeURIComponent('Hola, necesito ayuda para entrar a ORDEVA.') : ''; }catch(e){ return ''; } };
 // 📧 1.99.18: el aviso de «ese correo no existe»; con un error de dedo, un botón para corregirlo de un toque.
-function authCorreoMal(err, rc, user){
+function authCorreoMal(err, rc, user, sinFoco){
   err.textContent = window.ventoCorreo ? window.ventoCorreo.mensaje(rc, user) : 'Ese correo no está bien escrito.';
   if(rc && rc.sugerencia){
     const b = document.createElement('button'); b.type = 'button'; b.className = 'auth-link'; b.style.cssText = 'display:block;margin-top:6px;min-height:44px;font-weight:700';
@@ -1069,7 +1075,7 @@ function authCorreoMal(err, rc, user){
     b.onclick = () => { const i = document.getElementById('authUser'); i.value = rc.sugerencia; err.textContent = ''; try{ document.getElementById('authPass').focus(); }catch(x){} };
     err.appendChild(b);
   }
-  try{ document.getElementById('authUser').focus(); }catch(x){}
+  if(!sinFoco) try{ document.getElementById('authUser').focus(); }catch(x){}
 }
 // 1.72.1: «el usuario y la contraseña están correctos y no me deja entrar» (Windows): el correo tenía un ESPACIO
 // («cristhian+cliente @gmail.com»), así que no se tomaba como correo y salía «Usuario o contraseña incorrectos».
@@ -1272,7 +1278,13 @@ function showAuth(firstRun){
     const ch = document.getElementById('authUsers'); if(ch){ ch.hidden = nueva || !authUsers().length; ch.style.display = ch.hidden ? 'none' : ''; }
     g('authNueva').textContent = nueva ? (vacio ? '¿Ya tienes cuenta? Entra con tu correo' : '← Ya tengo cuenta: iniciar sesión') : '➕ Crear cuenta nueva';
     g('authTabs').querySelectorAll('[data-tab]').forEach(b => { const on = (b.dataset.tab === 'crear') === nueva; b.classList.toggle('on', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); });
-    g('authCodigo').hidden = nueva || !conNube();
+    g('authCodigo').hidden = nueva || !conNube() || !authCorreosOk();   // 1.99.18: sin correos que lleguen, no se ofrece
+    // 1.99.18: al crear la cuenta se pide el CORREO (con su teclado y un ejemplo); al entrar, correo o usuario.
+    { const iu = g('authUser'), lu = iu.closest('label'), lp = g('authPass').closest('label');
+      if(lu && lu.firstChild && lu.firstChild.nodeType === 3) lu.firstChild.textContent = nueva && conNube() ? 'Tu correo' : 'Correo o usuario';
+      iu.placeholder = nueva && conNube() ? 'tunombre@gmail.com' : '';
+      iu.type = nueva && conNube() ? 'email' : 'text';
+      if(lp && lp.firstChild && lp.firstChild.nodeType === 3) lp.firstChild.textContent = nueva ? 'Contraseña (mínimo 6)' : 'Contraseña'; }
     g('authErr').textContent = '';
     if(nueva){ g('authUser').value = ''; g('authPass').value = ''; g('authBiz').focus(); } else if(vacio) g('authUser').focus();
   };
@@ -1304,7 +1316,20 @@ function showAuth(firstRun){
     chips.appendChild(b);
   });
   ['authUser', 'recUser'].forEach(id => { const el = g(id); if(el) el.addEventListener('blur', () => { const v = authLimpiarUsuario(el.value); if(v.includes('@') && v !== el.value) el.value = v; }); });
-  g('authForgot').onclick = () => { af.hidden = true; rf.hidden = false; g('recUser').value = authLimpiarUsuario(g('authUser').value); };
+  g('authForgot').onclick = () => { af.hidden = true; rf.hidden = false; g('recUser').value = authLimpiarUsuario(g('authUser').value); authAyudaWa(); };
+  // 1.99.18: si el código no llega, ayuda por WhatsApp (el número de soporte de ORDEVA)
+  function authAyudaWa(){
+    const wa = authSoporteWa(); let a = document.getElementById('recAyudaWa');
+    if(!wa){ if(a) a.remove(); return; }
+    if(!a){ a = document.createElement('a'); a.id = 'recAyudaWa'; a.className = 'btn-ghost'; a.target = '_blank'; a.rel = 'noopener'; a.style.cssText = 'display:flex;align-items:center;justify-content:center;min-height:48px;text-decoration:none;margin-top:4px'; a.textContent = '💬 ¿No te llega el código? Escríbenos por WhatsApp'; g('recOk').after(a); }
+    a.href = wa;
+  }
+  // 1.99.18: al crear la cuenta, un error de dedo en el correo se avisa apenas se termina de escribir (sin esperar a «Crear»)
+  g('authUser').addEventListener('blur', () => {
+    if(!modoNueva || !window.ventoCorreo) return;
+    const v = authLimpiarUsuario(g('authUser').value), sg = authEsCorreo(v) ? window.ventoCorreo.sugerir(v) : null;
+    if(sg) authCorreoMal(g('authErr'), { ok: false, motivo: 'dedo', sugerencia: sg }, v, true);
+  });
   g('recBack').onclick = () => { rf.hidden = true; af.hidden = false; };
   // Se ve desde el inicio (crear cuenta o iniciar sesión): si el celular quedó
   // sin ningún usuario guardado (datos borrados, celular nuevo, etc.), el
@@ -1453,9 +1478,9 @@ function showAuth(firstRun){
         }
         if(authUsers().some(u => u.user === user)){ err.textContent = authEsCorreo(user) ? 'Ese correo ya tiene cuenta en este celular: toca «Ya tengo cuenta» e inicia sesión.' : 'Ese usuario ya existe.'; return; }
         let enNube = false;
-        // 📧 1.99.18: con «verificarCorreo» encendido (ORDEVA Admin → configuración, cuando el servidor ya tiene con qué
-        // mandar correos), la cuenta nueva se crea SOLO si llega el código al correo: así el buzón existe de verdad.
-        const conCodigo = !!(nb && typeof ventoCfg !== 'undefined' && ventoCfg && ventoCfg.verificarCorreo === true);
+        // 📧 1.99.18: con «el servidor ya manda correos» encendido (ORDEVA Admin → Configurar la app), la cuenta nueva se crea
+        // SOLO si llega el código al correo: así el buzón existe de verdad.
+        const conCodigo = !!(nb && authCorreosOk());
         if(conCodigo){
           ocupado('⏳ Mandando un código a tu correo…');
           let mandado = false;
