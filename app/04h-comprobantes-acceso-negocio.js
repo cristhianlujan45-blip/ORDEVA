@@ -1742,6 +1742,22 @@ function wireAccountUI(){
       showToast(data.cancionesMesa ? '🎵 Cada mesa puede pedir ' + data.cancionesMesa + ' canciones cada 15 minutos.' : '🎵 Sin límite: las mesas piden las canciones que quieran (suenan por turnos justos).');
     };
   }
+  // 🎵🛡️ 1.99.19: tope de duración, revisar las del QR y palabras que no se dejan pedir
+  const mxSel = document.getElementById('musicaMaxMinSel');
+  if(mxSel){
+    const v = Number(data.musicaMaxMin) || 12; mxSel.value = String([8, 10, 12, 15, 20, 180].includes(v) ? v : 12);
+    mxSel.onchange = () => { data.musicaMaxMin = Number(mxSel.value) || 12; saveData(); showToast(data.musicaMaxMin >= 180 ? '⏱️ Sin tope de duración para las canciones pedidas.' : '⏱️ Las canciones pedidas pueden durar hasta ' + data.musicaMaxMin + ' min.'); };
+  }
+  const rvTg = document.getElementById('musicaRevisarToggle');
+  if(rvTg){
+    rvTg.checked = !!data.musicaRevisar;
+    rvTg.onchange = () => { data.musicaRevisar = !!rvTg.checked; saveData(); showToast(data.musicaRevisar ? '🛡️ Las canciones del QR quedan «Por aprobar» en Música: suenan cuando tocas ✅.' : '🎵 Las canciones del QR entran solas a la cola, como siempre.', 6000); };
+  }
+  const pwTx = document.getElementById('musicaPalabrasTxt');
+  if(pwTx){
+    pwTx.value = data.musicaPalabras || '';
+    pwTx.onchange = () => { data.musicaPalabras = String(pwTx.value || '').slice(0, 2000); saveData(); showToast('🚫 Listo: ' + (data.musicaPalabras.trim() ? 'esas palabras no se dejan pedir.' : 'no hay palabras bloqueadas.')); };
+  }
   const domToggle = document.getElementById('domiciliosOnToggle');
   if(domToggle){
     domToggle.checked = !!data.domiciliosOn;

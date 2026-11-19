@@ -3945,6 +3945,18 @@ body:not(.mod-n) #personasToggle, body:not(.mod-d) #clienteToggle{ grid-column:1
         <div class="settings-row-text"><strong>🎵 Canciones que puede pedir cada mesa por QR</strong><span>Cuántas puede pedir una mesa (sumando todos sus celulares) cada 15 minutos. «Sin límite»: piden las que quieran; igual suenan por turnos justos entre las mesas.</span></div>
         <select id="cancionesMesaSel" class="mz-in" style="max-width:150px"><option value="0">Sin límite</option><option value="3">3</option><option value="5">5</option><option value="10">10 (recomendado)</option><option value="15">15</option><option value="20">20</option></select>
       </div>
+      <div class="settings-row">
+        <div class="settings-row-text"><strong>⏱️ Lo más que puede durar una canción pedida</strong><span>Un mix o un concierto de una hora tapa la cola de todas las mesas. Si la versión dura más, se busca otra; si no hay, al cliente le dice «Es muy larga: pide otra».</span></div>
+        <select id="musicaMaxMinSel" class="mz-in" style="max-width:150px"><option value="8">8 min</option><option value="10">10 min</option><option value="12">12 min (recomendado)</option><option value="15">15 min</option><option value="20">20 min</option><option value="180">Sin tope</option></select>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-text"><strong>🛡️ Revisar las canciones del QR antes de que suenen</strong><span>Encendido: lo que piden las mesas queda «🛡️ Por aprobar» en Música y suena solo cuando tocas ✅ (🚫 la quita). Al cliente le dice «Esperando que la aprueben».</span></div>
+        <label class="switch"><input type="checkbox" id="musicaRevisarToggle"><span class="switch-slider"></span></label>
+      </div>
+      <div class="settings-row" style="flex-direction:column;align-items:stretch">
+        <div class="settings-row-text"><strong>🚫 Palabras que no se dejan pedir</strong><span>Separadas por coma. Si el pedido de una mesa tiene alguna, no se pone y al cliente le dice «Esa canción no se puede pedir aquí». Lo que pones tú desde Música no se filtra.</span></div>
+        <textarea id="musicaPalabrasTxt" class="mz-in" rows="2" style="width:100%;box-sizing:border-box" placeholder="ej: palabra1, palabra2, otra frase"></textarea>
+      </div>
     </div>
 
     <div class="settings-group" hidden data-cat="negocio">
@@ -5587,7 +5599,8 @@ window.mesoraCelebrar = function(emojis){
     const a = A(); if(!a) return false;
     const t = tipoDe(titulo); if(!t || t === 'pagos') return false;
     const e = est(); if(!e.nombre || !e.conectado || !tiposDe(e).includes(t)) return false;
-    const frase = (limpiar(titulo) + (texto && t !== 'soporte' && t !== 'ia' ? '. ' + limpiar(texto) : '')).slice(0, 180);
+    // 1.99.19 (auditoría): de las canciones solo se dice el aviso (la mesa), no el texto que escribió el cliente.
+    const frase = (limpiar(titulo) + (texto && t !== 'soporte' && t !== 'ia' && t !== 'musica' ? '. ' + limpiar(texto) : '')).slice(0, 180);
     try{ return !!a.parlanteDecir(frase); }catch(x){ return false; }
   };
   function pintar(){
