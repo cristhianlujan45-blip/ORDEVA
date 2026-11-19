@@ -56,7 +56,8 @@ El informe completo está en `puente/AUDITORIA-MUSICA-1.99.18.md`. En esta versi
 - **«Equipo que pone la música»:** cuando el equipo de la música tardaba 90 s en dar señales (Android cerró su página, un
   corte de internet), el siguiente pedido del QR hacía que OTRO equipo tomara la música, y el primero cortaba la canción.
   - Ahora los pedidos se le mandan siempre al equipo de la música.
-  - A los 5 min sin señales se avisa; a los 10 min, si hay canciones esperando, se toma la música.
+  - A los 5 min sin señales se avisa; la música la toma una persona con «🎶 Que suene aquí». Tomarla sola podía caer en el
+    equipo equivocado.
   - El equipo de la música también da señales con la app minimizada.
 - **Al volver a abrir la página no se repiten** los ⏭, pausas ni «que siga» de los últimos 2 minutos.
 - **YouTube del TV que no dice qué hace:** los comerciales adelantaban el reloj de ORDEVA y la canción del QR mandaba
@@ -71,14 +72,31 @@ El informe completo está en `puente/AUDITORIA-MUSICA-1.99.18.md`. En esta versi
   - El avance de la canción ya no rehace el respaldo completo.
   - En la app de Android y en modo TV, el probador solo carga, no reproduce.
 
+## Revisión independiente (goldfish)
+- **Bloqueante:** faltaba subir el número de versión. Sin eso, los celulares seguían con el código viejo guardado. Se subió
+  a 1.99.18.
+- **Mayor:** la toma automática de la música a los 10 min podía caer en un celular recién abierto con la cola de ayer, en
+  uno sin reproductor, o en varios a la vez. → Ahora solo se avisa y la toma una persona.
+- **Mayor:** con el código encendido, en modo avión se creaba la cuenta sin código. → Sin internet ya no se crea. Para
+  que el SERVIDOR también lo exija, en Supabase hay que activar «Confirm email» (el aviso de ORDEVA Admin lo dice).
+- **Mayor:** se rechazaban correos reales con «_» o «-» al final (carlos_@hotmail.com). → Arreglado.
+- **Mayor:** cada código mal escrito mandaba otro correo. → Ahora son 3 intentos con el mismo código.
+- **Mayor:** si el correo ya tenía cuenta, se le cambiaba la contraseña a esa cuenta sin avisar. → Ahora entra a esa
+  cuenta, no cambia nada y lo dice.
+- **Menores corregidos:**
+  - Un DNS que falla no se toma como «el dominio no existe».
+  - La revisión del correo dura como mucho 8 s.
+  - «Ese correo no tiene cuenta» ya no dice que los correos no llegan.
+  - «La saltaron» solo para canciones que sí empezaron a sonar.
+
 ## Pruebas
 - **Nueva `pruebas/correoreal.test.js` (13/13).**
   - Usa el Supabase local real y un DNS simulado.
   - Cubre: error de dedo y su corrección, dominio inexistente, correo desechable, dominio real, corrección al entrar, y la
     cuenta creada con el código del correo (con un código malo no; con el bueno sí, y se entra con la contraseña en otro
     celular).
-- **`pruebas/musicaautoplay.test.js` ajustada** al cambio pedido: un pedido ya no toma la música; a los 10 min sin señales
-  sí (11/11).
+- **`pruebas/musicaautoplay.test.js` ajustada** (12/12): un pedido ya no toma la música; sin señales se avisa, y con
+  «🎶 Que suene aquí» la música pasa a ese equipo.
 - **`pruebas/cuentas.test.js` ajustada:** «Tu correo» en lugar de «Correo o usuario».
 - **Las reproducciones de la auditoría ya no fallan con este código:**
   - un pedido no toma la música;
