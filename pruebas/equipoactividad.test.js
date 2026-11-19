@@ -150,6 +150,8 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
 
     // ===== El dueño ve la actividad, por persona =====
     await pA.evaluate(() => window.ventoActividad.abrir());
+    // (con la máquina de pruebas cargada, lo que mandó el asesor puede llegar al servidor después de abrir la lista: se vuelve a abrir, como haría la persona)
+    for(let i = 0; i < 5 && !(await esperar(pA, () => /Venta borrada/.test((document.getElementById('actLista') || {}).innerText || ''), null, 4000)); i++) await pA.evaluate(() => window.ventoActividad.abrir());
     chk('Dueño: «📜 Actividad del equipo» muestra la venta borrada por el asesor y el precio que cambió él', await esperar(pA, () => { const t = (document.getElementById('actLista') || {}).innerText || ''; return /Venta borrada/.test(t) && /Blusa/.test(t) && /Laura/.test(t) && /Asesor de ventas/.test(t) && /Precio cambiado/.test(t); }, null, 15000), await pA.evaluate(() => (document.getElementById('actLista') || {}).innerText));
     const personas = await pA.evaluate(() => [...document.querySelectorAll('#actPersona option')].map(o => o.textContent));
     chk('…con filtro por persona', personas.some(x => /Laura/.test(x)) && personas.some(x => /ana@boutique|Ana/i.test(x)), personas);

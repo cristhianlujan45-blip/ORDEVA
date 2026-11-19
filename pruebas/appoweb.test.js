@@ -26,7 +26,7 @@ const UA_APP = UA_CHROME.replace('Mobile Safari/537.36', 'Mobile Safari/537.36 V
         window.VentoAndroid = { pagosAvisos: v => { A.on = !!v; }, pagosAvisosEstado: () => JSON.stringify({ on: A.on, permiso: A.permiso }), pagosAvisosTomar: () => '[]', mediosPermiso: () => {}, notificar: () => true, pagosNotif: () => {}, pagosVolumen: () => {} }; }
     }, [app]);
     const p = await ctx.newPage(); p.on('pageerror', e => errs.push(e.message));
-    await p.goto(url || BASE + '/index.html', { waitUntil: 'domcontentloaded' }); await p.waitForTimeout(1500);
+    await p.goto(url || BASE + '/index.html', { waitUntil: 'domcontentloaded', timeout: 60000 }); await p.waitForTimeout(1500);
     return { ctx, p };
   };
   const entrar = async (p, biz) => {
@@ -82,7 +82,7 @@ const UA_APP = UA_CHROME.replace('Mobile Safari/537.36', 'Mobile Safari/537.36 V
       await c.route('**/*', r => new URL(r.request().url()).hostname === 'localhost' ? r.continue() : r.abort());
       await c.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '', off: true })); }catch(e){} window.VentoAndroid = { notificar: () => true, hablar: () => {}, callar: () => {} }; window.__abrir = []; window.__errores = []; });
       const pv = await c.newPage(); pv.on('pageerror', e => errs.push(e.message));
-      await pv.goto(BASE + '/index.html', { waitUntil: 'domcontentloaded' }); await pv.waitForTimeout(1500);
+      await pv.goto(BASE + '/index.html', { waitUntil: 'domcontentloaded', timeout: 60000 }); await pv.waitForTimeout(1500);
       await entrar(pv, 'Bar Vieja');
       chk('2b. La app vieja se reconoce como app (no como ORDEVA Web)', await pv.evaluate(() => window.ventoAppVieja() && !window.ventoAndroidWeb() && !window.ventoAppSinPuente()));
       await pv.evaluate(() => { data.pagos = data.pagos || {}; data.pagos.on = true; saveData(); window.ventoPagosGuia(); });
@@ -121,7 +121,7 @@ const UA_APP = UA_CHROME.replace('Mobile Safari/537.36', 'Mobile Safari/537.36 V
     // En la app: llega «?_h=…» → se termina de conectar
     ({ ctx, p } = await nuevo(UA_APP, true, BASE + '/index.html'));
     await p.evaluate(() => localStorage.setItem('vito_ytvuelta', JSON.stringify({ nonce: 'app9', cid: 'x.apps.googleusercontent.com', redir: location.origin + '/', at: Date.now(), hora: true })));
-    await p.goto(BASE + '/index.html?_h=' + encodeURIComponent('access_token=ya29.tok&token_type=Bearer&expires_in=3599&state=vento-yt.app9'));
+    await p.goto(BASE + '/index.html?_h=' + encodeURIComponent('access_token=ya29.tok&token_type=Bearer&expires_in=3599&state=vento-yt.app9'), { waitUntil: 'domcontentloaded', timeout: 60000 });   // (como las demás: con la máquina de pruebas cargada, esperar «load» pasaba de 30 s)
     await p.waitForTimeout(2500);
     const v4 = await p.evaluate(() => ({ tok: localStorage.getItem('vito_ytok') || '', on: (JSON.parse(localStorage.getItem('vito_yt') || '{}')).on, url: location.search + location.hash, txt: document.body.innerText }));
     chk('3. En la app, la vuelta se termina: Google conectado con ese token', /ya29\.tok/.test(v4.tok) && v4.on === true && /Google conectado/.test(v4.txt), { tok: v4.tok, on: v4.on });

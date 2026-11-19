@@ -367,7 +367,15 @@
       fe_resolucion: v('vdFeRes'), fe_prefijo: v('vdFePre').toUpperCase(), fe_desde: v('vdFeDesde'), fe_hasta: v('vdFeHasta'), fe_siguiente: v('vdFeSig'), fe_vence: v('vdFeVence') };
   }
   function msg(t, mal){ var m = $d('vdMsg'); if(m){ m.innerHTML = t; m.style.color = mal ? '#f59e0b' : ''; } }
+  // 1.99.20: los guardados van uno detrás del otro. Si se tocaba «Guardar» y enseguida el interruptor, los dos viajaban a la
+  // vez y la respuesta del primero (todavía apagada) podía llegar después y dejar en pantalla lo contrario de lo elegido.
+  var colaGuardar = Promise.resolve();
   function guardarCfg(prender){
+    var p = colaGuardar.then(function(){ return guardarCfg0(prender); }, function(){ return guardarCfg0(prender); });
+    colaGuardar = p.catch(function(){});
+    return p;
+  }
+  function guardarCfg0(prender){
     var n = negocio(); if(!n) return;
     var c = leerForm(); if(prender != null) c.activo = !!prender;
     msg('Guardando…');
