@@ -1142,7 +1142,7 @@ const mzAvisarCliente=(it,e)=>{try{if(it&&it.reqId&&!it.fondo&&!mqOtro())mzRespo
 function mzAvisarFin(it){
   try{
     if(!it||!it.reqId||it.fondo||mqOtro())return;
-    const corta=it.status==='skipped'&&it.dur&&(it.playedSeconds||0)<it.dur*0.5;
+    const corta=it.status==='skipped'&&it.startedAt&&(it.playedSeconds||0)>0&&it.dur&&it.playedSeconds<it.dur*0.5;   // (sí empezó a sonar)
     mzResponder(it.reqId,'sono',it.mesa,corta?{i:'⏭',n:'La saltaron (sonó un ratico)'}:null,it.canal);
   }catch(err){}
 }
@@ -2010,15 +2010,15 @@ const mqDesde=Date.now();
 const MQ_HECHOS_K='vito_mq_hechos';
 const mqHechos={_m:(()=>{try{const o=JSON.parse(localStorage.getItem(MQ_HECHOS_K)||'{}');const t=Date.now();Object.keys(o).forEach(k=>{if(t-o[k]>15*6e4)delete o[k];});return o;}catch(e){return {};}})(),
   has(k){return !!this._m[k];},add(k){this._m[k]=Date.now();const ks=Object.keys(this._m);if(ks.length>300)ks.sort((a,b)=>this._m[a]-this._m[b]).slice(0,ks.length-300).forEach(x=>delete this._m[x]);try{localStorage.setItem(MQ_HECHOS_K,JSON.stringify(this._m));}catch(e){}}};
-// El equipo de la música lleva 5 min sin dar señales (ni con la app abierta en él): se avisa aquí, una vez; la música la
-// toma una persona tocando «Que suene aquí» (o sola si pasan 10 min y aquí hay canciones esperando).
+// El equipo de la música lleva 5 min sin dar señales: se AVISA aquí (con la app a la vista y la música encendida, cada
+// 30 min). La música la toma una PERSONA tocando «🎶 Que suene aquí»: tomarla sola podía caer en el equipo equivocado (un
+// celular recién abierto con la cola de ayer, uno de un mesero sin reproductor, o varios a la vez).
 let mqAvisoMudo=0;
 function mqVigilarEquipo(){
-  if(!mqOtro()||Date.now()-mqDesde<5*6e4)return;
+  if(!mqOtro()||Date.now()-mqDesde<5*6e4||document.hidden||window.__ventoAlFrente===false)return;
+  if(typeof musicaOn==='function'&&!musicaOn())return;
   const mudo=Date.now()-(mqVisto||mqDesde);   // si nunca dio señales desde que se abrió aquí, se cuenta desde entonces
-  if(mudo>5*6e4&&Date.now()-mqAvisoMudo>15*6e4){mqAvisoMudo=Date.now();try{showToast('🎶 «'+mqNombre()+'» (el equipo de la música) no da señales hace '+Math.round(mudo/6e4)+' min. Si se apagó, en Música toca «Que suene aquí».',10000);}catch(e){}}
-  if(mudo>10*6e4&&cola().some(x=>!x.done&&x.status!=='playing')){const era=mqNombre();try{mqElegir(true);}catch(e){}try{showToast('🎶 «'+era+'» no respondía hace 10 min: ahora la música suena en este equipo.',9000);}catch(e){}
-    try{siguienteAuto();verificarCola();}catch(e){}}
+  if(mudo>5*6e4&&Date.now()-mqAvisoMudo>30*6e4){mqAvisoMudo=Date.now();try{showToast('🎶 «'+mqNombre()+'» (el equipo de la música) no da señales hace '+Math.round(mudo/6e4)+' min. Si se apagó, en Música toca «🎶 Que suene aquí».',10000);}catch(e){}}
 }
 function mqEscuchar(){
   const c=mqCfg()?mqCanal():'';
@@ -2105,6 +2105,8 @@ function mqElegir(si){
   if(typeof data==='undefined'||!data)return;
   if(si){data.musicaEquipo={id:mqEq(),nombre:mqNombreEquipo(),at:Date.now()};mqCanal();saveData();
     mqEra=false;try{mzAsegurarReproductor(true);}catch(e){}
+    // 1.99.18: lo que esperaba en la cola suena ya aquí (dentro del mismo toque, para que el navegador deje sonar)
+    try{siguienteAuto();}catch(e){}setTimeout(()=>{try{siguienteAuto();verificarCola();}catch(e){}},300);
     showToast('🎶 Listo: la música suena SOLO en este equipo. En tus otros equipos ves la cola y lo que pongas allá suena aquí.',8000);}
   else{data.musicaEquipo=null;saveData();showToast('🎶 Listo: cada equipo pone su música por su cuenta (como antes).',6000);}
   mqRevisar();mqPublicarEstado(true);try{mzAutoPintar();renderMusica();}catch(e){}

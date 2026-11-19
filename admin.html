@@ -676,7 +676,7 @@
       <label for="aAnuncio">📣 Anuncio para todos los negocios (vacío = sin anuncio)</label>
       <textarea id="aAnuncio" placeholder="Ej: El domingo 12 hay mantenimiento de 2 a 3 a. m."></textarea>
       <label style="display:flex;gap:10px;align-items:flex-start;min-height:44px"><input type="checkbox" id="aVerifCorreo" style="width:22px;height:22px;margin-top:2px">
-        <span>📧 <b>El servidor ya manda correos.</b> Al encenderlo: la cuenta nueva se crea solo con el código que le llega al correo (así el correo existe de verdad) y aparece «📲 Entrar fácil con un código». <b>Enciéndelo solo cuando Supabase ya tenga con qué mandar correos</b> (Authentication → Emails → SMTP, ej. Resend o Brevo): con el correo de prueba de Supabase solo llegan 2 por hora y solo a tu equipo, y nadie podría crear cuenta ni recuperar su contraseña.</span></label>
+        <span>📧 <b>El servidor ya manda correos.</b> Al encenderlo: la cuenta nueva se crea solo con el código que le llega al correo (así el correo existe de verdad) y aparece «📲 Entrar fácil con un código». <b>Enciéndelo solo cuando Supabase ya tenga con qué mandar correos</b> (Authentication → Emails → SMTP, ej. Resend o Brevo): con el correo de prueba de Supabase solo llegan 2 por hora y solo a tu equipo, y nadie podría crear cuenta ni recuperar su contraseña. Para que el servidor también lo exija (no solo la app), activa en Supabase «Confirm email» (Authentication → Sign In / Providers → Email).</span></label>
       <label for="aSusp">⛔ Negocios suspendidos (códigos de negocio, uno por línea)</label>
       <textarea id="aSusp" placeholder="ABCD-1234"></textarea>
       <p class="soft">Un negocio suspendido no puede hacer ventas nuevas (igual que con la suscripción vencida). Sus datos y pedidos no se borran.</p>
@@ -1296,7 +1296,7 @@
   function cfgPintar(c){ c = c || {}; $('aPrecio').value = c.precioTexto || ''; $('aWa').value = c.whatsapp || ''; $('aPrueba').value = c.pruebaDias != null ? c.pruebaDias : 15; $('aGracia').value = c.graciaDias != null ? c.graciaDias : 3; $('aAnuncio').value = c.anuncio || ''; $('aVerifCorreo').checked = c.correos === true; $('aSusp').value = (c.suspendidos || []).join('\n'); const pg = c.pagos || {}; $('aNequi').value = pg.nequi || ''; $('aBreb').value = pg.breb || ''; $('aBanco').value = pg.banco || ''; $('aTitular').value = pg.titular || ''; }
   function cfgGuardarCache(){ try{ localStorage.setItem(CFG_CACHE, JSON.stringify(cfgLeerForm())); }catch(e){} }
   function cfgPintarDesdeCache(){ if($('aPrecio').dataset.ok) return; $('aPrecio').dataset.ok = '1'; let c = null; try{ c = JSON.parse(localStorage.getItem(CFG_CACHE) || 'null'); }catch(e){} cfgPintar(c); }
-  ['aPrecio', 'aWa', 'aPrueba', 'aGracia', 'aAnuncio', 'aSusp', 'aNequi', 'aBreb', 'aBanco', 'aTitular'].forEach(id => $(id).addEventListener('change', cfgGuardarCache));
+  ['aPrecio', 'aWa', 'aPrueba', 'aGracia', 'aAnuncio', 'aVerifCorreo', 'aSusp', 'aNequi', 'aBreb', 'aBanco', 'aTitular'].forEach(id => $(id).addEventListener('change', cfgGuardarCache));
   try{ $('aToken').value = localStorage.getItem(TOKEN_LS) || ''; }catch(e){}
   $('aToken').addEventListener('change', () => { try{ localStorage.setItem(TOKEN_LS, $('aToken').value.trim()); }catch(e){} });
   const gh = async (ruta, op) => {

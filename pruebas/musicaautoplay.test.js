@@ -7,7 +7,7 @@
 //     al tocarlo suena.
 //  3. «Este equipo pone la música» en otro equipo que no responde: el panel lo dice. 1.99.18 (auditoría): al poner una
 //     canción ya NO se toma la música (eso cortaba la canción en el otro equipo cuando solo tardaba en dar señales): se le
-//     manda. Si a los 10 min sigue sin dar señales y hay canciones esperando, este equipo la toma solo.
+//     manda. Si sigue sin dar señales, se AVISA para que una persona toque «🎶 Que suene aquí» (y al tocarlo, suena aquí).
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 const video = (id, t) => ({ id: { videoId: id }, snippet: { title: t, channelTitle: 'Artista' }, duracion: 200 });
@@ -85,8 +85,11 @@ const video = (id, t) => ({ id: { videoId: id }, snippet: { title: t, channelTit
     // Pasan 11 minutos sin señales del otro equipo (se adelanta el reloj de la página)
     await p.evaluate(() => { const n0 = Date.now.bind(Date); Date.now = () => n0() + 11 * 6e4; window.__mqVigilar(); });
     await p.waitForTimeout(800);
-    // (en un navegador sin toque no deja sonar solo —este simulador lo imita—; en la app de Android sí suena sola)
-    chk('3. A los 10 min sin señales y con canciones esperando, este equipo toma la música y la pone aquí', await p.evaluate(() => window.__toasts.some(t => /no respondía hace 10 min: ahora la música suena en este equipo/.test(t)) && window.__yt.cargados.includes('salsaxxxxxx')), await p.evaluate(() => [window.__toasts.slice(-3), window.__yt.cargados]));
+    chk('3. Sin señales del equipo de la música: se AVISA, pero no se le quita la música sola', await p.evaluate(() => window.__toasts.some(t => /no da señales hace \d+ min/.test(t)) && !window.__toasts.some(t => /ahora la música suena en este equipo/.test(t))), await p.evaluate(() => window.__toasts.slice(-3)));
+    await p.click('#ypMqYo');
+    await p.waitForTimeout(1200);
+    // (la canción se comprueba primero y luego se pone: en un navegador sin otro toque sale «▶ Toca»; en la app de Android suena sola)
+    chk('3. Al tocar «🎶 Que suene aquí», la música pasa a este equipo y la pone aquí', await p.evaluate(() => window.__toasts.some(t => /la música suena SOLO en este equipo/.test(t))) && await p.waitForFunction(() => window.__yt.cargados.includes('salsaxxxxxx'), null, { timeout: 15000 }).then(() => true, () => false), await p.evaluate(() => [window.__toasts.slice(-3), window.__yt.cargados]));
     chk('3. … y ya no sale el aviso de otro equipo', !(await p.isVisible('#ypMq')));
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.stack || e)); }
   chk('Sin errores de página', !errs.length, errs);

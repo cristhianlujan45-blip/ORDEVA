@@ -81,9 +81,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     await crear(C.p, 'nuevo@tienda-real.com', 'clave-nueva-1');
     chk('6. Con «el servidor ya manda correos», pide el código que llegó al correo', await esperar(C.p, () => document.querySelector('#promptOverlay.show') && /código/i.test(document.getElementById('promptTitle').textContent), null, 15000));
     await C.p.fill('#promptInput', '000000'); await C.p.click('#promptOkBtn');
-    chk('6. Con un código malo no crea la cuenta', await esperar(C.p, () => /no es correcto|venció/.test(document.getElementById('authErr').textContent), null, 15000) && await fuera(C.p), await err(C.p));
-    await crear(C.p, 'nuevo@tienda-real.com', 'clave-nueva-1');
-    await esperar(C.p, () => !!document.querySelector('#promptOverlay.show'), null, 15000);
+    chk('6. Con un código malo no crea la cuenta y lo vuelve a pedir (sin mandar otro correo)', await esperar(C.p, () => document.querySelector('#promptOverlay.show') && /no es correcto/.test(document.getElementById('promptMessage').textContent), null, 15000) && await fuera(C.p) && sb.recuperaciones.filter(x => x.email === 'nuevo@tienda-real.com').length === 1, await err(C.p));
     const cod = (sb.recuperaciones.filter(x => x.email === 'nuevo@tienda-real.com' && x.codigo).pop() || {}).codigo;
     chk('6. (el código llegó al «correo»)', !!cod, JSON.stringify(sb.recuperaciones.slice(-3)));
     await C.p.fill('#promptInput', String(cod)); await C.p.click('#promptOkBtn');

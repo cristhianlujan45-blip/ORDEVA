@@ -90,7 +90,7 @@
       [/for security purposes.*after (\d+) seconds/i, 'Espera unos segundos para pedir otro código.'],
       [/token has expired|otp.*(expired|invalid)|invalid.*(token|otp)/i, 'Ese código no sirve o ya venció. Pide uno nuevo.'],
       [/rate limit|too many|for security purposes/i, 'Ya se mandaron varios códigos: espera unos minutos y vuelve a pedirlo.'],
-      [/signups? not allowed|email address.*not authorized|not authorized/i, 'Los correos de ORDEVA no están llegando ahora mismo. Entra con tu contraseña, o escríbenos por WhatsApp y te ayudamos.'],
+      [/email address.*not authorized|not authorized to send/i, 'Los correos de ORDEVA no están llegando ahora mismo. Entra con tu contraseña, o escríbenos por WhatsApp y te ayudamos.'],
       [/error sending|smtp|sending (magic link|confirmation|recovery) email/i, 'Los correos de ORDEVA no están llegando ahora mismo. Intenta más tarde, o escríbenos por WhatsApp y te ayudamos.'],
       [/email not confirmed/i, 'Falta confirmar el correo: abre el mensaje que te llegó y vuelve a entrar.'],
       [/already registered|already exists/i, 'Ese correo ya tiene cuenta: usa «Entrar».'],

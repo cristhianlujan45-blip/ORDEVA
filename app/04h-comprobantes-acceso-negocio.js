@@ -1484,22 +1484,32 @@ function showAuth(firstRun){
         const conCodigo = !!(nb && authCorreosOk());
         if(conCodigo){
           ocupado('⏳ Mandando un código a tu correo…');
-          let mandado = false;
-          try{ await nb.codigoCorreo(user); mandado = true; }
-          catch(x){ if(!authSinRed(x)){ err.textContent = '📧 No se pudo mandar el código a ' + user + ': ' + nb.msgError(x); return; } }
-          if(mandado){
-            ocupado('');
-            const cod = await showPrompt({ icon: '📧', title: 'Escribe el código del correo', message: 'Te mandamos un código de 6 números a ' + user + ' (revisa también «Spam» o «Promociones»). Así sabemos que ese correo es tuyo.', inputMode: 'numeric', autocomplete: 'one-time-code', placeholder: '123456', confirmText: 'Verificar' });
+          // Sin internet no se crea: el código es la prueba de que el correo es suyo (antes, en modo avión, se saltaba).
+          try{ await nb.codigoCorreo(user); }
+          catch(x){ err.textContent = authSinRed(x) ? '📶 Para crear la cuenta hace falta internet: te mandamos un código al correo.' : '📧 No se pudo mandar el código a ' + user + ': ' + nb.msgError(x); return; }
+          ocupado('');
+          // Hasta 3 intentos con el MISMO código (no se manda otro correo por cada error).
+          let r = null, msgCod = 'Te mandamos un código de 6 números a ' + user + ' (revisa también «Spam» o «Promociones»). Así sabemos que ese correo es tuyo.';
+          for(let intento = 0; intento < 3 && !r; intento++){
+            const cod = await showPrompt({ icon: '📧', title: 'Escribe el código del correo', message: msgCod, inputMode: 'numeric', autocomplete: 'one-time-code', placeholder: '123456', confirmText: 'Verificar' });
             if(!cod){ err.textContent = '📧 Sin el código del correo no se crea la cuenta. Toca otra vez «Crear cuenta» para que te llegue uno nuevo.'; return; }
             ocupado('⏳ Verificando el código…');
-            let r;
             try{ r = await nb.entrarConCodigo(user, cod, false); }
-            catch(x){ err.textContent = '📧 ' + (/expired|invalid/i.test(String(x && x.message)) ? 'El código no es correcto o ya venció. Toca otra vez «Crear cuenta» para que te llegue uno nuevo.' : nb.msgError(x)); return; }
-            // El correo YA tenía cuenta con negocio: se entra a esa cuenta (no se crea otra).
-            if(r.negocios && r.negocios.length){ try{ await nb.nuevaClave(pass); }catch(x){} await authEntrarDesdeNube(user, null, r.negocios); try{ await authPonerClaveLocal(user, pass); }catch(x){} return; }
-            try{ await nb.nuevaClave(pass); enNube = 'ok'; }
-            catch(x){ err.textContent = '📧 El correo quedó verificado, pero no se pudo poner la contraseña: ' + nb.msgError(x); return; }
+            catch(x){
+              if(!/expired|invalid/i.test(String(x && x.message))){ err.textContent = '📧 ' + nb.msgError(x); return; }
+              msgCod = '❌ Ese código no es correcto o ya venció. Revisa el último correo que te llegó y escríbelo otra vez.';
+            }
+            finally{ ocupado(''); }
           }
+          if(!r){ err.textContent = '📧 El código no fue correcto. Toca otra vez «Crear cuenta» para que te llegue uno nuevo.'; return; }
+          // El correo YA tenía cuenta con negocio: se entra a ESA cuenta (no se crea otra ni se le cambia la contraseña).
+          if(r.negocios && r.negocios.length){
+            try{ await authEntrarDesdeNube(user, null, r.negocios); showToast('📧 ' + user + ' ya tenía cuenta: entraste a ella. Tu contraseña es la de esa cuenta (si no la recuerdas: «¿Olvidaste tu contraseña?»).', 9000); }
+            catch(x){ err.textContent = '📧 ' + nb.msgError(x); }
+            return;
+          }
+          try{ await nb.nuevaClave(pass); enNube = 'ok'; }
+          catch(x){ err.textContent = '📧 El correo quedó verificado, pero no se pudo poner la contraseña (' + nb.msgError(x) + '). Toca otra vez «Crear cuenta».'; try{ await nb.salir(); }catch(y){} return; }
         }
         if(nb && !conCodigo){
           ocupado('⏳ Creando tu cuenta…');
