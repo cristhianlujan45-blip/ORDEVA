@@ -1155,7 +1155,7 @@ function agregarCancion(mesa,song,reqId,op){
   const pedidoOriginal=String(song).slice(0,120),lim=mzLimpiarPedido(song);
   song=lim.query||song;
   // 🛡️ 1.99.19: lo que el dueño no deja pedir (pedidos de las mesas; el personal sí puede poner lo que quiera)
-  if(reqId&&!mqOtro()&&(mzProhibida(pedidoOriginal)||mzProhibida(song))){
+  if(mzEsQR(reqId)&&!mqOtro()&&(mzProhibida(pedidoOriginal)||mzProhibida(song))){
     mzResponder(reqId,'quitada',mesa,{n:'Esa canción no se puede pedir aquí'},op.canal);
     return{msg:'🛡️ '+tableLabel(mesa)+' pidió algo que no se deja pedir aquí: no se puso.',nuevo:false,prohibida:true};
   }
@@ -1174,6 +1174,12 @@ function agregarCancion(mesa,song,reqId,op){
   // doble toque, recarga o reintento) no se vuelve a encolar.
   const nk=normVoiceText(song);
   const dup=l.concat(mzHist()).find(x=>(reqId&&x.reqId===reqId)||(x.mesa===mesa&&normVoiceText(x.song||'')===nk&&now-(x.ts||x.requestedAt||0)<3*6e4&&x.status!=='cancelled'));
+  if(dup&&dup.unida&&reqId&&dup.reqId===reqId){   // 1.99.19: ese pedido se unió al de otra mesa: se le dice cómo va ESA
+    const m=l.find(y=>y.id===dup.unida)||mzHist().find(y=>y.id===dup.unida);
+    const e=!m?'cola':m.status==='playing'?'sonando':['played','skipped'].includes(m.status)?'sono':m.status==='cancelled'?'quitada':m.status==='error'?'novid':'cola';
+    mzResponder(reqId,e,mesa,e==='cola'?{n:'Ya la pidió otra mesa: suena una sola vez'}:null,op.canal);
+    return{msg:'🎵 Esa canción ya está en la cola.',nuevo:false};
+  }
   if(dup){
     // El mismo pedido otra vez (el celular lo reenvió porque no vio la respuesta): se le confirma; otra igual: «repetida».
     if(reqId&&dup.reqId===reqId)mzAvisarCliente(dup,dup.status==='playing'?'sonando':['played','skipped'].includes(dup.status)?'sono':dup.status==='cancelled'?'quitada':dup.status==='error'?'novid':'cola');
@@ -1182,12 +1188,12 @@ function agregarCancion(mesa,song,reqId,op){
   }
   // 🎵 1.99.19 (auditoría): la MISMA canción que ya pidió OTRA mesa y todavía no termina (esperando o sonando) no se pone
   // dos veces seguidas: el pedido se une al que ya está, no gasta cupo, y a esa mesa se le avisa igual (en cola, sonando, sonó).
-  if(!reenviar&&reqId&&!op.sc){
-    const igual=l.find(x=>!x.fondo&&x.mesa!==mesa&&!['played','skipped','cancelled','error'].includes(x.status)&&normVoiceText(x.song||'')===nk);
+  if(!reenviar&&mzEsQR(reqId)&&!op.sc){
+    const igual=l.find(x=>mzUnible(x)&&x.mesa!==mesa&&normVoiceText(x.song||'')===nk);
     if(igual){
       const ll=cola(),it0=ll.find(y=>y.id===igual.id);
-      if(it0){it0.tambien=(Array.isArray(it0.tambien)?it0.tambien:[]).filter(t=>t.rid!==reqId).concat([{rid:reqId,mesa,canal:qCanalOk(op.canal)?op.canal:null}]).slice(-20);SS('vito_cola',ll);}
-      mzResponder(reqId,igual.status==='playing'?'sonando':'cola',mesa,{n:igual.status==='playing'?'¡Ya está sonando! (la pidió otra mesa)':'Ya la pidió otra mesa: suena una sola vez'},op.canal);
+      if(it0){it0.tambien=(Array.isArray(it0.tambien)?it0.tambien:[]).filter(t=>t.rid!==reqId).concat([{rid:reqId,mesa,canal:qCanalOk(op.canal)?op.canal:null}]).slice(-20);SS('vito_cola',ll);mzRespaldo();}
+      mzResponder(reqId,'cola',mesa,{n:igual.revisar?'Ya la pidió otra mesa: esperando que la aprueben':'Ya la pidió otra mesa: suena una sola vez'},op.canal);
       return{msg:'🎵 '+tableLabel(mesa)+' pidió «'+song+'», que ya está en la cola (de '+tableLabel(igual.mesa)+').',nuevo:false};
     }
   }
@@ -1199,7 +1205,7 @@ function agregarCancion(mesa,song,reqId,op){
   if(!reenviar&&mesa!==0&&MAX&&rec.length>=MAX){const min=Math.ceil((rec[0].ts+VENT-now)/6e4);return{msg:'🎵 '+(op.sc?'Las canciones sin el código de su QR':tableLabel(mesa))+' ya '+(op.sc?'son ':'pidió ')+MAX+' canciones; podrá pedir otra en '+min+' min.',limite:true,min,max:MAX};}
   const it={id:now+'-'+Math.random().toString(36).slice(2,6),reqId:reqId||null,mesa,mesaNombre:tableLabel(mesa),song:song.slice(0,120),pedido:pedidoOriginal,title:lim.title.slice(0,80),artist:lim.artist.slice(0,60),ts:now,done:false,status:'pending'};
   if(op.sc)it.sc=true;
-  if(reqId&&!reenviar&&mzRevisarQR())it.revisar=true;   // 🛡️ espera a que la aprueben en Música
+  if(mzEsQR(reqId)&&!reenviar&&mzRevisarQR())it.revisar=true;   // 🛡️ espera a que la aprueben en Música (solo lo del QR)
   if(qCanalOk(op.canal))it.canal=op.canal;
   // El video que tocó el cliente: solo con el código de su mesa, y solo se usa si sale en la búsqueda de ESA canción (ytUno),
   // con las mismas revisiones de siempre. Así nadie pone en el TV un video cualquiera con un nombre inocente.
@@ -1463,6 +1469,8 @@ setInterval(()=>{
 },1000);
 document.addEventListener('visibilitychange',()=>{ const t=LS(MZ_T_KEY,null); if(!document.hidden&&t&&t.espera&&!t.pend&&mzAutoOn()) mzCronoAvanzar(); });
 // 🛡️ 1.99.19: aprobar una canción del QR que esperaba revisión: se busca su video y entra a la cola normal.
+// Las que nadie aprobó en 2 horas se quitan (al cliente le dice «La quitaron de la cola»).
+setInterval(()=>{try{if(mqOtro())return;cola().filter(x=>x.revisar&&!x.done&&Date.now()-(x.ts||0)>2*36e5).forEach(x=>mzTermino(x.id,'cancelled'));}catch(e){}},60e3);
 function mzAprobar(id){const it=mzCambiar(id,{revisar:false});if(!it)return;mzAvisarCliente(it,'cola');try{ytAgregar(id);tvPublicar(true);}catch(e){}renderMusica();}
 function renderMusica(){
   const L=$('mzList');if(!L||typeof data==='undefined'||!data)return;
@@ -1483,7 +1491,9 @@ function renderMusica(){
     const d=document.createElement('div');d.className='mz-song';
     d.innerHTML='<span>'+(i+1)+'. '+esc(x.song)+' · '+esc(mzEtq(x))+' <small class="mz-est mz-'+(x.status||'pending')+'">'+(x.revisar?'🛡️ Por aprobar':x.status==='approved'||x.ok?'En cola':'Pendiente')+' · '+new Date(x.ts).toLocaleTimeString('es-CO',{hour:'numeric',minute:'2-digit'})+'</small></span>';
     if(x.revisar){
-      d.append(btn('✅',()=>{mzAprobar(x.id);}),btn('🚫',()=>{mzTermino(x.id,'cancelled');tvPublicar(true);renderMusica();}));
+      // (desde otro equipo se le pide al equipo de la música, que es el que tiene la cola de verdad)
+      d.append(btn('✅',()=>{if(mqOtro()){mqPub({t:'cmd',a:'aprobar',id:x.id});mzCambiar(x.id,{revisar:false});showToast('✅ Aprobada: suena en «'+mqNombre()+'».');renderMusica();}else mzAprobar(x.id);}),
+        btn('🚫',()=>{if(mqOtro())mqPub({t:'cmd',a:'quitar',id:x.id});mzTermino(x.id,'cancelled');tvPublicar(true);renderMusica();}));
       L.appendChild(d);return;
     }
     d.append(btn('▶',()=>reproducir(x)),btn('🗑',()=>{if(mqOtro())mqPub({t:'cmd',a:'quitar',id:x.id});mzTermino(x.id,'cancelled');tvPublicar(true);renderMusica();}));
@@ -1560,6 +1570,7 @@ function yEstado(){
 async function yApi(path,opt){
   const r=await fetch('https://www.googleapis.com/youtube/v3/'+path,Object.assign({headers:{Authorization:'Bearer '+yTok(),'Content-Type':'application/json'},signal:ySenal(15000)},opt));
   if(!r.ok){const j=await r.json().catch(()=>({}));throw new Error((j.error&&j.error.message)||('Error '+r.status));}
+  if(r.status===204)return {};   // (1.99.19: borrar no devuelve nada)
   return r.json();
 }
 // 🎵 1.99.19: la lista de YouTube Music (transmitida al TV) se limpia: lo que se agregó hace más de 6 horas ya sonó y se
@@ -1568,10 +1579,12 @@ let ytLimpiadoAt=0;
 async function ytListaLimpiar(){
   if(Date.now()-ytLimpiadoAt<36e5||!yTok()||ySinCupo())return;ytLimpiadoAt=Date.now();
   const viejas=mzHist().concat(cola()).filter(x=>x.ytItemId&&!x.ytBorrado&&x.ytAt&&Date.now()-x.ytAt>6*36e5).slice(0,5);
+  const borradas=[];
   for(const x of viejas){
-    try{await yApi('playlistItems?id='+encodeURIComponent(x.ytItemId),{method:'DELETE'});}catch(e){if(/quota|exceeded/i.test(String(e&&e.message)))break;}
-    x.ytBorrado=true;
+    try{await yApi('playlistItems?id='+encodeURIComponent(x.ytItemId),{method:'DELETE'});borradas.push(x);}
+    catch(e){if(/not ?found|404/i.test(String(e&&e.message)))borradas.push(x);else if(/quota|exceeded/i.test(String(e&&e.message)))break;}
   }
+  viejas.length=0;borradas.forEach(x=>viejas.push(x));
   if(viejas.length){const l=cola();l.forEach(y=>{if(viejas.some(v=>v.id===y.id))y.ytBorrado=true;});SS('vito_cola',l);
     const h=mzHist();h.forEach(y=>{if(viejas.some(v=>v.id===y.id))y.ytBorrado=true;});SS('vito_mzhist',h);}
 }
@@ -1602,6 +1615,10 @@ const YT_NO_SE_DEJA=[100,101,150];
 const mzPalabras=()=>{try{return String((data&&data.musicaPalabras)||'').split(/[,\n;]+/).map(w=>normVoiceText(w).trim()).filter(w=>w.length>=2).slice(0,200);}catch(e){return [];}};
 const mzProhibida=t=>{const n=' '+normVoiceText(String(t||''))+' ';return mzPalabras().find(w=>n.includes(' '+w+' ')||(w.includes(' ')&&n.includes(w)))||null;};
 window.ventoMusicaProhibida=t=>mzProhibida(t);   // (lo usa el parlante de avisos)
+const mzEsQR=r=>/^c[\w-]{4,40}$/.test(String(r||''));   // pedido de un CLIENTE por el QR (el personal manda otros ids)
+// Se puede unir un pedido a otro que todavía no suena: esperando, por aprobar o ya mandado al TV (no a uno que ya suena,
+// ni a los que van a la lista de YouTube Music, que ORDEVA no sabe cuándo suenan).
+const mzUnible=x=>!!x&&!x.fondo&&!x.done?['pending','approved'].includes(x.status||'pending'):x&&!x.fondo&&x.status==='tv';
 const mzRevisarQR=()=>{try{return !!(data&&data.musicaRevisar);}catch(e){return false;}};
 const mzMaxDur=()=>{try{const m=+(data&&data.musicaMaxMin);return (m>=3&&m<=180?m:12)*60;}catch(e){return 720;}};
 function ytMarcarBad(v){ if(!v)return; const b=ytBad(); if(!b.includes(v)){ b.push(v); SS(YT_BAD_KEY,b.slice(-400)); } }
@@ -1742,20 +1759,22 @@ async function ytUno(id){
       let v=await ySearch(it.song,it.probados,v0);
       // 🎵 1.99.19 (auditoría): tope de duración. Un mix o un concierto de 1 hora tapaba la cola de todas las mesas. Si la
       // versión encontrada dura más del tope (12 min, o lo que diga Ajustes), se busca otra versión de la misma canción.
-      let largas=0;
-      while(v&&!it.fondo&&ytDurCache[v]&&ytDurCache[v]>mzMaxDur()&&largas<3){largas++;it.probados=(it.probados||[]).concat(v);try{v=await ySearch(it.song,it.probados,null);}catch(e){v=null;}}
-      const muyLarga=!!(v&&!it.fondo&&ytDurCache[v]&&ytDurCache[v]>mzMaxDur());
+      let largas=0;const largasV=[],conTope=mzEsQR(it.reqId);   // (lo que pone el personal no tiene tope)
+      while(conTope&&v&&ytDurCache[v]&&ytDurCache[v]>mzMaxDur()&&largas<3){largas++;largasV.push(v);try{v=await ySearch(it.song,(it.probados||[]).concat(largasV),null);}catch(e){v=undefined;}}
+      const muyLarga=!!(conTope&&v&&ytDurCache[v]&&ytDurCache[v]>mzMaxDur());
       l=cola();it=l.find(x=>x.id===id);if(!it)return;
+      if(largasV.length){it.probados=(it.probados||[]).concat(largasV);SS('vito_cola',l);}
       if(muyLarga||(largas&&v===null)){it.novid=true;it.yt='no';it.status='error';it.done=true;it.larga=true;it.endedAt=Date.now();SS('vito_cola',l);try{mzAlHistorial(it);}catch(e){}
-        if(it.reqId)mzResponder(it.reqId,'novid',it.mesa,{n:'Es muy larga (más de '+Math.round(mzMaxDur()/60)+' min): pide otra canción'},it.canal);
+        const exL={n:'Es muy larga (más de '+Math.round(mzMaxDur()/60)+' min): pide otra canción'};
+        if(it.reqId)mzResponder(it.reqId,'novid',it.mesa,exL,it.canal);mzTambien(it,t=>mzResponder(t.rid,'novid',t.mesa,exL,t.canal));
         try{showToast('⏱️ «'+it.song+'» dura demasiado (más de '+Math.round(mzMaxDur()/60)+' min): no se puso.');renderMusica();}catch(e){}return;}
       // Sin respuesta (servidor o internet caídos): se reintenta cada minuto, hasta 10 veces; luego se avisa que no se pudo.
       if(v===undefined){it.busq=(it.busq||0)+1;if(it.busq>=10){it.novid=true;it.yt='no';it.status='error';it.done=true;it.endedAt=Date.now();try{mzAlHistorial(it);}catch(e){}mzAvisarCliente(it,'novid');}SS('vito_cola',l);return;}
       // 1.99.19: el MISMO video que otra mesa ya tiene en la cola (escrito distinto): se une a ese, no suena dos veces.
-      const igualV=v&&!it.fondo&&l.find(y=>y.id!==it.id&&y.vid===v&&!y.fondo&&!['played','skipped','cancelled','error'].includes(y.status));
+      const igualV=v&&!it.fondo&&mzEsQR(it.reqId)&&l.find(y=>y.id!==it.id&&y.vid===v&&y.mesa!==it.mesa&&mzUnible(y));
       if(igualV){
-        igualV.tambien=(Array.isArray(igualV.tambien)?igualV.tambien:[]).concat(it.reqId?[{rid:it.reqId,mesa:it.mesa,canal:it.canal||null}]:[]).concat(Array.isArray(it.tambien)?it.tambien:[]).slice(-20);
-        it.done=true;it.status='cancelled';it.endedAt=Date.now();it.unida=igualV.id;SS('vito_cola',l);
+        igualV.tambien=(Array.isArray(igualV.tambien)?igualV.tambien:[]).concat([{rid:it.reqId,mesa:it.mesa,canal:it.canal||null}]).concat(Array.isArray(it.tambien)?it.tambien:[]).slice(-20);
+        it.tambien=[];it.done=true;it.status='cancelled';it.endedAt=Date.now();it.unida=igualV.id;SS('vito_cola',l);mzRespaldo();
         if(it.reqId)mzResponder(it.reqId,igualV.status==='playing'?'sonando':'cola',it.mesa,{n:'Ya la pidió otra mesa: suena una sola vez'},it.canal);
         try{renderMusica();}catch(e){}return;
       }
@@ -1774,15 +1793,13 @@ async function ytUno(id){
     // «en tu lista» y el reproductor de la app ya no la tocaba (con Google conectado, la cola se «gastaba» sin sonar).
     // Ya se renovó el cupo y el reproductor lo había prendido ORDEVA por eso: se vuelve a la lista de YouTube Music.
     if(!ySinCupo()&&LS('vito_auto_por_cupo',0)&&AUTO()&&!sonando){SS('vito_auto_play',{on:false});SS('vito_auto_por_cupo',0);try{const a=$('autoPlay');if(a)a.checked=false;}catch(e){}}
-    // 🎵 1.99.19 (auditoría): la lista de YouTube Music en el MISMO celular no es confiable (ORDEVA no sabe en qué canción
-    // va: las nuevas quedaban detrás de lo que sonaba y no sonaban, la lista crecía sin fin y al cliente nunca le decía
-    // «sonando»). Si esa iba a ser la forma de poner la canción, se enciende el reproductor de ORDEVA (orden justo,
-    // estados al cliente y sin gastar el cupo de Google). Transmitiendo YouTube Music al TV (Chromecast) sigue como antes.
-    if(it.vid&&!it.yt&&yTok()&&!tvOn()&&!(typeof lngOn==='function'&&lngOn())&&!AUTO()&&!(typeof castOn==='function'&&castOn())){
-      SS('vito_auto_play',{on:true});SS('vito_auto_por_cupo',0);try{const a=$('autoPlay');if(a)a.checked=true;}catch(e){}
-      if(!LS('vito_auto_por_lista',0)){SS('vito_auto_por_lista',Date.now());try{showToast('🎶 Las canciones de las mesas ahora suenan en el reproductor de ORDEVA (en orden y sin perderse). Ábrelo en Música si no las escuchas.',9000);}catch(e){}}
-      try{mzAsegurarReproductor(true);setTimeout(()=>{try{verificarCola();}catch(e){}},50);}catch(e){}
-      return;
+    // 🎵 1.99.19 (auditoría): la lista de YouTube Music en el MISMO celular no es del todo confiable (ORDEVA no sabe en qué
+    // canción va: las nuevas pueden quedar detrás de lo que suena, y al cliente no le llega «sonando»). No se cambia sola
+    // (hay quien la usa a propósito con un parlante): se RECOMIENDA una vez el reproductor de ORDEVA (Música → «Activar
+    // música automática»).
+    if(it.vid&&!it.yt&&yTok()&&!tvOn()&&!(typeof lngOn==='function'&&lngOn())&&!AUTO()&&!(typeof castOn==='function'&&castOn())&&!LS('vito_aviso_lista',0)){
+      SS('vito_aviso_lista',Date.now());
+      try{showToast('🎶 Consejo: para que las canciones de las mesas suenen en orden y sin perderse, usa el reproductor de ORDEVA (Música → «Activar música automática»). Con la lista de YouTube Music, ORDEVA no sabe en qué canción va.',12000);}catch(e){}
     }
     if(!it.vid||it.yt||!yTok()||tvOn()||(typeof lngOn==='function'&&lngOn())||AUTO()||ySinCupo())return;
     const pl=await yLista();
@@ -2108,7 +2125,7 @@ function mqEscuchar(){
 function mqPublicarEstado(forzar){
   if(!mqSoy())return;
   const a=mzActual(),F=mzF();let pausa=false;try{pausa=!!(a&&a.fuente==='app'&&yPl&&yPl.getPlayerState&&yPl.getPlayerState()===2);}catch(e){}
-  const it=x=>({i:x.id,v:x.vid||'',s:String(x.title||x.song||'').slice(0,80),a:String(x.artist||'').slice(0,50),g:String(x.song||'').slice(0,100),m:x.mesa,mn:String(x.mesaNombre||tableLabel(x.mesa)).slice(0,30),d:x.dur||null,ts:x.ts||0,pr:x.primero||0,fo:x.fondo?1:0,r:x.reqId?String(x.reqId).slice(0,40):undefined});
+  const it=x=>({i:x.id,v:x.vid||'',s:String(x.title||x.song||'').slice(0,80),a:String(x.artist||'').slice(0,50),g:String(x.song||'').slice(0,100),m:x.mesa,mn:String(x.mesaNombre||tableLabel(x.mesa)).slice(0,30),d:x.dur||null,ts:x.ts||0,pr:x.primero||0,fo:x.fondo?1:0,rv:x.revisar?1:undefined,r:x.reqId?String(x.reqId).slice(0,40):undefined});
   const est={t:'estado',ahora:a?Object.assign(it(a),{f:a.fuente||'',p:pausa?1:0}):null,q:ordenJusto(cola()).slice(0,40).map(it),fondo:F&&F.on?String(F.nombre||'').slice(0,60):''};
   const h=JSON.stringify(est);
   if(!forzar&&h===mqHash&&Date.now()-mqHashT<60e3)return;                // sin cambios: un «sigo aquí» por minuto
@@ -2122,7 +2139,7 @@ function mqAplicar(m){
   mqVisto=Date.now();
   const prev=mzActual(),l=[];
   if(prev&&(!m.ahora||m.ahora.i!==prev.id)){prev.status='played';prev.endedAt=Date.now();try{mzAlHistorial(prev);}catch(e){}}
-  const de=x=>({id:String(x.i),vid:x.v||null,title:x.s,artist:x.a,song:x.g||x.s,mesa:x.m,mesaNombre:x.mn,dur:x.d,ts:x.ts||Date.now(),primero:x.pr||0,fondo:!!x.fo,reqId:x.r||null});
+  const de=x=>({id:String(x.i),vid:x.v||null,title:x.s,artist:x.a,song:x.g||x.s,mesa:x.m,mesaNombre:x.mn,dur:x.d,ts:x.ts||Date.now(),primero:x.pr||0,fondo:!!x.fo,revisar:!!x.rv,reqId:x.r||null});
   if(m.ahora)l.push(Object.assign(de(m.ahora),{status:'playing',done:true,fuente:'remoto',pausa:!!m.ahora.p,playedSeconds:m.ahora.p?m.ahora.e||0:m.ahora.e||0,progresoAt:m.ahora.p?null:Date.now(),startedAt:Date.now()-(m.ahora.e||0)*1000}));
   (m.q||[]).forEach(x=>l.push(Object.assign(de(x),{status:'approved',ok:true,done:false})));
   const ids=new Set(l.map(x=>x.id));
@@ -2151,6 +2168,7 @@ function mqComando(m){
       if(r&&r.limite)mzResponder(rid,'limite',mesa,{min:r.min,max:r.max||mzMax(),n:'Sin cupo: otra en '+r.min+' min'},cn);
       if(r&&r.nuevo===true){try{renderMusica();}catch(e){}try{if(notifMusica())showToast(r.msg);}catch(e){}}
     }
+    else if(m.a==='aprobar'&&m.id)mzAprobar(String(m.id));   // 🛡️ 1.99.19: aprobada desde otro equipo
     else if(m.a==='sig')mzSaltar();
     else if(m.a==='pausa')ypPausa();
     else if(m.a==='quitar'&&m.id){mzTermino(String(m.id),'cancelled');try{tvPublicar(true);}catch(e){}renderMusica();}
@@ -2365,7 +2383,7 @@ window.vitoMusicaDiag=()=>{let st=-2,t=0,vd='';try{st=yPl&&yPl.getPlayerState?yP
 const mzLista=y=>!!y.vid&&!y.sinVersion&&(y.ok||!yTestListo);
 function mzOrdenParaSonar(){
   const o=ordenJusto(cola()),ahora=Date.now();
-  const esperando=o.some(y=>!y.fondo&&!mzLista(y)&&!y.novid&&ahora-(y.ts||0)<60000);
+  const esperando=o.some(y=>!y.fondo&&!y.revisar&&!mzLista(y)&&!y.novid&&ahora-(y.ts||0)<60000);
   return o.filter(y=>mzLista(y)&&!(esperando&&y.fondo));
 }
 // El TV vuelve a recibir la lista cada 15 s (solo si cambió): así, pasados los 60 s de espera de una pedida, sigue el fondo.

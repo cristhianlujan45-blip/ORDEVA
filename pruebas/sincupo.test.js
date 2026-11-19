@@ -29,9 +29,7 @@ const video = (id, t) => ({ id: { videoId: id }, snippet: { title: t, channelTit
     });
     await ctx.addInitScript(() => {
       try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: 'https://prueba.supabase.co', key: 'x'.repeat(30) }));
-        localStorage.setItem('vito_ytok', JSON.stringify({ t: 'token', exp: Date.now() + 3600e3 })); localStorage.setItem('vito_yt', JSON.stringify({ pl: 'PLbar', on: true }));
-        // 1.99.19: la lista de YouTube Music solo se usa transmitiéndola al TV (Chromecast); en el mismo celular suena el reproductor de ORDEVA.
-        localStorage.setItem('vito_cast', JSON.stringify({ on: true })); localStorage.setItem('vito_castoff1', '1'); }catch(e){}
+        localStorage.setItem('vito_ytok', JSON.stringify({ t: 'token', exp: Date.now() + 3600e3 })); localStorage.setItem('vito_yt', JSON.stringify({ pl: 'PLbar', on: true })); }catch(e){}
       window.__yt = { cargados: [] };
       window.YT = { Player: class { constructor(id, o){ this.o = o; this.id = id; this.st = -1; if(id === 'ytPlayer') window.__yt.main = this; setTimeout(() => o.events && o.events.onReady && o.events.onReady(), 20); }
         loadVideoById(v){ this.st = 1; if(this.id === 'ytPlayer') window.__yt.cargados.push(v); setTimeout(() => this.o.events && this.o.events.onStateChange && this.o.events.onStateChange({ data: 1 }), 20); }

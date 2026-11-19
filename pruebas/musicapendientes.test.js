@@ -62,17 +62,26 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     const tieneAgregar = await p.evaluate(() => !!(window.vitoMod && window.vitoMod.agregarCancion));
     chk('(la página expone agregarCancion para la prueba)', tieneAgregar);
 
-    // ===== 1. La misma canción, dos mesas =====
-    await pedir(1, 'Despacito Luis Fonsi', 'c-r1-mesa1');
+    // ===== 1. La misma canción, dos mesas (la primera suena; dos mesas piden la MISMA que viene después) =====
+    await pedir(6, 'Cancion que ya suena', 'c-r0-mesa6');
     await esperar(() => window.__yt.calls.some(c => c.el === 'ytPlayer' && c.a === 'load'));
+    await pedir(1, 'Despacito Luis Fonsi', 'c-r1-mesa1');
+    await p.waitForTimeout(400);
     await pedir(2, 'despacito luis fonsi', 'c-r2-mesa2');
+    await pedir(2, 'despacito luis fonsi', 'c-r2-mesa2');          // el celular reenvía el mismo pedido
     await p.waitForTimeout(800);
     const n1 = await p.evaluate(() => window.vitoMusica.cola().filter(x => /despacito/i.test(x.song) && x.status !== 'cancelled').length);
-    chk('1. La misma canción de dos mesas queda UNA sola vez en la cola', n1 === 1, n1);
-    chk('1. A la segunda mesa le dice que ya la pidió otra mesa (o que ya suena)', (await resp('c-r2-mesa2')).some(x => /otra mesa/.test(x)), await resp('c-r2-mesa2'));
-    await p.evaluate(() => { const a = window.vitoMusica.actual(); if(a) window.vitoMod.mzEmpezo(a.id, 'app'); });
+    chk('1. La misma canción de dos mesas queda UNA sola vez en la cola (también si el celular reenvía el pedido)', n1 === 1, n1);
+    chk('1. A la segunda mesa le dice que ya la pidió otra mesa', (await resp('c-r2-mesa2')).some(x => /otra mesa/.test(x)), await resp('c-r2-mesa2'));
+    await p.evaluate(() => { const d = window.vitoMusica.cola().find(x => /despacito/i.test(x.song)); window.vitoMod.mzEmpezo(d.id, 'app'); });
     await p.waitForTimeout(500);
     chk('1. Cuando suena, a las DOS mesas se les dice «sonando»', (await resp('c-r1-mesa1')).some(x => /^sonando/.test(x)) && (await resp('c-r2-mesa2')).some(x => /^sonando/.test(x)), [await resp('c-r1-mesa1'), await resp('c-r2-mesa2')]);
+    await p.evaluate(() => { const d = window.vitoMusica.cola().find(x => /despacito/i.test(x.song)); window.vitoMod.mzTermino(d.id, 'played', 200); });
+    await p.waitForTimeout(400);
+    chk('1. Y al terminar, a las DOS se les dice «Ya sonó»', (await resp('c-r1-mesa1')).some(x => /^sono/.test(x)) && (await resp('c-r2-mesa2')).some(x => /^sono/.test(x)), [await resp('c-r1-mesa1'), await resp('c-r2-mesa2')]);
+    await pedir(3, 'Cancion que ya suena', 'c-r9-mesa3');
+    await p.waitForTimeout(400);
+    chk('1. A una que YA está sonando no se une (se pone en la cola, para que sí la escuchen)', await p.evaluate(() => window.vitoMusica.cola().filter(x => /Cancion que ya suena/.test(x.song) && x.status !== 'cancelled').length === 2));
 
     // ===== 2. Tope de duración =====
     await pedir(3, 'Mix salsa 1 hora', 'c-r3-mesa3');
@@ -101,16 +110,19 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     chk('4. Con 🚫 se quita y al cliente le dice «La quitaron»', await esperar(() => window.__resp.some(x => x.id === 'c-r6-mesa6' && x.e === 'quitada')), await resp('c-r6-mesa6'));
     await p.evaluate(() => { data.musicaRevisar = false; saveData(); });
 
-    // ===== 6. El parlante dice solo el aviso =====
-    const dichos = await p.evaluate(() => { window.__dichos = []; window.ventoParlanteAviso && window.ventoParlanteAviso('🎵 Canción pedida · Mesa 3', 'texto que escribió el cliente con groserías'); return window.__dichos; });
-    chk('6. El parlante dice «Canción pedida, Mesa 3» sin el texto del cliente', dichos.length === 1 && /Canción pedida, Mesa 3/.test(dichos[0]) && !/cliente/.test(dichos[0]), dichos);
+    // ===== 6. El parlante: el nombre de la canción solo si no tiene palabras bloqueadas =====
+    const dichos = await p.evaluate(() => { window.__dichos = [];
+      window.ventoParlanteAviso && window.ventoParlanteAviso('🎵 Canción · Mesa 3', 'Cancion con palabrota fea');
+      window.ventoParlanteAviso && window.ventoParlanteAviso('🎵 Canción · Mesa 4', 'Karol G - Provenza');
+      return window.__dichos; });
+    chk('6. Con una palabra bloqueada el parlante dice solo «Canción, Mesa 3»; sin ella, también el nombre', dichos.length === 2 && /^Canción, Mesa 3$/.test(dichos[0]) && /Mesa 4\. Karol G/.test(dichos[1]), dichos);
     await ctx.close();
 
-    // ===== 5. Google conectado, sin TV ni reproductor: se usa el reproductor de ORDEVA =====
+    // ===== 5. Google conectado, sin TV ni reproductor: se RECOMIENDA el reproductor de ORDEVA (una vez; no se cambia solo) =====
     const ctx2 = await b.newContext({ viewport: { width: 390, height: 844 } });
     await ctx2.route('**/*', async r => { if(await mock.handler(r)) return; const u = new URL(r.request().url());
       if(u.hostname === 'localhost') return r.continue();
-      if(u.hostname === 'www.googleapis.com'){ if(/playlist/.test(u.pathname)){ window.__noOcurre = 1; } return google(r); }
+      if(u.hostname === 'www.googleapis.com'){ return google(r); }
       return r.abort(); });
     await ctx2.addInitScript(() => { try{ localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vito_yt', JSON.stringify({ key: 'AIzaClaveDelNegocio00000000000000000' })); localStorage.setItem('vito_ytok', JSON.stringify({ t: 'ya29.token-de-prueba', exp: Date.now() + 36e5 })); localStorage.setItem('vito_auto_play', JSON.stringify({ on: false })); }catch(e){} });
     const q = await ctx2.newPage(); q.on('pageerror', e => errs.push('2: ' + e.message));
@@ -118,8 +130,13 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     await q.fill('#authBiz', 'Bar'); await q.fill('#authUser', 'ana'); await q.fill('#authPass', 'clave123'); await q.click('#authBtn'); await q.waitForTimeout(1500);
     await q.evaluate(() => { document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')); data.tables[1] = data.tables[1] || { items: [], people: [] }; saveData(); });
     const conGoogle = await q.evaluate(() => { try{ return !!(window.vitoMod && window.vitoMod.yTok && window.vitoMod.yTok()); }catch(e){ return 'err ' + e.message; } });
+    await q.evaluate(() => { window.__toasts = []; const t0 = window.showToast; window.showToast = (m, ms) => { window.__toasts.push(String(m)); t0(m, ms); }; });
     await q.evaluate(() => window.vitoAddSong(1, 'La gota fria Carlos Vives'));
-    chk('5. Con Google conectado y sin TV ni reproductor, se enciende el reproductor de ORDEVA (no la lista de YouTube Music)', await q.waitForFunction(() => JSON.parse(localStorage.getItem('vito_auto_play') || '{}').on === true, null, { timeout: 15000 }).then(() => true, () => false), { conGoogle });
+    await q.waitForTimeout(3000);
+    await q.evaluate(() => window.vitoAddSong(1, 'Otra para la lista'));
+    await q.waitForTimeout(3000);
+    const r5 = await q.evaluate(() => ({ consejos: window.__toasts.filter(t => /Consejo/.test(t)).length, auto: JSON.parse(localStorage.getItem('vito_auto_play') || '{}').on === true }));
+    chk('5. Con Google conectado y sin TV ni reproductor: recomienda UNA vez el reproductor de ORDEVA y no lo cambia solo', r5.consejos === 1 && !r5.auto, Object.assign({ conGoogle }, r5));
     await ctx2.close();
   }
 })();

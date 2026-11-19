@@ -1751,7 +1751,10 @@ function wireAccountUI(){
   const rvTg = document.getElementById('musicaRevisarToggle');
   if(rvTg){
     rvTg.checked = !!data.musicaRevisar;
-    rvTg.onchange = () => { data.musicaRevisar = !!rvTg.checked; saveData(); showToast(data.musicaRevisar ? '🛡️ Las canciones del QR quedan «Por aprobar» en Música: suenan cuando tocas ✅.' : '🎵 Las canciones del QR entran solas a la cola, como siempre.', 6000); };
+    rvTg.onchange = () => { data.musicaRevisar = !!rvTg.checked; saveData();
+      // Al apagarlo, las que esperaban aprobación entran a la cola (no se quedan esperando para siempre)
+      if(!data.musicaRevisar) try{ const vm = window.vitoMod; vm.cola().filter(x => x.revisar && !x.done).forEach(x => vm.mzAprobar(x.id)); }catch(e){}
+      showToast(data.musicaRevisar ? '🛡️ Las canciones del QR quedan «Por aprobar» en Música: suenan cuando tocas ✅.' : '🎵 Las canciones del QR entran solas a la cola, como siempre.', 6000); };
   }
   const pwTx = document.getElementById('musicaPalabrasTxt');
   if(pwTx){
