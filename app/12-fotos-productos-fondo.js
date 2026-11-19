@@ -747,6 +747,9 @@ function ccSiguiente(){
   if(!ccRespaldo || !ccSes || !window.chrome || !chrome.cast || !chrome.cast.media) return;
   const ms = ccSes.getMediaSession && ccSes.getMediaSession();
   if(ms && ms.playerState && ms.playerState !== 'IDLE') return;
+  // 1.99.17: sin noticias del TV (no hay sesión de video que diga «terminó»), una canción de ORDEVA que según su duración
+  // todavía suena NO se corta para poner la siguiente (antes, a los 15 s se daba por terminada y entraba la nueva).
+  if(!ms){ const ya = vm().cola().find(y => y.status === 'playing' && y.fuente === 'cc'); if(ya && Date.now() - (ya.startedAt || 0) < ((ya.dur || 240) + 20) * 1000) return; }
   if(ccRespaldo !== 'esperando'){ const ant = vm().cola().find(y => y.status === 'playing' && y.fuente === 'cc'); if(ant && Date.now() - (ant.startedAt || 0) > 15000) vm().mzTermino(ant.id, 'played'); }
   const l = vm().cola ? vm().ordenJusto(vm().cola()) : [];
   const x = l.find(y => y.vid && !y.lng && !y.done); if(!x) return;
@@ -1880,8 +1883,16 @@ function lngEstadoTV(t){
   let st = null, m, re = /"state"\s*:\s*"?(-?\d+)"?/g;
   while((m = re.exec(t))) st = m[1];
   if(st === null) return null;
-  return st === '1' || st === '2' || st === '3';
+  if(st === '1' || st === '2' || st === '3') return true;
+  if(st === '0' || st === '5') return false;
+  // 🎵 1.99.17: «cuando alguien pone una canción del QR se quita la que está sonando». -1 es el TV pasando de una canción a
+  // la otra, y otros códigos (ej. 1081) son un COMERCIAL de YouTube: el TV sí tiene algo puesto. Antes contaban como
+  // «quieto» y la canción nueva mandaba «lista nueva» (setPlaylist), que reemplaza lo que sonaba. Ahora: -1 = no se sabe
+  // (manda lo demás que se sabe del TV) y un comercial = sonando (la nueva se agrega al final).
+  return st === '-1' ? null : true;
 }
+// Códigos normales del TV; cualquier otro es un comercial (o algo de YouTube que no es «quieto»).
+const LNG_ESTADOS = [-1, 0, 1, 2, 3, 5];
 /* La sesión del TV se cae sola en menos de un minuto si nadie la sostiene (ORDEVA no
    mantiene el canal de vuelta abierto). Por eso, antes de cada canción, se saluda de
    nuevo: sale barato, garantiza que el envío no se pierda y de paso trae el estado real
@@ -1940,6 +1951,9 @@ async function lngArrancar(videoId, encolada){
     await new Promise(r => setTimeout(r, 3000));
     try{ await lngAsegurar(true); }catch(e){ lngLog('   no pude comprobar el TV: ' + (e.message || e)); return; }
     if(lng.tvPlay === true){ lngOk(); return; }
+    // 🎵 1.99.17: si la canción solo se AGREGÓ a una cola viva y el TV no dice «quieto» (está cambiando de canción, -1),
+    // no se le vuelve a poner la cola: eso reemplaza y corta lo que suena. Solo «play», por si acaso.
+    if(encolada && lng.tvPlay !== false){ if(i === 0){ lngLog('   el TV está cambiando de canción → «play» y se deja seguir su cola'); try{ await lngCmd('play', {}); }catch(e){} } return; }
     if(!lngReporta() && lng.tvPlay === null){
       if(i === 0){ lngLog('   este TV no informa su estado → «play» por si acaso y se deja sonar'); try{ await lngCmd('play', {}); }catch(e){} }
       return;
@@ -1999,7 +2013,9 @@ async function lngSync(forzar){
       // canción de ORDEVA (o haya mandadas esperando), la nueva SOLO se agrega al final: nunca se corta
       // la que suena. Se dejan 30 s de margen por si el TV tardó en cargar.
       const relojOcupado = !lngReporta() && Date.now() < lngOcupadoHasta() + 30000;
-      const quedaCola = arrancando || relojOcupado || (lng.tvPlay === false ? false : probado);
+      // 1.99.17: terminó una canción de ORDEVA y el TV tiene más de ORDEVA detrás: está pasando a la siguiente, no quieto.
+      const avanzando = lng.tvSt === 0 && deVento && lngEnTV().some(y => y.vid !== lng.tvVid);
+      const quedaCola = arrancando || relojOcupado || avanzando || (lng.tvPlay === false ? false : probado);
       // «Arrancar ya» (al reconectar el TV solo o tocar ▶) no corta una canción de ORDEVA que ya suena.
       const porPersona = !!lng.porPersona; lng.porPersona = false;   // ▶ tocado a mano: arrancar sí o sí
       const nuevaCola = porPersona || (forzarInicio && !(deVento && lng.tvPlay === true) && !relojOcupado) || !quedaCola;
@@ -2052,6 +2068,7 @@ async function lngVigilar(){
     await lngAsegurar(true);
     const vid = lng.tvVid, st = lng.tvSt, reciente = Date.now() - (lng.ultimoEnvio || 0) < 25000;
     lngResultado(true);
+    if(st !== null && !LNG_ESTADOS.includes(st)){ lngLog('   el TV está pasando un comercial → se espera'); return; }   // 1.99.17: no se le cambia la cola
     if(!lngReporta()){ lngPorTiempo(lngEnTV()); return; }
     // Canciones mandadas hace más de 3 h (el TV se apagó, cerraron ORDEVA…): no se reponen.
     enTV.filter(x => Date.now() - (x.lngAt || 0) > 3 * 36e5).forEach(x => vm().mzTermino(x.id, 'skipped'));

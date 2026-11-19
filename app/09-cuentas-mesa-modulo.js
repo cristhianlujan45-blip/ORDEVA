@@ -2151,16 +2151,22 @@ function crearTest(){
     const i=document.createElement('div');i.id='ytTestIn';d.appendChild(i);document.body.appendChild(d);}
   yTest=new YT.Player('ytTestIn',{width:'200',height:'113',playerVars:{playsinline:1,mute:1,controls:0},events:{
     onReady:()=>{yTestListo=true;try{yTest.mute();}catch(e){}},
-    onStateChange:e=>{if(verificando&&e.data===1)verificando.fin(true);},
+    onStateChange:e=>{if(verificando&&(e.data===1||(verificando.cue&&e.data===5)))verificando.fin(true);},
     onError:()=>{if(verificando)verificando.fin(false);}}});
 }
+// 🎵 1.99.17: «cuando alguien pone una canción del QR se quita la que está sonando». El probador REPRODUCÍA la canción nueva
+// (en silencio, escondido) mientras sonaba la otra: dos videos a la vez. En el celular eso gasta mucha memoria y Android
+// cerraba la página de ORDEVA («falta de memoria», 47 veces en un día en el Xiaomi), y al volver la canción que sonaba se
+// daba por saltada. Ahora, si este equipo está sonando, solo se «carga sin reproducir» (cue): YouTube igual dice si esa
+// versión no se deja poner, y si alguna se escapa, el reproductor principal busca otra versión al llegar a ella.
+const ySonandoAqui=()=>{try{return !!(sonando||(yPl&&yPl.getPlayerState&&[1,3].includes(yPl.getPlayerState())));}catch(e){return !!sonando;}};
 function probarVideo(v){
   return new Promise(res=>{
     if(!yTestListo){res(true);return;}                      // sin probador: el reproductor principal igual cambia de versión si falla
-    let t=null;
-    verificando={fin:ok=>{clearTimeout(t);verificando=null;try{yTest.stopVideo();}catch(e){}res(ok);}};
+    let t=null;const cue=ySonandoAqui();
+    verificando={cue,fin:ok=>{clearTimeout(t);verificando=null;try{yTest.stopVideo();}catch(e){}res(ok);}};
     t=setTimeout(()=>verificando&&verificando.fin(true),9000);   // no respondió: se da por buena
-    try{yTest.mute();yTest.loadVideoById(v);}catch(e){verificando.fin(true);}
+    try{yTest.mute();if(cue)yTest.cueVideoById(v);else yTest.loadVideoById(v);}catch(e){verificando.fin(true);}
   });
 }
 let verifCorriendo=false;
@@ -2254,8 +2260,11 @@ function siguienteAuto(){
   if(mzActual()&&mzActual().fuente==='app')return;    // ya hay una sonando: la nueva queda en la cola
   if(tvOn())return;                                   // el TV es el reproductor
   const x=mzOrdenParaSonar()[0];if(!x)return;        // solo versiones ya comprobadas, y lo pedido antes que el fondo
-  mzEmpezo(x.id,'app');
-  SS('vito_now',x);sonando=true;cargadoEn=Date.now();ytMostrar(true);yPl.loadVideoById(x.vid);renderMusica();
+  const desde=x.retomarEn>5?x.retomarEn:0;
+  mzEmpezo(x.id,'app');if(x.retomarEn!=null||x.primero)mzCambiar(x.id,{retomarEn:null,primero:0});
+  SS('vito_now',x);sonando=true;cargadoEn=Date.now();ytMostrar(true);
+  if(desde)yPl.loadVideoById({videoId:x.vid,startSeconds:desde});else yPl.loadVideoById(x.vid);   // retomada: sigue donde iba
+  renderMusica();
 }
 // Progreso real del reproductor de la app (segundos y duración que da YouTube)
 setInterval(()=>{try{const a=mzActual();if(a&&a.fuente==='app'&&yPl&&yPl.getCurrentTime&&yPl.getPlayerState()===1)mzProgreso(a.id,yPl.getCurrentTime(),yPl.getDuration());}catch(e){}},5000);
@@ -2319,8 +2328,14 @@ function mzAutoPintar(){
   t.textContent=!gestoUsuario?'🔈 Toca la pantalla una vez para permitir el sonido (el navegador lo exige); luego sigue sola.':a?'🟢 Automática: suena «'+(a.title||a.song)+'»; al terminar pone la siguiente sola.':'🟢 Automática: esperando canciones. Cuando una mesa pida, empieza sola.';
 }
 function iniAutoPlay(){
-  // Si la app se cerró o recargó mientras sonaba algo en este celular, esa canción se da por terminada.
-  try{cola().filter(x=>x.status==='playing'&&x.fuente==='app').forEach(x=>mzTermino(x.id,x.dur&&x.playedSeconds>=x.dur*0.9?'played':'skipped'));}catch(e){}
+  // Si la app se cerró o recargó mientras sonaba algo en este celular: 🎵 1.99.17, si se cortó a la mitad hace poco (Android
+  // cerró la página por memoria, se recargó), esa canción se RETOMA de primera desde donde iba (antes se daba por saltada y
+  // «se quitaba la canción que estaba sonando»). Si ya casi terminaba o pasó mucho rato, se da por terminada como antes.
+  try{cola().filter(x=>x.status==='playing'&&x.fuente==='app').forEach(x=>{
+    const casi=x.dur&&x.playedSeconds>=x.dur*0.9,hace=Date.now()-(x.progresoAt||x.startedAt||0);
+    if(!casi&&x.vid&&!x.sinVersion&&hace<10*6e4)mzCambiar(x.id,{status:'approved',done:false,ok:true,retomarEn:Math.max(0,(x.playedSeconds||0)-3),primero:Date.now()});
+    else mzTermino(x.id,casi?'played':'skipped');
+  });}catch(e){}
   const go=$('mzAutoGo');
   if(go)go.onclick=()=>{gestoUsuario=true;if(!AUTO()){$('autoPlay').checked=true;$('autoPlay').dispatchEvent(new Event('change'));}cargarAPI();try{if(yPl&&yPl.getPlayerState&&yPl.getPlayerState()===2)yPl.playVideo();}catch(e){}siguienteAuto();mzAutoPintar();showToast('🎶 Música automática encendida: las canciones suenan solas, una tras otra.');};
   setInterval(mzAutoPintar,3000);setTimeout(mzAutoPintar,800);

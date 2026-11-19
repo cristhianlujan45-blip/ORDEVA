@@ -1014,7 +1014,7 @@ function bloquearApp(){
     if(!ok){ authLoginFail(authUser); err.textContent = authPinPuede(u) ? 'PIN o contraseña incorrectos.' : 'Contraseña incorrecta.'; inp.value = ''; return; }
     authPinFallo(authUser, 0); authLoginClear(authUser); ov.remove();
   };
-  ov.querySelector('#lockOtro').onclick = () => { try{ saveData(); }catch(e){} try{ sessionStorage.setItem('vento-salio', '1'); }catch(e){} localStorage.removeItem(AUTH_SESSION_KEY); location.reload(); };
+  ov.querySelector('#lockOtro').onclick = () => { try{ saveData(); }catch(e){} localStorage.removeItem(AUTH_SESSION_KEY); location.reload(); };
   setTimeout(() => inp.focus(), 100);
 }
 window.bloquearApp = bloquearApp;
@@ -1467,6 +1467,7 @@ function showAuth(firstRun){
         if(waitMin){ err.textContent = '🔒 Demasiados intentos con "' + user + '". Espera ' + waitMin + ' min. e intenta de nuevo.'; return; }
         const u = authUsers().find(x => x.user === user);
         let entro = !!u && await authClaveOk(u, pass);
+        const porClave = entro;                                // 👆 1.99.17: la huella solo se ofrece al entrar con la contraseña
         if(entro) authPinFallo(user, 0);                       // con la contraseña, el PIN se desbloquea
         else if(u && authPinPuede(u) && /^\d{4,6}$/.test(pass)){
           // Entrar con el PIN (empleados): 5 intentos malos seguidos y queda bloqueado.
@@ -1485,7 +1486,7 @@ function showAuth(firstRun){
           document.getElementById('authPass').value = '';
           await enterApp(user, null);
           if(nb){ if(nb.conectado(user)) authRevisarClave(user, pass); else authConectarNube(user, pass, true); }
-          try{ window.ventoHuella && window.ventoHuella.ofrecer(user); }catch(x){}   // 👆 1.99.17: «¿Entrar con tu huella la próxima vez?»
+          try{ if(porClave && window.ventoHuella) window.ventoHuella.ofrecer(user); }catch(x){}   // 👆 1.99.17: «¿Entrar con tu huella la próxima vez?»
           return;
         }
         // Correo que no está en este celular (celular nuevo) o con la contraseña cambiada en otro celular:

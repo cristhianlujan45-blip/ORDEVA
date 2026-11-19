@@ -879,11 +879,25 @@ public class VentoApp extends Application {
         @JavascriptInterface
         public String huellaEstado() { return Huella.estado(VentoApp.this); }
 
-        /** Pide la huella; responde con window.__ventoHuellaRespuesta(id, ok, motivo). */
+        /** ¿La llave de ORDEVA (Keystore, solo se abre con huella) está en este celular y sirve? "ok", "sin-llave" o "invalidada". */
+        @JavascriptInterface
+        public String huellaLista() { return Huella.lista(); }
+
+        /** Pide la huella para entrar; responde con window.__ventoHuellaRespuesta(id, ok, motivo). */
         @JavascriptInterface
         public void huellaPedir(final String id, final String titulo, final String subtitulo) {
-            ui.post(() -> Huella.pedir(id, titulo, subtitulo));
+            ui.post(() -> Huella.pedir(id, titulo, subtitulo, false));
         }
+
+        /** Activar: igual, pero hace la llave si no hay una que sirva. */
+        @JavascriptInterface
+        public void huellaActivar(final String id, final String titulo, final String subtitulo) {
+            ui.post(() -> Huella.pedir(id, titulo, subtitulo, true));
+        }
+
+        /** La página dejó de esperar: se cierra la ventana de huella. */
+        @JavascriptInterface
+        public void huellaCancelar() { ui.post(Huella::cancelar); }
 
         @JavascriptInterface
         public double escalaPantalla() {

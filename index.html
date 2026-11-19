@@ -5269,7 +5269,8 @@ export default {
   async function collectAppData(){
     const keys=[];
     for(let i=0;i<localStorage.length;i++) keys.push(localStorage.key(i));
-    const storage={}; keys.filter(k=>!/@t$/.test(k)).forEach(k=>storage[k]=localStorage.getItem(k));
+    // 👆 1.99.17: lo de la huella (vento-huella…) es de ESTE equipo: no va en el respaldo (en otro celular no debe servir).
+    const storage={}; keys.filter(k=>!/@t$/.test(k)&&!/^vento-huella/.test(k)).forEach(k=>storage[k]=localStorage.getItem(k));
     try{
       const ks=await ventoAlmacen.claves();
       for(const k of ks){
@@ -5300,7 +5301,7 @@ export default {
         if(!b || b.format!=='cerveceria-backup' || !b.localStorage) throw new Error('Formato no válido');
         if(!(await siNo({ icon: '💾', title: '¿Reemplazar tus datos por los del respaldo?', message: 'Lo que hay ahora en este equipo se cambia por lo que trae el respaldo.', confirmText: 'Sí, reemplazar' }))) return;
         // Lo recibido manda: sin marca «@t», storageGet lo toma aunque el almacén grande tenga otra cosa.
-        Object.keys(b.localStorage).filter(k=>!/@t$/.test(k)).forEach(k=>{ try{ localStorage.removeItem(k+'@t'); }catch(e){} localStorage.setItem(k,b.localStorage[k]); });
+        Object.keys(b.localStorage).filter(k=>!/@t$/.test(k)&&!/^vento-huella/.test(k)).forEach(k=>{ try{ localStorage.removeItem(k+'@t'); }catch(e){} localStorage.setItem(k,b.localStorage[k]); });
         // Se recarga YA (como antes con alert()): si se esperara a que toquen un botón, un guardado de la app con los datos viejos
         // en memoria podría pisar el respaldo. El aviso «Respaldo recibido» sale después de recargar.
         try{ sessionStorage.setItem('vento-respaldo-ok', '1'); }catch(x){}
