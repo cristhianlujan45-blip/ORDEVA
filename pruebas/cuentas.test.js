@@ -73,7 +73,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){
 
     // ===== 1. Celular A crea la cuenta con su correo =====
     const A = await celular('celular A');
-    chk('1. Pantalla de primera vez: dice «Correo o usuario» y ofrece «🔑 Iniciar sesión» (pestaña)', /Correo o usuario/.test(await A.p.textContent('#authForm')) && /Iniciar sesión/.test(await A.p.textContent('#authTabs [data-tab="entrar"]')) && await A.p.isVisible('#authTabs [data-tab="entrar"]'));
+    chk('1. Pantalla de primera vez: pide el correo («Tu correo», 1.99.18) y ofrece «🔑 Iniciar sesión» (pestaña)', /Tu correo|Correo o usuario/.test(await A.p.textContent('#authForm')) && /Iniciar sesión/.test(await A.p.textContent('#authTabs [data-tab="entrar"]')) && await A.p.isVisible('#authTabs [data-tab="entrar"]'));
     await crear(A.p, 'Bar Ana', 'Ana@Bar.co', 'clave123');
     chk('1. Celular A entra a la app', await dentro(A.p));
     await A.p.click('#onbSaltar', { timeout: 4000 }).catch(() => {}); await cerrarTodo(A.p);

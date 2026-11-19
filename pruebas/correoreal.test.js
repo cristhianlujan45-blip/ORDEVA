@@ -42,7 +42,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
         return (u.hostname === 'localhost' || u.hostname === '127.0.0.1') ? rt.continue() : rt.abort();
       });
       await enrutar(ctx, sb);
-      await ctx.addInitScript(c => { try{ localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento-hola', '0'); if(c) localStorage.setItem('vento-cfg', JSON.stringify(c)); }catch(e){} window.__ventoExigirCorreo = true; }, cfg || null);
+      await ctx.addInitScript(c => { try{ localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento-hola', '0'); if(c) localStorage.setItem('vento-cfg', JSON.stringify(c)); }catch(e){} window.__ventoExigirCorreo = true; window.__ventoRevisarCorreo = true; }, cfg || null);
       const p = await ctx.newPage(); p.on('pageerror', e => errs.push(nombre + ': ' + e.message));
       await p.goto(BASE + '/index.html');
       await p.waitForSelector('#authOverlay:not([hidden])', { timeout: 15000 });

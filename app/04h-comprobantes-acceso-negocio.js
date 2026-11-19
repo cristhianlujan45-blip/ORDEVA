@@ -1063,7 +1063,7 @@ const authEsCorreo = t => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(t || '').trim
 // 📧 1.99.18: ¿el servidor de ORDEVA ya manda correos (códigos, recuperar la contraseña)? Lo enciende el proveedor en
 // ORDEVA Admin cuando Supabase ya tiene su servicio de correo (SMTP). Sin eso, los correos solo le llegan al equipo de
 // Supabase: «Entrar con un código» y los códigos de recuperación no le llegan a nadie más.
-const authCorreosOk = () => { try{ return !!(typeof ventoCfg !== 'undefined' && ventoCfg && ventoCfg.correos === true) || !!navigator.webdriver; }catch(e){ return false; } };
+const authCorreosOk = () => { try{ return !!(typeof ventoCfg !== 'undefined' && ventoCfg && ventoCfg.correos === true); }catch(e){ return false; } };
 // Soporte por WhatsApp (el número lo pone el proveedor en ORDEVA Admin): para cuando algo no llega.
 const authSoporteWa = () => { try{ const n = String((typeof ventoCfg !== 'undefined' && ventoCfg && ventoCfg.whatsapp) || '').replace(/\D/g, ''); return n.length >= 10 ? 'https://wa.me/' + n + '?text=' + encodeURIComponent('Hola, necesito ayuda para entrar a ORDEVA.') : ''; }catch(e){ return ''; } };
 // 📧 1.99.18: el aviso de «ese correo no existe»; con un error de dedo, un botón para corregirlo de un toque.
@@ -1278,7 +1278,8 @@ function showAuth(firstRun){
     const ch = document.getElementById('authUsers'); if(ch){ ch.hidden = nueva || !authUsers().length; ch.style.display = ch.hidden ? 'none' : ''; }
     g('authNueva').textContent = nueva ? (vacio ? '¿Ya tienes cuenta? Entra con tu correo' : '← Ya tengo cuenta: iniciar sesión') : '➕ Crear cuenta nueva';
     g('authTabs').querySelectorAll('[data-tab]').forEach(b => { const on = (b.dataset.tab === 'crear') === nueva; b.classList.toggle('on', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); });
-    g('authCodigo').hidden = nueva || !conNube() || !authCorreosOk();   // 1.99.18: sin correos que lleguen, no se ofrece
+    // 1.99.18: sin correos que lleguen, no se ofrece (las pruebas automáticas lo siguen viendo: prueban el servidor local)
+    g('authCodigo').hidden = nueva || !conNube() || !(authCorreosOk() || navigator.webdriver);
     // 1.99.18: al crear la cuenta se pide el CORREO (con su teclado y un ejemplo); al entrar, correo o usuario.
     { const iu = g('authUser'), lu = iu.closest('label'), lp = g('authPass').closest('label');
       if(lu && lu.firstChild && lu.firstChild.nodeType === 3) lu.firstChild.textContent = nueva && conNube() ? 'Tu correo' : 'Correo o usuario';
@@ -1328,7 +1329,7 @@ function showAuth(firstRun){
   g('authUser').addEventListener('blur', () => {
     if(!modoNueva || !window.ventoCorreo) return;
     const v = authLimpiarUsuario(g('authUser').value), sg = authEsCorreo(v) ? window.ventoCorreo.sugerir(v) : null;
-    if(sg) authCorreoMal(g('authErr'), { ok: false, motivo: 'dedo', sugerencia: sg }, v, true);
+    if(sg && !g('authErr').textContent.includes(sg)) authCorreoMal(g('authErr'), { ok: false, motivo: 'dedo', sugerencia: sg }, v, true);   // (si ya está el aviso, no se repinta: se perdería el toque en «Usar…»)
   });
   g('recBack').onclick = () => { rf.hidden = true; af.hidden = false; };
   // Se ve desde el inicio (crear cuenta o iniciar sesión): si el celular quedó
