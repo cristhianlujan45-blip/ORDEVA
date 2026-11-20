@@ -3,7 +3,7 @@
 //  2. Llegando a 10 entre los dos, ninguno puede pedir la 11.ª: «Esta mesa ya pidió 10 canciones…».
 //  3. Si un celular no alcanzó a ver el cupo (sin cuenta en vivo) y la manda igual, ORDEVA la rechaza y le avisa a ESE
 //     celular (estado «limite»): sale el aviso y su contador no se queda con una canción que no entró.
-//  4. Otra mesa no se ve afectada.
+//  4. Otra mesa no se ve afectada. 4b. La misma canción de otra mesa se une a esa y no le gasta el cupo a quien la pidió.
 'use strict';
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const fs = require('fs');
@@ -87,6 +87,15 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     await pedir(C4, 'Cancion de la mesa dos');
     chk('4. Otra mesa pide sin problema', await esperar(A.p, () => window.vitoMod.cola().some(x => x.mesa === 2), null, 20000));
     chk('4. … y su cupo es el suyo (1 de 10)', await C4.p.evaluate(() => usadas() === 1), await C4.p.evaluate(() => usadas()));
+
+    // ===== 4b. 1.99.22: la misma canción pedida por otra mesa se une a la que ya espera y NO le gasta el cupo =====
+    const C5 = await pagina('cliente5', await link(3));
+    await pedir(C5, 'Cancion de la mesa dos');
+    chk('4b. Otra mesa pide la misma canción: se le dice «Ya la pidió otra mesa»', await esperar(C5.p, () => (jget(MISK, []).find(x => /mesa dos/.test(x.txt)) || {}).n === 'Ya la pidió otra mesa: suena una sola vez', null, 20000), await C5.p.evaluate(() => jget(MISK, [])));
+    chk('4b. … no se pone dos veces en la cola', await A.p.evaluate(() => window.vitoMod.cola().filter(x => /mesa dos/i.test(x.song) && x.status !== 'cancelled').length === 1));
+    chk('4b. … y en su celular no gasta cupo (0 de 10)', await esperar(C5.p, () => recLocal().length === 0 && usadas() === 0, null, 8000), await C5.p.evaluate(() => [recLocal().length, usadas()]));
+    await pedir(C5, 'Cancion propia de la mesa tres');
+    chk('4b. Una canción distinta sí gasta su cupo (1 de 10)', await esperar(C5.p, () => recLocal().length === 1, null, 15000), await C5.p.evaluate(() => recLocal().length));
 
     // ===== 5. «Sin límite» (Ajustes → Música) =====
     await A.p.evaluate(() => { const sel = document.getElementById('cancionesMesaSel'); sel.value = '0'; sel.dispatchEvent(new Event('change')); });

@@ -1177,7 +1177,7 @@ function agregarCancion(mesa,song,reqId,op){
   if(dup&&dup.unida&&reqId&&dup.reqId===reqId){   // 1.99.19: ese pedido se unió al de otra mesa: se le dice cómo va ESA
     const m=l.find(y=>y.id===dup.unida)||mzHist().find(y=>y.id===dup.unida);
     const e=!m?'cola':m.status==='playing'?'sonando':['played','skipped'].includes(m.status)?'sono':m.status==='cancelled'?'quitada':m.status==='error'?'novid':'cola';
-    mzResponder(reqId,e,mesa,e==='cola'?{n:'Ya la pidió otra mesa: suena una sola vez'}:null,op.canal);
+    mzResponder(reqId,e,mesa,e==='cola'?{n:'Ya la pidió otra mesa: suena una sola vez',u:1}:null,op.canal);
     return{msg:'🎵 Esa canción ya está en la cola.',nuevo:false};
   }
   if(dup){
@@ -1193,7 +1193,7 @@ function agregarCancion(mesa,song,reqId,op){
     if(igual){
       const ll=cola(),it0=ll.find(y=>y.id===igual.id);
       if(it0){it0.tambien=(Array.isArray(it0.tambien)?it0.tambien:[]).filter(t=>t.rid!==reqId).concat([{rid:reqId,mesa,canal:qCanalOk(op.canal)?op.canal:null}]).slice(-20);SS('vito_cola',ll);mzRespaldo();}
-      mzResponder(reqId,'cola',mesa,{n:igual.revisar?'Ya la pidió otra mesa: esperando que la aprueben':'Ya la pidió otra mesa: suena una sola vez'},op.canal);
+      mzResponder(reqId,'cola',mesa,{n:igual.revisar?'Ya la pidió otra mesa: esperando que la aprueben':'Ya la pidió otra mesa: suena una sola vez',u:1},op.canal);   // u: unida (al cliente no le gasta el cupo)
       return{msg:'🎵 '+tableLabel(mesa)+' pidió «'+song+'», que ya está en la cola (de '+tableLabel(igual.mesa)+').',nuevo:false};
     }
   }
@@ -1775,7 +1775,7 @@ async function ytUno(id){
       if(igualV){
         igualV.tambien=(Array.isArray(igualV.tambien)?igualV.tambien:[]).concat([{rid:it.reqId,mesa:it.mesa,canal:it.canal||null}]).concat(Array.isArray(it.tambien)?it.tambien:[]).slice(-20);
         it.tambien=[];it.done=true;it.status='cancelled';it.endedAt=Date.now();it.unida=igualV.id;SS('vito_cola',l);mzRespaldo();
-        if(it.reqId)mzResponder(it.reqId,igualV.status==='playing'?'sonando':'cola',it.mesa,{n:'Ya la pidió otra mesa: suena una sola vez'},it.canal);
+        if(it.reqId)mzResponder(it.reqId,igualV.status==='playing'?'sonando':'cola',it.mesa,{n:'Ya la pidió otra mesa: suena una sola vez',u:1},it.canal);
         try{renderMusica();}catch(e){}return;
       }
       if(v){it.vid=v;it.ok=false;if(ytDurCache[v])it.dur=ytDurCache[v];}else{it.novid=true;it.yt='no';it.status='error';it.done=true;it.endedAt=Date.now();try{mzAlHistorial(it);}catch(e){}mzAvisarCliente(it,'novid');showToast('⚠️ No encontré una versión de «'+it.song+'» que se pueda reproducir aquí.');try{window.ventoError&&window.ventoError('musica','No se encontró ninguna versión que se pueda reproducir',{cancion:String(it.song).slice(0,80),fuente:yFuente||''},'musica|sin-version');}catch(e){}}

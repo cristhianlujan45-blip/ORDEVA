@@ -1265,8 +1265,8 @@ let playCargado=null;
 function cargarPlay(){
   if(playCargado)return playCargado;
   playCargado=new Promise((res,rej)=>{
-    const l=document.createElement('link');l.rel='stylesheet';l.href='play/play.css?v=1.99.21';document.head.appendChild(l);
-    const sc=document.createElement('script');sc.src='play/ordeva-play.js?v=1.99.21';sc.onload=()=>res(window.ordevaPlay);sc.onerror=()=>{playCargado=null;rej(new Error('play'))};document.head.appendChild(sc);
+    const l=document.createElement('link');l.rel='stylesheet';l.href='play/play.css?v=1.99.22';document.head.appendChild(l);
+    const sc=document.createElement('script');sc.src='play/ordeva-play.js?v=1.99.22';sc.onload=()=>res(window.ordevaPlay);sc.onerror=()=>{playCargado=null;rej(new Error('play'))};document.head.appendChild(sc);
   });
   return playCargado;
 }
@@ -1341,7 +1341,7 @@ async function canalPost(body){
   }
   return false;
 }
-const OUTK='outbox_'+c,MISK='mis_'+c+'_'+SUF,MISC='misc_'+c+'_'+SUF;
+const OUTK='outbox_'+c,MISK='mis_'+c+'_'+SUF,MISC='misc_'+c+'_'+SUF;let enVuelo=null;   // la canción que se está enviando ahora
 function outboxAgregar(body){const l=jget(OUTK,[]);if(!l.some(x=>x.body===body))l.push({body,at:Date.now()});jset(OUTK,l.slice(-20));}
 let vaciando=false;
 async function vaciarOutbox(){
@@ -1378,8 +1378,11 @@ function escucharEstados(forzar){
     // La app del local rechazó una canción porque la MESA ya llegó a su cupo (la pidieron desde otros celulares).
     // 🎵 1.95.4: también si la música está apagada, si ya estaba en la cola o si llegó muy tarde: no cuenta en el cupo.
     // Quitada o sin versión que se pueda poner: tampoco gasta el cupo de este celular (el local ya no la cuenta).
+    // 🎵 1.99.22: unida a la misma canción de otra mesa: el local no la cuenta, así que aquí tampoco gasta el cupo (sin aviso de error).
+    //    Si llega mientras todavía se está enviando (enVuelo), no se descuenta aquí: al terminar el envío ya no se cuenta.
+    if(o.u&&/^c/.test(String(o.id))){const mc=jget(MISC,[]);if(mc.includes(o.id)){jset(MISC,mc.filter(x=>x!==o.id));if(o.id!==enVuelo){const a=jget(K,[]);a.pop();jset(K,a);if(modo=='c')pintarCupos();}}}
     if(['limite','apagada','repetida','vieja','nomesa','quitada','novid'].includes(o.e)){const mc=jget(MISC,[]);if(mc.includes(o.id)){jset(MISC,mc.filter(x=>x!==o.id));
-      const a=jget(K,[]);a.pop();jset(K,a);if(modo=='c')pintarCupos();
+      if(o.id!==enVuelo){const a=jget(K,[]);a.pop();jset(K,a);}if(modo=='c')pintarCupos();
       const k={apagada:'musicaApagada',repetida:'cancionRepetida',vieja:'cancionVieja',nomesa:'cancionNoMesa'}[o.e];
       if(o.e==='limite'||k)setMsg(()=>o.e==='limite'?t('cancionLimiteMesa',{max:o.max||MAXC()||10,min:o.min||1}):t(k),'err');}}
     const l=jget(MISK,[]),x=l.find(y=>y.id===o.id);if(!x)return;
@@ -1484,9 +1487,12 @@ $('b').onclick=async()=>{
     if(cuerpo.length>3800||ultimo.length>(dom?500:2000))return setMsg(()=>t('pedidoLargo'),'err');
     $('b').disabled=true;
     try{
-      const r={ok:await canalPost(cuerpo)};
+      enVuelo=idEnv;let r;try{r={ok:await canalPost(cuerpo)};}finally{enVuelo=null;}
       if(r.ok){
-        if(modo=='c'){const a=recientes();a.push(Date.now());jset(K,a);aprenderCancion(txt);if($('sugC'))$('sugC').hidden=true;if($('ytPrev'))$('ytPrev').hidden=true}
+        // 1.99.22: si el local la rechazó o la unió a la de otra mesa antes de terminar el envío, no se cuenta (antes se
+        // descontaba otra y se sumaba esta: con el contador en 0 quedaba gastada una que no contaba).
+        if(modo=='c'&&!(idEnv&&!jget(MISC,[]).includes(idEnv))){const a=recientes();a.push(Date.now());jset(K,a);}
+        if(modo=='c'){aprenderCancion(txt);if($('sugC'))$('sugC').hidden=true;if($('ytPrev'))$('ytPrev').hidden=true}
         if(modo=='p'){guardarRonda(env);aprender(env);lineas=[];pintarLineas();pintarRonda();pintarChips()}
         $('s').value=$('n').value='';
         $('b').disabled=false;
