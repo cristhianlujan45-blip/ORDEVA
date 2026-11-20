@@ -111,7 +111,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     await latir(CEL); await new Promise(r => setTimeout(r, 1500)); await CEL.p.evaluate(() => window.ventoPagos.sincronizar()); await new Promise(r => setTimeout(r, 1000));
     const cel = await and(CEL);
     chk('4. El celular que lo leyó: ni otra ventana, ni otra voz (la app Android ya lo dijo)', cel.pagos.length === 0 && !cel.decir.some(t => /300 pesos/.test(t)), cel);
-    chk('4. … y queda un solo pago de $300 en su lista', await CEL.p.evaluate(() => (data.pagos.lista || []).filter(x => x.monto === 300).length === 1));
+    chk('4. … y queda un solo pago de $300 en su lista', await CEL.p.evaluate(() => (data.pagos.lista || []).filter(x => x.monto === 300).length === 1), await CEL.p.evaluate(() => ({ l: (data.pagos.lista || []).filter(x => x.monto === 300).map(x => ({ id: x.id, srv: x.srv, t: x.t % 1e6, estado: x.estado, par: x.par, parSrv: x.parSrv, fuente: String(x.fuente || '').slice(0, 40) })), nube: (window.__nubeTraza || []).slice(-25).map(x => [x.ev, x.t % 1e6, x.v, x.x]) })));
 
     // ===== 5. Sin internet cuando llega el aviso =====
     const sinRed = r => r.abort('internetdisconnected');
