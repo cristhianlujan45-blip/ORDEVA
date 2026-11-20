@@ -475,16 +475,21 @@ let guardadoPend = null;
 function saveData(){
   const key = STORAGE_KEY, obj = data;
   if(!obj || typeof obj !== 'object') return Promise.resolve();   // 1.99.16: nunca se guarda un negocio vacío («null»)
-  if(guardadoPend && guardadoPend.key === key && guardadoPend.obj === obj) return guardadoPend.p;
+  // 1.69.1: se avisa a la nube YA (sube en ~25 ms lo que hay en memoria), sin esperar a que termine de guardarse aquí.
+  // 💜 1.99.23: también cuando este guardado se junta con uno que todavía no se escribía (menos de 120 ms). Antes ahí se
+  // devolvía sin avisar: si la nube ya estaba subiendo lo anterior, lo nuevo (un pago registrado en una mesa) quedaba
+  // como «subido», y la siguiente bajada de otro equipo lo borraba (prueba pagosequipos 7, 2 de 4 veces con el equipo lento).
+  const avisarNube = () => {
+    if(key !== STORAGE_KEY) return;
+    if(!window.__nubeAplicando) equipoGuardar();          // 1.81.4: lo que se cambió aquí queda como ajuste de este equipo
+    if(window.__nubeAplicando) window.__nubeCambioEnAplicar = true;   // se avisa apenas terminen de ponerse los datos del otro equipo
+    else { try{ window.ventoNube && window.ventoNube.cambio(); }catch(e){} }
+  };
+  if(guardadoPend && guardadoPend.key === key && guardadoPend.obj === obj){ avisarNube(); return guardadoPend.p; }
   if(guardadoPend) guardadoAhora();                       // otra sede u otros datos: lo pendiente se guarda ya, con su llave
   let listo; const p = new Promise(r => { listo = r; });
   const g = guardadoPend = { key, obj, p, listo };
-  // 1.69.1: se avisa a la nube YA (sube en ~25 ms lo que hay en memoria), sin esperar a que termine de guardarse aquí.
-  if(key === STORAGE_KEY && !window.__nubeAplicando) equipoGuardar();   // 1.81.4: lo que se cambió aquí queda como ajuste de este equipo
-  if(key === STORAGE_KEY){
-    if(window.__nubeAplicando) window.__nubeCambioEnAplicar = true;   // se avisa apenas terminen de ponerse los datos del otro equipo
-    else { try{ window.ventoNube && window.ventoNube.cambio(); }catch(e){} }
-  }
+  avisarNube();
   const ir = () => { if(guardadoPend === g) guardadoAhora(); };
   try{ requestAnimationFrame(() => setTimeout(ir, 0)); }catch(e){}
   g.t = setTimeout(ir, 120);                              // sin cuadros (app en el fondo): igual se guarda enseguida
