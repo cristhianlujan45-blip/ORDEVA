@@ -1335,19 +1335,27 @@ const LICS_KEY = 'vento-licencias', NEGOCIO_KEY = 'vento-negocio';
 /* 1.99.24: manda el código que viaja con los datos (data.negocioCodigo), no el guardado en el celular. Antes mandaba el del
    celular: dos celulares con códigos distintos (uno que estuvo en otro negocio) se lo cambiaban entre sí sin parar —
    274 subidas en 2 horas en un negocio real— y cada vuelta era una subida y una mezcla más entre los equipos.
-   Si una suscripción ya se activó para uno de los dos códigos, se queda ese (para no perderla). */
+   Para no perder una suscripción:
+   • si una suscripción vigente de los DATOS (la ven todos los equipos) es del código del celular, se queda ese y pasa a los
+     datos (todos los equipos llegan a lo mismo: no hay ida y vuelta);
+   • si la suscripción vigente es solo de ESTE celular, este celular usa su código pero no cambia el de los datos. */
+const licPayload = raw => { try{ const p = JSON.parse(new TextDecoder().decode(licB64(String(raw).split('.')[0]))); return p && typeof p === 'object' ? p : null; }catch(e){ return null; } };
+const licVigentePara = (raws, cod) => (raws || []).some(raw => { const p = licPayload(raw); return !!p && p.d === cod && !(p.v && p.v < Date.now()); });
 function codigoNegocio(){
   let ls = ''; try{ ls = localStorage.getItem(NEGOCIO_KEY) || ''; }catch(e){}
-  const dc = (typeof data !== 'undefined' && data && typeof data.negocioCodigo === 'string') ? data.negocioCodigo : '';
-  let c = dc || ls;
+  const hayData = typeof data !== 'undefined' && data && typeof data === 'object';
+  const dc = hayData && typeof data.negocioCodigo === 'string' ? data.negocioCodigo : '';
+  let c = dc || ls, aDatos = !dc;
   if(dc && ls && dc !== ls){
-    const firmadas = new Set();
-    try{ licRaws().forEach(raw => { try{ const m = String(raw).split('.'); const p = JSON.parse(new TextDecoder().decode(licB64(m[0]))); if(p && p.d) firmadas.add(p.d); }catch(e){} }); }catch(e){}
-    c = firmadas.has(dc) || !firmadas.has(ls) ? dc : ls;
+    const deDatos = hayData && Array.isArray(data.licencias) ? data.licencias : [];
+    if(licVigentePara(deDatos, dc)) c = dc;
+    else if(licVigentePara(deDatos, ls)){ c = ls; aDatos = true; }
+    else if(licVigentePara(licRaws().filter(x => deDatos.indexOf(x) < 0), ls)) c = ls;   // solo de este celular
+    else c = dc;
   }
-  if(!c){ const a = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; c = Array.from(crypto.getRandomValues(new Uint8Array(8)), b => a[b % a.length]).join(''); c = c.slice(0, 4) + '-' + c.slice(4); }
+  if(!c){ const a = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; c = Array.from(crypto.getRandomValues(new Uint8Array(8)), b => a[b % a.length]).join(''); c = c.slice(0, 4) + '-' + c.slice(4); aDatos = true; }
   if(ls !== c) try{ localStorage.setItem(NEGOCIO_KEY, c); }catch(e){}
-  if(typeof data !== 'undefined' && data && dc !== c){ data.negocioCodigo = c; try{ saveData(); }catch(e){} }
+  if(hayData && aDatos && dc !== c){ data.negocioCodigo = c; try{ saveData(); }catch(e){} }
   return c;
 }
 function licRaws(){

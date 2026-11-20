@@ -1438,22 +1438,25 @@ function histFila(h, idx){
   const payments = h.payments || [];
   const debt = h.debt || 0;
   const itemsHtml = items.map(it=>`
-      <div class="hist-detail-line"><span>${it.name}${it.person ? ' — ' + it.person : ''} ×${it.qty}</span><span>${fmt(it.price*it.qty)}</span></div>
+      <div class="hist-detail-line"><span>${it.name}${it.person ? ' — ' + histEsc(it.person) : ''} ×${it.qty}</span><span>${fmt(it.price*it.qty)}</span></div>
     `).join('') || '<div class="hist-detail-line"><span>Sin productos registrados</span><span></span></div>';
   const paymentsHtml = payments.map(p=>`
-      <div class="hist-detail-line"><span>${p.note || 'Pago'} <span class="pay-method ${p.method}">${methodLabelHist[p.method] || p.method}</span>${payItemsHtml(p)}</span><span>${fmt(p.amount)}</span></div>
+      <div class="hist-detail-line"><span>${p.note ? histEsc(p.note) : 'Pago'} <span class="pay-method ${p.method}">${methodLabelHist[p.method] || p.method}</span>${payItemsHtml(p)}</span><span>${fmt(p.amount)}</span></div>
     `).join('') || '<div class="hist-detail-line"><span>Sin pagos registrados</span><span></span></div>';
   const debtHtml = debt > 0 ? `<div class="hist-detail-line"><span class="hist-debt-flag">Queda debiendo</span><span class="hist-debt-flag">${fmt(debt)}</span></div>` : '';
-  // 📒 1.99.24: si quedaron debiendo varias personas de la mesa (cada fiado con su nombre), se ven sus nombres.
-  const histDeudores = x => { const n = [...new Set((x.payments || []).filter(q => q && q.method === 'debe' && String(q.note || '').trim() && !/^(saldo sin registrar al cerrar|queda debiendo)$/i.test(String(q.note).trim())).map(q => String(q.note).trim()))];
-    return n.length ? ' — ' + n.join(', ').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])) : ''; };
+  // 📒 1.99.24: quiénes quedaron debiendo: la persona de la cuenta y los nombres de cada fiado (si quedaron varias personas
+  // de la mesa, se ven todas; antes solo una). Los nombres escritos se muestran como texto (no como código).
+  const histDeudores = x => { const n = [];
+    const pon = v => { v = String(v || '').trim(); if(v && !/^(saldo sin registrar al cerrar|queda debiendo)$/i.test(v) && !n.some(y => y.toLowerCase() === v.toLowerCase())) n.push(v); };
+    pon(x.person); (x.payments || []).forEach(q => { if(q && q.method === 'debe') pon(q.note); });
+    return n.length ? ' — ' + histEsc(n.join(', ')) : ''; };
   const row = document.createElement('div');
   row.className = 'hist-row';
   row.dataset.idx = idx;
   row.innerHTML = `
       <div class="hist-row-top">
         <div class="hist-left">
-          <div class="hist-table">${h.tableName || (i18nPut(espacioN()) + ' ' + h.table)}${h.person ? ' — ' + h.person : (debt > 0 ? histDeudores(h) : '')}${debt > 0 ? ' · <span class="hist-debt-flag">DEBE</span>' : ''}${h.corregida ? ' · ✏️ corregida' : ''}</div>
+          <div class="hist-table">${h.tableName ? histEsc(h.tableName) : (i18nPut(espacioN()) + ' ' + h.table)}${debt > 0 ? histDeudores(h) : (h.person ? ' — ' + histEsc(h.person) : '')}${debt > 0 ? ' · <span class="hist-debt-flag">DEBE</span>' : ''}${h.corregida ? ' · ✏️ corregida' : ''}</div>
           <div class="hist-date">${dateStr}</div>
           ${histRef(h) ? `<div class="hist-ref">${invEsc(histRef(h))}</div>` : ''}
         </div>
@@ -2098,6 +2101,7 @@ function openDeleteHistory(){
   renderDeleteHistoryDays();
   deleteHistoryOverlay.classList.add('show');
 }
+function histEsc(v){ return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 function closeDeleteHistory(){
   deleteHistoryOverlay.classList.remove('show');
 }

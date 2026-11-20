@@ -1141,10 +1141,12 @@ function closeTableToHistory(tableId){
     by: (typeof authUser !== 'undefined' && authUser) ? authUser : null   // quién cerró/cobró esta mesa, para el turno de caja
   };
   try{ Object.defineProperty(entry, '_facturaDevolver', { value: facturaT.devolver, enumerable: false }); }catch(e){}
-  // Si quedó debiendo UNA sola persona con nombre, la cuenta también queda a su nombre (lo leen Historial y los avisos).
+  // Si TODA la deuda quedó a nombre de UNA sola persona, la cuenta también queda a su nombre (lo leen Historial y los
+  // avisos). Si además quedó un saldo sin nombre, no: ese saldo no es de ella.
   if(debt > 0 && !entry.person){
-    const nombres = [...new Set(paymentsDetail.filter(p => p.method === 'debe' && p.note && !/^(saldo sin registrar al cerrar|queda debiendo)$/i.test(String(p.note).trim())).map(p => String(p.note).trim()))];
-    if(nombres.length === 1) entry.person = nombres[0];
+    const debe = paymentsDetail.filter(p => p.method === 'debe' && (Number(p.amount) || 0) > 0), generico = n => !String(n || '').trim() || /^(saldo sin registrar al cerrar|queda debiendo)$/i.test(String(n).trim());
+    const nombres = [...new Set(debe.filter(p => !generico(p.note)).map(p => String(p.note).trim()))];
+    if(nombres.length === 1 && !debe.some(p => generico(p.note))) entry.person = nombres[0];
   }
   data.history.unshift(entry);
   if(!(entry.debt > 0)) try{ window.mesoraCelebrar && window.mesoraCelebrar(['💰', '✨', '🎉']); }catch(e){}

@@ -189,41 +189,54 @@
   }
   const lbCanon = n => lbPersonasLib().find(x => lbNorm(x) === lbNorm(n)) || n;
   // Una cuenta que quedó debiendo SIN nombre (ni en el pago, ni de la persona, ni de la mesa): antes todas se juntaban en
-  // una sola «Sin nombre». Ahora cada una sale aparte, con su mesa y su día, y se le puede poner el nombre (✏️).
+  // una sola «Sin nombre». Ahora cada una sale aparte, con su mesa, su día y su hora, y se le puede poner el nombre (✏️).
   const LB_SIN = '❓ ';
   function lbSinNombre(h){
-    let d = ''; try{ d = new Date(h.date).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }); }catch(e){}
+    let d = ''; try{ const f = new Date(h.date); d = f.toLocaleString('es-CO', Object.assign({ day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }, f.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {})); }catch(e){}
     let m = ''; try{ m = h.table ? tableLabel(h.table) : ''; }catch(e){ m = h.table ? 'Mesa ' + h.table : ''; }
     return LB_SIN + 'Sin nombre · ' + (m || 'Venta') + (d ? ' · ' + d : '');
   }
-  function lbQuienMesa(h){
-    const q = lbNombresDebe(h);
-    const n = (q[0] && q[0].n) || String(h.person || '').trim() || String(h.tableName || '').trim();
+  // Quién queda con lo que no tiene nombre: la persona de la cuenta (cierre de una persona), el nombre de la mesa, o «sin nombre».
+  function lbResto(h){
+    const n = String(h.person || '').trim() || String(h.tableName || '').trim();
     return n ? lbCanon(n) : lbSinNombre(h);
   }
-  /* Lo que debe hoy cada quien en esa cuenta. Con un solo nombre (lo de siempre): toda la deuda es de esa persona. Con
-     varios (dos personas de la mesa quedaron debiendo): a cada una lo suyo, menos lo que ella abonó en la libreta; lo que
-     no tiene nombre queda aparte. Nunca suma más que la deuda de la cuenta. */
+  function lbQuienMesa(h){ const q = lbNombresDebe(h); return q[0] ? lbCanon(q[0].n) : lbResto(h); }
+  const lbAbonoDe = (h, n) => (h.abonosLib || []).filter(a => a && a.p && lbNorm(a.p) === lbNorm(n)).reduce((s, a) => s + (Number(a.m) || 0), 0);
+  const lbAbonoSinQuien = h => (h.abonosLib || []).filter(a => a && !a.p).reduce((s, a) => s + (Number(a.m) || 0), 0);
+  // Lo que quedó debiendo sin nombre en esa cuenta, al principio (para su historial).
+  const lbRestoOrig = h => Math.max(0, lbDeudaOriginal(h) - lbNombresDebe(h).reduce((s, x) => s + x.m, 0));
+  /* Lo que debe hoy cada quien en esa cuenta. A cada nombre, lo que quedó debiendo con su nombre menos lo que abonó en la
+     libreta (los abonos viejos, sin «de quién», eran de la primera: así los contaba la libreta antes). Lo que no tiene
+     nombre («Saldo sin registrar al cerrar») queda aparte (lbResto): ya no se le carga a la persona que sí tenía nombre.
+     Nunca suma más que la deuda de la cuenta. */
   function lbPartes(h){
     const debt = Math.max(0, Number(h.debt) || 0); if(!(debt > 0)) return [];
     const ns = lbNombresDebe(h);
-    if(ns.length < 2) return [{ n: lbQuienMesa(h), m: debt, orig: lbDeudaOriginal(h) }];
-    let queda = debt; const out = [];
-    ns.forEach(x => {
-      const ab = (h.abonosLib || []).filter(a => a && a.p && lbNorm(a.p) === lbNorm(x.n)).reduce((s, a) => s + (Number(a.m) || 0), 0);
+    if(!ns.length) return [{ n: lbResto(h), m: debt, orig: lbDeudaOriginal(h) }];
+    let queda = debt; const out = [], sinQuien = lbAbonoSinQuien(h);
+    ns.forEach((x, i) => {
+      const ab = lbAbonoDe(h, x.n) + (i === 0 ? sinQuien : 0);
       const m = Math.min(Math.max(0, x.m - ab), queda); queda -= m;
       if(m > 0) out.push({ n: lbCanon(x.n), m, orig: x.m });
     });
-    if(queda > 0){ const n = String(h.person || '').trim() || String(h.tableName || '').trim(); out.push({ n: n ? lbCanon(n) : lbSinNombre(h), m: queda, orig: queda }); }
+    if(queda > 0){ const n = lbResto(h), ya = out.find(x => lbNorm(x.n) === lbNorm(n)); if(ya) ya.m += queda; else out.push({ n, m: queda, orig: lbRestoOrig(h) }); }
     return out;
   }
   const lbParteDe = (h, p) => lbPartes(h).filter(x => lbNorm(x.n) === lbNorm(p)).reduce((s, x) => s + x.m, 0);
   // Todos los nombres de una cuenta que quedó debiendo (también las ya pagadas, para su historial).
   function lbNombresDe(h){
     const ns = lbNombresDebe(h);
-    if(ns.length < 2) return [lbQuienMesa(h)];
-    const o = ns.map(x => lbCanon(x.n)), resto = lbPartes(h).map(x => x.n).filter(n => !o.some(y => lbNorm(y) === lbNorm(n)));
-    return o.concat(resto);
+    if(!ns.length) return [lbResto(h)];
+    const o = ns.map(x => lbCanon(x.n)), r = lbResto(h);
+    return lbRestoOrig(h) > 0 && !o.some(y => lbNorm(y) === lbNorm(r)) ? o.concat([r]) : o;
+  }
+  // Cuánto quedó debiendo p en esa cuenta (al principio).
+  function lbOrigDe(h, p){
+    const ns = lbNombresDebe(h);
+    if(!ns.length) return lbDeudaOriginal(h);
+    const x = ns.find(y => lbNorm(y.n) === lbNorm(p)), r = lbNorm(lbResto(h)) === lbNorm(p) ? lbRestoOrig(h) : 0;
+    return (x ? x.m : 0) + r;
   }
   const lbPagoDespues = h => (h.payments || []).filter(x => /pag[oó] despu[eé]s/i.test(x.note || '')).reduce((s, x) => s + (x.amount || 0), 0);
   const lbAbonosMesa = h => (h.abonosLib || []).reduce((s, x) => s + x.m, 0);
@@ -241,8 +254,7 @@
     const ev = [];
     LB().movs.filter(m => m.persona === p).forEach(m => ev.push({ f: m.fecha, t: m.tipo === 'debe' ? '📕 Quedó debiendo' : m.tipo === 'abono' ? '✅ Pagó' : '👷 Le pagaste', m: m.monto, d: m.nota === 'pagó todo' ? 'todo' : '' }));
     lbHist().filter(h => lbDeudaOriginal(h) > 0 && lbNombresDe(h).some(n => lbNorm(n) === lbNorm(p))).forEach(h => {
-      const ns = lbNombresDebe(h), mio = ns.length >= 2 ? (ns.find(x => lbNorm(x.n) === lbNorm(p)) || {}).m : null;
-      ev.push({ f: h.date, t: '📕 Quedó debiendo', m: mio != null ? mio : lbDeudaOriginal(h), d: h.tableName || (i18nPut(espacioN()) + ' ' + h.table) });
+      ev.push({ f: h.date, t: '📕 Quedó debiendo', m: lbOrigDe(h, p), d: h.tableName || (i18nPut(espacioN()) + ' ' + h.table) });
       if(lbPagoDespues(h) > 0 && h.paidLater) ev.push({ f: h.paidLater, t: '✅ Pagó', m: lbPagoDespues(h), d: (h.tableName || 'Mesa') + ' · desde Historial' });
     });
     return ev.sort((a, b) => new Date(b.f) - new Date(a.f));

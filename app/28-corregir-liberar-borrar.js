@@ -158,12 +158,15 @@
         const metodoAntes = unPago ? pagos[0].method : null, metodo = unPago ? ov.querySelector('#vfMetodo').value : null;
         const fotoAntes = JSON.parse(JSON.stringify({ items: h.items || [], total: h.total, payments: h.payments || [], debt: h.debt || 0 }));
         const ventaAntes = JSON.parse(JSON.stringify(h));
+        // 📒 1.99.24: lo que ya se pagó de esa deuda por fuera de los pagos (abonos de la libreta, «pagó después» en Historial)
+        // sigue pagado. Antes la deuda se volvía a sacar solo de los pagos «debe» y lo ya abonado volvía a deberse.
+        const debeAntes = (h.payments || []).filter(p => p.method === 'debe').reduce((s, p) => s + (+p.amount || 0), 0), yaPagado = Math.max(0, debeAntes - (+h.debt || 0));
         its.forEach((it, i) => stock(it.name, (+it.qty || 0) - q[i]));
         h.items = its.map((it, i) => Object.assign(it, { qty: q[i] })).filter(it => it.qty > 0);
         h.total = nuevo;
         if(unPago){ pagos[0].amount = nuevo; pagos[0].method = metodo; }
         else if(pagos.length){ const dif = nuevo - totAntes, last = pagos[pagos.length - 1]; last.amount = Math.max(0, (+last.amount || 0) + dif); }
-        h.debt = pagos.filter(p => p.method === 'debe').reduce((s, p) => s + (+p.amount || 0), 0);
+        h.debt = Math.max(0, pagos.filter(p => p.method === 'debe').reduce((s, p) => s + (+p.amount || 0), 0) - yaPagado);
         h.corregida = { t: Date.now(), por: typeof authUser !== 'undefined' ? authUser : null };
         // 1.99.1: cómo estaba antes de cada corrección queda en la misma venta (se ve en su detalle).
         h.correcciones = (Array.isArray(h.correcciones) ? h.correcciones : []).concat([{ t: h.corregida.t, por: h.corregida.por, como, antes: fotoAntes }]);
