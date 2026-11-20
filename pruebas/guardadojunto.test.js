@@ -2,7 +2,7 @@
 // también se le avisa a la nube. Antes ese segundo guardado se juntaba con el primero sin avisar: si la nube ya estaba
 // subiendo lo primero, lo segundo quedaba como «ya subido» y la siguiente bajada de otro equipo lo borraba (pasó con un
 // pago registrado en la Mesa 4 en pagosequipos, 2 de cada 4 veces con el equipo lento).
-//  1. Dos guardados seguidos → dos avisos a la nube.
+//  1. Dos guardados seguidos → dos avisos a la nube (el segundo al escribirse); 50 seguidos no avisan 50 veces.
 //  2. Los dos cambios quedan guardados en el equipo.
 //  3. Mientras se ponen los datos de otro equipo, el segundo guardado también queda anotado para subirse después.
 'use strict';
@@ -25,17 +25,18 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
       data.pagos = data.pagos || {}; data.pagos.prueba = 1; saveData();          // 1.º: lo de pagos
       data.tables[1] = data.tables[1] || { items: [], people: [] };
       data.tables[1].payments = [{ amount: 27300, method: 'transferencia', note: 'prueba' }]; saveData();   // 2.º, enseguida: el pago en la mesa
-      const n = avisos.length;
+      for(let i = 0; i < 50; i++){ data.pagos.prueba = 100 + i; saveData(); }   // muchos seguidos: no avisan uno por uno
       await guardadoAhora();
+      const n = avisos.length;
       const g = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
       // 3. mientras se ponen los datos de otro equipo
       window.__nubeCambioEnAplicar = false; window.__nubeAplicando = true;
       data.pagos.prueba = 2; saveData(); data.pagos.prueba = 3; saveData();
-      const anotado = window.__nubeCambioEnAplicar === true; window.__nubeAplicando = false; window.__nubeCambioEnAplicar = false;
       await guardadoAhora();
-      return { n, guardado: !!(g && g.pagos && g.pagos.prueba === 1 && g.tables[1].payments.length === 1), anotado, avisos3: avisos.length };
+      const anotado = window.__nubeCambioEnAplicar === true; window.__nubeAplicando = false; window.__nubeCambioEnAplicar = false;
+      return { n, guardado: !!(g && g.pagos && g.pagos.prueba === 149 && g.tables[1].payments.length === 1), anotado, avisos3: avisos.length };
     });
-    chk('1. Dos guardados seguidos le avisan dos veces a la nube (el segundo no se pierde)', r.n === 2, r);
+    chk('1. Dos guardados seguidos le avisan dos veces a la nube (el segundo no se pierde), y 50 más seguidos no avisan 50 veces', r.n === 2, r);
     chk('2. Los dos cambios quedan guardados en el equipo', r.guardado, r);
     chk('3. Mientras llegan datos de otro equipo, el cambio queda anotado para subirse (sin avisar en medio)', r.anotado && r.avisos3 === 2, r);
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.stack || e)); }

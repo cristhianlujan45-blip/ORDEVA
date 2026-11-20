@@ -479,13 +479,15 @@ function saveData(){
   // 💜 1.99.23: también cuando este guardado se junta con uno que todavía no se escribía (menos de 120 ms). Antes ahí se
   // devolvía sin avisar: si la nube ya estaba subiendo lo anterior, lo nuevo (un pago registrado en una mesa) quedaba
   // como «subido», y la siguiente bajada de otro equipo lo borraba (prueba pagosequipos 7, 2 de 4 veces con el equipo lento).
+  // Se avisa UNA vez, al escribir lo pendiente (guardadoAhora): muchos guardados seguidos no avisan uno por uno. Una
+  // bajada escribe lo pendiente antes de mirar si hay algo por subir, así que no alcanza a pisarlo.
   const avisarNube = () => {
     if(key !== STORAGE_KEY) return;
     if(!window.__nubeAplicando) equipoGuardar();          // 1.81.4: lo que se cambió aquí queda como ajuste de este equipo
     if(window.__nubeAplicando) window.__nubeCambioEnAplicar = true;   // se avisa apenas terminen de ponerse los datos del otro equipo
     else { try{ window.ventoNube && window.ventoNube.cambio(); }catch(e){} }
   };
-  if(guardadoPend && guardadoPend.key === key && guardadoPend.obj === obj){ avisarNube(); return guardadoPend.p; }
+  if(guardadoPend && guardadoPend.key === key && guardadoPend.obj === obj){ guardadoPend.reavisar = avisarNube; return guardadoPend.p; }
   if(guardadoPend) guardadoAhora();                       // otra sede u otros datos: lo pendiente se guarda ya, con su llave
   let listo; const p = new Promise(r => { listo = r; });
   const g = guardadoPend = { key, obj, p, listo };
@@ -498,6 +500,7 @@ function saveData(){
 function guardadoAhora(){
   const g = guardadoPend; if(!g) return Promise.resolve();
   guardadoPend = null; clearTimeout(g.t);
+  if(g.reavisar){ try{ g.reavisar(); }catch(e){} }        // 1.99.23: hubo más cambios después del aviso: se avisa otra vez
   // 1.68.1: mientras se ponen los datos de otro equipo no se escribe nada: antes se podía guardar la copia VIEJA encima de
   // lo que acababa de llegar y el toque se perdía. Lo tocado se junta al terminar (vento-nube: aplicarProtegido).
   if(window.__nubeAplicando && g.key === STORAGE_KEY){ window.__nubeCambioEnAplicar = true; g.listo(true); return Promise.resolve(true); }
