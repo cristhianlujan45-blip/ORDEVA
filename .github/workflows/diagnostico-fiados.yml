@@ -79,6 +79,16 @@ jobs:
               from datos_cambios c
               where c.negocio_id = (select id from neg) and c.cambios ? 'libreta'
               order by c.version desc limit 120) x),
+            'que_se_cambia_24h', (select coalesce(json_agg(x order by x.veces desc), '[]') from (
+              -- Qué partes del negocio se guardaron en las últimas 24 h, cuántas veces y con qué rol (sin datos).
+              select k parte, count(*) veces,
+                coalesce((select r.rol from rol_de r where r.negocio_id = (select id from neg) and r.usuario_id = c.creado_por), 'otro') por_rol,
+                (min(c.creado_en) at time zone 'America/Bogota')::text primero, (max(c.creado_en) at time zone 'America/Bogota')::text ultimo
+              from (select cc.* from datos_cambios cc where cc.negocio_id = (select id from neg) and cc.creado_en > now() - interval '24 hours') c,
+                   jsonb_object_keys(c.cambios) k
+              group by k, c.creado_por order by 2 desc limit 40) x),
+            'cambios_retenidos', (select json_build_object('cuantos', count(*), 'desde', (min(creado_en) at time zone 'America/Bogota')::text, 'v_min', min(version), 'v_max', max(version))
+              from datos_cambios where negocio_id = (select id from neg)),
             'cambios_historial_deudas', (select coalesce(json_agg(x order by x.version desc), '[]') from (
               -- Cambios del historial que tocaron cuentas con deuda: cuántas quedaron con deuda en lo cambiado, y cuántas se quitaron.
               select c.version, (c.creado_en at time zone 'America/Bogota')::text cuando,
