@@ -1095,8 +1095,16 @@ function closeTableToHistory(tableId){
   if(!t || !t.items || !t.items.length) return null;
   const total = tableTotal(tableId);
   const balance = tableBalance(tableId);
+  // 📒 1.99.24: el fiado de una persona de la mesa («Juan queda debiendo», desde su cuenta) se guarda CON SU NOMBRE. Antes
+  // el pago llevaba solo el número de la persona, que se borra al cerrar la mesa: en la libreta salía «Sin nombre» o el
+  // nombre de la mesa, y si dos personas quedaban debiendo, todo se le cargaba a una.
+  const notaDe = p => {
+    const n = String(p.note || '').trim();
+    if(p.method === 'debe' && (!n || /^queda debiendo$/i.test(n)) && p.personId){ const q = personLookupName(t, p.personId); if(q && String(q).trim()) return String(q).trim(); }
+    return p.note || '';
+  };
   const paymentsDetail = (t.payments||[]).map(p=>({
-    note: p.note || '',
+    note: notaDe(p),
     amount: p.amount,
     method: p.method || 'efectivo',
     items: p.items || null,
@@ -1133,6 +1141,11 @@ function closeTableToHistory(tableId){
     by: (typeof authUser !== 'undefined' && authUser) ? authUser : null   // quién cerró/cobró esta mesa, para el turno de caja
   };
   try{ Object.defineProperty(entry, '_facturaDevolver', { value: facturaT.devolver, enumerable: false }); }catch(e){}
+  // Si quedó debiendo UNA sola persona con nombre, la cuenta también queda a su nombre (lo leen Historial y los avisos).
+  if(debt > 0 && !entry.person){
+    const nombres = [...new Set(paymentsDetail.filter(p => p.method === 'debe' && p.note && !/^(saldo sin registrar al cerrar|queda debiendo)$/i.test(String(p.note).trim())).map(p => String(p.note).trim()))];
+    if(nombres.length === 1) entry.person = nombres[0];
+  }
   data.history.unshift(entry);
   if(!(entry.debt > 0)) try{ window.mesoraCelebrar && window.mesoraCelebrar(['💰', '✨', '🎉']); }catch(e){}
   t.items = [];

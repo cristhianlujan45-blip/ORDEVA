@@ -174,28 +174,75 @@
      «Quedó debiendo», esa deuda aparece aquí con el nombre de quien debe. Un pago anotado
      en la libreta salda primero esas cuentas (la más vieja primero) y queda en su historial. */
   const lbHist = () => (typeof data !== 'undefined' && data && data.history) || [];
+  // 1.99.24: los nombres de quien quedó debiendo en una cuenta, con cuánto quedó cada uno (de las notas de los pagos «debe»).
+  // «Saldo sin registrar al cerrar» y «Queda debiendo» no son nombres.
+  const LB_GENERICO = /^(saldo sin registrar al cerrar|queda debiendo)$/i;
+  function lbNombresDebe(h){
+    const o = new Map();
+    (h.payments || []).forEach(x => {
+      if(!x || x.method !== 'debe') return;
+      const n = String(x.note || '').trim(); if(!n || LB_GENERICO.test(n)) return;
+      const k = lbNorm(n); if(!k) return;
+      const e = o.get(k) || { n, m: 0 }; e.m += Number(x.amount) || 0; o.set(k, e);
+    });
+    return [...o.values()];
+  }
+  const lbCanon = n => lbPersonasLib().find(x => lbNorm(x) === lbNorm(n)) || n;
+  // Una cuenta que quedó debiendo SIN nombre (ni en el pago, ni de la persona, ni de la mesa): antes todas se juntaban en
+  // una sola «Sin nombre». Ahora cada una sale aparte, con su mesa y su día, y se le puede poner el nombre (✏️).
+  const LB_SIN = '❓ ';
+  function lbSinNombre(h){
+    let d = ''; try{ d = new Date(h.date).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }); }catch(e){}
+    let m = ''; try{ m = h.table ? tableLabel(h.table) : ''; }catch(e){ m = h.table ? 'Mesa ' + h.table : ''; }
+    return LB_SIN + 'Sin nombre · ' + (m || 'Venta') + (d ? ' · ' + d : '');
+  }
   function lbQuienMesa(h){
-    const q = (h.payments || []).filter(x => x.method === 'debe' && x.note && x.note !== 'Saldo sin registrar al cerrar').map(x => x.note);
-    const n = q[0] || h.person || h.tableName || 'Sin nombre';
-    return lbPersonasLib().find(x => lbNorm(x) === lbNorm(n)) || n;
+    const q = lbNombresDebe(h);
+    const n = (q[0] && q[0].n) || String(h.person || '').trim() || String(h.tableName || '').trim();
+    return n ? lbCanon(n) : lbSinNombre(h);
+  }
+  /* Lo que debe hoy cada quien en esa cuenta. Con un solo nombre (lo de siempre): toda la deuda es de esa persona. Con
+     varios (dos personas de la mesa quedaron debiendo): a cada una lo suyo, menos lo que ella abonó en la libreta; lo que
+     no tiene nombre queda aparte. Nunca suma más que la deuda de la cuenta. */
+  function lbPartes(h){
+    const debt = Math.max(0, Number(h.debt) || 0); if(!(debt > 0)) return [];
+    const ns = lbNombresDebe(h);
+    if(ns.length < 2) return [{ n: lbQuienMesa(h), m: debt, orig: lbDeudaOriginal(h) }];
+    let queda = debt; const out = [];
+    ns.forEach(x => {
+      const ab = (h.abonosLib || []).filter(a => a && a.p && lbNorm(a.p) === lbNorm(x.n)).reduce((s, a) => s + (Number(a.m) || 0), 0);
+      const m = Math.min(Math.max(0, x.m - ab), queda); queda -= m;
+      if(m > 0) out.push({ n: lbCanon(x.n), m, orig: x.m });
+    });
+    if(queda > 0){ const n = String(h.person || '').trim() || String(h.tableName || '').trim(); out.push({ n: n ? lbCanon(n) : lbSinNombre(h), m: queda, orig: queda }); }
+    return out;
+  }
+  const lbParteDe = (h, p) => lbPartes(h).filter(x => lbNorm(x.n) === lbNorm(p)).reduce((s, x) => s + x.m, 0);
+  // Todos los nombres de una cuenta que quedó debiendo (también las ya pagadas, para su historial).
+  function lbNombresDe(h){
+    const ns = lbNombresDebe(h);
+    if(ns.length < 2) return [lbQuienMesa(h)];
+    const o = ns.map(x => lbCanon(x.n)), resto = lbPartes(h).map(x => x.n).filter(n => !o.some(y => lbNorm(y) === lbNorm(n)));
+    return o.concat(resto);
   }
   const lbPagoDespues = h => (h.payments || []).filter(x => /pag[oó] despu[eé]s/i.test(x.note || '')).reduce((s, x) => s + (x.amount || 0), 0);
   const lbAbonosMesa = h => (h.abonosLib || []).reduce((s, x) => s + x.m, 0);
   const lbDeudaOriginal = h => (h.debt || 0) + lbAbonosMesa(h) + lbPagoDespues(h);
   const lbFiadosMesa = () => lbHist().filter(h => lbDeudaOriginal(h) > 0 && ((h.debt || 0) > 0 || h.abonosLib || h.paidLater));
   function lbPersonasLib(){ return [...new Set(LB().movs.map(m => m.persona))]; }
-  function lbPersonas(){ return [...new Set(lbPersonasLib().concat(lbFiadosMesa().map(lbQuienMesa)))]; }
-  const lbMesasDe = p => lbHist().filter(h => (h.debt || 0) > 0 && lbNorm(lbQuienMesa(h)) === lbNorm(p));
+  function lbPersonas(){ return [...new Set(lbPersonasLib().concat(...lbFiadosMesa().map(lbNombresDe)))]; }
+  const lbMesasDe = p => lbHist().filter(h => (h.debt || 0) > 0 && lbParteDe(h, p) > 0);
   function lbSaldo(p){
     const lib = LB().movs.filter(m => m.persona === p).reduce((s, m) => s + (m.tipo === 'debe' ? m.monto : m.tipo === 'abono' ? -(m.monto - (m.aMesas || 0)) : 0), 0);
-    return lib + lbMesasDe(p).reduce((s, h) => s + (h.debt || 0), 0);
+    return lib + lbMesasDe(p).reduce((s, h) => s + lbParteDe(h, p), 0);
   }
   // Todo lo que pasó con una persona, en orden: cuándo quedó debiendo y cuándo pagó.
   function lbHistorial(p){
     const ev = [];
     LB().movs.filter(m => m.persona === p).forEach(m => ev.push({ f: m.fecha, t: m.tipo === 'debe' ? '📕 Quedó debiendo' : m.tipo === 'abono' ? '✅ Pagó' : '👷 Le pagaste', m: m.monto, d: m.nota === 'pagó todo' ? 'todo' : '' }));
-    lbHist().filter(h => lbNorm(lbQuienMesa(h)) === lbNorm(p) && lbDeudaOriginal(h) > 0).forEach(h => {
-      ev.push({ f: h.date, t: '📕 Quedó debiendo', m: lbDeudaOriginal(h), d: h.tableName || (i18nPut(espacioN()) + ' ' + h.table) });
+    lbHist().filter(h => lbDeudaOriginal(h) > 0 && lbNombresDe(h).some(n => lbNorm(n) === lbNorm(p))).forEach(h => {
+      const ns = lbNombresDebe(h), mio = ns.length >= 2 ? (ns.find(x => lbNorm(x.n) === lbNorm(p)) || {}).m : null;
+      ev.push({ f: h.date, t: '📕 Quedó debiendo', m: mio != null ? mio : lbDeudaOriginal(h), d: h.tableName || (i18nPut(espacioN()) + ' ' + h.table) });
       if(lbPagoDespues(h) > 0 && h.paidLater) ev.push({ f: h.paidLater, t: '✅ Pagó', m: lbPagoDespues(h), d: (h.tableName || 'Mesa') + ' · desde Historial' });
     });
     return ev.sort((a, b) => new Date(b.f) - new Date(a.f));
@@ -278,9 +325,10 @@
       let resto = m.monto; m.aplic = [];
       lbMesasDe(persona).sort((a, b) => new Date(a.date) - new Date(b.date)).forEach(h => {
         if(resto <= 0) return;
-        const toma = Math.min(resto, h.debt);
+        const toma = Math.min(resto, lbParteDe(h, persona), h.debt);   // 1.99.24: solo lo de esta persona (si en la cuenta deben varias)
+        if(!(toma > 0)) return;
         h.debt -= toma; resto -= toma;
-        h.abonosLib = (h.abonosLib || []).concat({ f: m.fecha, m: toma });
+        h.abonosLib = (h.abonosLib || []).concat({ f: m.fecha, m: toma, p: persona });
         if(h.debt <= 0){ h.debt = 0; h.paidLater = m.fecha; }
         m.aplic.push({ hid: h.id, m: toma });
       });
@@ -589,8 +637,15 @@
     ov.addEventListener('click', e => {
       const dp = e.target.closest('.lb-deudor');
       if(dp && !e.target.closest('button')){ lbAbrirPersona = lbAbrirPersona === dp.dataset.persona ? null : dp.dataset.persona; lbPintar(); return; }
+      const nb = e.target.closest('[data-nombrar]');
+      if(nb){ lbNombrar(nb.dataset.nombrar); return; }
       const pt = e.target.closest('[data-pagotodo]');
-      if(pt){ const r = lbEntender(pt.dataset.pagotodo + ' pagó todo'); if(r) lbResponder(r.texto); return; }
+      if(pt){
+        const quien = pt.dataset.pagotodo;
+        // Una cuenta sin nombre («❓ Sin nombre · Mesa 3 · 18 nov») no pasa por las palabras: se salda directo.
+        if(quien.indexOf(LB_SIN) === 0){ const debia = lbSaldo(quien); if(debia > 0){ lbAgregar('abono', quien, debia, 'pagó todo'); lbResponder('✅ Listo: ' + quien.replace(LB_SIN, '') + ' quedó a paz y salvo (' + plata(debia) + ').'); } return; }
+        const r = lbEntender(quien + ' pagó todo'); if(r) lbResponder(r.texto); return;
+      }
       const del = e.target.closest('[data-borrar]');
       if(del){
         const idB = del.dataset.borrar;
@@ -602,6 +657,23 @@
     });
     $l('lbMic').onclick = lbEscuchar;
   }
+  // ✏️ 1.99.24: ponerle el nombre a una cuenta que quedó debiendo sin nombre. Se guarda en la cuenta (persona y pagos «debe»
+  // sin nombre), así sale con su nombre en la libreta, en Historial y en todos los equipos.
+  async function lbNombrar(etq){
+    const hs = lbHist().filter(h => (h.debt || 0) > 0 && lbPartes(h).some(x => x.n === etq));
+    if(!hs.length) return;
+    const n0 = typeof showPrompt === 'function' ? await showPrompt({ icon: '📒', title: '¿Quién quedó debiendo?', message: etq.replace(LB_SIN, '') + ' · ' + plata(hs.reduce((s, h) => s + lbParteDe(h, etq), 0)), placeholder: 'Nombre', confirmText: 'Guardar' }) : window.prompt('¿Quién quedó debiendo?');
+    const n = String(n0 || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+    if(!n) return;
+    const nombre = lbPersonas().find(x => lbNorm(x) === lbNorm(n)) || n;
+    hs.forEach(h => {
+      if(!String(h.person || '').trim()) h.person = nombre;
+      (h.payments || []).forEach(x => { if(x && x.method === 'debe' && (!String(x.note || '').trim() || LB_GENERICO.test(String(x.note).trim()))) x.note = nombre; });
+    });
+    saveData(); lbAbrirPersona = nombre; lbPintar();
+    try{ typeof renderHistorial === 'function' && renderHistorial(); }catch(e){}
+    lbResponder('📒 Listo: esa cuenta quedó a nombre de ' + nombre + '.');
+  }
   function lbPintar(){
     if(!$l('libretaOverlay') || !data) return;
     const d = lbDeudores();
@@ -609,7 +681,8 @@
     $l('lbDeben').innerHTML = d.length ? d.map(([p, s]) => {
       const mesas = lbMesasDe(p).length;
       const abierto = lbAbrirPersona === p;
-      return '<div class="lb-fila lb-deudor" data-persona="' + esc2(p) + '"><span>' + esc2(p) + '<small>' + (mesas ? '🍽️ ' + mesas + (mesas === 1 ? ' cuenta de mesa' : ' cuentas de mesa') + ' · ' : '') + 'toca para ver su historial</small></span><b>' + plata(s) + '</b><button type="button" class="btn-ghost" data-pagotodo="' + esc2(p) + '">✅ Pagó todo</button></div>' +
+      const sinNombre = p.indexOf(LB_SIN) === 0;
+      return '<div class="lb-fila lb-deudor" data-persona="' + esc2(p) + '"><span>' + esc2(p) + (sinNombre ? ' <button type="button" class="btn-ghost lb-nombrar" data-nombrar="' + esc2(p) + '">✏️ ¿Quién es?</button>' : '') + '<small>' + (mesas ? '🍽️ ' + mesas + (mesas === 1 ? ' cuenta de mesa' : ' cuentas de mesa') + ' · ' : '') + 'toca para ver su historial</small></span><b>' + plata(s) + '</b><button type="button" class="btn-ghost" data-pagotodo="' + esc2(p) + '">✅ Pagó todo</button></div>' +
         (abierto ? '<div class="lb-hist">' + lbHistorial(p).map(e => '<div class="lb-ev"><span>' + e.t + (e.d && e.d !== 'todo' ? ' · ' + esc2(e.d) : e.d === 'todo' ? ' (todo)' : '') + '<small>' + new Date(e.f).toLocaleString('es-CO', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) + '</small></span><b>' + plata(e.m) + '</b></div>').join('') + '</div>' : '');
     }).join('') : '<div class="lb-vacio">Nadie te debe nada 🎉</div>';
     const e = lbEmpleadosMes();

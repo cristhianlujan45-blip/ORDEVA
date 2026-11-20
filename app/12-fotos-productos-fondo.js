@@ -1332,12 +1332,22 @@ async function licVerificar(texto){
 }
 const LICS_KEY = 'vento-licencias', NEGOCIO_KEY = 'vento-negocio';
 // Código del NEGOCIO: el mismo en todos los celulares del negocio (viaja con los datos). La suscripción se firma para él.
+/* 1.99.24: manda el código que viaja con los datos (data.negocioCodigo), no el guardado en el celular. Antes mandaba el del
+   celular: dos celulares con códigos distintos (uno que estuvo en otro negocio) se lo cambiaban entre sí sin parar —
+   274 subidas en 2 horas en un negocio real— y cada vuelta era una subida y una mezcla más entre los equipos.
+   Si una suscripción ya se activó para uno de los dos códigos, se queda ese (para no perderla). */
 function codigoNegocio(){
-  let c = ''; try{ c = localStorage.getItem(NEGOCIO_KEY) || ''; }catch(e){}
-  if(!c && typeof data !== 'undefined' && data && data.negocioCodigo) c = data.negocioCodigo;
+  let ls = ''; try{ ls = localStorage.getItem(NEGOCIO_KEY) || ''; }catch(e){}
+  const dc = (typeof data !== 'undefined' && data && typeof data.negocioCodigo === 'string') ? data.negocioCodigo : '';
+  let c = dc || ls;
+  if(dc && ls && dc !== ls){
+    const firmadas = new Set();
+    try{ licRaws().forEach(raw => { try{ const m = String(raw).split('.'); const p = JSON.parse(new TextDecoder().decode(licB64(m[0]))); if(p && p.d) firmadas.add(p.d); }catch(e){} }); }catch(e){}
+    c = firmadas.has(dc) || !firmadas.has(ls) ? dc : ls;
+  }
   if(!c){ const a = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; c = Array.from(crypto.getRandomValues(new Uint8Array(8)), b => a[b % a.length]).join(''); c = c.slice(0, 4) + '-' + c.slice(4); }
-  try{ localStorage.setItem(NEGOCIO_KEY, c); }catch(e){}
-  if(typeof data !== 'undefined' && data && data.negocioCodigo !== c){ data.negocioCodigo = c; try{ saveData(); }catch(e){} }
+  if(ls !== c) try{ localStorage.setItem(NEGOCIO_KEY, c); }catch(e){}
+  if(typeof data !== 'undefined' && data && dc !== c){ data.negocioCodigo = c; try{ saveData(); }catch(e){} }
   return c;
 }
 function licRaws(){
