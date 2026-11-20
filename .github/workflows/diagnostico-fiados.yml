@@ -64,6 +64,15 @@ jobs:
                     'con_abonos', count(*) filter (where h->'abonosLib' is not null),
                     'pagadas_despues', count(*) filter (where h->'paidLater' is not null))
                    from jsonb_array_elements(case when jsonb_typeof(dd.j->'history') = 'array' then dd.j->'history' else '[]'::jsonb end) h) fiados_mesas,
+                -- De las cuentas que deben hoy: con cuántos nombres distintos quedó el fiado (sin mostrar los nombres).
+                (select json_build_object(
+                    'sin_nombre', count(*) filter (where n = 0), 'un_nombre', count(*) filter (where n = 1), 'varios_nombres', count(*) filter (where n > 1),
+                    'con_person', count(*) filter (where tiene_person), 'con_nombre_de_mesa', count(*) filter (where tiene_mesa))
+                   from (select (select count(distinct lower(trim(p->>'note'))) from jsonb_array_elements(case when jsonb_typeof(h->'payments') = 'array' then h->'payments' else '[]'::jsonb end) p
+                                  where p->>'method' = 'debe' and coalesce(trim(p->>'note'), '') not in ('', 'Saldo sin registrar al cerrar', 'Queda debiendo')) n,
+                                coalesce(trim(h->>'person'), '') <> '' tiene_person, coalesce(trim(h->>'tableName'), '') <> '' tiene_mesa
+                         from jsonb_array_elements(case when jsonb_typeof(dd.j->'history') = 'array' then dd.j->'history' else '[]'::jsonb end) h
+                         where (case when jsonb_typeof(h->'debt') = 'number' then (h->>'debt')::numeric else 0 end) > 0) q) nombres_fiados,
                 (select count(*) from jsonb_object_keys(case when jsonb_typeof(dd.j->'tables') = 'object' then dd.j->'tables' else '{}'::jsonb end)) mesas
               from docs dd) x),
             'cambios_libreta', (select coalesce(json_agg(x order by x.version desc), '[]') from (
