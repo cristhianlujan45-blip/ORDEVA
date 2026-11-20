@@ -1,0 +1,104 @@
+# ORDEVA · 📒 Diagnóstico de los fiados de UN negocio (SOLO LECTURA, se corre a mano).
+# Para cuando un dueño dice «los fiados / las personas que me deben no quedan guardados». Responde, sin nombres:
+#   • hoy y en cada respaldo de la nube: cuántos apuntes tiene la libreta (por tipo), cuántas personas, cuánto suman,
+#     cuántas cuentas del historial quedaron debiendo y cuánto, y apuntes dañados (sin id, id repetido, sin persona/valor);
+#   • los últimos cambios guardados que tocaron la libreta: cuándo, quién (por rol), y cuántos apuntes quedaron.
+# El negocio se pasa por los primeros 8 caracteres de su id. No cambia nada (una sola consulta select).
+name: Diagnóstico de fiados de un negocio
+
+on:
+  workflow_dispatch:
+    inputs:
+      negocio:
+        description: 'primeros 8 caracteres del id del negocio'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostico:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Consultar (solo lectura)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          NEGOCIO: ${{ github.event.inputs.negocio }}
+        run: |
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ] || [ -z "$PROJECT_REF" ]; then echo "Faltan los secretos"; exit 1; fi
+          if ! printf '%s' "$NEGOCIO" | grep -Eq '^[0-9a-f]{8}$'; then echo "negocio: 8 letras/números del id"; exit 1; fi
+          cat > /tmp/q.sql <<'SQL'
+          with neg as (select id from negocios where left(id::text, 8) = '__NEG__' limit 1),
+          rol_de as (select negocio_id, usuario_id, rol from miembros),
+          docs as (
+            select 'hoy' origen, d.actualizado_en cuando, d.version, d.datos j from datos_negocio d where d.negocio_id = (select id from neg)
+            union all
+            select 'respaldo', r.creado_en, r.version, r.datos from respaldos r where r.negocio_id = (select id from neg)
+          )
+          select json_build_object(
+            'ahora_bogota', (now() at time zone 'America/Bogota')::text,
+            'existe', (select count(*) from neg),
+            'copias', (select coalesce(json_agg(x order by x.cuando desc), '[]') from (
+              select dd.origen, (dd.cuando at time zone 'America/Bogota')::text cuando, dd.version,
+                jsonb_typeof(dd.j->'libreta') libreta_tipo,
+                (select count(*) from jsonb_array_elements(case when jsonb_typeof(dd.j->'libreta'->'movs') = 'array' then dd.j->'libreta'->'movs' else '[]'::jsonb end)) apuntes,
+                (select json_object_agg(coalesce(t, '¿?'), c) from (select m->>'tipo' t, count(*) c from jsonb_array_elements(case when jsonb_typeof(dd.j->'libreta'->'movs') = 'array' then dd.j->'libreta'->'movs' else '[]'::jsonb end) m group by 1) q) por_tipo,
+                (select count(distinct lower(trim(m->>'persona'))) from jsonb_array_elements(case when jsonb_typeof(dd.j->'libreta'->'movs') = 'array' then dd.j->'libreta'->'movs' else '[]'::jsonb end) m) personas,
+                (select coalesce(sum(case when jsonb_typeof(m->'monto') <> 'number' then 0 when m->>'tipo' = 'debe' then (m->>'monto')::numeric when m->>'tipo' = 'abono' then -(m->>'monto')::numeric else 0 end), 0)
+                   from jsonb_array_elements(case when jsonb_typeof(dd.j->'libreta'->'movs') = 'array' then dd.j->'libreta'->'movs' else '[]'::jsonb end) m) saldo_libreta,
+                (select json_build_object(
+                    'sin_id', count(*) filter (where m->>'id' is null),
+                    'id_repetido', count(*) filter (where m->>'id' is not null) - count(distinct m->>'id'),
+                    'sin_persona', count(*) filter (where coalesce(trim(m->>'persona'), '') = ''),
+                    'sin_valor', count(*) filter (where jsonb_typeof(m->'monto') is distinct from 'number'),
+                    'sin_fecha', count(*) filter (where m->>'fecha' is null))
+                   from jsonb_array_elements(case when jsonb_typeof(dd.j->'libreta'->'movs') = 'array' then dd.j->'libreta'->'movs' else '[]'::jsonb end) m) danados,
+                (select count(*) from jsonb_array_elements(case when jsonb_typeof(dd.j->'history') = 'array' then dd.j->'history' else '[]'::jsonb end)) ventas,
+                (select json_build_object(
+                    'deben', count(*) filter (where (case when jsonb_typeof(h->'debt') = 'number' then (h->>'debt')::numeric else 0 end) > 0),
+                    'suman', coalesce(sum((case when jsonb_typeof(h->'debt') = 'number' then (h->>'debt')::numeric else 0 end)) filter (where (case when jsonb_typeof(h->'debt') = 'number' then (h->>'debt')::numeric else 0 end) > 0), 0),
+                    'con_pago_debe', count(*) filter (where exists (select 1 from jsonb_array_elements(case when jsonb_typeof(h->'payments') = 'array' then h->'payments' else '[]'::jsonb end) p where p->>'method' = 'debe')),
+                    'debe_sin_deuda', count(*) filter (where exists (select 1 from jsonb_array_elements(case when jsonb_typeof(h->'payments') = 'array' then h->'payments' else '[]'::jsonb end) p where p->>'method' = 'debe')
+                                                       and not ((case when jsonb_typeof(h->'debt') = 'number' then (h->>'debt')::numeric else 0 end) > 0) and h->'paidLater' is null and h->'abonosLib' is null),
+                    'con_abonos', count(*) filter (where h->'abonosLib' is not null),
+                    'pagadas_despues', count(*) filter (where h->'paidLater' is not null))
+                   from jsonb_array_elements(case when jsonb_typeof(dd.j->'history') = 'array' then dd.j->'history' else '[]'::jsonb end) h) fiados_mesas,
+                (select count(*) from jsonb_object_keys(case when jsonb_typeof(dd.j->'tables') = 'object' then dd.j->'tables' else '{}'::jsonb end)) mesas
+              from docs dd) x),
+            'cambios_libreta', (select coalesce(json_agg(x order by x.version desc), '[]') from (
+              select c.version, (c.creado_en at time zone 'America/Bogota')::text cuando,
+                coalesce((select r.rol from rol_de r where r.negocio_id = c.negocio_id and r.usuario_id = c.creado_por), case when c.creado_por is null then null else 'otro' end) por_rol,
+                case when c.cambios->'libreta' ? 'x' then 'borrada'
+                     when c.cambios->'libreta' ? 'v' then 'reemplazada'
+                     when c.cambios->'libreta' ? 'o' then 'partes:' || (select string_agg(k, ',') from jsonb_object_keys(c.cambios->'libreta'->'o') k)
+                     else 'otro' end como,
+                case when jsonb_typeof(c.cambios->'libreta'->'v'->'movs') = 'array' then jsonb_array_length(c.cambios->'libreta'->'v'->'movs')
+                     when jsonb_typeof(c.cambios->'libreta'->'o'->'movs'->'v') = 'array' then jsonb_array_length(c.cambios->'libreta'->'o'->'movs'->'v')
+                     else null end apuntes_quedaron
+              from datos_cambios c
+              where c.negocio_id = (select id from neg) and c.cambios ? 'libreta'
+              order by c.version desc limit 120) x),
+            'cambios_historial_deudas', (select coalesce(json_agg(x order by x.version desc), '[]') from (
+              -- Cambios del historial que tocaron cuentas con deuda: cuántas quedaron con deuda en lo cambiado, y cuántas se quitaron.
+              select c.version, (c.creado_en at time zone 'America/Bogota')::text cuando,
+                coalesce((select r.rol from rol_de r where r.negocio_id = c.negocio_id and r.usuario_id = c.creado_por), case when c.creado_por is null then null else 'otro' end) por_rol,
+                case when c.cambios->'history' ? 'v' then 'reemplazado' when c.cambios->'history' ? 'l' then 'lista' else 'otro' end como,
+                jsonb_array_length(coalesce(c.cambios->'history'->'l'->'del', '[]'::jsonb)) quitadas,
+                (select count(*) from jsonb_array_elements(coalesce(c.cambios->'history'->'l'->'set', '[]'::jsonb) || coalesce(c.cambios->'history'->'l'->'pre', '[]'::jsonb)) h
+                   where exists (select 1 from jsonb_array_elements(case when jsonb_typeof(h->'payments') = 'array' then h->'payments' else '[]'::jsonb end) p where p->>'method' = 'debe')) con_fiado,
+                (select count(*) from jsonb_array_elements(coalesce(c.cambios->'history'->'l'->'set', '[]'::jsonb) || coalesce(c.cambios->'history'->'l'->'pre', '[]'::jsonb)) h
+                   where (case when jsonb_typeof(h->'debt') = 'number' then (h->>'debt')::numeric else 0 end) > 0) con_deuda
+              from datos_cambios c
+              where c.negocio_id = (select id from neg) and c.cambios ? 'history'
+                and (c.cambios->'history' ? 'v' or jsonb_array_length(coalesce(c.cambios->'history'->'l'->'del', '[]'::jsonb)) > 0
+                     or exists (select 1 from jsonb_array_elements(coalesce(c.cambios->'history'->'l'->'set', '[]'::jsonb) || coalesce(c.cambios->'history'->'l'->'pre', '[]'::jsonb)) h
+                                where exists (select 1 from jsonb_array_elements(case when jsonb_typeof(h->'payments') = 'array' then h->'payments' else '[]'::jsonb end) p where p->>'method' = 'debe')))
+              order by c.version desc limit 120) x)
+          ) resultado;
+          SQL
+          sed -i "s/__NEG__/$NEGOCIO/" /tmp/q.sql
+          jq -n --rawfile q /tmp/q.sql '{query: $q}' > /tmp/q.json
+          curl -sS -X POST "https://api.supabase.com/v1/projects/$PROJECT_REF/database/query" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H 'Content-Type: application/json' --data @/tmp/q.json > /tmp/r.json
+          jq '.[0].resultado // .' /tmp/r.json
