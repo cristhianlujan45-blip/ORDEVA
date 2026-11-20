@@ -86,7 +86,9 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
     await p2.waitForTimeout(1200); await entrar(p2);
     chk('5. Al recibir el respaldo manda lo recibido («Tienda Nueva», 2 ventas), aunque el almacén grande tuviera otra cosa', await p2.evaluate(() => data.businessName === 'Tienda Nueva' && data.history.length === 2), await p2.evaluate(() => [data.businessName, data.history.length]));
     // ---------- 6. Una versión vieja de ORDEVA escribió en localStorage ----------
-    await p2.evaluate(() => { const d = JSON.parse(localStorage.getItem('bar-data')); d.businessName = 'Cambio de la versión vieja'; localStorage.setItem('bar-data', JSON.stringify(d)); });
+    // La versión vieja escribe con ORDEVA cerrada: primero se termina lo que esta tenía pendiente de guardar y ya no guarda más
+    // (antes, un guardado pendiente de milisegundos se escribía al recargar, encima de lo de la versión vieja: fallaba a veces).
+    await p2.evaluate(async () => { await guardadoAhora(); window.saveData = () => Promise.resolve(); const d = JSON.parse(localStorage.getItem('bar-data')); d.businessName = 'Cambio de la versión vieja'; localStorage.setItem('bar-data', JSON.stringify(d)); });
     await p2.reload({ waitUntil: 'load' }); await p2.waitForTimeout(1200); await entrar(p2);
     chk('6. Lo que escribió una versión vieja (solo en localStorage) no se pierde', await p2.evaluate(() => data.businessName === 'Cambio de la versión vieja'), await p2.evaluate(() => [data.businessName, (localStorage.getItem('bar-data') || '').slice(0, 120), Object.keys(localStorage).filter(k => /bar-data|almac/.test(k))]));
     // ---------- 7. Restablecer todo ----------

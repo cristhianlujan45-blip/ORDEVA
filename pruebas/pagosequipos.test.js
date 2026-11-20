@@ -36,6 +36,10 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
       await ctx.addInitScript(android => {
         try{ localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento-hola', '0'); }catch(e){}
         const A = window.__and = { cola: [], notifs: [], pagos: [], decir: [] };
+        // Diagnóstico (solo para saber qué pasó si falla la parte 7): qué hizo la nube y cuándo cambiaron los pagos de la Mesa 4.
+        window.__nubeTraza = []; window.__nubeTrazaQ = d => { try{ const t = d && d.tables && d.tables[4]; return t ? (t.payments || []).length : null; }catch(e){ return null; } };
+        window.__pagos4 = []; let ult4 = null;
+        setInterval(() => { try{ const n = window.__nubeTrazaQ(typeof data !== "undefined" ? data : null); if(n !== ult4){ window.__pagos4.push({ t: Date.now(), n }); ult4 = n; } if(window.__nubeTraza.length > 400) window.__nubeTraza.splice(0, 200); }catch(e){} }, 100);
         if(android) window.VentoAndroid = {
           pagosAvisos: () => {}, pagosAvisosEstado: () => JSON.stringify({ on: true, permiso: true, vivo: true }),
           pagosAvisosTomar: () => { const s = JSON.stringify(A.cola); A.cola = []; return s; },
@@ -180,6 +184,9 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     for(let i = 0; i < 6; i++){ await latir(TAB); await new Promise(r => setTimeout(r, 500)); }
     chk('7. El celular y la tablet NO abren «Llegó un pago» para esa mesa (se registra en el computador)', !(await modal7(CEL)) && !(await modal7(TAB)));
     chk('7. Queda registrado UNA sola vez en todos los equipos', await esperar(CEL.p, () => (data.tables[4].payments || []).length === 1, null, 15000) && await esperar(TAB.p, () => (data.tables[4].payments || []).length === 1, null, 15000), [await CEL.p.evaluate(() => data.tables[4].payments), await TAB.p.evaluate(() => data.tables[4].payments), await PC.p.evaluate(() => data.tables[4].payments)]);
+    if(!(await CEL.p.evaluate(() => (data.tables[4].payments || []).length === 1))){
+      for(const E of [PC, CEL, TAB]) console.log('   🔎 ' + E.nombre + ': pagos de la Mesa 4 ' + JSON.stringify(await E.p.evaluate(() => window.__pagos4)) + '\n      nube ' + JSON.stringify(await E.p.evaluate(() => window.__nubeTraza.slice(-40).map(x => [x.ev, x.t % 1e6, x.q, x.v, x.x && typeof x.x === 'object' ? x.x : x.x]))).slice(0, 3000));
+    }
 
     // ===== 6. El valor que entendió la app manda cuando el servidor no entiende el aviso =====
     const dev = await CEL.p.evaluate(() => JSON.parse(localStorage.getItem('vento_pagos_dev')));
