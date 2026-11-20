@@ -617,7 +617,9 @@ async function switchToSede(sede){
   STORAGE_KEY = sede.key;
   try{ localStorage.setItem(CURRENT_SEDE_KEY, sede.id); }catch(e){}
   currentTable = null;
-  document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show'));
+  // 1.99.24: las ventanas marcadas «data-sigue» (ej. «Pon tu propia contraseña») no son de los datos de la sede: se quedan.
+  // Antes se escondían y la persona ya no podía escribir su contraseña (prueba clavevarios en GitHub).
+  document.querySelectorAll('.overlay.show').forEach(o => { if(!o.hasAttribute('data-sigue')) o.classList.remove('show'); });
   await loadData();
   ['renderMesas', 'renderInventario', 'renderStats', 'renderCarta', 'renderHistorial', 'renderPromos'].forEach(fn => {
     try{ if(typeof window[fn] === 'function') window[fn](); }catch(e){}

@@ -34,7 +34,9 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const o = 
   const adentro = p => p.evaluate(() => { const o = document.getElementById('authOverlay'); return !!o && o.hidden && typeof authUser !== 'undefined' && !!authUser; });
   const dentro = p => esperar(p, () => { const o = document.getElementById('authOverlay'); return !!o && o.hidden && typeof authUser !== 'undefined' && !!authUser; }, null, 20000);
   const fuera = (p, ms) => esperar(p, () => { const o = document.getElementById('authOverlay'); return !!o && !o.hidden && !!document.getElementById('authUser'); }, null, ms || 20000);
-  const cerrarTodo = p => p.evaluate(() => document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')));
+  // 1.99.24: no cierra las que la persona no puede cerrar (data-sigue: «Pon tu propia contraseña»). Antes, si esa ventana
+  // salía antes de este paso (GitHub es más rápido para eso), la prueba misma la escondía y fallaba el punto 6.
+  const cerrarTodo = p => p.evaluate(() => document.querySelectorAll('.overlay.show').forEach(o => { if(!o.hasAttribute('data-sigue')) o.classList.remove('show'); }));
   const entrar = async (p, clave) => {
     await p.waitForSelector('#authUser', { timeout: 15000 }).catch(() => {});
     await p.click('#authTabs [data-tab="entrar"]').catch(() => {});
@@ -100,7 +102,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const o = 
       await sb.sql('select public.srv_marcar_cambiar_clave($1, true)', [uid]);
       await sb.sql('update public.perfiles set clave_puesta_en = now() where usuario_id = $1', [uid]);
     };
-    const ventana = p => esperar(p, () => !!document.getElementById('vcClaveOv'), null, 15000);
+    const ventana = p => esperar(p, () => { const o = document.getElementById('vcClaveOv'), c = document.getElementById('vcCl1'); return !!o && o.classList.contains('show') && !!c && !!c.offsetParent; }, null, 15000);   // a la vista, no solo en la página
     await ponerAdmin('admin789x');
     await revisar(B.p); await fuera(B.p, 20000);
     r = await entrar(B.p, 'admin789x');
