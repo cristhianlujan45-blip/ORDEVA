@@ -373,7 +373,10 @@
     if(canon){ const r = lbEntender(canon, soloSeguro); lbNombre.crudo = raw; if(r) return r; }
     if(/^(borra|quita|cancela|elimina)( lo| el)? (ultimo|ultima)$|^me equivoque$|^deshacer$/.test(t)){
       if(soloSeguro) return null;
-      const m = LB().movs.pop(); if(!m) return { texto: 'No hay nada que borrar.' };
+      // 1.99.24: el más reciente por fecha (con varios equipos, el último de la lista puede ser uno que anotó otro equipo antes).
+      const l = LB().movs; if(!l.length) return { texto: 'No hay nada que borrar.' };
+      let i = l.length - 1; l.forEach((x, j) => { if(x && String(x.fecha || '') > String(l[i].fecha || '')) i = j; });
+      const m = l.splice(i, 1)[0];
       lbQuitarMov(m); saveData(); lbPintar();
       return { texto: 'Listo, borré: ' + TIPOS[m.tipo].replace(/^\S+ /, '') + ' ' + m.persona + ', ' + plata(m.monto) + '.' };
     }
@@ -694,7 +697,7 @@
     const pv = lbPagadoProvMes();
     $l('lbTotProv').textContent = pv.length ? plata(pv.reduce((a, x) => a + x[1], 0)) : '';
     $l('lbProv').innerHTML = pv.length ? pv.map(([p, s]) => '<div class="lb-fila"><span>' + esc2(p) + '</span><b>' + plata(s) + '</b></div>').join('') : '<div class="lb-vacio">Todavía no hay pagos a proveedores este mes.</div>';
-    const ult = LB().movs.slice(-12).reverse();
+    const ult = LB().movs.slice().sort((a, b) => String((b && b.fecha) || '').localeCompare(String((a && a.fecha) || ''))).slice(0, 12);   // los más nuevos por fecha (con varios equipos el orden de la lista no es el de las fechas)
     $l('lbMovs').innerHTML = ult.length ? ult.map(m => '<div class="lb-fila lb-mov"><span>' + TIPOS[m.tipo] + ' ' + (m.tipo === 'emp' || m.tipo === 'prov' || m.tipo === 'pdeb' ? esc2(m.persona) : '· ' + esc2(m.persona)) + (m.nota && m.nota !== 'pagó todo' ? ' · ' + esc2(m.nota) : '') + '<small>' + new Date(m.fecha).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }) + '</small></span><b>' + plata(m.monto) + '</b><button type="button" class="lb-x" data-borrar="' + m.id + '" title="Borrar">🗑</button></div>').join('') : '<div class="lb-vacio">Aquí van a salir tus apuntes.</div>';
   }
   /* 📊 Lo de la libreta en Contabilidad (1.65.7), en el periodo [ini, fin):

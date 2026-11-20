@@ -1444,13 +1444,16 @@ function histFila(h, idx){
       <div class="hist-detail-line"><span>${p.note || 'Pago'} <span class="pay-method ${p.method}">${methodLabelHist[p.method] || p.method}</span>${payItemsHtml(p)}</span><span>${fmt(p.amount)}</span></div>
     `).join('') || '<div class="hist-detail-line"><span>Sin pagos registrados</span><span></span></div>';
   const debtHtml = debt > 0 ? `<div class="hist-detail-line"><span class="hist-debt-flag">Queda debiendo</span><span class="hist-debt-flag">${fmt(debt)}</span></div>` : '';
+  // 📒 1.99.24: si quedaron debiendo varias personas de la mesa (cada fiado con su nombre), se ven sus nombres.
+  const histDeudores = x => { const n = [...new Set((x.payments || []).filter(q => q && q.method === 'debe' && String(q.note || '').trim() && !/^(saldo sin registrar al cerrar|queda debiendo)$/i.test(String(q.note).trim())).map(q => String(q.note).trim()))];
+    return n.length ? ' — ' + n.join(', ').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])) : ''; };
   const row = document.createElement('div');
   row.className = 'hist-row';
   row.dataset.idx = idx;
   row.innerHTML = `
       <div class="hist-row-top">
         <div class="hist-left">
-          <div class="hist-table">${h.tableName || (i18nPut(espacioN()) + ' ' + h.table)}${h.person ? ' — ' + h.person : ''}${debt > 0 ? ' · <span class="hist-debt-flag">DEBE</span>' : ''}${h.corregida ? ' · ✏️ corregida' : ''}</div>
+          <div class="hist-table">${h.tableName || (i18nPut(espacioN()) + ' ' + h.table)}${h.person ? ' — ' + h.person : (debt > 0 ? histDeudores(h) : '')}${debt > 0 ? ' · <span class="hist-debt-flag">DEBE</span>' : ''}${h.corregida ? ' · ✏️ corregida' : ''}</div>
           <div class="hist-date">${dateStr}</div>
           ${histRef(h) ? `<div class="hist-ref">${invEsc(histRef(h))}</div>` : ''}
         </div>

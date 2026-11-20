@@ -50,6 +50,17 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
     chk('2. «Pedro pagó todo»: Pedro en cero y Juan con lo suyo', s.Pedro === 0 && s.Juan === 15000, s);
     chk('2. La cuenta de la mesa queda debiendo solo lo de Juan', await p.evaluate(() => data.history[0].debt === 15000), await p.evaluate(() => data.history[0].debt));
 
+    const histTxt = await p.evaluate(() => { try{ renderHistorial(); }catch(e){} return [...document.querySelectorAll('.hist-table')].map(x => x.textContent).join(' | '); });
+    chk('2. En Historial la cuenta dice quiénes quedaron debiendo (Juan, Pedro)', /Juan, Pedro/.test(histTxt), histTxt);
+    // «Borra lo último»: el más nuevo por fecha, aunque en la lista quede antes (llegó de otro equipo)
+    const b2 = await p.evaluate(() => {
+      const l = data.libreta.movs, n0 = l.length;
+      l.unshift({ id: 'otro1', tipo: 'debe', persona: 'Luis', monto: 7000, nota: '', fecha: new Date(Date.now() + 60000).toISOString() });
+      window.libretaEntender('borra lo último');
+      return { n0, n1: l.length, quedaLuis: l.some(m => m.id === 'otro1') };
+    });
+    chk('2. «Borra lo último» quita el apunte más nuevo por fecha (aunque esté primero en la lista)', b2.n1 === b2.n0 && !b2.quedaLuis, b2);
+
     // ===== 3. Una sola persona =====
     const h3 = await p.evaluate(() => {
       data.tables[4] = { items: [{ productId: 'x', name: 'Cerveza', price: 5000, qty: 2, personId: 'pa' }], people: [{ id: 'pa', name: 'Ana' }], payments: [{ note: '', amount: 10000, method: 'debe', personId: 'pa' }] };
