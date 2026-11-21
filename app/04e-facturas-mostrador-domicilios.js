@@ -868,7 +868,7 @@ function invoiceRowHtml(it, i){
     '<div class="iv-section iv-section-venta">' +
       '<div class="iv-section-title">💰 A cómo lo vendes</div>' +
       '<div class="iv-grid">' +
-        '<div><label>Precio actual (al que lo tienes hoy)</label><input type="number" class="iv-precioactual" min="0" step="50" placeholder="Ingresar valor" value="' + (precioActual != null ? Math.round(precioActual) : '') + '"></div>' +
+        '<div><label>A cómo lo vendes (si lo escribes, se guarda este)</label><input type="number" class="iv-precioactual" min="0" step="50" placeholder="Tu precio de venta" value="' + (precioActual != null ? Math.round(precioActual) : '') + '"></div>' +
         '<div><label>Margen al precio actual</label><span class="iv-actual-margen ' + (margenActual == null ? '' : (margenActual < 0 ? 'bad' : 'good')) + '">' + (margenActual == null ? '—' : Math.round(margenActual * 100) + '%') + '</span></div>' +
       '</div>' +
       (utilidadActual == null ? '' :
@@ -883,12 +883,13 @@ function invoiceRowHtml(it, i){
       '<div class="iv-grid">' +
         '<div><label>Margen de venta %</label><input type="number" class="iv-margin" min="0" max="90" step="1" value="' + Math.round(marginPct * 100) + '"></div>' +
         '<div><label>Utilidad por unidad (al sugerido)</label><span class="iv-profit">' + fmt(utilidad) + '</span></div>' +
-        '<div class="iv-full"><label>Precio sugerido (el que se va a aplicar al inventario)</label><input type="number" class="iv-price" min="0" step="100" value="' + it.newPrice + '"></div>' +
+        '<div class="iv-full"><label class="iv-price-lbl">' + invoicePrecioLbl(it) + '</label><input type="number" class="iv-price" min="0" step="100" value="' + it.newPrice + '"></div>' +
         '<div class="iv-full"><button type="button" class="btn-ghost iv-webprice">🌐 Ver a cómo lo tienen en el mercado</button><div class="iv-note iv-webprice-note">' + invEsc(it.webPriceNote || '') + '</div></div>' +
       '</div>' +
     '</div>' +
   '</div>';
 }
+function invoicePrecioLbl(it){ return it.precioFijo ? '✅ Precio que se guarda: el TUYO (cambiar el margen pone el sugerido)' : 'Precio sugerido (el que se va a aplicar al inventario)'; }
 function fiChipConfianza(it){
   const m = it.match; if(!m) return '';
   const elegido = it.productId && (m.candidatos || []).find(c => c.id === it.productId);
@@ -1167,7 +1168,15 @@ function invoiceRecalcFromBox(it){                // recalcula cantidad y costo/
   const costoTotalConIva = (it.cajas || 1) * (it.costoSinIva || 0) * (1 + (it.ivaPct || 0));
   it.qty = totalUnidades;
   it.cost = Math.round(costoTotalConIva / totalUnidades);
-  it.newPrice = invoicePriceFromMargin(it.cost, it.marginPct) || it.newPrice;
+  invoicePrecioSugeridoSiNoFijo(it, invoicePriceFromMargin(it.cost, it.marginPct) || it.newPrice);
+}
+/* 💲 1.99.26: el precio que escribe la persona MANDA. Antes, al escribir «a cómo lo vendo», se guardaba igual el precio
+   sugerido, y cada cambio de costo, cantidad o cajas volvía a poner el sugerido encima del suyo. Ahora, si la persona
+   escribió su precio (it.precioFijo), los recálculos solo ajustan el margen que se ve; el sugerido vuelve si borra su
+   precio o si cambia el margen a mano. */
+function invoicePrecioSugeridoSiNoFijo(it, sugerido){
+  if(it.precioFijo && it.newPrice > 0){ it.marginPct = it.newPrice > 0 ? Math.max(0, (it.newPrice - it.cost) / it.newPrice) : it.marginPct; return; }
+  it.newPrice = sugerido;
 }
 function invoiceApplyFieldChange(it, cls, target){  // recalcula el item según qué campo cambió (sin tocar el DOM)
   if(cls.contains('iv-match') || cls.contains('iv-cost')){
@@ -1181,15 +1190,21 @@ function invoiceApplyFieldChange(it, cls, target){  // recalcula el item según 
     // Cambió el producto emparejado o el costo: recalculamos el margen (el
     // que ya tenía ese producto, o el sano por defecto) y el precio sugerido.
     const matched = it.productId ? data.products.find(p => p.id === it.productId) : null;
-    it.marginPct = invoiceInferMargin(matched);
-    it.newPrice = invoicePriceFromMargin(it.cost, it.marginPct) || (matched ? matched.price : 0);
+    if(!it.precioFijo) it.marginPct = invoiceInferMargin(matched);
+    invoicePrecioSugeridoSiNoFijo(it, invoicePriceFromMargin(it.cost, it.marginPct) || (matched ? matched.price : 0));
   } else if(cls.contains('iv-margin')){
-    // Cambió el margen de venta a mano: el precio de venta se recalcula solo.
+    // Cambió el margen de venta a mano: quiere el sugerido para ese margen (deja de mandar el precio escrito).
+    it.precioFijo = false;
     it.newPrice = invoicePriceFromMargin(it.cost, it.marginPct);
   } else if(cls.contains('iv-price')){
-    // Cambió el precio de venta a mano: el margen mostrado se ajusta solo,
-    // para que siempre cuadren entre sí.
+    // Cambió el precio de venta a mano: ese manda (no se vuelve a poner el sugerido) y el margen se ajusta solo.
+    it.precioFijo = it.newPrice > 0;
+    if(it.precioFijo) it.precioActual = it.newPrice;
     it.marginPct = it.newPrice > 0 ? Math.max(0, (it.newPrice - it.cost) / it.newPrice) : it.marginPct;
+  } else if(cls.contains('iv-precioactual')){
+    // «A cómo lo vendes»: lo que escribe es su precio de venta y es el que se guarda. Si lo borra, vuelve el sugerido.
+    if(it.precioActual > 0){ it.precioFijo = true; it.newPrice = Math.round(it.precioActual); it.marginPct = Math.max(0, (it.newPrice - it.cost) / it.newPrice); }
+    else { it.precioFijo = false; it.newPrice = invoicePriceFromMargin(it.cost, it.marginPct) || it.newPrice; }
   } else if(cls.contains('iv-qty')){
     // Cambió la cantidad de unidades a mano: lo que dice la factura es cuánto se PAGÓ por el renglón, así que ese
     // total se mantiene y se DIVIDE entre las unidades (antes se dejaba el costo por unidad y el total se multiplicaba).
@@ -1200,7 +1215,7 @@ function invoiceApplyFieldChange(it, cls, target){  // recalcula el item según 
     if(total > 0){
       it.costoSinIva = total / (it.cajas * (1 + iva));
       it.cost = Math.round(total / q * 100) / 100;
-      it.newPrice = invoicePriceFromMargin(it.cost, it.marginPct) || it.newPrice;
+      invoicePrecioSugeridoSiNoFijo(it, invoicePriceFromMargin(it.cost, it.marginPct) || it.newPrice);
     }
     it.qtyFalta = false;
   } else if(cls.contains('iv-cajas') || cls.contains('iv-unidxcaja') || cls.contains('iv-costosiniva') || cls.contains('iv-ivapct')){
@@ -1222,8 +1237,7 @@ function invoiceApplyFieldChange(it, cls, target){  // recalcula el item según 
     it.costoSinIva = ivaPct > -1 ? totalConIva / (cajas * (1 + ivaPct)) : totalConIva / cajas;
     invoiceRecalcFromBox(it);
   }
-  // iv-precioactual e iv-inc no necesitan recalcular nada más del item: el
-  // primero solo se compara contra el costo, y el segundo es un check simple.
+  // iv-inc no necesita recalcular nada más del item (es un check simple).
 }
 function invoiceRowComputed(it){                    // los mismos valores derivados que arma invoiceRowHtml, para refrescar la fila en vivo
   const matched = it.productId ? data.products.find(p => p.id === it.productId) : null;
@@ -1250,6 +1264,7 @@ function invoiceUpdateRowLive(row, it){
   setVal('.iv-margin', Math.round(c.marginPct * 100));
   setVal('.iv-price', it.newPrice);
   setVal('.iv-precioactual', c.precioActual != null ? Math.round(c.precioActual) : '');
+  const pl = row.querySelector('.iv-price-lbl'); if(pl) pl.textContent = invoicePrecioLbl(it);
   setVal('.iv-cajas', c.cajas);
   setVal('.iv-unidxcaja', c.unidadesPorCaja);
   setVal('.iv-costosiniva', Math.round(c.costoSinIva));
@@ -1817,13 +1832,15 @@ document.getElementById('priceBody').addEventListener('input', e => {
   if(!pcDraft) return;
   const id = e.target.id;
   if(id === 'pcName'){ pcDraft.name = e.target.value; return; }
-  if(id === 'pcPrice'){ pcDraft.newPrice = Math.max(0, Math.round(+e.target.value || 0)); }
+  // 💲 1.99.26: el precio que escribe la persona manda: cambiar el costo o el paquete ya no lo reemplaza por el sugerido
+  // (solo cambiar el margen objetivo pide el sugerido otra vez).
+  if(id === 'pcPrice'){ pcDraft.newPrice = Math.max(0, Math.round(+e.target.value || 0)); pcDraft.precioFijo = pcDraft.newPrice > 0; }
   else if(id === 'pcSeen' || id === 'pcPack' || id === 'pcTarget'){
     pcDraft.seen = Math.max(0, +document.getElementById('pcSeen').value || 0);
     pcDraft.pack = Math.max(1, Math.floor(+document.getElementById('pcPack').value || 1));
     pcDraft.target = Math.min(90, Math.max(0, +document.getElementById('pcTarget').value || 0));
-    pcDraft.newPrice = pcSuggest(pcUnitCost(), pcDraft.target);
-    document.getElementById('pcPrice').value = pcDraft.newPrice || '';
+    if(id === 'pcTarget') pcDraft.precioFijo = false;
+    if(!pcDraft.precioFijo){ pcDraft.newPrice = pcSuggest(pcUnitCost(), pcDraft.target); document.getElementById('pcPrice').value = pcDraft.newPrice || ''; }
   } else return;
   document.getElementById('pcResult').innerHTML = pcResultHtml();
 });
@@ -1833,7 +1850,7 @@ document.getElementById('priceBody').addEventListener('change', e => {
   const p = pcProduct();
   if(p){ pcDraft.name = p.name; pcDraft.size = p.size || ''; }
   pcDraft.target = pcAutoTarget(p);
-  pcDraft.newPrice = pcSuggest(pcUnitCost(), pcDraft.target);
+  if(!pcDraft.precioFijo) pcDraft.newPrice = pcSuggest(pcUnitCost(), pcDraft.target);
   pcRenderForm();
 });
 document.getElementById('priceBody').addEventListener('click', async e => {
@@ -1847,7 +1864,7 @@ document.getElementById('priceBody').addEventListener('click', async e => {
     if(my !== pcToken || !pcDraft) return;
     if(r && Number(r.price) > 0){
       pcDraft.seen = Math.round(Number(r.price)); pcDraft.pack = 1;
-      pcDraft.newPrice = pcSuggest(pcUnitCost(), pcDraft.target);
+      if(!pcDraft.precioFijo) pcDraft.newPrice = pcSuggest(pcUnitCost(), pcDraft.target);
       pcDraft.note = '🌐 Precio estimado en la web' + (r.source ? ' (' + r.source + ')' : '') + '. Verifícalo antes de guardar.';
     } else pcDraft.note = 'No encontré un precio confiable en la web. Escríbelo tú.';
     pcRenderForm();
