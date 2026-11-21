@@ -2325,7 +2325,9 @@ function invRate(pid){                       // unidades por día, promedio de l
   const L = data.stockLog || [], since = Date.now() - 14 * INV_DAY;
   if(!L.length) return 0;
   const net = L.reduce((s, x) => (x.p === pid && x.at >= since) ? s + x.q : s, 0);
-  const span = Math.max(1, Math.min(14, (Date.now() - Math.max(since, L[0].at)) / INV_DAY));
+  // 1.99.26: el movimiento más viejo por fecha (la lista ya no va de viejo a nuevo: lo nuevo va al comienzo).
+  const viejo = L.reduce((m, x) => (x && x.at < m ? x.at : m), Infinity);
+  const span = Math.max(1, Math.min(14, (Date.now() - Math.max(since, viejo)) / INV_DAY));
   return net > 0 ? net / span : 0;
 }
 function invDays(p){ const r = invRate(p.id); return (p.stock == null || !(r > 0)) ? null : p.stock / r; }
@@ -2347,14 +2349,33 @@ function invBadge(){
   const n = data.products.filter(p => ['out','low'].includes(invStatus(p))).length;
   const b = document.getElementById('invBadge'); if(b) b.textContent = n || '';
 }
+// La lista de movimientos con id en cada renglón. Los viejos (sin id) reciben uno sacado de su contenido, igual en todos
+// los equipos: si dos lo hacen a la vez, salen los mismos ids y la nube no los duplica. El orden solo se toca esa vez.
+function invLogOrden(L){ return L.slice().sort((a, b) => ((b.at || 0) - (a.at || 0)) || String(a.p).localeCompare(String(b.p)) || ((a.q || 0) - (b.q || 0)) || String(a.id || '').localeCompare(String(b.id || ''))); }
+function invLogConId(){
+  let L = Array.isArray(data.stockLog) ? data.stockLog.filter(x => x && typeof x === 'object') : [];
+  if(L.length === (data.stockLog || []).length && L.every(x => x.id)) return data.stockLog;
+  const vistos = {};
+  L = invLogOrden(L).map(x => {
+    if(x.id) return x;
+    const k = 'k' + Number(x.at || 0).toString(36) + '-' + String(x.p) + '-' + x.q;
+    vistos[k] = (vistos[k] || 0) + 1;
+    return Object.assign({ id: vistos[k] > 1 ? k + '-' + vistos[k] : k }, x);
+  });
+  data.stockLog = L;
+  return L;
+}
 function invOnSale(item, q){                 // se llama solo, cada vez que cambia la cantidad de un ítem en una cuenta
   const p = data.products.find(x => x.id === item.productId);
   if(!p || !q) return;
   if(p.combo){ p.combo.forEach(c => invOnSale({ productId: c.id }, q * c.qty)); return; }   // un combo descuenta sus productos
   const before = invStatus(p);
-  data.stockLog = data.stockLog || [];
-  data.stockLog.push({ p: p.id, q, at: Date.now() });
-  if(data.stockLog.length > 3000) data.stockLog = data.stockLog.slice(-2500);
+  // 📶 1.99.26: cada movimiento con su id y lo nuevo al COMIENZO (como el historial). Así la nube sube solo el movimiento
+  // nuevo; antes, con cada producto vendido subía la lista entera (hasta 3.000 renglones) a la nube y a los otros equipos.
+  const L = invLogConId();
+  const at = Date.now();
+  L.unshift({ id: 'k' + at.toString(36) + '-' + Math.random().toString(36).slice(2, 6), p: p.id, q, at });
+  if(L.length > 3000) data.stockLog = invLogOrden(L).slice(0, 2500);
   // ⏳ 1.67.6: lotes con vencimiento: se vende primero el que vence antes; lo que se devuelve (deshacer) vuelve a ese lote.
   if(Array.isArray(p.lotes) && p.lotes.length){
     const F = window.ventoFinanzas;
