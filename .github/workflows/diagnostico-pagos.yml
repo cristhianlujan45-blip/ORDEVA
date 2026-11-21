@@ -85,6 +85,18 @@ jobs:
                        (d.ultimo_visto at time zone 'America/Bogota')::text ultimo_visto
                 from dispositivos d left join miembros m on m.negocio_id = d.negocio_id and m.usuario_id = d.usuario_id
                 where d.revocado_en is null and d.ultimo_visto > now() - interval '3 days' order by d.ultimo_visto desc limit 25) x),
+            'posibles_repetidos', (select coalesce(json_agg(x order by x.creado desc), '[]') from (
+                -- 1.99.26: el mismo valor dos veces en el mismo negocio en menos de 10 minutos (¿el mismo pago anotado dos
+                -- veces, por SMS y por la app?). Sin nombres ni teléfonos: valor, método, confianza y de dónde vino.
+                select left(p.negocio_id::text, 8) neg, p.monto, p.metodo, p.confianza, p.canal, p.estado,
+                       (p.creado_en at time zone 'America/Bogota')::text creado,
+                       q.metodo otro_metodo, q.confianza otra_confianza, q.canal otro_canal,
+                       round(extract(epoch from (p.creado_en - q.creado_en))::numeric, 1) seg_despues,
+                       (p.aplicado_en is not null) aplicado, (q.aplicado_en is not null) otro_aplicado
+                from pagos p join pagos q on q.negocio_id = p.negocio_id and q.monto = p.monto and q.id <> p.id
+                  and q.creado_en <= p.creado_en and q.creado_en > p.creado_en - interval '10 minutes'
+                where p.creado_en > now() - interval '7 days' and p.estado <> 'anulado' and q.estado <> 'anulado'
+                order by p.creado_en desc limit 40) x),
             'versiones_en_uso', (select coalesce(json_agg(x), '[]') from (
                 select version, plataforma, count(distinct equipo) equipos, (max(ultimo) at time zone 'America/Bogota')::text ultimo
                 from app_errores where ultimo > now() - interval '72 hours' group by 1, 2 order by max(ultimo) desc limit 20) x)

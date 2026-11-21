@@ -352,8 +352,9 @@
       return;
     }
     if(p.confianza === 'revisar'){
-      toast('⚠️ ' + nombreMetodo(p.metodo) + ': ' + plata(p.monto) + (p.pagador ? ' de ' + p.pagador : '') + m + '. ' + (p.detalle || 'Confírmalo en la app del banco.'), 12000);
-      hablarPago('Llegó un aviso de ' + p.monto + ' pesos por ' + nombreMetodo(p.metodo) + '. Revísalo en la aplicación del banco antes de entregar.');
+      // 1.99.26 (pedido del dueño): un SMS del banco dice solo cuánto llegó (sin «revísalo antes de entregar»).
+      toast('💜 Llegaron ' + plata(p.monto) + ' por ' + nombreMetodo(p.metodo) + (p.pagador ? ' de ' + p.pagador : '') + m + ' (mensaje de texto)', 12000);
+      hablarPago('Llegaron ' + p.monto + ' pesos por ' + nombreMetodo(p.metodo) + '.');
       return;
     }
     // Como el parlante de Bold: sonido de éxito y «Pago confirmado» en voz alta.
@@ -396,7 +397,9 @@
     var vc = null;
     if(nuevoAprobado && enVivo && !leidoAqui(x)){ try{ vc = window.ventoConfirma ? window.ventoConfirma.llego(x, p) : null; }catch(e){} }
     if(vc === 'duplicado' || vc === 'junto'){ try{ saveData(); }catch(e){} pintarHistorial(); return; }
-    if(nuevoAprobado && enVivo && !leidoAqui(x)) avisar(p, x, !!vc);
+    // 1.99.26: el mismo pago ya sonó por SMS: la notificación de la app del banco lo confirma (se registra) sin repetirlo.
+    var yaDicho = !!x._yaDicho; try{ delete x._yaDicho; }catch(e){}
+    if(nuevoAprobado && enVivo && !leidoAqui(x) && !yaDicho) avisar(p, x, !!vc);
     else if(p.estado === 'rechazado' && p.confianza === 'falso' && !antes && enVivo) avisar(p, x);
     pintarHistorial();
     try{ window.layaPintarTarjeta && window.layaPintarTarjeta(); }catch(e){}

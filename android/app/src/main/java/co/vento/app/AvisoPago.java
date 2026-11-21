@@ -289,7 +289,8 @@ public final class AvisoPago {
         String banco = nombreApp(b0);
         if ("celular".equals(tipo)) return "Ojo. Llegó un mensaje de pago sospechoso por " + monto + " pesos desde un número de celular. Parece falso. No entregues nada.";
         if (confiar) return "Llegaron " + monto + " pesos por " + banco + ", por mensaje de texto.";
-        return "Llegó un mensaje de texto de " + monto + " pesos desde " + banco + ". Revísalo en la aplicación del banco antes de entregar.";
+        // 1.99.26 (pedido del dueño): sin «revísalo antes de entregar»: solo cuánto llegó.
+        return "Llegaron " + monto + " pesos por " + banco + ".";
     }
 
     /** El banco que nombra el texto («DaviPlata», «Nequi»…) o «el banco». */

@@ -171,6 +171,20 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     });
     chk('5d. Solo la llave (sin valor): el computador dice que llegó plata por Bre-B en DaviPlata', await esperar(PC.p, () => (window.__voz || []).some(t => /Bre-?B/i.test(t) && /DaviPlata/i.test(t)), null, 35000), await PC.p.evaluate(() => window.__voz));
 
+    // ===== 5e. 1.99.26: el MISMO pago llega por SMS (código corto sin confirmar) y luego por la app de Nequi. En el computador
+    //     suena UNA vez y sin «revísalo antes de entregar» (antes: «Llegó un aviso… Revísalo…» y después «Llegaron…»).
+    await PC.p.evaluate(() => { window.__voz = []; });
+    const idS = 'S:' + Date.now() + ':31';
+    await CEL.p.evaluate(idS => { window.__and.cola.push({ id: idS, txt: 'SMS | 85954 | Nequi: CARLOS PEREZ te envio $31.000', t: Date.now(), voz: true }); window.ventoAvisosNativos(); }, idS);
+    for(let i = 0; i < 20 && !(await enServidor(31000)).length; i++){ await latir(CEL); await new Promise(r => setTimeout(r, 250)); }
+    await new Promise(r => setTimeout(r, 1500));
+    await CEL.p.evaluate(idS => { window.__and.cola.push({ id: 'A:' + Date.now() + ':31', txt: 'Nequi | Nequi | CARLOS PEREZ te envió $31.000', t: Date.now(), voz: true, reemplaza: idS }); window.ventoAvisosNativos(); }, idS);
+    for(let i = 0; i < 20 && (await enServidor(31000)).length < 2; i++){ await latir(CEL); await new Promise(r => setTimeout(r, 250)); }
+    await esperar(PC.p, () => (window.__voz || []).some(t => /31000/.test(t)), null, 35000);
+    for(let i = 0; i < 16; i++){ await latir(PC); await new Promise(r => setTimeout(r, 500)); }
+    const v5e = await PC.p.evaluate(() => (window.__voz || []).filter(t => /31000/.test(t)));
+    chk('5e. SMS y luego la app del mismo pago: el computador lo dice UNA vez («Llegaron 31000 pesos por Nequi»), sin «revísalo»', v5e.length === 1 && /^Llegaron 31000 pesos por Nequi/.test(v5e[0]) && !v5e.some(t => /Rev[ií]salo|antes de entregar/.test(t)), { v5e, servidor: (await enServidor(31000)).map(x => x.confianza) });
+
     // ===== 7. ⏳ El computador espera el pago de la Mesa 4; el celular lo lee =====
     await CEL.p.evaluate(() => { data.pagos = data.pagos || {}; data.pagos.on = true; data.tables[4] = { items: [{ productId: 'p4', name: 'Bandeja', price: 27300, qty: 1 }], payments: [], people: [] }; saveData(); });
     chk('7. La mesa llega al computador', await esperar(PC.p, () => !!(data.tables[4] && data.tables[4].items.length), null, 15000));

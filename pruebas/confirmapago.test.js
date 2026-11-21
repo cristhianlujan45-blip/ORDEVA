@@ -84,13 +84,13 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
       await p.waitForTimeout(400); s = await pantalla();
       chk(N + '1. Propina: $32.000 en una cuenta de $30.000 → al día y «$2.000 de más (propina)»', (await pagado(4)) === 32000 && /2\.000 de más/.test(s.txt), s);
       await p.evaluate(() => window.ventoConfirma.cerrar());
-      // Un SMS en la pantalla: «⚠️ Llegó por SMS» y «✅ Lo vi en la app»
+      // Un SMS en la pantalla: «💜 Llegaron $17.300 por SMS» (1.99.26: sin «míralo antes de entregar») y «✅ Registrar el pago»
       await p.evaluate(() => { data.tables[8] = { items: [{ productId: 'p8', name: 'Cosa 8', price: 17300, qty: 1 }], payments: [], people: [] }; saveData(); window.ventoConfirma.abrir(8); });
       await llega('c8:1', 'SMS | 85954 | Bancolombia: Recibiste $17.300 en tu cuenta');
       await p.waitForTimeout(400); s = await pantalla();
-      chk(N + '1. Llega por SMS: la pantalla dice «⚠️ Llegó por SMS · míralo en la app» y no lo registra todavía', /vc-rev/.test(s.cls) && /Llegó por SMS/.test(s.txt) && (await pagado(8)) === 0, s);
+      chk(N + '1. Llega por SMS: la pantalla dice «💜 Llegaron $17.300 por SMS» (sin «antes de entregar») y no lo registra todavía', /vc-rev/.test(s.cls) && /Llegaron \$\s?17\.300 por SMS/.test(s.txt) && !/antes de entregar|Míralo/.test(s.txt) && (await pagado(8)) === 0, s);
       await p.click('#vcEspera [data-vc="lovi"]'); await p.waitForTimeout(300); s = await pantalla();
-      chk(N + '1. «✅ Lo vi en la app» → PAGADO y registrado', /PAGADO/.test(s.txt) && (await pagado(8)) === 17300, s);
+      chk(N + '1. «✅ Registrar el pago» → PAGADO y registrado', /PAGADO/.test(s.txt) && (await pagado(8)) === 17300, s);
       await p.evaluate(() => window.ventoConfirma.cerrar());
 
       // ===== 2. La mesa correcta =====

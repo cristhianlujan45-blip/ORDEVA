@@ -167,6 +167,19 @@ final class Cruce {
     }
     static String metodo(String m) { String x = METODO.get(String.valueOf(m).toUpperCase()); return x != null ? x : (m == null || m.isEmpty() ? "transferencia" : m.charAt(0) + m.substring(1).toLowerCase()); }
 
+    /* 1.99.26: el mismo pago por SMS («revisar») y por la app del banco («ok») son dos avisos en el servidor. Se juntan uno
+       con uno (mismo valor, menos de 5 min): el segundo de la pareja no suena. Dos pagos de distinta gente por el mismo valor
+       siguen sonando los dos (cada SMS se junta con una sola notificación de la app, y dos de la app no se juntan). */
+    private static final java.util.List<long[]> RECIENTES = new java.util.ArrayList<>();   // {monto, t, esSms, emparejado}
+    static synchronized boolean yaAnunciadoPar(long monto, boolean esSms) {
+        long ahora = System.currentTimeMillis();
+        RECIENTES.removeIf(r -> ahora - r[1] > 5 * 60_000L);
+        for (long[] r : RECIENTES) if (r[3] == 0 && r[0] == monto && (r[2] == 1) != esSms) { r[3] = 1; return true; }
+        RECIENTES.add(new long[]{ monto, ahora, esSms ? 1 : 0, 0 });
+        while (RECIENTES.size() > 40) RECIENTES.remove(0);
+        return false;
+    }
+
     /** Notificación de pagos + 🪟 ventana + voz, como un pago leído en este celular. */
     static void anunciar(JSONObject p) {
         long monto = p.optLong("monto");
@@ -178,10 +191,8 @@ final class Cruce {
             String f = "Ojo. Llegó un mensaje de pago sospechoso por " + monto + " pesos. Parece falso. No entregues nada.";
             VentoApp.decirPago(f);
             VentoApp.notificarPago("🚨 Mensaje de pago FALSO: " + plata, f, detalle, plata, banco, "falso");
-        } else if ("revisar".equals(conf)) {
-            String f = "Llegó un aviso de " + monto + " pesos por " + banco + ". Revísalo en la aplicación del banco antes de entregar.";
-            VentoApp.decirPago(f);
-            VentoApp.notificarPago("⚠️ Aviso de " + plata + ": revísalo", f, detalle, plata, banco, "revisar");
+        } else if (yaAnunciadoPar(monto, "revisar".equals(conf))) {
+            // 1.99.26: el mismo pago llegó por SMS y por la app del banco (dos avisos en el servidor): ya sonó uno, no se repite.
         } else {
             VentoApp.decirPago("Llegaron " + monto + " pesos por " + banco + ".");   // la cantidad siempre; sin el nombre
             VentoApp.notificarPago("💜 Recibiste " + plata + " por " + banco, "Recibiste " + monto + " pesos por " + banco + (de.isEmpty() ? "" : ", de " + de) + ".", detalle, plata, banco, "ok");

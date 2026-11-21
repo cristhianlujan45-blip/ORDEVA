@@ -437,7 +437,9 @@ public class VentoEscucha extends NotificationListenerService {
                 return true;
             }
             // El mismo pago ya llegó por la app del banco con su valor (confirmado): el SMS no se cuenta otra vez.
-            if (parear(sp, monto, true, id, banco != null || sp.getBoolean(PREF_SMS_OK, false)) != null) return false;
+            // 1.99.26: el SMS queda como «ya dicho» si sonó (ahora dice «Llegaron X pesos», sin «revísalo»): cuando después
+            // llega la notificación de la app del banco de ese mismo pago, ya no se repite.
+            if (parear(sp, monto, true, id, !callado) != null) return false;
             // El código corto OFICIAL del banco (85888 = DaviPlata) cuenta como confirmado: el valor del pago solo llega por
             // ahí (la app de DaviPlata no lo trae). Otros códigos cortos: «revísalo», salvo que el dueño elija confirmarlos.
             final boolean confiar = banco != null || sp.getBoolean(PREF_SMS_OK, false);
@@ -449,8 +451,7 @@ public class VentoEscucha extends NotificationListenerService {
                 String f = banco != null ? AvisoPago.frase(banco, monto, cuerpo) : AvisoPago.fraseSms(remitente, cuerpo, monto, tipo, confiar);
                 VentoApp.decirPago(f);
                 if (sp.getBoolean(PREF_NOTIF, true)) {
-                    if (confiar) VentoApp.anunciarPagoAviso(banco != null ? banco : AvisoPago.bancoDe(cuerpo), monto, cuerpo);
-                    else VentoApp.notificarPago("⚠️ Aviso de " + AvisoPago.plata(monto) + " por SMS: revísalo", f, cuerpo, AvisoPago.plata(monto), "SMS " + remitente, "revisar");
+                    VentoApp.anunciarPagoAviso(banco != null ? banco : AvisoPago.bancoDe(cuerpo), monto, cuerpo);   // 1.99.26: igual que un pago (sin «revísalo»)
                 }
             }
             guardar(sp, id, txt, !callado, null, confiar, null);
