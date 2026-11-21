@@ -289,8 +289,15 @@ public final class AvisoPago {
         String banco = nombreApp(b0);
         if ("celular".equals(tipo)) return "Ojo. Llegó un mensaje de pago sospechoso por " + monto + " pesos desde un número de celular. Parece falso. No entregues nada.";
         if (confiar) return "Llegaron " + monto + " pesos por " + banco + ", por mensaje de texto.";
-        // 1.99.26 (pedido del dueño): sin «revísalo antes de entregar»: solo cuánto llegó.
-        return "Llegaron " + monto + " pesos por " + banco + ".";
+        return "Llegó un mensaje de texto de " + monto + " pesos desde " + banco + ". Revísalo en la aplicación del banco antes de entregar.";
+    }
+
+    /** 1.99.26 (pedido del dueño): lo que DICE la voz por un SMS del banco: solo cuánto llegó, sin «revísalo antes de
+     *  entregar». El texto de la notificación sigue siendo fraseSms (no cambia). El SMS desde un celular sigue avisando «falso». */
+    static String fraseSmsVoz(String remitente, String cuerpo, long monto, String tipo, boolean confiar) {
+        if ("celular".equals(tipo) || confiar) return fraseSms(remitente, cuerpo, monto, tipo, confiar);
+        String b0 = bancoDe(cuerpo); if (b0.isEmpty() && bancoDeCodigo(remitente) != null) b0 = bancoDeCodigo(remitente);
+        return "Llegaron " + monto + " pesos por " + nombreApp(b0) + ".";
     }
 
     /** El banco que nombra el texto («DaviPlata», «Nequi»…) o «el banco». */

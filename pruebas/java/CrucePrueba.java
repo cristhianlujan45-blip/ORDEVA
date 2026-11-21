@@ -93,15 +93,15 @@ public class CrucePrueba {
         // 4. Por revisar y falso
         responder("admin", pago("p5", 12000, "TRANSFERENCIA", null, "revisar", "OTRO", 1_000), pago("p6", 50000, "NEQUI", null, "falso", "OTRO", 1_000));
         revisarYEsperar();
-        chk("4. «Revisar» (SMS, 1.99.26): «💜 Recibiste $12.000» y la voz dice «Llegaron 12000 pesos…», sin «revísalo»", VentoApp.notifs.stream().anyMatch(n -> n[0].startsWith("💜 Recibiste $12.000") && n[5].equals("ok")) && !VentoApp.dichos.stream().anyMatch(d -> d.contains("Revísalo")) && VentoApp.dichos.stream().anyMatch(d -> d.contains("12000")), VentoApp.notifs.stream().map(n -> n[0]).collect(java.util.stream.Collectors.toList()) + " " + VentoApp.dichos);
+        chk("4. «Revisar»: «⚠️ Aviso de $12.000: revísalo» y la voz lo dice", VentoApp.notifs.stream().anyMatch(n -> n[0].equals("⚠️ Aviso de $12.000: revísalo") && n[5].equals("revisar")) && VentoApp.dichos.stream().anyMatch(d -> d.equals("Llegaron 12000 pesos por transferencia.")) && !VentoApp.dichos.stream().anyMatch(d -> d.contains("Revísalo")), VentoApp.dichos);   // 1.99.26: el texto sigue igual; la voz, sin «revísalo»
         chk("4. «Falso»: «🚨 Mensaje de pago FALSO: $50.000» y la voz avisa", VentoApp.notifs.stream().anyMatch(n -> n[0].equals("🚨 Mensaje de pago FALSO: $50.000") && n[5].equals("falso")) && VentoApp.dichos.stream().anyMatch(d -> d.contains("sospechoso")), VentoApp.avisos);
 
-        // 4b. 1.99.26: el MISMO pago por SMS («revisar») y por la app del banco («app») son dos avisos del servidor: suena UNO.
-        //     Dos pagos de la app por el mismo valor (dos clientes) suenan los dos.
+        // 4b. 1.99.26: el MISMO pago por SMS («revisar») y por la app del banco («app») son dos avisos del servidor: los dos se
+        //     muestran como siempre, pero la voz suena UNA vez. Dos pagos de la app por el mismo valor (dos clientes) suenan los dos.
         VentoApp.dichos.clear(); VentoApp.notifs.clear();
         responder("admin", pago("p10", 23000, "NEQUI", null, "revisar", "OTRO", 1_000), pago("p11", 23000, "NEQUI", null, "app", "OTRO", 1_000));
         revisarYEsperar();
-        chk("4b. El mismo pago por SMS y por la app (dos avisos del servidor): suena una sola vez", VentoApp.dichos.stream().filter(d -> d.contains("23000")).count() == 1 && VentoApp.notifs.stream().filter(n -> n[0].contains("$23.000")).count() == 1, VentoApp.dichos);
+        chk("4b. El mismo pago por SMS y por la app: la voz suena una vez y las dos notificaciones salen como siempre", VentoApp.dichos.stream().filter(d -> d.contains("23000")).count() == 1 && VentoApp.notifs.stream().filter(n -> n[0].contains("$23.000")).count() == 2, VentoApp.dichos);
         responder("admin", pago("p12", 15000, "NEQUI", null, "app", "OTRO", 1_000), pago("p13", 15000, "NEQUI", null, "app", "OTRO", 1_000));
         revisarYEsperar();
         chk("4b. Dos pagos de la app por el mismo valor (dos clientes): suenan los dos", VentoApp.dichos.stream().filter(d -> d.contains("15000")).count() == 2, VentoApp.dichos);

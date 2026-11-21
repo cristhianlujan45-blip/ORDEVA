@@ -165,7 +165,7 @@ function pagoHuella(t){
     const quien = /^sms$/i.test(t1) ? '' : t1;
     const dig = quien.replace(/\D/g, '');
     if(dig.length >= 7) return { nivel: 'falso', txt: 'SMS desde un número de celular (' + quien + '): los bancos no escriben desde celulares' };
-    return { nivel: 'revisar', txt: 'Llegó por SMS' + (quien ? ' (' + quien + ')' : '') };   // 1.99.26: sin «antes de entregar»
+    return { nivel: 'revisar', txt: 'Llegó por SMS' + (quien ? ' (' + quien + ')' : '') + ': confírmalo en la app del banco antes de entregar' };
   }
   const pgConfirmado = x => !x.estado || x.estado === 'app' || x.estado === 'ok';
   // ¿El aviso llegó por SMS? («origen | remitente | texto»)

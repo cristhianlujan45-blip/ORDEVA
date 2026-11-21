@@ -387,7 +387,11 @@ public class VentoEscucha extends NotificationListenerService {
         // solo se dijo como «revísalo» (Nequi y otros bancos no tienen un número corto confirmado), ahora la app del banco
         // lo confirma: se dice, con su notificación y su 🪟 ventana. Antes ese Nequi no abría la ventana.
         boolean yaDicho = par != null && par.optBoolean("ok");
-        if (confiable && !callado && !yaDicho) { VentoApp.anunciarPago(app, monto, sp.getBoolean(PREF_NOTIF, true), todo); voz = true; }
+        // 1.99.26: el SMS de este mismo pago ya SONÓ («Llegaron X pesos»): la app lo confirma con su notificación y su
+        // 🪟 ventana, como siempre, pero sin repetir la voz.
+        boolean yaSono = par != null && par.optBoolean("dicho");
+        if (confiable && !callado && !yaDicho && yaSono) { if (sp.getBoolean(PREF_NOTIF, true)) VentoApp.anunciarPagoAviso(app, monto, todo); voz = true; }
+        else if (confiable && !callado && !yaDicho) { VentoApp.anunciarPago(app, monto, sp.getBoolean(PREF_NOTIF, true), todo); voz = true; }
         else if (confiable && !callado) voz = true;
         else if (!confiable && !callado) {
             String f = "Ojo. Llegó un aviso de " + monto + " pesos de una aplicación que no es la oficial de " + AvisoPago.nombreApp(app) + ". Revísalo en la aplicación del banco antes de entregar.";
@@ -437,9 +441,9 @@ public class VentoEscucha extends NotificationListenerService {
                 return true;
             }
             // El mismo pago ya llegó por la app del banco con su valor (confirmado): el SMS no se cuenta otra vez.
-            // 1.99.26: el SMS queda como «ya dicho» si sonó (ahora dice «Llegaron X pesos», sin «revísalo»): cuando después
-            // llega la notificación de la app del banco de ese mismo pago, ya no se repite.
-            if (parear(sp, monto, true, id, !callado) != null) return false;
+            // 1.99.26: queda anotado si este SMS ya SONÓ: cuando después llega la notificación de la app del banco de ese mismo
+            // pago, se muestra como siempre, pero la voz no se repite.
+            if (parear(sp, monto, true, id, banco != null || sp.getBoolean(PREF_SMS_OK, false), !callado) != null) return false;
             // El código corto OFICIAL del banco (85888 = DaviPlata) cuenta como confirmado: el valor del pago solo llega por
             // ahí (la app de DaviPlata no lo trae). Otros códigos cortos: «revísalo», salvo que el dueño elija confirmarlos.
             final boolean confiar = banco != null || sp.getBoolean(PREF_SMS_OK, false);
@@ -449,9 +453,11 @@ public class VentoEscucha extends NotificationListenerService {
                 // Se dice YA (1.41.1): antes esperaba 1,5 s el aviso de la app y, con la pantalla apagada, esa espera podía
                 // quedarse dormida hasta desbloquear el celular.
                 String f = banco != null ? AvisoPago.frase(banco, monto, cuerpo) : AvisoPago.fraseSms(remitente, cuerpo, monto, tipo, confiar);
-                VentoApp.decirPago(f);
+                // 1.99.26: la voz, sin «revísalo antes de entregar» (el texto de la notificación sigue igual).
+                VentoApp.decirPago(banco != null ? f : AvisoPago.fraseSmsVoz(remitente, cuerpo, monto, tipo, confiar));
                 if (sp.getBoolean(PREF_NOTIF, true)) {
-                    VentoApp.anunciarPagoAviso(banco != null ? banco : AvisoPago.bancoDe(cuerpo), monto, cuerpo);   // 1.99.26: igual que un pago (sin «revísalo»)
+                    if (confiar) VentoApp.anunciarPagoAviso(banco != null ? banco : AvisoPago.bancoDe(cuerpo), monto, cuerpo);
+                    else VentoApp.notificarPago("⚠️ Aviso de " + AvisoPago.plata(monto) + " por SMS: revísalo", f, cuerpo, AvisoPago.plata(monto), "SMS " + remitente, "revisar");
                 }
             }
             guardar(sp, id, txt, !callado, null, confiar, null);
@@ -519,7 +525,8 @@ public class VentoEscucha extends NotificationListenerService {
 
     /** El mismo pago por los dos lados (app del banco y SMS, mismo valor, en 3 min): devuelve el ID del otro aviso si
      *  todavía no estaba emparejado (y los empareja); si no, guarda este para emparejarlo después. */
-    private static synchronized JSONObject parear(SharedPreferences sp, long monto, boolean esSms, String id, boolean ok) {
+    private static JSONObject parear(SharedPreferences sp, long monto, boolean esSms, String id, boolean ok) { return parear(sp, monto, esSms, id, ok, false); }
+    private static synchronized JSONObject parear(SharedPreferences sp, long monto, boolean esSms, String id, boolean ok, boolean dicho) {
         try {
             JSONArray l = new JSONArray(sp.getString(PREF_RECIENTES, "[]")), out = new JSONArray();
             long ahora = System.currentTimeMillis();
@@ -534,7 +541,7 @@ public class VentoEscucha extends NotificationListenerService {
                 out.put(o);
             }
             // «ok»: ese aviso ya se dijo como pago CONFIRMADO (la app del banco o el SMS del 85888). Un SMS de «revísalo» no.
-            if (par == null) out.put(new JSONObject().put("id", id).put("m", monto).put("sms", esSms).put("t", ahora).put("ok", ok));
+            if (par == null) out.put(new JSONObject().put("id", id).put("m", monto).put("sms", esSms).put("t", ahora).put("ok", ok).put("dicho", dicho));
             while (out.length() > 40) out.remove(0);
             sp.edit().putString(PREF_RECIENTES, out.toString()).apply();
             return par;

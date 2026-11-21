@@ -70,5 +70,5 @@ export function fuente(txt: string): { nivel: "app" | "revisar" | "falso"; txt: 
   }
   const quien = /^sms$/i.test(t1) ? "" : t1;
   if (quien.replace(/\D/g, "").length >= 7) return { nivel: "falso", txt: "SMS desde un número de celular (" + quien + "): los bancos no escriben desde celulares" };
-  return { nivel: "revisar", txt: "Llegó por SMS" + (quien ? " (" + quien + ")" : "") };   // 1.99.26: sin «antes de entregar» (pedido del dueño)
+  return { nivel: "revisar", txt: "Llegó por SMS" + (quien ? " (" + quien + ")" : "") + ": confírmalo en la app del banco antes de entregar" };
 }

@@ -317,7 +317,8 @@
       return !!n && (n.rol === 'dueno' || n.rol === 'admin') && e.ok === true && Date.now() - Number(e.t || 0) < 20000;
     }catch(x){ return false; }
   }
-  function avisar(p, x, enPantalla){
+  // callarVoz (1.99.26): el mismo pago ya sonó por SMS: se muestra como siempre, pero la voz no se repite.
+  function avisar(p, x, enPantalla, callarVoz){
     if(!paraMi(p, x)) return;
     // Mesero, empleado o cajero: solo «✅ Mesa 3 ya pagó», sin el valor ni quién pagó.
     try{ if(window.ventoConfirma && window.ventoConfirma.mesero(x || p)) return; }catch(e){}
@@ -352,15 +353,15 @@
       return;
     }
     if(p.confianza === 'revisar'){
-      // 1.99.26 (pedido del dueño): un SMS del banco dice solo cuánto llegó (sin «revísalo antes de entregar»).
-      toast('💜 Llegaron ' + plata(p.monto) + ' por ' + nombreMetodo(p.metodo) + (p.pagador ? ' de ' + p.pagador : '') + m + ' (mensaje de texto)', 12000);
-      hablarPago('Llegaron ' + p.monto + ' pesos por ' + nombreMetodo(p.metodo) + '.');
+      toast('⚠️ ' + nombreMetodo(p.metodo) + ': ' + plata(p.monto) + (p.pagador ? ' de ' + p.pagador : '') + m + '. ' + (p.detalle || 'Confírmalo en la app del banco.'), 12000);
+      // 1.99.26 (pedido del dueño): la VOZ dice solo cuánto llegó, sin «revísalo antes de entregar» (el texto sigue igual).
+      if(!callarVoz) hablarPago('Llegaron ' + p.monto + ' pesos por ' + nombreMetodo(p.metodo) + '.');
       return;
     }
     // Como el parlante de Bold: sonido de éxito y «Pago confirmado» en voz alta.
     toast('✅ Pago confirmado · ' + plata(p.monto) + ' por ' + nombreMetodo(p.metodo) + (p.pagador ? ' de ' + p.pagador : '') + m + (p.aprobacion ? ' · N.º ' + p.aprobacion : ''), 9000);
     try{ window.ventoSonidos && window.ventoSonidos.success(); }catch(e){}
-    hablarPago('Llegaron ' + p.monto + ' pesos por ' + nombreMetodo(p.metodo) + (p.mesa ? ', de la ' + etiquetaMesa(p.mesa) : ''));   // la cantidad, sin el nombre
+    if(!callarVoz) hablarPago('Llegaron ' + p.monto + ' pesos por ' + nombreMetodo(p.metodo) + (p.mesa ? ', de la ' + etiquetaMesa(p.mesa) : ''));   // la cantidad, sin el nombre
     try{ navigator.vibrate && navigator.vibrate([150, 80, 150]); }catch(e){}
     try{ window.mesoraCelebrar && window.mesoraCelebrar(['💜', '💰', '✨']); }catch(e){}
   }
@@ -397,9 +398,9 @@
     var vc = null;
     if(nuevoAprobado && enVivo && !leidoAqui(x)){ try{ vc = window.ventoConfirma ? window.ventoConfirma.llego(x, p) : null; }catch(e){} }
     if(vc === 'duplicado' || vc === 'junto'){ try{ saveData(); }catch(e){} pintarHistorial(); return; }
-    // 1.99.26: el mismo pago ya sonó por SMS: la notificación de la app del banco lo confirma (se registra) sin repetirlo.
+    // 1.99.26: el mismo pago ya sonó por SMS: la app del banco lo confirma (se registra y se muestra) sin repetir la voz.
     var yaDicho = !!x._yaDicho; try{ delete x._yaDicho; }catch(e){}
-    if(nuevoAprobado && enVivo && !leidoAqui(x) && !yaDicho) avisar(p, x, !!vc);
+    if(nuevoAprobado && enVivo && !leidoAqui(x)) avisar(p, x, !!vc, yaDicho);
     else if(p.estado === 'rechazado' && p.confianza === 'falso' && !antes && enVivo) avisar(p, x);
     pintarHistorial();
     try{ window.layaPintarTarjeta && window.layaPintarTarjeta(); }catch(e){}

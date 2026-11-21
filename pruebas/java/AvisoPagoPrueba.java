@@ -82,8 +82,10 @@ public class AvisoPagoPrueba {
         chk("SMS de código NO se toma", !AvisoPago.esSmsDePago("85888", "DaviPlata: su clave para recibir $5.000 es 4455"), "");
         chk("Remitente celular (3001234567) → «celular» (falso)", AvisoPago.tipoRemitente("+57 300 123 4567").equals("celular"), AvisoPago.tipoRemitente("+57 300 123 4567"));
         chk("Remitente código corto (85888) → «corto»", AvisoPago.tipoRemitente("85888").equals("corto"), "");
-        chk("Frase SMS sin confiar (1.99.26): «Llegaron 200 pesos por DaviPlata.» (sin «revísalo antes de entregar»)", AvisoPago.fraseSms("DaviPlata: Recibió $200", 200, "corto", false).equals("Llegaron 200 pesos por DaviPlata."), AvisoPago.fraseSms("DaviPlata: Recibió $200", 200, "corto", false));
+        chk("Frase SMS sin confiar: «Llegó un mensaje de texto de 200 pesos desde DaviPlata. Revísalo…»", AvisoPago.fraseSms("DaviPlata: Recibió $200", 200, "corto", false).startsWith("Llegó un mensaje de texto de 200 pesos desde DaviPlata. Revísalo"), AvisoPago.fraseSms("DaviPlata: Recibió $200", 200, "corto", false));
         chk("Frase SMS confiando: «Llegaron 200 pesos por DaviPlata, por mensaje de texto.»", AvisoPago.fraseSms("DaviPlata: Recibió $200", 200, "corto", true).equals("Llegaron 200 pesos por DaviPlata, por mensaje de texto."), AvisoPago.fraseSms("DaviPlata: Recibió $200", 200, "corto", true));
+        chk("1.99.26: la VOZ del SMS sin confiar dice «Llegaron 200 pesos por DaviPlata.» (el texto de la notificación no cambia)", AvisoPago.fraseSmsVoz(null, "DaviPlata: Recibió $200", 200, "corto", false).equals("Llegaron 200 pesos por DaviPlata."), AvisoPago.fraseSmsVoz(null, "DaviPlata: Recibió $200", 200, "corto", false));
+        chk("1.99.26: la voz del SMS desde un celular sigue avisando «Ojo… parece falso»", AvisoPago.fraseSmsVoz(null, "Nequi: te llegó $50.000", 50000, "celular", false).startsWith("Ojo."), "");
         chk("Frase SMS desde celular: «Ojo… parece falso» aunque se confíe", AvisoPago.fraseSms("Nequi: te llegó $50.000", 50000, "celular", true).startsWith("Ojo."), "");
         chk("Banco: DaviPlata", AvisoPago.esBanco("DaviPlata"), "");
         chk("Banco: Nequi", AvisoPago.esBanco("Nequi"), "");
@@ -187,7 +189,7 @@ public class AvisoPagoPrueba {
         String sms2 = "Recibiste  140,000. Para saber mas, consulta tus movimientos.";
         chk("SMS 85888 «Recibiste 140,000.» (sin decir DaviPlata): pago de 140000 de DaviPlata", AvisoPago.esSmsDePago("85888", sms2) && AvisoPago.monto(sms2) == 140000 && "DaviPlata".equals(AvisoPago.bancoDeCodigo("85888")), AvisoPago.monto(sms2));
         chk("…y desde un celular el mismo texto NO es del banco", !AvisoPago.esSmsDePago("3001234567", sms2), "");
-        chk("Voz del SMS 85888 (1.99.26): «Llegaron 140000 pesos por DaviPlata.»", AvisoPago.fraseSms("85888", sms2, 140000, "corto", false).equals("Llegaron 140000 pesos por DaviPlata."), AvisoPago.fraseSms("85888", sms2, 140000, "corto", false));
+        chk("Voz del SMS 85888: «… 140000 pesos desde DaviPlata …»", AvisoPago.fraseSms("85888", sms2, 140000, "corto", false).contains("140000 pesos desde DaviPlata"), AvisoPago.fraseSms("85888", sms2, 140000, "corto", false));
         chk("Voz de la llave con el valor del SMS: «Llegaron 140000 pesos por Bre-B, en DaviPlata.»", "Llegaron 140000 pesos por Bre-B, en DaviPlata.".equals(AvisoPago.frase("DaviPlata", 140000, llaves)), AvisoPago.frase("DaviPlata", 140000, llaves));
         String[] salen = { "DaviPlata | Pasaste $100 a otro DaviPlata. Para saber mas, consulta tus movimientos.", "DaviPlata: Compra exitosa en la Tienda Virtual por  20,000. Para saber mas, consulta tus movimientos" };
         for (String x : salen) chk("Plata que SALE no es pago: «" + x + "»", !AvisoPago.esRecibido(x) && !AvisoPago.esSmsDePago("85888", x), x);

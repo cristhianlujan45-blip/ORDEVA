@@ -111,10 +111,10 @@ public class EscuchaPrueba {
         sp = nuevo();
         VentoEscucha.leerSms(sp, "85954", "", conv(new Object[]{"Nequi: MARIBE ARIAS te envio $1.500", ahora - 1000}), "k7c:", false);
         VentoApp.ui.correr();
-        chk("1.99.26: el SMS de Nequi dice «Llegaron 1500 pesos por Nequi.» (sin «revísalo antes de entregar») y sale como un pago, con su ventana", VentoApp.dichos.contains("Llegaron 1500 pesos por Nequi.") && !VentoApp.dichos.stream().anyMatch(d -> d.contains("Revísalo")) && VentoApp.notifs.stream().anyMatch(n -> n[3].equals("$1.500") && n[5].equals("ok")), VentoApp.dichos + " " + VentoApp.notifs.size());
+        chk("1.99.26: la VOZ del SMS de Nequi dice «Llegaron 1500 pesos por Nequi.» (sin «revísalo»); la notificación sigue «⚠️ … revísalo»", VentoApp.dichos.contains("Llegaron 1500 pesos por Nequi.") && !VentoApp.dichos.stream().anyMatch(d -> d.contains("Revísalo")) && VentoApp.notifs.stream().anyMatch(n -> n[0].contains("revísalo") && n[5].equals("revisar")), VentoApp.dichos + " " + VentoApp.notifs.size());
         VentoApp.notifs.clear(); VentoApp.dichos.clear();
         app(sp, "Nequi", "Envío", "MARIBE ARIAS te envió 1500, ¡lo mejor!", "k7d:");
-        chk("1.99.26: Nequi por SMS y luego por la app: el SMS ya dijo «Llegaron 1500 pesos» → la app NO lo repite (ni voz ni otra notificación)", VentoApp.dichos.isEmpty() && VentoApp.notifs.isEmpty(), VentoApp.dichos + " " + VentoApp.notifs.size());
+        chk("Nequi por SMS y luego por la app: la app lo confirma con notificación y 🪟 ventana «$1.500» (1.99.26: sin repetir la voz)", VentoApp.dichos.isEmpty() && VentoApp.notifs.stream().anyMatch(n -> n[3].equals("$1.500") && n[5].equals("ok")), VentoApp.dichos + " " + VentoApp.notifs.size());
 
         // 8) «Pasaste $100 a otro DaviPlata» (plata que SALE): no suena
         limpiar();

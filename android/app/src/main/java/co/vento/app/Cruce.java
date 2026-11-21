@@ -167,9 +167,8 @@ final class Cruce {
     }
     static String metodo(String m) { String x = METODO.get(String.valueOf(m).toUpperCase()); return x != null ? x : (m == null || m.isEmpty() ? "transferencia" : m.charAt(0) + m.substring(1).toLowerCase()); }
 
-    /* 1.99.26: el mismo pago por SMS («revisar») y por la app del banco («ok») son dos avisos en el servidor. Se juntan uno
-       con uno (mismo valor, menos de 5 min): el segundo de la pareja no suena. Dos pagos de distinta gente por el mismo valor
-       siguen sonando los dos (cada SMS se junta con una sola notificación de la app, y dos de la app no se juntan). */
+    /* 1.99.26: pareja SMS («revisar») + app del banco del mismo pago, uno con uno (mismo valor, menos de 5 min). Dos pagos de
+       la app por el mismo valor (dos clientes) no se juntan: suenan los dos. */
     private static final java.util.List<long[]> RECIENTES = new java.util.ArrayList<>();   // {monto, t, esSms, emparejado}
     static synchronized boolean yaAnunciadoPar(long monto, boolean esSms) {
         long ahora = System.currentTimeMillis();
@@ -187,14 +186,19 @@ final class Cruce {
         if ("null".equals(de)) de = "";
         if ("null".equals(detalle)) detalle = "";
         String plata = AvisoPago.plata(monto);
+        // 1.99.26: el mismo pago por SMS («revisar») y por la app del banco son dos avisos en el servidor: se muestran los dos
+        // como siempre, pero la VOZ suena una sola vez.
+        boolean callarVoz = !"falso".equals(conf) && yaAnunciadoPar(monto, "revisar".equals(conf));
         if ("falso".equals(conf)) {
             String f = "Ojo. Llegó un mensaje de pago sospechoso por " + monto + " pesos. Parece falso. No entregues nada.";
             VentoApp.decirPago(f);
             VentoApp.notificarPago("🚨 Mensaje de pago FALSO: " + plata, f, detalle, plata, banco, "falso");
-        } else if (yaAnunciadoPar(monto, "revisar".equals(conf))) {
-            // 1.99.26: el mismo pago llegó por SMS y por la app del banco (dos avisos en el servidor): ya sonó uno, no se repite.
+        } else if ("revisar".equals(conf)) {
+            String f = "Llegó un aviso de " + monto + " pesos por " + banco + ". Revísalo en la aplicación del banco antes de entregar.";
+            if (!callarVoz) VentoApp.decirPago("Llegaron " + monto + " pesos por " + banco + ".");   // 1.99.26: la voz, sin «revísalo» (el texto sigue igual)
+            VentoApp.notificarPago("⚠️ Aviso de " + plata + ": revísalo", f, detalle, plata, banco, "revisar");
         } else {
-            VentoApp.decirPago("Llegaron " + monto + " pesos por " + banco + ".");   // la cantidad siempre; sin el nombre
+            if (!callarVoz) VentoApp.decirPago("Llegaron " + monto + " pesos por " + banco + ".");   // la cantidad siempre; sin el nombre
             VentoApp.notificarPago("💜 Recibiste " + plata + " por " + banco, "Recibiste " + monto + " pesos por " + banco + (de.isEmpty() ? "" : ", de " + de) + ".", detalle, plata, banco, "ok");
         }
     }
