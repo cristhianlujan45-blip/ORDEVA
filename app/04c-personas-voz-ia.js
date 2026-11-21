@@ -2354,16 +2354,20 @@ function invBadge(){
 function invLogOrden(L){ return L.slice().sort((a, b) => ((b.at || 0) - (a.at || 0)) || String(a.p).localeCompare(String(b.p)) || ((a.q || 0) - (b.q || 0)) || String(a.id || '').localeCompare(String(b.id || ''))); }
 function invLogConId(){
   let L = Array.isArray(data.stockLog) ? data.stockLog.filter(x => x && typeof x === 'object') : [];
-  if(L.length === (data.stockLog || []).length && L.every(x => x.id)) return data.stockLog;
-  const vistos = {};
-  L = invLogOrden(L).map(x => {
-    if(x.id) return x;
+  if(Array.isArray(data.stockLog) && L.length === data.stockLog.length && L.every(x => x.id) && new Set(L.map(x => x.id)).size === L.length) return data.stockLog;
+  // Revisión: si una mezcla sin copia de referencia juntó la lista vieja (sin id) con la ya convertida, el mismo movimiento
+  // quedaba dos veces. Aquí cada id va una sola vez, y un movimiento viejo cuyo id ya está es el mismo: no se repite.
+  const ya = new Set(), vistos = {}, out = [];
+  invLogOrden(L).forEach(x => { if(x.id && !ya.has(x.id)){ ya.add(x.id); out.push(x); } });
+  invLogOrden(L.filter(x => !x.id)).forEach(x => {
     const k = 'k' + Number(x.at || 0).toString(36) + '-' + String(x.p) + '-' + x.q;
     vistos[k] = (vistos[k] || 0) + 1;
-    return Object.assign({ id: vistos[k] > 1 ? k + '-' + vistos[k] : k }, x);
+    const id = vistos[k] > 1 ? k + '-' + vistos[k] : k;
+    if(ya.has(id)) return;
+    ya.add(id); out.push(Object.assign({ id }, x));
   });
-  data.stockLog = L;
-  return L;
+  data.stockLog = invLogOrden(out);
+  return data.stockLog;
 }
 function invOnSale(item, q){                 // se llama solo, cada vez que cambia la cantidad de un ítem en una cuenta
   const p = data.products.find(x => x.id === item.productId);
@@ -2375,7 +2379,9 @@ function invOnSale(item, q){                 // se llama solo, cada vez que camb
   const L = invLogConId();
   const at = Date.now();
   L.unshift({ id: 'k' + at.toString(36) + '-' + Math.random().toString(36).slice(2, 6), p: p.id, q, at });
-  if(L.length > 3000) data.stockLog = invLogOrden(L).slice(0, 2500);
+  // Tope 2.600 (quedan los 2.400 más nuevos): las versiones de antes recortan al pasar de 3.000 quedándose con el FINAL de
+  // la lista, que ahora es lo más viejo. Con este tope ellas nunca llegan a recortar.
+  if(L.length > 2600) data.stockLog = invLogOrden(L).slice(0, 2400);
   // ⏳ 1.67.6: lotes con vencimiento: se vende primero el que vence antes; lo que se devuelve (deshacer) vuelve a ese lote.
   if(Array.isArray(p.lotes) && p.lotes.length){
     const F = window.ventoFinanzas;

@@ -284,12 +284,15 @@
       if(!kb[k] && !kr[k]) out.push(x);                                                          // lo que agregó este celular
       else if(esItem(x) && kb[k] && !kr[k] && !igual(x, mb[k])){ var y = soloLoNuevo(x, mb[k]); if(y) out.push(y); }   // allá lo quitaron; aquí le agregaron
     });
+    var porIdB = {}, porIdL = {};
+    b.forEach(function(y){ if(y && y.id != null && !(String(y.id) in porIdB)) porIdB[String(y.id)] = y; });
+    l.forEach(function(y){ if(y && y.id != null && !(String(y.id) in porIdL)) porIdL[String(y.id)] = y; });
     // Mismo elemento cambiado en uno o en los dos celulares: se mezcla campo por campo
     // (así el stock suma las dos ventas y cada cambio se conserva).
     return out.map(function(x){
       if(esItem(x)){ var k = claveDe(x), ib = mb[k], il = ml[k]; return (il && kr[k] && (ib || !igual(il, x))) ? fusionarItem(ib, il, x) : x; }
       if(!(x && x.id != null)) return x;
-      var lb = b.find(function(y){ return y && y.id === x.id; }), ll = l.find(function(y){ return y && y.id === x.id; });
+      var lb = porIdB[String(x.id)], ll = porIdL[String(x.id)];   // 1.99.26: por id con un índice (antes buscaba en toda la lista por cada elemento)
       return (lb && ll) ? fusionar(lb, ll, x) : x;
     });
   }

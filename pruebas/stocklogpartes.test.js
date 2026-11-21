@@ -81,6 +81,25 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const o = 
     });
     chk('3. «Días de inventario»: el consumo por día da lo mismo con la lista nueva que en el orden de antes', Math.abs(r3.nuevo.a - r3.viejo.a) < 1e-9 && Math.abs(r3.nuevo.b - r3.viejo.b) < 1e-9 && r3.nuevo.a > 0, { r3, rateViejo });
     chk('3. … y antes de convertir la lista vieja daba un valor razonable (no se disparaba)', rateViejo.a > 0 && rateViejo.a < 100, rateViejo);
+    // ===== 4. Casos de la revisión =====
+    // 4c. Un negocio sin ningún movimiento todavía (data.stockLog no existe): la venta descuenta el inventario y anota el movimiento
+    const r4c = await CEL.p.evaluate(() => { const g = { id: 'g', name: 'Gaseosa', price: 3000, stock: 25 }; data.products.push(g); const antes = data.stockLog; delete data.stockLog;
+      invOnSale({ productId: 'g' }, 2); const r = { stock: g.stock, n: (data.stockLog || []).length }; data.stockLog = antes; return r; });
+    chk('4c. Sin movimientos todavía: la venta descuenta el inventario (25 → 23) y anota el movimiento', r4c.stock === 23 && r4c.n === 1, r4c);
+    const r4 = await CEL.p.evaluate(() => {
+      // 4a. Una mezcla sin copia de referencia juntó la lista vieja (sin id) con la convertida: cada movimiento dos veces
+      const t0 = Date.now() - 5 * 864e5, viejos = []; for(let i = 0; i < 10; i++) viejos.push({ p: 'a', q: 1, at: t0 + i * 1000 });
+      data.stockLog = viejos.map(x => Object.assign({}, x)); invLogConId();
+      const convertida = data.stockLog.map(x => Object.assign({}, x));
+      data.stockLog = convertida.concat(viejos.map(x => Object.assign({}, x)));   // 20 renglones: los 10 con id y los mismos 10 sin id
+      invOnSale({ productId: 'a' }, 1);
+      const L = data.stockLog, unicos = new Set(L.map(x => x.id)).size;
+      // 4b. Tope: vendiendo mucho, la lista nunca pasa de 2.600 (las versiones de antes recortan al pasar de 3.000)
+      data.stockLog = []; let max = 0; for(let i = 0; i < 3200; i++){ invOnSale({ productId: 'b' }, 1); max = Math.max(max, data.stockLog.length); }
+      return { n: L.length, unicos, todos: L.every(x => x.id), max, fin: data.stockLog.length, nuevoPrimero: data.stockLog[0].at >= data.stockLog[data.stockLog.length - 1].at };
+    });
+    chk('4a. Lista vieja y convertida juntas (mezcla sin copia de referencia): quedan 11 movimientos, uno por id (no 21)', r4.n === 11 && r4.unicos === 11 && r4.todos, r4);
+    chk('4b. Vendiendo 3.200 veces la lista nunca pasa de 2.600 (las versiones de antes no llegan a recortar) y lo nuevo va primero', r4.max <= 2600 && r4.fin <= 2600 && r4.fin >= 2400 && r4.nuevoPrimero, r4);
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.stack || e)); }
   chk('Sin errores de página', !errs.length, errs.join(' | '));
   await b.close().catch(() => {}); await sb.cerrar().catch(() => {});
