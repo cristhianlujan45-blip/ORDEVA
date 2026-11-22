@@ -2621,7 +2621,15 @@ body.neg-tienda #quickSaleBtn, body:not(.neg-tienda) #fiadosBtn, body:not(.neg-t
   .o2-kpi em, .o2-movil-top small, #menuDiaCard small, .mf-op small, .ct-kpi > span,
   .tb-kpi-pie small, .tb-top-v small, .tb-mv small, .tb-chip, .tb-tabla th,
   .p-name-wrap .p-tag, .st-leg small, #isFoto > em, .cam-ia{ font-size:12px !important; }
-  .st-bars .st-col > span{ font-size:11px !important; }   /* números de las barras: 9 px → 11 px (más grande tapa la barra vecina) */
+  .st-bars .st-col > span{ font-size:12px !important; }   /* 1.99.30 · fechas de las barras: 12 px (se muestran menos fechas en pantallas angostas para que no se tapen) */
+  /* 1.99.30 · Lo último de letra chica de la auditoría: encabezados de la tabla de Productos e Inventario (11 px), días de la
+     gráfica de Contabilidad (10 px) y «Ocupada» en Mesas (11,5 px). Las columnas de Contabilidad se ensanchan un poco para
+     que los meses («ene», «feb») no se toquen. */
+  table.margin-table th{ font-size:12px }
+  .ct-chart .ct-col{ flex-basis:24px; min-width:24px }
+  .ct-chart .ct-col small{ font-size:12px }
+  .vt-l b small{ font-size:12px }   /* «▼ 1 %» de Contabilidad › Frente al período anterior (11,7 px) */
+  .ticket .mp-fila .mp-pill, .ticket .mp-fila .mp-cap{ font-size:12px }
   /* 1.99.27 · Renglón «etiqueta · valor» (Contabilidad › IVA y la caja): su estilo solo llegaba al abrir la caja y se leía
      «IVA generado$0». */
   .vt-l{ display:flex; justify-content:space-between; gap:8px; padding:5px 0; border-bottom:1px solid var(--line, #3333); font-size:14px; }

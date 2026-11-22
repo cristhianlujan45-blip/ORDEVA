@@ -267,7 +267,7 @@ document.getElementById('langSel').addEventListener('change', e => setLang(e.tar
 let stPer = '7';
 const stMoney = n => fmt(Math.round(n || 0));
 function stBars(items){                          // columnas verticales [{l,v,t}]
-  const mx = Math.max(1, ...items.map(i => i.v)), every = Math.ceil(items.length / 8);
+  const mx = Math.max(1, ...items.map(i => i.v)), every = Math.ceil(items.length / (window.innerWidth <= 360 ? 5 : window.innerWidth <= 430 ? 7 : 8));   // 1.99.30: letra de 12 px → menos fechas en pantallas angostas
   return '<div class="st-bars">' + items.map((i, k) => '<div class="st-col" title="' + invEsc(i.t) + '"><div class="st-bar" style="height:' + (i.v ? Math.max(3, Math.round(i.v / mx * 100)) : 0) + '%"></div><span>' + (k % every === 0 ? invEsc(i.l) : '') + '</span></div>').join('') + '</div>';
 }
 function stRows(items){                          // barras horizontales [{l,v,t,c}]

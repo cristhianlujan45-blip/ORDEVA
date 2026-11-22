@@ -55,3 +55,10 @@ Después se revisaron capturas de cada hallazgo. Las alarmas que resultaron fals
 
 ## Prueba
 `pruebas/diseno1927.test.js` (14/14). Con el código anterior fallan 13 de las 14 comprobaciones.
+
+## Seguimiento (22/11)
+- 1.99.28: botones con los mismos colores, bordes y esquinas (`puente/REPORTE-1.99.28.md`).
+- 1.99.29: gráficas con letra de 12 px; Historial › «90 días» mostraba solo la mitad (los días más recientes no se
+  veían); el «?» de la ayuda de voz se toca en 44 × 44 (`puente/REPORTE-1.99.29.md`).
+- 1.99.30: la letra chica que quedaba (tablas, barras de Estadísticas y Contabilidad, «Ocupada»). En las 11 pantallas
+  medidas ya no queda texto de menos de 12 px (`puente/REPORTE-1.99.30.md`).
