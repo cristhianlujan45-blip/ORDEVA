@@ -2630,6 +2630,16 @@ body.neg-tienda #quickSaleBtn, body:not(.neg-tienda) #fiadosBtn, body:not(.neg-t
   .ct-chart .ct-col small{ font-size:12px }
   .vt-l b small{ font-size:12px }   /* «▼ 1 %» de Contabilidad › Frente al período anterior (11,7 px) */
   .ticket .mp-fila .mp-pill, .ticket .mp-fila .mp-cap{ font-size:12px }
+  /* 1.99.31 · Auditoría de diseño, nueva medición (22/11):
+     · el ojo «Ver la contraseña» (entrar, recuperar, usuarios…) medía 35 × 31 px: ahora se toca en 44 × 44;
+     · el número de la cantidad en la cuenta de la mesa (entre − y +) medía 20 px de alto: ahora 40, como los botones;
+     · los textos grises de la tarjeta «Te quedó» / «Resultado» de Contabilidad quedaban justo en el límite de contraste
+       sobre su fondo gris (4,49 : 1): un gris más oscuro;
+     · las teclas «Enter» / «Esc» de la ayuda al cobrar con teclado, de 11 px: 12 px. */
+  .ojo-clave, .pw-ojo{ min-width:44px !important; min-height:44px !important; right:1px !important; display:inline-grid !important; place-items:center; box-sizing:border-box }
+  :is(#overlay, #personOverlay) .add-row .qty-stepper input[type=number]{ height:40px }
+  .ct-kpi.res small, .ct-kpi.res span{ color:color-mix(in srgb, var(--ink-soft) 65%, var(--ink)) }
+  .pz-kb kbd, .pz-kb-ayuda kbd{ font-size:12px !important }
   /* 1.99.27 · Renglón «etiqueta · valor» (Contabilidad › IVA y la caja): su estilo solo llegaba al abrir la caja y se leía
      «IVA generado$0». */
   .vt-l{ display:flex; justify-content:space-between; gap:8px; padding:5px 0; border-bottom:1px solid var(--line, #3333); font-size:14px; }
