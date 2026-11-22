@@ -581,6 +581,7 @@ function openQuickProductOverlay(prefillName, ctx){
   document.getElementById('qpPrice').value = '';
   document.getElementById('qpCost').value = '';
   document.getElementById('qpSize').value = '';
+  const qs0 = document.getElementById('qpStock'); if(qs0) qs0.value = '';
   const preview = document.getElementById('qpPhotoPreview');
   if(preview) preview.classList.remove('show');
   ov.classList.add('show');
@@ -663,6 +664,11 @@ document.getElementById('qpAddBtn').addEventListener('click', async () => {
     return;
   }
   const size = sizeInput.value.trim();
+  // 📦 1.99.27 (pedido del dueño): el producto nuevo que se agrega desde la mesa queda INVENTARIADO de una vez. Con
+  // «¿Cuántas tienes?» queda con esa cantidad (y se descuenta lo que va a la mesa); sin escribirla, queda en el inventario
+  // con 0 para que le pongan la cantidad (no se inventa una). Antes quedaba sin control de inventario (stock vacío).
+  const stEl = document.getElementById('qpStock'), stTxt = stEl ? String(stEl.value || '').trim() : '';
+  const stock = stTxt === '' ? null : Math.max(0, Math.floor(+stTxt || 0));
   const fotoLista = qpFotoBlanca;   // se pierde al cerrar el overlay, así que se guarda antes
   const guardarFoto = async (p) => {
     if(!fotoLista || p.foto) return;   // no pisa una foto que el producto ya tuviera
@@ -676,6 +682,7 @@ document.getElementById('qpAddBtn').addEventListener('click', async () => {
   const existing = data.products.find(p => dupKey(p) === dupKey({ name, size }));
   if(existing){
     if(qpBarcode){ if(!Array.isArray(existing.barcodes)) existing.barcodes = []; if(!existing.barcodes.includes(qpBarcode)) existing.barcodes.push(qpBarcode); saveData(); }
+    if(existing.stock == null && stock != null){ existing.stock = stock; saveData(); renderInventario(); }   // ya existía sin inventario: ahora queda inventariado
     closeQuickProductOverlay();
     guardarFoto(existing);
     addFavoriteToTable(existing.id);
@@ -688,7 +695,7 @@ document.getElementById('qpAddBtn').addEventListener('click', async () => {
     categoryId: null,
     size,
     specifications: '',
-    stock: null,
+    stock: stock != null ? stock : 0,
     cost: invNum(costInput.value)
   };
   if(qpBarcode) newProduct.barcodes = [qpBarcode];
@@ -699,6 +706,8 @@ document.getElementById('qpAddBtn').addEventListener('click', async () => {
   closeQuickProductOverlay();
   await guardarFoto(newProduct);
   addFavoriteToTable(newProduct.id);
+  showToast(stock != null ? '📦 ' + newProduct.name + ' quedó en el inventario: ' + newProduct.stock + (newProduct.stock === 1 ? ' unidad' : ' unidades') + '.'
+    : '📦 ' + newProduct.name + ' quedó en el inventario. Escribe cuántas tienes en Inventario.', 5000);
 });
 
 /* ---------- Cuentas de un producto: costo, precio, IVA, cantidad ----------
