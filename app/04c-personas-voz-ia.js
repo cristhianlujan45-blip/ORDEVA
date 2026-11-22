@@ -320,7 +320,7 @@ function renderModalItems(){
           <div class="li-right">
             <span class="li-price">${fmt(it.price*it.qty)}</span>
             <button class="li-clock" data-idx="${idx}" title="Ver horario de pedidos">🕐</button>
-            <button class="li-remove" data-idx="${idx}">✕</button>
+            <button class="li-remove" data-idx="${idx}" aria-label="Quitar de la cuenta" title="Quitar de la cuenta">✕</button>
           </div>
         `;
         const hist = document.createElement('div');
@@ -423,7 +423,7 @@ function renderPayments(){
       <div><span class="li-name">${invEsc(p.note || 'Abono')}</span><span class="pay-method ${method}">${methodLabel[method] || method}</span>${(t.people || []).length ? '<span class="pay-quien">👤 ' + invEsc(personLookupName(t, p.personId) || 'Cuenta general') + '</span>' : ''}${payItemsHtml(p)}</div>
       <div class="li-right">
         <span class="li-price">${fmt(p.amount)}</span>
-        <button class="li-remove" data-idx="${idx}">✕</button>
+        <button class="li-remove" data-idx="${idx}" aria-label="Quitar de la cuenta" title="Quitar de la cuenta">✕</button>
       </div>
     `;
     container.appendChild(row);
@@ -940,7 +940,7 @@ function renderPersonModalItems(){
         <div class="li-right">
           <span class="li-price">${fmt(it.price*it.qty)}</span>
           <button class="li-clock" data-idx="${idx}" title="Ver horario de pedidos">🕐</button>
-          <button class="li-remove" data-idx="${idx}">✕</button>
+          <button class="li-remove" data-idx="${idx}" aria-label="Quitar de la cuenta" title="Quitar de la cuenta">✕</button>
         </div>
       `;
       const hist = document.createElement('div');
@@ -1029,7 +1029,7 @@ function renderPersonModalPayments(){
       <div><span class="li-name">${invEsc(p.note || 'Abono')}</span><span class="pay-method ${method}">${methodLabel[method] || method}</span>${payItemsHtml(p)}</div>
       <div class="li-right">
         <span class="li-price">${fmt(p.amount)}</span>
-        <button class="li-remove" data-idx="${idx}">✕</button>
+        <button class="li-remove" data-idx="${idx}" aria-label="Quitar de la cuenta" title="Quitar de la cuenta">✕</button>
       </div>
     `;
     container.appendChild(row);

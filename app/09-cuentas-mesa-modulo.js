@@ -2798,7 +2798,7 @@ function ypCrear(){
       '<section class="yp-lado" aria-label="Lo que suena">'+
         '<div class="yp-video" id="ypVideo"><img id="ypPortada" alt=""><div class="yp-nada" id="ypNada">🎵 No está sonando nada.<br><small>Busca una canción o pon una de tus listas.</small></div></div>'+
         '<div class="yp-ahora"><div class="yp-info"><div class="yp-titulo" id="ypTitulo"></div><div class="yp-quien" id="ypQuien"></div><div class="yp-donde" id="ypDonde"></div><div class="yp-bar"><i id="ypBar"></i></div><div class="yp-tiempo" id="ypTiempo"></div></div>'+
-        '<div class="yp-ctrl"><button type="button" class="yp-cor" id="ypCor" hidden>🤍</button><button type="button" class="btn-ghost" id="ypPausa">⏯<span class="yp-bt-txt"> Pausa</span></button><button type="button" class="btn-primary" id="ypSig">⏭<span class="yp-bt-txt"> Siguiente</span></button></div></div>'+
+        '<div class="yp-ctrl"><button type="button" class="yp-cor" id="ypCor" hidden>🤍</button><button type="button" class="btn-ghost" id="ypPausa">⏯<span class="yp-bt-txt"> Pausa</span></button><button type="button" class="btn-primary" id="ypSig" aria-label="Siguiente canción">⏭<span class="yp-bt-txt"> Siguiente</span></button></div></div>'+
         '<button type="button" class="btn-primary yp-tocar" id="ypTocar" hidden>▶ Toca aquí para que suene</button>'+
         '<div class="yp-mq" id="ypMq" hidden><span id="ypMqTxt"></span><button type="button" class="btn-ghost" id="ypMqYo">🎶 Que suene aquí</button></div>'+
         '<button type="button" class="yp-sc" id="ypSc" hidden>🚫 ¿Salen comerciales? Entra con tu YouTube Premium <b>›</b></button>'+
