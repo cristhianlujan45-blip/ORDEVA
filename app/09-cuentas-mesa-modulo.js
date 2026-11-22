@@ -222,9 +222,11 @@ let rango=7;
 // 1.99.29 · Se dibuja al ancho real del panel (la letra queda de 12 px, sin encogerse) y las barras se reparten en ese ancho:
 // antes cada barra medía al menos 4 + 3, y con «90 días» la mitad (los días más recientes) quedaba por fuera y no se veía.
 function barras(t,labels,vals,f,ancho){
-  const W=Math.max(240,Math.round(ancho||320)),H=130,mx=Math.max(...vals,1),n=vals.length,paso=(W-10)/Math.max(1,n),bw=Math.max(1,Math.min(paso-2,paso*.8)),cada=Math.ceil(n/Math.max(2,Math.floor((W-10)/42)));
+  const W=Math.max(240,Math.round(ancho||320)),H=130,mx=Math.max(...vals,1),n=vals.length,paso=(W-10)/Math.max(1,n),bw=Math.max(1,Math.min(paso-2,paso*.8)),
+    // 1.99.34: cuántas etiquetas caben según su largo (≈7,6 px por letra a 12 px, pensando en letras anchas) + 10 px de aire
+    anchoEt=Math.max(...labels.map(l=>String(l).length))*7.6,cada=Math.max(1,Math.ceil((anchoEt+10)/paso));
   let s='<svg viewBox="0 0 '+W+' '+(H+22)+'" style="width:100%;height:auto" role="img" aria-label="'+esc(t)+'">';
-  vals.forEach((v,i)=>{const h=Math.round(v/mx*H),x=5+i*paso,cx=x+bw/2,a=cx<20?'start':cx>W-20?'end':'middle',tx=a==='start'?x:a==='end'?x+bw:cx;
+  vals.forEach((v,i)=>{const h=Math.round(v/mx*H),x=5+i*paso,cx=x+bw/2,et=String(labels[i]).length*7.6/2,a='middle',tx=Math.min(Math.max(cx,et+1),W-et-1);   // centrada y sin salirse de los bordes
     s+='<rect x="'+x.toFixed(1)+'" y="'+(H-h)+'" width="'+bw.toFixed(1)+'" height="'+h+'" rx="'+(bw>4?2:0)+'" fill="var(--ink)" opacity=".85"><title>'+esc(labels[i])+': '+f(v)+'</title></rect>';
     if(i%cada===0)s+='<text x="'+tx.toFixed(1)+'" y="'+(H+15)+'" font-size="12" text-anchor="'+a+'" fill="var(--ink-soft)">'+esc(labels[i])+'</text>';});
   return '<div class="chart-box"><h3>'+esc(t)+'</h3>'+s+'</svg></div>';
