@@ -2668,9 +2668,23 @@ body.neg-tienda #quickSaleBtn, body:not(.neg-tienda) #fiadosBtn, body:not(.neg-t
     nav button, .nav-more, body.o2 nav button, body.o2 .nav-more{ padding-left:1px; padding-right:1px; letter-spacing:-.04em; font-size:11px !important; }
     /* 1.99.34: con letras más anchas (DejaVu, la de muchos Android y la de GitHub) «Productos» no cabía: «Más» (una palabra
        corta) cede ancho a los otros cuatro y la barra pierde 4 px de relleno por lado. */
+  }
+  /* 1.99.35 · La barra de abajo cortaba «Productos» en 360 px (el ancho de la mayoría de Android) aun con la letra normal, y
+     con letras anchas también «Caja POS» (360) y «Productos» (390). En todos los celulares: «Más» cede ancho a los otros
+     cuatro, la barra pierde 4 px de relleno por lado y las letras se juntan un poco. */
+  @media (max-width:430px){
     .tabbar > nav{ flex: 5 1 0; }
     body .tabbar{ padding-left:4px; padding-right:4px; }
+    nav button, .nav-more, body.o2 nav button, body.o2 .nav-more{ padding-left:1px; padding-right:1px; letter-spacing:-.03em; }
+    html body.vs-on nav button, html body.vs-on .nav-more{ font-size:12px; }   /* la vista sencilla (prendida por defecto) la subía a 12,5 px */
   }
+  @media (max-width:350px){ nav button, .nav-more, body.o2 nav button, body.o2 .nav-more{ letter-spacing:-.04em; } }
+  /* 1.99.35 · Cobrar: los montos rápidos («+$100.000») perdían el último número en celulares angostos. Contabilidad: la
+     descripción del movimiento («Ventas cobradas del día», hasta tres líneas) y Música: la frase bajo el título (hasta dos), se cortaban. */
+  @media (max-width:400px){ body .pz-pago .pz-billetes button{ font-size:12px !important; letter-spacing:-.04em; } }
+  @media (max-width:340px){ body .pz-pago .pz-billetes{ grid-template-columns:repeat(2,minmax(0,1fr)) !important; } body .pz-pago .pz-billetes [data-b="exacto"]{ grid-column:span 2; } }
+  .ct-mov .tx b{ white-space:normal; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; }
+  body .mf-txt span{ white-space:normal; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
   /* 1.99.4 · Ajustes › Negocio más corto: índice arriba y las dos listas largas plegadas (lib/vento-ajustes-indice.js) */
   .aj-indice{display:block;margin:0 0 14px;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
   .aj-indice-t{display:block;font-size:13px;color:var(--ink-soft);margin-bottom:8px}
@@ -3294,7 +3308,7 @@ body.easy-mode #overlay .mesa-ico{ min-height:0; width:38px; height:38px; }
 .mesa-pleg-btn[aria-expanded="true"] .mp-ch{ transform:rotate(90deg); }
 /* Celulares angostos: sin la flechita y un poco más juntos, para que quepan los dos en la línea */
 @media (max-width:400px){
-  #overlay .mesa-sec .mesa-pleg-btn{ gap:5px; padding:0 8px 0 10px; }
+  #overlay .mesa-sec .mesa-pleg-btn{ gap:4px; padding:0 6px 0 8px; }   /* 1.99.35: 5/8/10 → 4/6/8 px: con letras anchas «Personas» + el número no cabían por 2 px */
   #overlay .mesa-sec .mesa-pleg-btn .mp-ch{ display:none; }
 }
 #personasToggle{ grid-column:1; }
