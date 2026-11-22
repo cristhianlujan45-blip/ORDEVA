@@ -781,7 +781,7 @@
     '.lb-ej-mas summary{cursor:pointer;font-weight:700;min-height:44px;display:flex;align-items:center;justify-content:center;gap:6px;color:var(--ink)}.lb-ej-mas[open] summary{min-height:36px}' +
     '#lbCerrar{min-width:44px;min-height:44px;font-size:18px;margin-left:auto}' +
     '.lb-resp{font-size:19px;font-weight:700;padding:14px;border-radius:14px;background:rgba(200,162,74,.15);margin:8px 0;line-height:1.4}' +
-    '.lb-btns{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}' +
+    '.lb-btns{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:8px;margin:10px 0}' +   /* 1.99.27: en 320 px el 3.º botón se salía */
     '.lb-calc-btn{display:block;width:100%;padding:14px;border-radius:14px;border:2px solid var(--amber,#c8a24a);background:transparent;color:inherit;font:700 17px system-ui;cursor:pointer;margin-bottom:8px}' +
     '.lb-calc{background:rgba(127,127,127,.10);border-radius:16px;padding:12px;margin-bottom:10px;animation:mzIn .2s ease-out}' +
     '.lb-calc-pant{background:rgba(0,0,0,.25);border-radius:12px;padding:16px 14px;text-align:right;font:800 32px system-ui;margin-bottom:10px;overflow-x:auto;white-space:nowrap}' +

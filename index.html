@@ -2608,6 +2608,28 @@ body.neg-tienda #quickSaleBtn, body:not(.neg-tienda) #fiadosBtn, body:not(.neg-t
     #invHerr > .is-chip{ min-height:44px !important }   /* «Precio con foto», «Unir repetidos», «Pedido a proveedor»: is-chip forzaba min-height:0 */
     .pz-linea .pz-x, .pz-cart-h .pz-plegar, .pz-caja-top > button{ min-width:44px }
     .pz .pz-step > .pz-qn{ width:auto; min-width:44px }
+    /* 1.99.27 · cuarta tanda (auditoría de diseño del 22/11): Inicio, primeros pasos, Música, Estadísticas, Libreta y la ✕
+       de «Producto nuevo» seguían con botones de 16 a 33 px. */
+    .o2-rango .o2-chips > button, .o2-card > h2 > button, #primerosPasos .pp-como, #exportSalesExcelBtn,
+    #mzClear, #mzHistBtn, #mzScBtn, #lngCopy, #lngTest, #lngCuenta, #lngProbar, #lngVerLog,
+    #libretaOverlay [data-pagotodo], #libretaOverlay .lb-nombrar{ min-height:44px; box-sizing:border-box }
+    #primerosPasos .pp-x, #qpCloseBtn, .tv-opt .pw-ojo{ min-width:44px !important; min-height:44px !important; box-sizing:border-box }
+    #lngHow{ display:inline-block; padding:12px 4px; }
+    .o2-alerta button[data-o2ir], #cartaPrint{ min-height:44px; box-sizing:border-box }
+  }
+  /* 1.99.27 · Letra de 12 px como mínimo donde quedaba de 10 a 11,5 px (Inicio, Contabilidad, Estadísticas, Mesas, Música) */
+  .o2-kpi em, .o2-movil-top small, #menuDiaCard small, .mf-op small, .ct-kpi > span,
+  .tb-kpi-pie small, .tb-top-v small, .tb-mv small, .tb-chip, .tb-tabla th,
+  .p-name-wrap .p-tag, .st-leg small, #isFoto > em, .cam-ia{ font-size:12px !important; }
+  .st-bars .st-col > span{ font-size:11px !important; }   /* números de las barras: 9 px → 11 px (más grande tapa la barra vecina) */
+  /* 1.99.27 · Renglón «etiqueta · valor» (Contabilidad › IVA y la caja): su estilo solo llegaba al abrir la caja y se leía
+     «IVA generado$0». */
+  .vt-l{ display:flex; justify-content:space-between; gap:8px; padding:5px 0; border-bottom:1px solid var(--line, #3333); font-size:14px; }
+  .vt-l b{ white-space:nowrap; }
+  /* 1.99.27 · Celulares de 320 px: el nombre del negocio y la barra de abajo («Caja P…», «Produ…») se cortaban. */
+  @media (max-width:350px){
+    .brand-block .brand-name{ font-size:17px; }
+    nav button, .nav-more, body.o2 nav button, body.o2 .nav-more{ padding-left:1px; padding-right:1px; letter-spacing:-.02em; font-size:11px !important; }
   }
   /* 1.99.4 · Ajustes › Negocio más corto: índice arriba y las dos listas largas plegadas (lib/vento-ajustes-indice.js) */
   .aj-indice{display:block;margin:0 0 14px;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
