@@ -219,12 +219,14 @@ function mejorarHist(){
 
 /* ---------- Gráficas ---------- */
 let rango=7;
-function barras(t,labels,vals,f){
-  const W=320,H=130,mx=Math.max(...vals,1),n=vals.length,bw=Math.max(4,Math.floor((W-10)/n)-3);
+// 1.99.29 · Se dibuja al ancho real del panel (la letra queda de 12 px, sin encogerse) y las barras se reparten en ese ancho:
+// antes cada barra medía al menos 4 + 3, y con «90 días» la mitad (los días más recientes) quedaba por fuera y no se veía.
+function barras(t,labels,vals,f,ancho){
+  const W=Math.max(240,Math.round(ancho||320)),H=130,mx=Math.max(...vals,1),n=vals.length,paso=(W-10)/Math.max(1,n),bw=Math.max(1,Math.min(paso-2,paso*.8)),cada=Math.ceil(n/Math.max(2,Math.floor((W-10)/42)));
   let s='<svg viewBox="0 0 '+W+' '+(H+22)+'" style="width:100%;height:auto" role="img" aria-label="'+esc(t)+'">';
-  vals.forEach((v,i)=>{const h=Math.round(v/mx*H),x=5+i*(bw+3);
-    s+='<rect x="'+x+'" y="'+(H-h)+'" width="'+bw+'" height="'+h+'" rx="2" fill="var(--ink)" opacity=".85"><title>'+esc(labels[i])+': '+f(v)+'</title></rect>';
-    if(n<=12||i%Math.ceil(n/8)===0)s+='<text x="'+(x+bw/2)+'" y="'+(H+14)+'" font-size="9" text-anchor="middle" fill="var(--ink-soft)">'+esc(labels[i])+'</text>';});
+  vals.forEach((v,i)=>{const h=Math.round(v/mx*H),x=5+i*paso,cx=x+bw/2,a=cx<20?'start':cx>W-20?'end':'middle',tx=a==='start'?x:a==='end'?x+bw:cx;
+    s+='<rect x="'+x.toFixed(1)+'" y="'+(H-h)+'" width="'+bw.toFixed(1)+'" height="'+h+'" rx="'+(bw>4?2:0)+'" fill="var(--ink)" opacity=".85"><title>'+esc(labels[i])+': '+f(v)+'</title></rect>';
+    if(i%cada===0)s+='<text x="'+tx.toFixed(1)+'" y="'+(H+15)+'" font-size="12" text-anchor="'+a+'" fill="var(--ink-soft)">'+esc(labels[i])+'</text>';});
   return '<div class="chart-box"><h3>'+esc(t)+'</h3>'+s+'</svg></div>';
 }
 function hbarras(t,rows,f){
@@ -242,8 +244,8 @@ function graficas(){
   let ef=0,tr=0,de=0;hs.forEach(h=>(h.payments||[]).forEach(x=>{if(x.method==='efectivo')ef+=x.amount;else if(x.method==='transferencia')tr+=x.amount;else if(x.method==='debe')de+=x.amount;}));
   p.innerHTML='<div class="mz-actions" id="rg">'+[7,30,90].map(r=>'<button class="btn-ghost'+(r===rango?' on':'')+'" data-r="'+r+'" type="button">'+r+' días</button>').join('')+'</div>'
     +'<div style="font-size:13px">Vendido: <b>'+fmt(hs.reduce((s,h)=>s+h.total,0))+'</b> · '+hs.length+' cuentas</div>'
-    +barras('Ventas por día',days.map(d=>d.getDate()+'/'+(d.getMonth()+1)),byDay,fmt)
-    +barras('Ventas por hora',[...Array(24).keys()].map(h=>h+'h'),byHour,fmt)
+    +barras('Ventas por día',days.map(d=>d.getDate()+'/'+(d.getMonth()+1)),byDay,fmt,p.clientWidth)
+    +barras('Ventas por hora',[...Array(24).keys()].map(h=>h+'h'),byHour,fmt,p.clientWidth)
     +hbarras('Productos más vendidos (unidades)',top,String)
     +hbarras('Cómo pagaron',[['Efectivo',ef],['Transferencia',tr],['Debido',de]],fmt);
   p.querySelectorAll('#rg button').forEach(b=>{b.onclick=()=>{rango=+b.dataset.r;graficas();};});

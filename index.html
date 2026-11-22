@@ -2730,6 +2730,12 @@ body.neg-tienda #quickSaleBtn, body:not(.neg-tienda) #fiadosBtn, body:not(.neg-t
   .voice-fab-icon{display:flex}
   .voice-fab-close{display:none!important}
   .voice-fab-help{position:absolute;top:-8px;left:-8px;width:24px;height:24px;border-radius:50%;border:1px solid var(--line);background:var(--surface-2);color:var(--cream);font:800 13px/1 var(--font-main);display:grid;place-items:center;cursor:pointer;z-index:2;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+  /* 1.99.29 · El «?» de la ayuda de voz medía 24 px (difícil de tocar). Ahora se ve de 28 px y se puede tocar en 44 × 44:
+     la zona extra crece hacia afuera (arriba y al lado), no hacia el micrófono, para no quitarle toques. */
+  .voice-fab-help{top:-12px;left:-12px;width:28px;height:28px;font-size:15px}
+  .voice-fab-help::before{content:"";position:absolute;top:-17px;left:-17px;right:-1px;bottom:-1px}
+  .voice-fab-wrap.izq .voice-fab-help{left:auto;right:-12px}
+  .voice-fab-wrap.izq .voice-fab-help::before{left:-1px;right:-17px}
   .voice-fab-ai{position:absolute;right:62px;top:50%;transform:translateY(-50%);height:40px;padding:0 13px;border-radius:999px;border:1px solid var(--amber-deep);background:var(--surface);color:var(--cream);font:800 13px var(--font-main);cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.3)}
   .voice-fab-ai[hidden]{display:none}
   .vh-list{display:flex;flex-direction:column;gap:12px;text-align:left;margin-top:8px}
@@ -5157,7 +5163,7 @@ export default {
   .voice-fab-wrap.dragging{will-change:transform;transition:none!important}
   .voice-fab-wrap .voice-fab{transition:transform .15s ease, box-shadow .15s ease}
   .voice-fab-wrap.izq .voice-fab-ai{right:auto;left:66px}
-  .voice-fab-wrap.izq .voice-fab-help{left:auto;right:-8px}
+  .voice-fab-wrap.izq .voice-fab-help{left:auto;right:-12px}
 </style>
 <div class="voice-fab-wrap" id="voiceFabWrap">
   <button class="voice-fab-close" id="voiceFabCloseBtn" title="Ocultar comando por voz">✕</button>
