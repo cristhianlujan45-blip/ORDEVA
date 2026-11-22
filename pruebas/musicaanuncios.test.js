@@ -103,7 +103,7 @@ const video = (id, t, c) => ({ id: { videoId: id }, snippet: { title: t, channel
     if(await p.isVisible('#ypSc')) await p.click('#ypSc'); else await p.evaluate(() => window.vitoSinComerciales());
     await p.waitForSelector('#mzScOv.show');
     const g = await p.textContent('#mzScOv');
-    chk('6. Explica por qué salen (YouTube necesita tu cuenta Premium en el reproductor) y ofrece el TV', /cuenta Premium iniciada/.test(g) && /siempre funciona, sin límites/.test(g) && /sin comerciales y sin límite/.test(g) && /youtube\.com/.test(g), g.slice(0, 300));
+    chk('6. Explica por qué salen (YouTube necesita tu cuenta Premium en el reproductor) y ofrece el TV', /cuenta Premium iniciada/.test(g) && /La mejor forma: tu TV con tu Premium/.test(g) && /sin comerciales y sin límite/.test(g) && /youtube\.com/.test(g) && g.indexOf('La mejor forma') < g.indexOf('Otra forma'), g.slice(0, 300));   // 1.99.37: el TV va primero
     chk('6. Botones para vincular el TV y conectar la cuenta', await p.isVisible('#mzScOv [data-sc="tv"]') && await p.isVisible('#mzScOv [data-sc="codigo"]') && await p.isVisible('#mzScOv [data-sc="cuenta"]'));
     await p.click('#mzScOv [data-sc="codigo"]');
     await p.waitForTimeout(800);
