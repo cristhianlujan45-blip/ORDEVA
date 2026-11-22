@@ -353,3 +353,33 @@ body.o2 .settings-group .btn-camera.cam-big .cam-ic{ background: #f1f2f4; border
 /* 🕘 Historial: acciones peligrosas como botón (no como rectángulo rojo suelto) */
 body.o2 .btn-danger-outline{ border: 1px solid #fecaca; background: var(--o2-mal-bg); color: #b91c1c; border-radius: 10px; padding: 10px 14px; font-weight: 700; }
 body.o2 .btn-danger-outline:hover{ background: #fee2e2; }
+
+/* =====================================================================
+   1.99.28 · Un solo sistema de botones: colores, bordes y esquinas (auditoría de diseño 1.98, hallazgo 7, última parte;
+   pedido del dueño 22/11: «continúa con lo de los colores de los botones»). Medido en 15 pantallas: 322 botones con 66
+   combinaciones de fondo, letra, borde y esquina. Ahora, en la apariencia ORDEVA 2.0:
+   • Principal (lo que guarda o confirma): fondo negro, letra blanca.               .btn-primary, .btn-warn
+   • Secundario (cancelar, cerrar, otras acciones): fondo claro, borde gris, letra negra.  .btn-ghost, .btn-close, .btn-camera
+   • Peligro (borrar, anular): letra roja, borde rojo claro.                          .btn-danger-outline, .p-del
+   • Todos con la misma esquina (12 px); las pastillas de filtros y periodos, redondas.
+   Solo cambia cómo se ven: nada de lo que hacen.
+   ===================================================================== */
+body.o2 .btn-primary, body.o2 .btn-warn, body.o2 .btn-ghost, body.o2 .btn-close, body.o2 .btn-danger-outline{ border-radius: var(--o2-r); }
+body.o2 .btn-camera{ border-radius: var(--o2-r) !important; }
+/* Cancelar / Cerrar: igual que los demás secundarios (antes borde negro y letra gris) */
+body.o2 .btn-close{ background: transparent; border: 1px solid var(--line); color: var(--ink); font-weight: 600; }
+body.o2 .btn-close:hover{ border-color: var(--ink); color: var(--ink); }
+/* Foto con IA, código de barras, combos: secundario plano (antes con un degradado gris que no tenía ningún otro botón) */
+body.o2 .btn-camera{ background: var(--surface) !important; border: 1px solid var(--line) !important; color: var(--ink) !important; box-shadow: var(--o2-sombra); }
+body.o2 .btn-camera:hover{ border-color: var(--ink) !important; box-shadow: var(--o2-sombra); }
+/* ✕ de las ventanas: la misma esquina chica de todo lo demás */
+body.o2 .rename-table-btn{ border-radius: var(--o2-r-s); }
+/* Periodos de Inicio (Hoy · 7 días · Mes · Fechas): pastillas redondas, como en Estadísticas, Contabilidad y Mesas */
+body.o2 .o2-chips button{ border-radius: 999px; }
+/* «Contabilidad ›», «Ver todo ›»: era lo único azul de la app; ahora negro y subrayado, como un enlace */
+body.o2 .o2-card h2 button{ color: var(--ink); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+/* Borrar un producto: el mismo rojo de «Anular» */
+body.o2 .product-row .p-del, body.o2 .pr-acciones .p-del{ color: #b91c1c; }
+/* Acciones de cada producto (Rápido · Etiqueta · Editar · Eliminar), herramientas de la Caja y «Abrir caja»: la misma esquina */
+body.o2 .product-row .p-fav, body.o2 .product-row .p-label, body.o2 .product-row .p-edit, body.o2 .product-row .p-del,
+body.o2 .pz-caja-top > button, body.o2 .pz-herr2 > button, body.o2 .pz-est-btn{ border-radius: var(--o2-r); }
