@@ -2645,6 +2645,18 @@ body.neg-tienda #quickSaleBtn, body:not(.neg-tienda) #fiadosBtn, body:not(.neg-t
   .pz-stock, .pz-total span, .pz-modo small, .pz-kbd, .pz-caja-top .pz-celbtn i, .en-venta .pz-tec-ay,
   .cm-tags i, .cv-atajos, .cv-atajos kbd{ font-size:12px !important }
   /* 1.99.32 · Estadísticas › flechas «Anteriores / Siguientes» de los movimientos: 34 px en tabletas (táctiles) → 44 */
+  /* 1.99.33 · Recorrido por las ventanas (22/11): en pantallas táctiles quedaban de 26 a 39 px — Venta rápida (− y + de 30,
+     buscador, cantidad y «Agregar»), la ✕ de «Escanear código» (26), Exportar ventas (Hoy, Ayer, Este mes…), el reproductor
+     de música (Cerrar, pestañas, «Siguiente» y géneros), «Buscar mi TV», buscadores de Facturas anteriores / Historial de música / Pedido a
+     proveedores y el 👁 de las mesas en la Caja POS. Todo a 44 px (sus estilos los ponen otros archivos, por eso !important). */
+  @media (max-width:1023px), (pointer:coarse){
+    #qsSearch, #qsQty, #qsAddBtn, #quickSaleOverlay .mz-in, #scanOverlay .btn-ghost, #scanOverlay .btn-primary,
+    #exportOverlay [data-per], #exportOverlay .mz-in, .yp-nav > button, .gp-btn,
+    #mzHistQ, .fi-hbus, #layaListaOv input, #layaListaOv .btn-ghost, #layaListaOv .btn-primary{ min-height:44px !important; box-sizing:border-box }
+    .yp-chip, .yp-vermas{ min-height:44px !important; box-sizing:border-box }
+    #qsQtyMinus, #qsQtyPlus, #scanCloseBtn, #ypCerrar, #ypSig, .yp-mb{ min-width:44px !important; min-height:44px !important; box-sizing:border-box }
+    .pz-mesa-v{ min-width:44px !important; box-sizing:border-box }
+  }
   @media (max-width:1023px), (pointer:coarse){ body #tableroVento .tb-flecha{ width:44px; height:44px } #authNube, #authRestoreBtn, #shareImageBtn, #printReceiptBtn, #closureShareImageBtn{ min-height:44px; box-sizing:border-box } }   /* + entrar: «Me invitaron…», «¿Ya tenías una cuenta?» */
   /* 1.99.27 · Renglón «etiqueta · valor» (Contabilidad › IVA y la caja): su estilo solo llegaba al abrir la caja y se leía
      «IVA generado$0». */
