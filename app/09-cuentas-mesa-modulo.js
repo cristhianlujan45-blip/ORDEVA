@@ -1665,11 +1665,14 @@ function yBuscarApp(q){
 }
 // Búsqueda SIN cupo desde el Servidor ORDEVA (vento-ia/yt/buscar lee la página pública de resultados de YouTube).
 // La API de YouTube da 10.000 unidades al día y cada búsqueda cuesta 100: así ya no aparece «se alcanzó el límite».
-async function ySrvBuscar(qEnc){
+async function ySrvBuscar(qEnc,otraVez){
   const b=typeof iaVentoBase==='function'?iaVentoBase():'';if(!b)return undefined;
   const ctrl=new AbortController(),tm=setTimeout(()=>ctrl.abort(),8000);
   try{
-    const r=await fetch(b+'/yt/buscar?tipo=video&q='+qEnc,{signal:ctrl.signal});if(!r.ok)return undefined;
+    const r=await fetch(b+'/yt/buscar?tipo=video&q='+qEnc,{signal:ctrl.signal});
+    // 1.99.37: «muchas búsquedas seguidas» (todo el wifi del bar sale por una conexión): se reintenta una vez a los 2 s
+    if(r.status===429&&!otraVez){clearTimeout(tm);await new Promise(x=>setTimeout(x,2000));return ySrvBuscar(qEnc,true);}
+    if(!r.ok)return undefined;
     const j=await r.json();if(!j||!Array.isArray(j.items)||!j.items.length)return undefined;
     j.items.forEach(x=>{if(x&&x.id&&x.id.videoId&&x.duracion>0)ytDurCache[x.id.videoId]=x.duracion;});
     return {items:j.items,_srv:true};
@@ -2735,7 +2738,9 @@ function ypCorBtn(v){
    Por qué salen: el reproductor que va DENTRO de ORDEVA (como en cualquier app o página) es el de YouTube para otras
    páginas, y Google no deja iniciar sesión con la cuenta dentro de apps (lo bloquea por seguridad): ese reproductor no
    sabe que tienes Premium. Donde Premium SÍ se nota es en las apps de YouTube: el TV (vinculado a ORDEVA por código, sin
-   límites) o YouTube Music en el celular. Esta guía lleva a eso con un toque. */
+   límites) o YouTube Music en el celular. Esta guía lleva a eso con un toque.
+   1.99.37: el TV va primero (es lo que siempre funciona: Google casi siempre bloquea entrar dentro de una app) y ya no
+   necesita puente propio en ningún equipo (el Servidor ORDEVA hace de puente). */
 function mzSinComerciales(){
   let ov=$('mzScOv');
   if(!ov){ov=document.createElement('div');ov.id='mzScOv';ov.className='overlay';document.body.appendChild(ov);
@@ -2751,20 +2756,21 @@ function mzSinComerciales(){
   const A=window.VentoAndroid,app=!!(A&&A.youtubeEntrar),ses=ytSesionApp(),tv=mzHayTV(),con=!!yTok();
   ov.innerHTML='<div class="modal gp-modal"><h2>🚫 Música sin comerciales con tu YouTube Premium</h2>'+
     '<div class="modal-sub"><b>Por qué salen comerciales:</b> el reproductor de ORDEVA es el de YouTube, y YouTube solo quita los comerciales cuando sabe que eres tú, con tu cuenta Premium iniciada <b>en ese mismo reproductor</b>.</div>'+
+    (tv?'<div class="gp-alerta" style="border-color:#22c55e">✅ Ya tienes un TV vinculado: la música suena allá. Si el TV tiene tu cuenta Premium, no salen comerciales.</div>':'')+
+    '<div class="yp-sub" style="margin-top:12px">⭐ La mejor forma: tu TV con tu Premium</div>'+
+    '<ol class="gp-lista">'+
+    '<li class="gp-paso"><div class="gp-n">1</div><div><b>En el TV, entra a YouTube con tu cuenta Premium</b><div class="gp-c">Abre la app de <b>YouTube</b> del TV → tu foto (arriba a la izquierda) → elige o agrega <b>tu cuenta con Premium</b>.</div></div></li>'+
+    '<li class="gp-paso"><div class="gp-n">2</div><div><b>Vincula el TV con ORDEVA</b><div class="gp-c">Una sola vez: queda vinculado. Las canciones que pidan las mesas por QR y las que pongas tú suenan allá solas, una tras otra, <b>sin comerciales y sin límite</b> (no gasta el cupo de Google). Sirve desde la app, el computador o el iPhone.'+
+      '<br><button type="button" class="btn-primary gp-btn" data-sc="tv">📡 Buscar mi TV</button> <button type="button" class="btn-ghost gp-btn" data-sc="codigo">🔢 Con el código del TV</button></div></div></li>'+
+    '<li class="gp-paso"><div class="gp-n">3</div><div><b>Tu cuenta de YouTube en ORDEVA (para tus listas)</b><div class="gp-c">Con tu cuenta conectada ves y pones tus listas, tus «Me gusta» y tus suscripciones (👤 Mi YouTube). Queda vinculada para siempre.'+
+      (con?'<br>✅ <b>Ya está conectada.</b>':'<br><button type="button" class="btn-ghost gp-btn" data-sc="cuenta">🔗 Conectar mi cuenta de YouTube</button>')+'</div></div></li>'+
+    '</ol>'+
+    '<div class="yp-sub" style="margin-top:12px">Otra forma: tu Premium en este equipo</div>'+
     (app?'<div class="gp-paso" style="margin:10px 0;border-color:'+(ses?'#22c55e':'#ff0033')+'"><div class="gp-n">★</div><div><b>Entra con tu cuenta Premium en esta app</b>'+
         (ses?'<span class="gp-e gp-si">✅ Ya entraste</span><div class="gp-c">YouTube ya sabe que eres tú: con tu Premium, el reproductor de ORDEVA no pone comerciales (desde la próxima canción).</div>'
             :'<div class="gp-c">Se abre la página de Google de siempre; entra con tu correo y contraseña de YouTube Premium (ORDEVA no los ve). Queda guardado en la app.<br><button type="button" class="btn-primary gp-btn" data-sc="entrar">🔑 Entrar con mi YouTube Premium</button><br><small>Si Google dice <i>«Este navegador o app no es seguro»</i>, Google no deja entrar desde apps en tu celular: usa el TV (abajo), donde tu Premium siempre funciona.</small></div>')+
       '</div></div>'
       :'<div class="gp-alerta" style="border-color:#22c55e">💻 En este navegador: entra a <b>youtube.com</b> con tu cuenta Premium (en este mismo navegador) y vuelve a ORDEVA: el reproductor usa tu sesión.</div>')+
-    (tv?'<div class="gp-alerta" style="border-color:#22c55e">✅ Ya tienes un TV vinculado: la música suena allá. Si el TV tiene tu cuenta Premium, no salen comerciales.</div>':'')+
-    '<div class="yp-sub" style="margin-top:12px">También en el TV (siempre funciona, sin límites)</div>'+
-    '<ol class="gp-lista">'+
-    '<li class="gp-paso"><div class="gp-n">1</div><div><b>En el TV, entra a YouTube con tu cuenta Premium</b><div class="gp-c">Abre la app de <b>YouTube</b> del TV → tu foto (arriba a la izquierda) → elige o agrega <b>tu cuenta con Premium</b>.</div></div></li>'+
-    '<li class="gp-paso"><div class="gp-n">2</div><div><b>Vincula el TV con ORDEVA</b><div class="gp-c">Una sola vez: queda vinculado. Las canciones que pidan las mesas por QR y las que pongas tú suenan allá solas, una tras otra, <b>sin comerciales y sin límite</b> (no gasta el cupo de Google).'+
-      '<br><button type="button" class="btn-primary gp-btn" data-sc="tv">📡 Buscar mi TV</button> <button type="button" class="btn-ghost gp-btn" data-sc="codigo">🔢 Con el código del TV</button></div></div></li>'+
-    '<li class="gp-paso"><div class="gp-n">3</div><div><b>Tu cuenta de YouTube en ORDEVA (para tus listas)</b><div class="gp-c">Con tu cuenta conectada ves y pones tus listas, tus «Me gusta» y tus suscripciones (👤 Mi YouTube). Queda vinculada para siempre.'+
-      (con?'<br>✅ <b>Ya está conectada.</b>':'<br><button type="button" class="btn-ghost gp-btn" data-sc="cuenta">🔗 Conectar mi cuenta de YouTube</button>')+'</div></div></li>'+
-    '</ol>'+
     '<div class="settings-desc" style="margin-top:8px"><b>¿Sin TV?</b> Conecta el celular o el computador a un parlante Bluetooth y usa <b>YouTube Music</b> con tu Premium: ORDEVA pasa las canciones a tu lista «Música '+esc((typeof data!=='undefined'&&data&&data.businessName)||'del local')+'» (Música → «Lista de YouTube Music»). Ojo: Google pone un tope diario a esa forma; cuando se llena, ORDEVA sigue con su reproductor (con comerciales) hasta el otro día.'+
 '</div>'+
     '<div class="modal-actions"><button type="button" class="btn-close" data-sc="x">Listo</button></div></div>';

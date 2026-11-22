@@ -12,6 +12,8 @@
 //   POST /vento-ia/v1beta/models/<modelo>:streamGenerateContent?alt=sse
 //   GET  /vento-ia/yt/buscar?q=…&tipo=video|canal|lista    → canciones/artistas/playlists de YouTube SIN gastar cupo (youtube.ts)
 //   GET  /vento-ia/yt/lista?id=…                           → canciones de una playlist de YouTube, sin cupo
+//   POST /vento-ia/lounge/<pairing/get_screen|pairing/get_lounge_token_batch|bc/bind>
+//                                                          → puente del «YouTube del TV» (Vincular con código de TV)
 // Solo se aceptan pedidos desde la página de ORDEVA (VENTO_ORIGENES), modelos «gemini-…», cuerpos de hasta
 // 8 MB (fotos de facturas) y un máximo de pedidos por minuto por IP, para que nadie más gaste la clave.
 
@@ -30,7 +32,7 @@ function cors(origin: string): Record<string, string> {
   return {
     "Access-Control-Allow-Origin": ok ? (origin || "*") : "null",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "content-type, authorization, apikey, x-client-info",
+    "Access-Control-Allow-Headers": "content-type, authorization, apikey, x-client-info, x-youtube-loungeid-token",
     "Access-Control-Max-Age": "86400",
     "Vary": "Origin",
   };
@@ -71,7 +73,13 @@ function demasiados(ip: string, tope = POR_MINUTO): boolean {
 }
 // 1.96: las búsquedas de música tienen su propio número. Todo el Wi-Fi de un bar sale por una sola IP (los clientes y el
 // equipo del negocio), y cada búsqueda del cliente son 2 llamadas: con 40 por minuto, un bar lleno veía «muchas búsquedas».
-const YT_POR_MINUTO = 150;
+// 1.99.37 («que no haya límites en la búsqueda»): 150 → 600. Lo que ya está en el caché no cuenta, y el QR reintenta solo si
+// alguna vez llega a este tope. El tope queda solo para que nadie use el servidor para leer YouTube sin fin.
+const YT_POR_MINUTO = 600;
+// 📺 Puente del YouTube del TV: solo estas llamadas, y un tope por conexión que un negocio nunca alcanza (el equipo de la
+// música le habla al TV cada pocos segundos mientras suena).
+const LOUNGE_RUTAS = new Set(["pairing/get_screen", "pairing/get_lounge_token_batch", "bc/bind"]);
+const TV_POR_MINUTO = 240;
 // Y un caché de 10 minutos en el servidor por búsqueda (la misma canción la buscan muchos): menos llamadas a YouTube.
 const ytCache = new Map<string, { t: number; v: unknown }>();
 function ytEnCache(clave: string): unknown {
@@ -113,6 +121,27 @@ Deno.serve(async (req: Request) => {
       return json(res, 200, ytVacio(res) ? { ...h, "cache-control": "no-store" } : { ...h, "cache-control": "public, max-age=600" });
     } catch (e) {
       return json({ error: { code: 502, message: "No se pudo buscar en YouTube: " + (e instanceof Error ? e.message : String(e)) } }, 502, h);
+    }
+  }
+  // 📺 1.99.37 · Puente del «YouTube del TV» («Vincular con código de TV»): con la cuenta Premium iniciada en la app de
+  // YouTube del TV, las canciones de las mesas suenan allá SIN comerciales. Un navegador no puede hablar directo con
+  // www.youtube.com/api/lounge (CORS): antes había que crear un puente propio en Cloudflare (solo la app de Android lo
+  // traía incluido). Ahora el puente es este servidor. Solo deja pasar estas 3 llamadas, sin guardar nada.
+  if (ruta.startsWith("/lounge/") && req.method === "POST") {
+    const camino = ruta.slice("/lounge/".length);
+    if (!LOUNGE_RUTAS.has(camino)) return json({ error: { code: 404, message: "Esa llamada no es del YouTube del TV." } }, 404, h);
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() || "?";
+    if (demasiados("tv:" + ip, TV_POR_MINUTO)) return json({ error: { code: 429, message: "Demasiados mensajes al TV seguidos. Espera un momento." } }, 429, h);
+    const cuerpo = await req.text();
+    if (cuerpo.length > 64 * 1024) return json({ error: { code: 413, message: "Mensaje muy grande." } }, 413, h);
+    const hy: Record<string, string> = { "Content-Type": req.headers.get("content-type") || "application/x-www-form-urlencoded" };
+    const tok = req.headers.get("x-youtube-loungeid-token");
+    if (tok) hy["X-YouTube-LoungeId-Token"] = tok.slice(0, 4000);
+    try {
+      const r = await fetch("https://www.youtube.com/api/lounge/" + camino + u.search, { method: "POST", headers: hy, body: cuerpo, signal: AbortSignal.timeout(25000) });
+      return new Response(await r.text(), { status: r.status, headers: { ...h, "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" } });
+    } catch (_e) {
+      return json({ error: { code: 502, message: "No hubo conexión con YouTube." } }, 502, h);
     }
   }
   // Canciones de una playlist de YouTube (sin cupo).

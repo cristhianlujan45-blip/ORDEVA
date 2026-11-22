@@ -997,9 +997,20 @@ async function ytSrvBuscar(q,tipo){
   const ctrl=new AbortController(), tm=setTimeout(()=>ctrl.abort(),7000);
   // 1.51.0: «no hay resultados» también es una respuesta (devuelve la lista vacía). Solo si el servidor NO responde se
   // devuelve null y se usa la API de YouTube de respaldo: cada búsqueda de la API gasta 100 del cupo diario.
-  try{ const r=await fetch(b+'?tipo='+tipo+'&q='+encodeURIComponent(q),{signal:ctrl.signal}); if(r.status===429) ytMuchas=Date.now(); if(!r.ok) return null; const j=await r.json(); return j&&Array.isArray(j.items)?j:null; }
+  try{ const r=await fetch(b+'?tipo='+tipo+'&q='+encodeURIComponent(q),{signal:ctrl.signal}); if(r.status===429) ytMuchas=Date.now(); if(!r.ok) return r.status===429?429:null; const j=await r.json(); return j&&Array.isArray(j.items)?j:null; }
   catch(e){ return null; } finally{ clearTimeout(tm); }
 }
+// 1.99.37 («que no haya límites en la búsqueda»): si el servidor dice «muchas búsquedas seguidas» (todo el wifi de un bar
+// lleno sale por una sola conexión), se reintenta sola, sin decirle nada al cliente: a los 1,5 s y a los 3 s.
+const ytSrvBuscar1=ytSrvBuscar;
+ytSrvBuscar=async function(q,tipo){
+  for(let n=0;;n++){
+    const j=await ytSrvBuscar1(q,tipo);
+    if(j!==429) return j;
+    if(n>=2) return null;
+    await new Promise(r=>setTimeout(r,1500*(n+1)));
+  }
+};
 let ytTimer=null, ytSeq=0, ytSelArtist=null, ytMuchas=0;   // ytMuchas: el servidor dijo «muchas búsquedas» (429), no «no hay nada»
 const ytArtistCache={};
 function ytPintarMsg(msg){

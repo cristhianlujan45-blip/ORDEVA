@@ -1756,6 +1756,11 @@ async function lngProbar(){
       const t = await r.text();
       out.push(yt(r.status) || r.ok ? '✅ El puente llega a YouTube (YouTube contestó ' + r.status + ').' : '❌ El puente no llega a YouTube (error ' + r.status + (t ? ': ' + t.slice(0, 80) : '') + '). En Cloudflare vuelve a pegar el código del puente y toca Deploy.');
     }catch(e){ out.push('❌ El puente no deja pasar a ORDEVA (bloqueo del navegador). En Cloudflare pega otra vez el código del puente COMPLETO (botón «Copiar código del puente») y toca Deploy.'); }
+  } else if(lngServidor()){
+    try{
+      const r = await fetch(lngServidor() + 'pairing/get_screen', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(fake) });
+      out.push(yt(r.status) || r.ok ? '✅ El puente del Servidor ORDEVA llega a YouTube.' : '❌ El puente del Servidor ORDEVA no llega a YouTube (error ' + r.status + '). Reintenta en un momento.');
+    }catch(e){ out.push('❌ No hay conexión con el Servidor ORDEVA. Revisa el internet.'); }
   } else if(!lngPuenteApp()) out.push('❌ No hay puente configurado (paso 1).');
   if(c.screenId){
     try{ await lngBind(); out.push('✅ El TV «' + (c.nombre || 'TV') + '» contesta' + (lng.tvPlay === true ? ' y está sonando.' : '.')); }
@@ -1766,7 +1771,12 @@ async function lngProbar(){
 }
 // ¿Hay puente? Dentro de la app de Android el puente viene incluido (la app le habla directo a YouTube).
 const lngPuenteApp = () => !!(window.VentoAndroid && typeof window.VentoAndroid.lounge === 'function');
-const lngHayPuente = () => lngPuenteApp() || !!lngCfg().relay;
+// 📺 1.99.37: el puente viene incluido en el Servidor ORDEVA (vento-ia/lounge): ya no hay que crear uno en Cloudflare para
+// usar el YouTube del TV (con tu Premium, sin comerciales) desde un computador, iPhone o tableta. Si el negocio tiene su
+// propio puente configurado, se sigue usando ese.
+const lngServidor = () => { try{ const n = window.VENTO_NUBE_DEFAULT; return n && n.url ? String(n.url).replace(/\/+$/, '') + '/functions/v1/vento-ia/lounge/' : ''; }catch(e){ return ''; } };
+const lngPuenteUrl = () => { const r = lngCfg().relay; return r ? String(r).replace(/\/+$/, '') + '/api/lounge/' : lngServidor(); };
+const lngHayPuente = () => lngPuenteApp() || !!lngPuenteUrl();
 function lngFetchApp(path, params, body, token){
   return new Promise((res, rej) => {
     const id = 'l' + Date.now() + Math.random().toString(36).slice(2, 6);
@@ -1788,11 +1798,11 @@ async function lngFetch(path, params, body, token){
     // App de Android: puente incluido. Si esa conexión directa falla (no es una respuesta de YouTube,
     // sino que no hubo conexión), se prueba por el puente configurado, si hay uno.
     try{ return await lngFetchApp(path, params, body, token); }
-    catch(e){ if(e.status || !lngCfg().relay) throw e; lngLog('   la app no llegó directo a YouTube: uso el puente'); }
+    catch(e){ if(e.status || !lngPuenteUrl()) throw e; lngLog('   la app no llegó directo a YouTube: uso el puente'); }
   }
-  const c = lngCfg();
-  if(!c.relay) throw new Error('Falta la dirección del puente (paso 1).');
-  const url = c.relay.replace(/\/+$/, '') + '/api/lounge/' + path + (params ? '?' + new URLSearchParams(params) : '');
+  const base = lngPuenteUrl();
+  if(!base) throw new Error('Falta la dirección del puente (paso 1).');
+  const url = base + path + (params ? '?' + new URLSearchParams(params) : '');
   const h = { 'Content-Type': 'application/x-www-form-urlencoded' };
   if(token) h['X-YouTube-LoungeId-Token'] = token;
   // Tiempo límite de 15 s: antes, una llamada que se quedaba colgada (internet lento) dejaba la
