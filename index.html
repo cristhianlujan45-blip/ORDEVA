@@ -2567,7 +2567,7 @@ body.neg-tienda #quickSaleBtn, body:not(.neg-tienda) #fiadosBtn, body:not(.neg-t
   @media (max-width:420px){ .top-pill span{display:none} .top-pill{width:40px;padding:0;justify-content:center} }
   .live-clock{display:flex;flex-direction:column;align-items:flex-end;justify-content:center;height:40px;padding:0 4px;line-height:1.15;flex-shrink:0}
   .live-clock .lc-time{font-variant-numeric:tabular-nums;font-weight:800;font-size:17px;letter-spacing:.01em;color:var(--ink)}
-  .live-clock .lc-date{font-size:10.5px;font-weight:600;letter-spacing:.03em;text-transform:capitalize;color:var(--ink-soft)}
+  .live-clock .lc-date{font-size:12px;font-weight:600;letter-spacing:.03em;text-transform:capitalize;color:var(--ink-soft)}
   @media (max-width:420px){ .live-clock .lc-date{display:none} }
   /* 1.99.3 · Celular: el nombre del negocio tiene espacio. «Salir» ya no va al lado de la campana (está en Más → Mi cuenta →
      Cerrar sesión, con su pregunta) y la hora la muestra el propio teléfono arriba; el subtítulo va en una sola línea. */
@@ -2640,6 +2640,12 @@ body.neg-tienda #quickSaleBtn, body:not(.neg-tienda) #fiadosBtn, body:not(.neg-t
   :is(#overlay, #personOverlay) .add-row .qty-stepper input[type=number]{ height:40px }
   .ct-kpi.res small, .ct-kpi.res span{ color:color-mix(in srgb, var(--ink-soft) 65%, var(--ink)) }
   .pz-kb kbd, .pz-kb-ayuda kbd{ font-size:12px !important }
+  /* 1.99.32 · Medición en tableta y computador: en la Caja POS quedaban «Quedan 5» y «Agotado» en 10 px, «TOTAL» y la
+     ayuda de teclas en 11 a 11,5 px. Todo a 12 px (sus estilos los pone lib/vento-pos.js después, por eso !important). */
+  .pz-stock, .pz-total span, .pz-modo small, .pz-kbd, .pz-caja-top .pz-celbtn i, .en-venta .pz-tec-ay,
+  .cm-tags i, .cv-atajos, .cv-atajos kbd{ font-size:12px !important }
+  /* 1.99.32 · Estadísticas › flechas «Anteriores / Siguientes» de los movimientos: 34 px en tabletas (táctiles) → 44 */
+  @media (max-width:1023px), (pointer:coarse){ body #tableroVento .tb-flecha{ width:44px; height:44px } #authNube, #authRestoreBtn, #shareImageBtn, #printReceiptBtn, #closureShareImageBtn{ min-height:44px; box-sizing:border-box } }   /* + entrar: «Me invitaron…», «¿Ya tenías una cuenta?» */
   /* 1.99.27 · Renglón «etiqueta · valor» (Contabilidad › IVA y la caja): su estilo solo llegaba al abrir la caja y se leía
      «IVA generado$0». */
   .vt-l{ display:flex; justify-content:space-between; gap:8px; padding:5px 0; border-bottom:1px solid var(--line, #3333); font-size:14px; }

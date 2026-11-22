@@ -63,7 +63,7 @@ body.o2 header{ border-bottom-color: transparent; }
   body.o2-lado .o2-marca{ display: flex; align-items: center; gap: 12px; padding: 4px 8px 20px; color: var(--o2-lado-ink); text-decoration: none; }
   body.o2-lado .o2-marca img{ width: 38px; height: 38px; border-radius: 50%; background: #000; box-shadow: 0 0 0 1px rgba(255,255,255,.14); }
   body.o2-lado .o2-marca b{ display: block; font: 800 19px/1.05 var(--font-main); letter-spacing: .04em; }
-  body.o2-lado .o2-marca small{ display: block; font-size: 11.5px; color: var(--o2-lado-soft); margin-top: 3px; }
+  body.o2-lado .o2-marca small{ display: block; font-size: 12px; color: var(--o2-lado-soft); margin-top: 3px; }
   body.o2-lado .o2-negocio{
     display: flex; align-items: center; gap: 10px; width: 100%; margin-top: 12px; padding: 10px; text-align: left;
     background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08); border-radius: 12px; color: var(--o2-lado-ink);
@@ -71,7 +71,7 @@ body.o2 header{ border-bottom-color: transparent; }
   }
   body.o2-lado .o2-negocio:hover{ background: rgba(255,255,255,.09); }
   body.o2-lado .o2-negocio .o2-av{ flex: 0 0 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: #fff; color: #000; font-weight: 800; font-size: 13px; }
-  body.o2-lado .o2-negocio small{ display: block; color: var(--o2-lado-soft); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 160px; }
+  body.o2-lado .o2-negocio small{ display: block; font-size: 12px; color: var(--o2-lado-soft); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 160px; }
   body.o2-lado .toast{ left: calc(50% + var(--o2-lado) / 2) !important; }
 }
 
@@ -174,7 +174,7 @@ body.o2 header{ border-bottom-color: transparent; }
   body.o2 #productList > .product-row > .pr-sum{ padding: 10px 18px; }
   body.o2 #productList .p-right{ display: contents; }
   body.o2 #productList .o2-col{ display: block; text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-soft); font-size: 14px; }
-  body.o2 #productList .o2-col small{ font-size: 11.5px; }
+  body.o2 #productList .o2-col small{ font-size: 12px; }
   body.o2 #productList .p-price{ text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }
   body.o2 #productList .p-margen{ justify-self: end; font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; }
   body.o2 #productList .p-margen.pr-bien{ color: var(--o2-ok); background: var(--o2-ok-bg); }
