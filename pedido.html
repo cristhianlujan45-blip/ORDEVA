@@ -327,6 +327,24 @@ button:active{transform:scale(.97)}button:hover{filter:brightness(1.1)}
 /* ---------- Modo fácil: letra y botones más grandes, sin animaciones.
    Pensado para gente mayor o pantallas táctiles; no cambia el diseño
    original, solo se activa con el botón "Letra grande". ---------- */
+/* 1.99.36 · Auditoría de la página del QR en los celulares de los clientes (22/11): botones de 32 a 42 px y textos cortados.
+   · Idioma, moneda y «Letra grande» (37–39 px), categorías de la carta (36), «Cerrar» de la carta (40), sugerencias y
+     géneros de canciones → 44.
+   · «+» de cada plato: 32 → 40 visibles y 44 para tocar.
+   · − / + del pedido (38) y la ✕ para quitar (34): 44.
+   · Pestañas «Pedido · Canción · Mi cuenta»: «Mi cuenta» se cortaba desde 412 px, y con «Letra grande» se cortaban las tres.
+     En celulares el ícono va arriba del nombre y el nombre puede usar dos renglones.
+   · Detalles del plato: 11,5 → 12 px. */
+.lang, .prefBtn, .cat-tab, .carta .x, .chip, .gen, .ytpedir{min-height:44px;box-sizing:border-box}
+.pcard .padd{width:40px;height:40px}
+.pcard .padd::before{content:"";position:absolute;inset:-3px}   /* 1 px de borde: 38 + 3 + 3 = 44 */
+.step button{width:44px;height:44px}
+.x{width:44px;height:44px}
+.pcard .pdet{font-size:12px !important}
+@media (max-width:430px){
+  .tabs .t{flex-direction:column;gap:3px;padding:8px 2px;min-height:52px}
+  .tabs .t span{white-space:normal;text-overflow:clip;text-align:center;line-height:1.15}
+}
 body.easy-mode{zoom:1.2}
 body.easy-mode *,body.easy-mode *::before,body.easy-mode *::after{animation:none!important;transition:none!important}
 body.easy-mode #fxLayer{display:none!important}
