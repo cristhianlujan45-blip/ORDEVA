@@ -713,9 +713,21 @@
     document.querySelectorAll('#lbDeben .lb-deudor').forEach(f => { const v = !q || lbNorm(f.dataset.persona).includes(q); f.hidden = !v; if(v) n++; });
     const nada = $l('lbDebenNada'); if(nada) nada.hidden = !(q && !n);
   }
+  /* 1.99.42 · El último fiado anotado (en la última hora) sale de PRIMERO, marcado «🆕 Recién anotado»: al cerrar una cuenta
+     con «Debe» y abrir la libreta, se ve de una vez (antes la lista iba solo de mayor a menor y Camila quedó en el puesto 7). */
+  const LB_RECIENTE_MS = 60 * 60 * 1000;
+  function lbReciente(){
+    const ahora = Date.now(); let mejor = null;
+    const ver = (n, f) => { const t = new Date(f).getTime(); if(n && t && ahora - t <= LB_RECIENTE_MS && ahora - t >= -5 * 60 * 1000 && (!mejor || t > mejor.t)) mejor = { n, t }; };
+    lbHist().forEach(h => { if((h.debt || 0) > 0){ const ps = lbPartes(h); if(ps[0]) ver(ps[0].n, h.date); } });
+    LB().movs.forEach(m => { if(m && m.tipo === 'debe') ver(m.persona, m.fecha); });
+    return mejor ? (lbNorm(mejor.n) || mejor.n) : '';
+  }
   function lbPintar(){
     if(!$l('libretaOverlay') || !data) return;
     const d = lbDeudores();
+    const rec = lbReciente(), iRec = rec ? d.findIndex(x => (lbNorm(x[0]) || x[0]) === rec) : -1;
+    if(iRec > 0) d.unshift(d.splice(iRec, 1)[0]);
     $l('lbTotDeben').textContent = d.length ? plata(d.reduce((s, x) => s + x[1], 0)) + ' · ' + d.length + (d.length === 1 ? ' persona' : ' personas') : '';
     const bus = $l('lbBuscarDeben');
     if(bus){ bus.hidden = d.length < 6; if(!bus._ok){ bus._ok = 1; bus.addEventListener('input', lbFiltrarDeben); } }
@@ -723,7 +735,8 @@
       const mesas = lbMesasDe(p).length;
       const abierto = lbAbrirPersona === p;
       const sinNombre = p.indexOf(LB_SIN) === 0;
-      return '<div class="lb-fila lb-deudor" data-persona="' + esc2(p) + '"><span>' + esc2(p) + (sinNombre ? ' <button type="button" class="btn-ghost lb-nombrar" data-nombrar="' + esc2(p) + '">✏️ ¿Quién es?</button>' : '') + '<small>' + (mesas ? '🍽️ ' + mesas + (mesas === 1 ? ' cuenta de mesa' : ' cuentas de mesa') + ' · ' : '') + 'toca para ver su historial</small></span><b>' + plata(s) + '</b><button type="button" class="btn-ghost" data-pagotodo="' + esc2(p) + '">✅ Pagó todo</button></div>' +
+      const nuevo = iRec >= 0 && (lbNorm(p) || p) === rec;
+      return '<div class="lb-fila lb-deudor' + (nuevo ? ' lb-nuevo' : '') + '" data-persona="' + esc2(p) + '"><span>' + (nuevo ? '<em class="lb-nuevo-t">🆕 Recién anotado</em>' : '') + esc2(p) + (sinNombre ? ' <button type="button" class="btn-ghost lb-nombrar" data-nombrar="' + esc2(p) + '">✏️ ¿Quién es?</button>' : '') + '<small>' + (mesas ? '🍽️ ' + mesas + (mesas === 1 ? ' cuenta de mesa' : ' cuentas de mesa') + ' · ' : '') + 'toca para ver su historial</small></span><b>' + plata(s) + '</b><button type="button" class="btn-ghost" data-pagotodo="' + esc2(p) + '">✅ Pagó todo</button></div>' +
         (abierto ? '<div class="lb-hist">' + lbHistorial(p).map(e => '<div class="lb-ev"><span>' + e.t + (e.d && e.d !== 'todo' ? ' · ' + esc2(e.d) : e.d === 'todo' ? ' (todo)' : '') + '<small>' + new Date(e.f).toLocaleString('es-CO', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) + '</small></span><b>' + plata(e.m) + '</b></div>').join('') + '</div>' : '');
     }).join('') : '<div class="lb-vacio">Nadie te debe nada 🎉</div>');
     lbFiltrarDeben();
@@ -823,6 +836,7 @@
     '.lb-form input{font-size:20px!important;padding:12px!important}.lb-form-a{display:flex;gap:8px}.lb-form-a button{flex:1;padding:14px;font-size:18px}' +
     '.lb-buscar{width:100%;box-sizing:border-box;min-height:44px;margin:2px 0 8px;padding:8px 12px;font-size:16px;border-radius:12px;border:1px solid var(--line,#444);background:var(--card,transparent);color:inherit}.lb-buscar[hidden],.lb-deudor[hidden]{display:none!important}' + '.lb-sec{margin-top:14px}.lb-sec-t{font-size:17px;font-weight:700;margin-bottom:6px;display:flex;justify-content:space-between}' +
     '.lb-fila{display:flex;align-items:center;gap:8px;padding:10px 4px;border-top:1px solid var(--line,#444);font-size:18px}.lb-fila span{flex:1}.lb-fila small{display:block;font-size:12px;opacity:.65}' +
+    '.lb-nuevo{border:1px solid var(--amber,#c8a24a);border-radius:12px;padding-left:8px;padding-right:8px;background:color-mix(in srgb,var(--amber,#c8a24a) 10%,transparent)}.lb-nuevo-t{display:block;font-style:normal;font-size:12px;font-weight:800;color:var(--amber,#c8a24a)}' +
     '.lb-deudor{cursor:pointer}.lb-hist{margin:0 0 8px 10px;padding:6px 10px;border-left:3px solid var(--amber,#c8a24a);background:rgba(127,127,127,.08);border-radius:0 10px 10px 0;animation:mzIn .25s ease-out}' +
     '.lb-ev{display:flex;gap:8px;padding:6px 0;font-size:15px}.lb-ev span{flex:1}.lb-ev small{display:block;font-size:12px;opacity:.65}' +
     '.lb-mov{font-size:15px}.lb-x{background:none;border:0;font-size:18px;cursor:pointer;padding:4px}.lb-vacio{opacity:.7;padding:8px 4px}' +

@@ -6,6 +6,8 @@
 //  3. Camila sale con lo suyo.
 //  4. Un abono de la libreta escrito «TANIA» le baja a Tania (aunque se escribió distinto).
 //  5. Con 6 o más personas hay un buscador: «cami» deja solo a Camila; un nombre que no está dice que nadie con ese nombre debe.
+//  6. Se cierra una cuenta de mesa con «Debe» a nombre de «Lucía» ($8.000, la que menos debe): al abrir la libreta sale de
+//     PRIMERA, marcada «🆕 Recién anotado», y Camila y Camilo siguen cada uno aparte.
 'use strict';
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html';
@@ -46,6 +48,13 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
     chk('5. «cami» deja a Camila (y a Camilo)', f5.length === 2 && f5.includes('Camila=$52.500'), f5);
     await p.fill('#lbBuscarDeben', 'zoila'); await p.waitForTimeout(150);
     chk('5. Un nombre que no está dice «Nadie con ese nombre te debe»', (await filas()).length === 0 && await p.evaluate(() => !document.getElementById('lbDebenNada').hidden));
+    await p.fill('#lbBuscarDeben', ''); await p.waitForTimeout(100);
+    await p.evaluate(() => { data.tables[2] = { items: [{ productId: 'x', name: 'Aguila', price: 8000, qty: 1 }], people: [], payments: [{ note: 'Lucía', amount: 8000, method: 'debe' }] };
+      closeTableToHistory(2); saveData(); window.libretaAbrir(); });
+    await p.waitForTimeout(300);
+    const f6 = await p.evaluate(() => [...document.querySelectorAll('#lbDeben .lb-deudor')].map(f => ({ p: f.dataset.persona, m: f.querySelector('b').textContent, nuevo: f.classList.contains('lb-nuevo') && /Recién anotado/.test(f.textContent) })));
+    chk('6. El fiado recién anotado (Lucía, $8.000) sale de primero, marcado «🆕 Recién anotado»', f6[0] && f6[0].p === 'Lucía' && f6[0].m === '$8.000' && f6[0].nuevo && f6.filter(x => x.nuevo).length === 1, f6.slice(0, 3));
+    chk('6. … Camila ($52.500) y Camilo ($95.300) siguen cada uno aparte', f6.some(x => x.p === 'Camila' && x.m === '$52.500') && f6.some(x => x.p === 'Camilo' && x.m === '$95.300'), f6);
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.stack || e)); }
   chk('Sin errores de página', !errs.length, errs.join(' | '));
   await b.close(); console.log('RESULTADO', ok, 'bien', mal, 'mal'); process.exit(mal ? 1 : 0);

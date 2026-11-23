@@ -1,5 +1,8 @@
 # ORDEVA 1.99.42 — Libreta (Camila / Tania) y Productos más ordenado
 
+Incluye también lo que estaba listo sin publicar: 1.99.40 (memoria del celular), 1.99.41 (mapa del local) y el arreglo de
+fechas de las reservas (rango «28 al 2 de diciembre»).
+
 ## 1. «Camila no aparece en la libreta de quién me debe»
 Revisado con el diagnóstico de solo lectura en la nube (factura FV-0131 y el nombre «camila», sin mostrar otros nombres):
 - La cuenta de Camila **sí estaba bien guardada**: debe $52.500, el pago «Debe» a su nombre, sin abonos.
@@ -12,6 +15,11 @@ Arreglo:
 - Los abonos de la libreta escritos distinto («TANIA») también le bajan a esa persona.
 - «Me deben» ahora dice cuántas personas son.
 - Con 6 o más personas sale un buscador «🔎 Buscar quién me debe».
+- El último fiado anotado (en la última hora) sale de PRIMERO, marcado «🆕 Recién anotado».
+
+Comprobado con la libreta real y los datos del negocio (diagnóstico, solo el nombre pedido): con la versión publicada Camila
+estaba en el puesto 7 ($52.500) de 15 filas y el total era $766.125; con 1.99.42 son 13 personas, $578.525, y Camila en el 5
+(de primera si se acaba de anotar). Camila y Camilo siempre fueron filas aparte.
 
 ## 2. Productos: «organiza estos menús»
 - Categorías en **una fila que se desliza de lado** (antes 10 renglones), con «Categorías · 16» y «Ver todas ▾ / Ver menos ▴».
@@ -22,5 +30,5 @@ Arreglo:
 - «97 producto(s) sin control de stock» en una línea con el botón a la derecha.
 
 ## Pruebas
-- Nuevas: `libretanombres1942` (8/8) y `productosorden1942` (12/12).
+- Nuevas: `libretanombres1942` (10/10) y `productosorden1942` (12/12).
 - Libreta y fiados: fiadosnombres 28/28, libreta 24/24, ventasfiados 16/16.
