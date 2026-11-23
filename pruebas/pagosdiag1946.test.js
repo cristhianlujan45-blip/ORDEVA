@@ -5,6 +5,7 @@
 //     («🔋 Nequi CON ahorro de batería»), y la reconexión de la lectura también.
 //  2. Al recargar la página (el mismo registro del celular) NO se vuelven a mandar.
 //  3. Un apunte nuevo sí se manda.
+//  4. Lo mismo con los cierres de la app Android («cerró la página por falta de memoria»): uno solo, aunque se recargue.
 'use strict';
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html';
@@ -21,7 +22,8 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
         { t: t0 + 1000, app: 'Vento', txt: '', r: '🔌 Android volvió a conectar la lectura de avisos · celular bloqueado' }];
       window.VentoAndroid = { pagosAvisos: () => {}, pagosAvisosEstado: () => JSON.stringify({ on: true, permiso: true }), pagosAvisosTomar: () => '[]', pagosLectura: () => 1,
         pagosAvisosDiag: () => JSON.stringify({ ultimo: Date.now(), lista: [], traza: window.__traza, vivo: true }),
-        bancosBateria: () => JSON.stringify([{ pkg: 'com.nequi.MobileApp', nombre: 'Nequi', sinRestriccion: false }]), bancoAjustes: () => {}, notificar: () => true, permisos: () => '{}' };
+        bancosBateria: () => JSON.stringify([{ pkg: 'com.nequi.MobileApp', nombre: 'Nequi', sinRestriccion: false }]), bancoAjustes: () => {}, notificar: () => true, permisos: () => '{}',
+        erroresNativos: () => JSON.stringify([{ tipo: 'pagina', mensaje: 'Android cerró la página de ORDEVA por falta de memoria', t: t0, app: '1.0.99', android: 36, modelo: 'Xiaomi 2409' }]) };
     });
     const p = await ctx.newPage(); p.on('pageerror', e => errs.push(e.message));
     const cargar = async () => { await p.goto(BASE, { waitUntil: 'load' }); await p.waitForTimeout(900);
@@ -41,6 +43,11 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
     await p.evaluate(() => { window.__traza.push({ t: Date.now(), app: 'Vento', txt: '', r: '🔌 Android volvió a conectar la lectura de avisos · celular en uso' }); window.pagosDiagReportar(); });
     rep = await p.evaluate(() => window.__rep);
     chk('3. Un apunte nuevo sí se manda', rep.length === 1 && /celular en uso/.test(rep[0]), rep);
+    const veces = () => p.evaluate(() => { window.ventoErrores._nativos(); return window.ventoErrores.pendientes().filter(x => /falta de memoria/.test(x.mensaje)).reduce((a, x) => a + (x.veces || 1), 0); });
+    const v1 = await veces();
+    await cargar(); await p.waitForTimeout(6500);
+    const v2 = await veces();
+    chk('4. El cierre por falta de memoria cuenta 1 vez aunque se recargue la página (antes 1 por cada recarga)', v1 === 1 && v2 === 1, { v1, v2 });
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.stack || e)); }
   chk('Sin errores de página', !errs.length, errs.join(' | '));
   await b.close(); console.log('RESULTADO', ok, 'bien', mal, 'mal'); process.exit(mal ? 1 : 0);
