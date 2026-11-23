@@ -57,6 +57,9 @@ jobs:
                 'factura_repetida', (select count(*) from (select h->>'invoiceNo' n from jsonb_array_elements(coalesce(d.datos->'history', '[]'::jsonb)) h
                     where coalesce(h->>'invoiceNo', '') <> '' group by 1 having count(*) > 1) x),
                 'sin_numero', (select count(*) from jsonb_array_elements(coalesce(d.datos->'history', '[]'::jsonb)) h where coalesce(h->>'invoiceNo', '') = '' and h->'dian' is null),
+                'sin_numero_detalle', (select json_agg(x) from (select left(h->>'date', 10) dia, coalesce(h->>'table', '-') mesa, (h->>'tableName') is not null con_nombre,
+                      (select json_agg(k) from jsonb_object_keys(h) k where k in ('corregida','correcciones','editada','liberada','origen','caja','pos','mostrador','dom','pedido','qr','dian','by')) marcas
+                    from jsonb_array_elements(coalesce(d.datos->'history', '[]'::jsonb)) h where coalesce(h->>'invoiceNo', '') = '' and h->'dian' is null order by h->>'date' desc limit 12) x),
                 'total_distinto_a_productos', (select count(*) from jsonb_array_elements(coalesce(d.datos->'history', '[]'::jsonb)) h
                     where jsonb_typeof(h->'items') = 'array' and jsonb_typeof(h->'total') = 'number' and h->'descuento' is null and coalesce(h->>'propina', '') = ''
                       and abs((h->>'total')::numeric - (select coalesce(sum(coalesce((i->>'price')::numeric, 0) * coalesce((i->>'qty')::numeric, 0)), 0) from jsonb_array_elements(h->'items') i where jsonb_typeof(i->'price') = 'number' and jsonb_typeof(i->'qty') = 'number')) > 1),
