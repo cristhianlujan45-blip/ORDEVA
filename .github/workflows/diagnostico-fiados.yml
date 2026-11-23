@@ -38,8 +38,8 @@ jobs:
         run: |
           if [ -z "$SUPABASE_ACCESS_TOKEN" ] || [ -z "$PROJECT_REF" ]; then echo "Faltan los secretos"; exit 1; fi
           if ! printf '%s' "$NEGOCIO" | grep -Eq '^[0-9a-f]{8}$'; then echo "negocio: 8 letras/números del id"; exit 1; fi
-          printf '%s' "$FACTURA" | grep -Eq '^[A-Za-z0-9-]{0,20}$' || { echo "factura: letras, números y guion"; exit 1; }
-          NOMBRE=$(printf '%s' "$NOMBRE" | tr 'A-Z' 'a-z'); printf '%s' "$NOMBRE" | grep -Eq '^[a-z ]{0,40}$' || { echo "nombre: solo letras sin tildes"; exit 1; }
+          [ -z "$FACTURA" ] || printf '%s' "$FACTURA" | grep -Eq '^[A-Za-z0-9-]{1,20}$' || { echo "factura: letras, números y guion"; exit 1; }
+          NOMBRE=$(printf '%s' "$NOMBRE" | tr 'A-Z' 'a-z'); [ -z "$NOMBRE" ] || printf '%s' "$NOMBRE" | grep -Eq '^[a-z ]{1,40}$' || { echo "nombre: solo letras sin tildes"; exit 1; }
           cat > /tmp/q.sql <<'SQL'
           with neg as (select id from negocios where left(id::text, 8) = '__NEG__' limit 1),
           rol_de as (select negocio_id, usuario_id, rol from miembros),
