@@ -4,6 +4,8 @@
 function modsNegocio(){
   const t = tipoNegocio(), d = typeof data !== 'undefined' && data ? data : null;
   let m = (d && d.modoCompleto) ? MOD_TODO : (t ? t.mod : MOD_TODO);   // sin tipo elegido (negocios viejos): se ve todo, como siempre
+  // 1.99.41: 🗺️ el mapa del local viene prendido en TODOS los negocios (también tiendas y agropecuarias): se apaga a mano.
+  if(!m.includes('p')) m += 'p';
   // 1.65.7 (pedido del dueño): 🧂 Insumos y recetas es solo para los que PREPARAN comida (restaurantes, cafeterías…): no
   // se prende con «Mostrar todas las funciones» ni en un negocio sin tipo elegido. Se puede prender a mano (abajo).
   if(m.includes('r') && !(t && String(t.mod || '').includes('r'))) m = m.replace('r', '');

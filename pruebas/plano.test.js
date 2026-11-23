@@ -42,7 +42,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     v = await p.evaluate(() => ({ hoja: (document.getElementById('plHoja') || {}).innerText || '', sug: (document.querySelector('#plHoja .pl-elems .on') || {}).textContent || '' }));
     chk('2. Plano vacío: ofrece plantillas y sugiere «Restaurante»', /Empezamos con una plantilla/.test(v.hoja) && /Restaurante/.test(v.sug), v);
     await p.click('#plHoja [data-pl="plantilla"][data-v="restaurante"]'); await p.waitForTimeout(300);
-    await p.click('#confirmOkBtn'); await p.waitForTimeout(500);
+    await p.click('#confirmOkBtn', { timeout: 1500 }).catch(() => {}); await p.waitForTimeout(500);   // 1.99.41: con el plano vacío ya no pregunta
     v = await p.evaluate(() => ({ el: data.plano.el.map(e => e.t), dentro: Object.values(data.tables).every(t => t.mapX >= 10 && t.mapX <= 75 && t.mapY >= 25 && t.mapY <= 82), vis: document.querySelectorAll('#plLienzo .pl-el').length }));
     chk('2. Plantilla restaurante: barra, cocina, baños, caja y entrada en el plano; las mesas en el salón', ['barra', 'cocina', 'bano', 'caja', 'entrada'].every(t => v.el.includes(t)) && v.vis === v.el.length && v.dentro, v);
     // ===== 3 =====
@@ -111,8 +111,16 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     await B.ctx.close();
     // ===== 8. Tienda =====
     const T = await abrir('minimercado', 'Minimercado La 14'); const s = T.p;
-    v = await s.evaluate(() => ({ vista: !!document.getElementById('plVista'), disp: window.ventoPlano.disponible() }));
-    chk('8. Tienda por cuentas / caja: no muestra el plano de mesas', !v.vista && !v.disp, v);
+    // 1.99.41 (pedido del dueño: «mapear también las tiendas»): la tienda SÍ tiene plano (desde «Más» → «🗺️ Mapa del local»),
+    // pero es el plano del LOCAL (góndolas, caja…): las cuentas no se ponen encima, y la caja sigue siendo la pantalla principal.
+    await s.evaluate(() => { document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')); window.ventoPlano.abrir(); });
+    await s.waitForTimeout(500);
+    await s.evaluate(() => { const b = document.querySelector('#plHoja [data-pl="plantilla"][data-v="tienda"]'); b && b.click(); }); await s.waitForTimeout(500);
+    v = await s.evaluate(() => ({ disp: window.ventoPlano.disponible(), plano: !!(document.getElementById('floorPlan') || {}).offsetParent, mesas: document.querySelectorAll('#plLienzo .pl-mesa').length, gondolas: data.plano.el.filter(e => e.t === 'estante').length, caja: !!(document.getElementById('posPanel') || {}).offsetParent }));
+    chk('8. Tienda: tiene plano del local (góndolas), sin poner las cuentas encima y escondiendo la caja mientras se ve', v.disp && v.plano && v.mesas === 0 && v.gondolas === 3 && !v.caja, v);
+    await s.evaluate(() => document.querySelector('[data-pl="vender"]').click()); await s.waitForTimeout(300);
+    v = await s.evaluate(() => ({ caja: !!(document.getElementById('posPanel') || {}).offsetParent, plano: !!(document.getElementById('floorPlan') || {}).offsetParent }));
+    chk('8. … «🛒 Volver a vender» vuelve a la caja', v.caja && !v.plano, v);
     await T.ctx.close();
     chk('8. Sin errores en la página', errs.length === 0, errs);
   }catch(e){ mal++; console.log('❌ Error: ' + (e.stack || e)); }
