@@ -37,6 +37,14 @@
   li span{ font-size:2vh; color:var(--soft); }
   .empty{ color:var(--soft); font-size:2.3vh; }
   .state{ margin-top:auto; padding-top:2vh; font-size:1.9vh; color:var(--soft); }
+  /* 1.99.39 · Se lee desde lejos (a 3 m del TV): la mesa, «Siguen», el estado y las ayudas un poco más grandes, y los
+     títulos largos de la cola en dos renglones en vez de cortarse con «…». */
+  .hint{ font-size:2.5vh; }
+  .idle span{ font-size:2.8vh; }
+  h2{ font-size:2.7vh; }
+  li b{ font-size:2.9vh; white-space:normal; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; line-height:1.2; }
+  li span{ font-size:2.4vh; }
+  .state{ font-size:2.2vh; }
   .dot{ display:inline-block; width:1.3vh; height:1.3vh; border-radius:50%; background:var(--soft); margin-right:.8vh; vertical-align:middle; }
   .dot.ok{ background:var(--ok); } .dot.bad{ background:var(--bad); }
   #start{ position:fixed; top:0; left:0; right:0; bottom:0; z-index:9; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3vh; background:rgba(11,10,18,.94); text-align:center; }
