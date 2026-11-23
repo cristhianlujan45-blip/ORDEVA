@@ -63,6 +63,15 @@ jobs:
                 'pagos_no_cuadran', (select count(*) from jsonb_array_elements(coalesce(d.datos->'history', '[]'::jsonb)) h
                     where jsonb_typeof(h->'payments') = 'array' and jsonb_typeof(h->'total') = 'number' and h->'devoluciones' is null
                       and abs((h->>'total')::numeric - (select coalesce(sum(case when jsonb_typeof(p->'amount') = 'number' then (p->>'amount')::numeric else 0 end), 0) from jsonb_array_elements(h->'payments') p)) > 1),
+                -- cuáles (sin nombres): número, fecha, total, suma de pagos, medios y marcas
+                'pagos_no_cuadran_detalle', (select json_agg(json_build_object('factura', h->>'invoiceNo', 'fecha', left(h->>'date', 16), 'total', h->'total', 'deuda', h->'debt',
+                      'suma_pagos', (select sum(case when jsonb_typeof(p->'amount') = 'number' then (p->>'amount')::numeric else 0 end) from jsonb_array_elements(h->'payments') p),
+                      'medios', (select json_agg(json_build_object('m', p->>'method', 'v', p->'amount', 'nota_generica', coalesce(p->>'note', '') ~* '(pagó después|abono|vueltas|saldo|propina|bono|corregid)', 'campos', (select json_agg(k) from jsonb_object_keys(p) k))) from jsonb_array_elements(h->'payments') p),
+                      'marcas', (select json_agg(k) from jsonb_object_keys(h) k where k in ('descuento','propina','abonosLib','paidLater','corregida','correcciones','anulada','credito','usd','vueltas','saldoFavor','bono','dian','editada','liberada')),
+                      'n_items', jsonb_array_length(coalesce(h->'items', '[]'::jsonb))))
+                    from jsonb_array_elements(coalesce(d.datos->'history', '[]'::jsonb)) h
+                    where jsonb_typeof(h->'payments') = 'array' and jsonb_typeof(h->'total') = 'number' and h->'devoluciones' is null
+                      and abs((h->>'total')::numeric - (select coalesce(sum(case when jsonb_typeof(p->'amount') = 'number' then (p->>'amount')::numeric else 0 end), 0) from jsonb_array_elements(h->'payments') p)) > 1),
                 'deuda_negativa', (select count(*) from jsonb_array_elements(coalesce(d.datos->'history', '[]'::jsonb)) h where jsonb_typeof(h->'debt') = 'number' and (h->>'debt')::numeric < 0),
                 'deuda_mayor_que_total', (select count(*) from jsonb_array_elements(coalesce(d.datos->'history', '[]'::jsonb)) h where jsonb_typeof(h->'debt') = 'number' and jsonb_typeof(h->'total') = 'number' and (h->>'debt')::numeric > (h->>'total')::numeric + 1),
                 'fecha_futura', (select count(*) from jsonb_array_elements(coalesce(d.datos->'history', '[]'::jsonb)) h where (h->>'date') > to_char(now() + interval '1 day', 'YYYY-MM-DD')),
