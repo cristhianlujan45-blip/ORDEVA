@@ -163,27 +163,46 @@ function acRender(){
   c.times.forEach(t=>{const b=btn(t+'  ✕',()=>{const x=acCfg();x.times=x.times.filter(y=>y!==t);SS('vito_auto',x);acRender();});b.style.margin='3px';l.appendChild(b);});
 }
 window.ventoCierreAuto = c => cierreAuto(c);   // para las pruebas (cierre automático programado)
-function cierreAuto(c){
+function cierreAuto(c,hasta){
   if(c.open==='cerrar'){closeCashRegister({ auto: true });return;}   // ya no pregunta en modo automático (1.99.8): no hace falta engañar a confirm()
-  const last=data.closures.length?data.closures[0]:null,fromISO=last?last.date:null,toISO=new Date().toISOString();
+  // 1.99.47: «hasta» = la hora programada (un cierre que se hace tarde corta ahí: solo las ventas de ese día)
+  const last=data.closures.length?data.closures[0]:null,fromISO=last?last.date:null,toISO=(hasta||new Date()).toISOString();
   const s=computeClosureStats(fromISO,toISO);
   if(!s.tickets.length){showToast('Cierre automático: no había cuentas nuevas.');return;}
   data.closures.unshift({id:(window.ventoIdUnico?window.ventoIdUnico():Date.now().toString()+Math.random().toString(36).slice(2,6)),date:toISO,from:fromISO,businessName:data.businessName,ticketCount:s.tickets.length,totalSold:s.totalSold,totalEfectivo:s.totalEfectivo,totalTransferencia:s.totalTransferencia,totalDebe:s.totalDebe,hourly:s.hourly,auto:true});
   saveData();renderMesas();renderHistorial();showToast('🔒 Cierre automático de caja hecho.');
 }
+/* 1.99.47 · El cierre automático de un día ya no se pierde. Antes solo se hacía si ORDEVA estaba despierta entre la hora
+   programada y la medianoche (la cuenta de «4 horas» no pasaba de la medianoche): si a las 11:30 p. m. el celular estaba
+   apagado o dormido, ese día no se cerraba y el siguiente cierre juntaba dos días (pasó el sábado 21: el cierre del
+   domingo fue «20 nov 11:30 p. m. — 22 nov 11:30 p. m.»). Ahora, al despertar (hasta 36 h después), se hace el cierre de
+   ese día CORTADO a la hora programada (solo las ventas hasta esa hora). Si ya se cerró a mano después de esa hora, no se
+   repite. «Cerrar las cuentas abiertas» (open='cerrar') solo dentro de las 4 h: cerrar mesas de otro día no sirve. */
 function acTick(){
   if(typeof data==='undefined'||!data)return;
   const c=acCfg();if(!c.on||!c.times.length)return;
-  const now=new Date(),k=dkey(now);
+  const now=new Date();
   c.times.forEach(t=>{
-    const [h,m]=t.split(':').map(Number),at=new Date(now);at.setHours(h,m,0,0);
-    const d=now-at;
-    if(d>=0&&d<=4*36e5&&c.last[t]!==k){c.last[t]=k;SS('vito_auto',c);cierreAuto(c);}
+    const [h,m]=t.split(':').map(Number);
+    [1,0].forEach(atras=>{
+      const at=new Date(now);at.setDate(at.getDate()-atras);at.setHours(h,m,0,0);
+      const d=now-at,k=dkey(at);
+      if(d<0||c.last[t]===k)return;
+      if(d>(c.open==='cerrar'?4:36)*36e5)return;
+      if(c.desde&&at.getTime()<c.desde)return;                       // se prendió después de esa hora
+      if((c.last[t]||'')>''&&acClaveMayor(c.last[t],k))return;        // ya se hizo uno más nuevo
+      const ult=data.closures&&data.closures[0];
+      c.last[t]=k;SS('vito_auto',c);
+      if(ult&&new Date(ult.date).getTime()>=at.getTime())return;     // ya se cerró (a mano u otro equipo) después de esa hora
+      cierreAuto(c,d>5*6e4?at:null);
+    });
   });
 }
+window.ventoAcTick=acTick;   // (para las pruebas)
+const acClaveMayor=(a,b)=>{const p=x=>x.split('-').map(Number);const [y1,m1,d1]=p(a),[y2,m2,d2]=p(b);return y1!==y2?y1>y2:m1!==m2?m1>m2:d1>d2;};
 function iniAuto(){
   acRender();
-  $('acOn').onchange=e=>{const c=acCfg();c.on=e.target.checked;SS('vito_auto',c);acTick();};
+  $('acOn').onchange=e=>{const c=acCfg();c.on=e.target.checked;if(c.on)c.desde=Date.now();SS('vito_auto',c);acTick();};
   $('acOpen').onchange=e=>{const c=acCfg();c.open=e.target.value;SS('vito_auto',c);};
   $('acAdd').onclick=()=>{const v=$('acTime').value;if(!v)return;const c=acCfg();if(!c.times.includes(v))c.times.push(v);c.times.sort();SS('vito_auto',c);acRender();};
   setInterval(acTick,30000);document.addEventListener('visibilitychange',acTick);setTimeout(acTick,3000);

@@ -1853,7 +1853,13 @@ function closureDateRangeStr(closure){
     const sameDay = from.toDateString() === to.toDateString();
     const fromTime = from.toLocaleTimeString('es-CO', {hour:'2-digit', minute:'2-digit'});
     const toTime = to.toLocaleTimeString('es-CO', {hour:'2-digit', minute:'2-digit'});
-    return sameDay ? (toStr + ' · ' + fromTime + ' a ' + toTime) : (from.toLocaleDateString('es-CO',{day:'2-digit',month:'short'}) + ' ' + fromTime + ' — ' + toStr + ' ' + toTime);
+    if(sameDay) return toStr + ' · ' + fromTime + ' a ' + toTime;
+    // 1.99.47: más corto («domingo, 22 de nov, 11:30 p. m. · desde el vie 20, 11:30 p. m.») y dice si junta varios días
+    // (un cierre automático que no se hizo). Antes: «20 de nov 11:30 p. m. — domingo, 22 de noviembre de 2026 11:30 p. m.».
+    const corto = to.toLocaleDateString('es-CO', {weekday:'long', day:'numeric', month:'short'}) + (to.getFullYear() !== new Date().getFullYear() ? ' ' + to.getFullYear() : '');
+    const d0 = new Date(from); d0.setHours(0, 0, 0, 0); const d1 = new Date(to); d1.setHours(0, 0, 0, 0);
+    const dias = Math.round((d1 - d0) / 864e5);
+    return corto + ', ' + toTime + ' · desde el ' + from.toLocaleDateString('es-CO', {weekday:'short', day:'numeric'}) + ', ' + fromTime + (dias >= 2 ? ' · ⚠️ junta ' + dias + ' días' : '');
   }
   const toTime = to.toLocaleTimeString('es-CO', {hour:'2-digit', minute:'2-digit'});
   return toStr + ' · hasta las ' + toTime;
