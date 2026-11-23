@@ -1759,7 +1759,7 @@ function renderMesasList(){
       }catch(x){}
     }
     card.innerHTML = `
-      <div class="num"><svg class="tk-ic" viewBox="0 0 24 24" aria-hidden="true">${iconoEsp()}</svg>${tableLabel(id)}</div>
+      <div class="num"><svg class="tk-ic" viewBox="0 0 24 24" aria-hidden="true">${iconoEsp()}</svg><span data-novocab>${tableLabel(id)}</span></div>
       <div class="status ${isOpen ? '' : 'empty'}">${isOpen ? fmt(balance) : 'Vacía'}</div>
       <div class="items-count">${subLine}</div>
       ${desde ? '<div class="tk-desde">⏱ Desde ' + desde + '</div>' : ''}
