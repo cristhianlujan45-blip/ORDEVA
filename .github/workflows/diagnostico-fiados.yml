@@ -51,6 +51,37 @@ jobs:
           select json_build_object(
             'ahora_bogota', (now() at time zone 'America/Bogota')::text,
             'existe', (select count(*) from neg),
+            -- 1.99.50: integridad de los datos del negocio (SOLO conteos, sin nombres ni valores de nadie).
+            'integridad', (select json_build_object(
+                'ventas', jsonb_array_length(coalesce(d.datos->'history', '[]'::jsonb)),
+                'factura_repetida', (select count(*) from (select h->>'invoiceNo' n from jsonb_array_elements(coalesce(d.datos->'history', '[]'::jsonb)) h
+                    where coalesce(h->>'invoiceNo', '') <> '' group by 1 having count(*) > 1) x),
+                'sin_numero', (select count(*) from jsonb_array_elements(coalesce(d.datos->'history', '[]'::jsonb)) h where coalesce(h->>'invoiceNo', '') = '' and h->'dian' is null),
+                'total_distinto_a_productos', (select count(*) from jsonb_array_elements(coalesce(d.datos->'history', '[]'::jsonb)) h
+                    where jsonb_typeof(h->'items') = 'array' and jsonb_typeof(h->'total') = 'number' and h->'descuento' is null and coalesce(h->>'propina', '') = ''
+                      and abs((h->>'total')::numeric - (select coalesce(sum(coalesce((i->>'price')::numeric, 0) * coalesce((i->>'qty')::numeric, 0)), 0) from jsonb_array_elements(h->'items') i where jsonb_typeof(i->'price') = 'number' and jsonb_typeof(i->'qty') = 'number')) > 1),
+                'pagos_no_cuadran', (select count(*) from jsonb_array_elements(coalesce(d.datos->'history', '[]'::jsonb)) h
+                    where jsonb_typeof(h->'payments') = 'array' and jsonb_typeof(h->'total') = 'number' and h->'devoluciones' is null
+                      and abs((h->>'total')::numeric - (select coalesce(sum(case when jsonb_typeof(p->'amount') = 'number' then (p->>'amount')::numeric else 0 end), 0) from jsonb_array_elements(h->'payments') p)) > 1),
+                'deuda_negativa', (select count(*) from jsonb_array_elements(coalesce(d.datos->'history', '[]'::jsonb)) h where jsonb_typeof(h->'debt') = 'number' and (h->>'debt')::numeric < 0),
+                'deuda_mayor_que_total', (select count(*) from jsonb_array_elements(coalesce(d.datos->'history', '[]'::jsonb)) h where jsonb_typeof(h->'debt') = 'number' and jsonb_typeof(h->'total') = 'number' and (h->>'debt')::numeric > (h->>'total')::numeric + 1),
+                'fecha_futura', (select count(*) from jsonb_array_elements(coalesce(d.datos->'history', '[]'::jsonb)) h where (h->>'date') > to_char(now() + interval '1 day', 'YYYY-MM-DD')),
+                'productos', jsonb_array_length(coalesce(d.datos->'products', '[]'::jsonb)),
+                'productos_stock_negativo', (select count(*) from jsonb_array_elements(coalesce(d.datos->'products', '[]'::jsonb)) p where jsonb_typeof(p->'stock') = 'number' and (p->>'stock')::numeric < 0),
+                'productos_sin_precio', (select count(*) from jsonb_array_elements(coalesce(d.datos->'products', '[]'::jsonb)) p where coalesce((case when jsonb_typeof(p->'price') = 'number' then (p->>'price')::numeric end), 0) <= 0 and not coalesce((p->>'combo')::boolean, false)),
+                'productos_costo_mayor_precio', (select count(*) from jsonb_array_elements(coalesce(d.datos->'products', '[]'::jsonb)) p where jsonb_typeof(p->'cost') = 'number' and jsonb_typeof(p->'price') = 'number' and (p->>'cost')::numeric > (p->>'price')::numeric and (p->>'price')::numeric > 0),
+                'productos_nombre_repetido', (select count(*) from (select lower(trim(p->>'name')) n from jsonb_array_elements(coalesce(d.datos->'products', '[]'::jsonb)) p group by 1 having count(*) > 1) x),
+                'productos_id_repetido', (select count(*) from (select p->>'id' n from jsonb_array_elements(coalesce(d.datos->'products', '[]'::jsonb)) p group by 1 having count(*) > 1) x),
+                'cuentas_abiertas', (select count(*) from jsonb_each(case when jsonb_typeof(d.datos->'tables') = 'object' then d.datos->'tables' else '{}'::jsonb end) t where jsonb_array_length(coalesce(t.value->'items', '[]'::jsonb)) > 0),
+                'cuentas_abiertas_viejas_2dias', (select count(*) from jsonb_each(case when jsonb_typeof(d.datos->'tables') = 'object' then d.datos->'tables' else '{}'::jsonb end) t
+                    where exists (select 1 from jsonb_array_elements(coalesce(t.value->'items', '[]'::jsonb)) i, jsonb_array_elements(coalesce(i->'history', '[]'::jsonb)) hh
+                                  where jsonb_typeof(hh->'at') = 'number' and (hh->>'at')::numeric < extract(epoch from now() - interval '2 days') * 1000)),
+                'cierres', jsonb_array_length(coalesce(d.datos->'closures', '[]'::jsonb)),
+                'cierres_que_juntan_dias', (select count(*) from jsonb_array_elements(coalesce(d.datos->'closures', '[]'::jsonb)) c
+                    where c->>'from' is not null and ((c->>'date')::timestamptz at time zone 'America/Bogota')::date - ((c->>'from')::timestamptz at time zone 'America/Bogota')::date >= 2),
+                'turno_abierto', d.datos->'turno' is not null and jsonb_typeof(d.datos->'turno') = 'object',
+                'tamano_kb', round(octet_length(d.datos::text) / 1024.0))
+              from datos_negocio d where d.negocio_id = (select id from neg)),
             -- 1.99.41 (opcional): una factura y UN nombre que el dueño pidió revisar. No muestra ningún otro nombre: las notas de
             -- los pagos solo se comparan (sin tildes ni mayúsculas) con el nombre pedido.
             'revisar', (select json_build_object(
