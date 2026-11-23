@@ -258,6 +258,14 @@ public class AvisoPagoPrueba {
         for (String x : siGold) chk("Goldfish: sigue siendo plata que llegó: «" + x + "»", AvisoPago.esRecibido(x), AvisoPago.porQueNo(x));
         String[] noGold = { "Davivienda | Pago recibido | Gracias por el pago de tu tarjeta de credito por $200.000", "Bancolombia: Recibimos tu pago por $200.000 a tu tarjeta de credito" };
         for (String x : noGold) chk("Goldfish: no es plata que llegó: «" + x + "»", !AvisoPago.esRecibido(x), AvisoPago.porQueNo(x));
+        // 1.99.49: de hace cuánto es un pago (para decirlo y no confundirlo con uno nuevo)
+        long t0 = 1_800_000_000_000L;
+        chk("minutosAtras: llegó ahora → 0", AvisoPago.minutosAtras(t0 - 1000, t0 - 500, t0) == 0, AvisoPago.minutosAtras(t0 - 1000, t0 - 500, t0));
+        chk("minutosAtras: llegó al celular hace 595 s → 10", AvisoPago.minutosAtras(t0 - 600_000L, t0 - 595_000L, t0) == 10, AvisoPago.minutosAtras(t0 - 600_000L, t0 - 595_000L, t0));
+        chk("minutosAtras: el banco lo mandó 370 s tarde → 6", AvisoPago.minutosAtras(t0 - 370_000L, t0 - 1000, t0) == 6, AvisoPago.minutosAtras(t0 - 370_000L, t0 - 1000, t0));
+        chk("minutosAtras: hora rara (más de 1 hora) → 0", AvisoPago.minutosAtras(t0 - 5 * 3600_000L, t0 - 1000, t0) == 0, "");
+        chk("minutosAtras: sin horas → 0", AvisoPago.minutosAtras(0, 0, t0) == 0, "");
+        chk("deHace(10) = « Es de hace 10 minutos.»; deHace(0) = «»", AvisoPago.deHace(10).equals(" Es de hace 10 minutos.") && AvisoPago.deHace(0).isEmpty(), AvisoPago.deHace(10));
         System.out.println("RESULTADO " + ok + " bien " + mal + " mal");
         System.exit(mal > 0 ? 1 : 0);
     }

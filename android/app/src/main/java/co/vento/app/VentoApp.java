@@ -196,9 +196,11 @@ public class VentoApp extends Application {
     /** Con el texto del aviso: si llegó por la llave Bre-B, la voz y el aviso lo dicen. */
     static void anunciarPago(String appBanco, long monto, boolean notif, String texto) {
         if (app == null || monto <= 0) return;
-        String frase = AvisoPago.frase(appBanco, monto, texto);
+        // 1.99.49: un pago que llegó tarde dice de cuándo es («Llegaron 1400 pesos por Nequi. Es de hace 10 minutos.»).
+        long min = VentoEscucha.minutosAtras();
+        String frase = AvisoPago.frase(appBanco, monto, texto) + AvisoPago.deHace(min);
         decirPago(frase);
-        if (notif) notificarPago("💜 Recibiste " + AvisoPago.plata(monto) + (AvisoPago.esBreB(texto) ? " por Bre-B en " : " por ") + AvisoPago.nombreApp(appBanco), frase, texto,
+        if (notif) notificarPago("💜 Recibiste " + AvisoPago.plata(monto) + (AvisoPago.esBreB(texto) ? " por Bre-B en " : " por ") + AvisoPago.nombreApp(appBanco) + (min > 0 ? " · de hace " + min + " min" : ""), frase, texto,
                 AvisoPago.plata(monto), (AvisoPago.esBreB(texto) ? "Bre-B en " : "") + AvisoPago.nombreApp(appBanco), "ok");
     }
 
@@ -278,7 +280,8 @@ public class VentoApp extends Application {
     static void anunciarPagoAviso(String banco, long monto) { anunciarPagoAviso(banco, monto, null); }
     static void anunciarPagoAviso(String banco, long monto, String texto) {
         if (app == null || monto <= 0) return;
-        notificarPago("💜 Recibiste " + AvisoPago.plata(monto) + " por " + AvisoPago.nombreApp(banco), AvisoPago.frase(banco, monto, texto), texto,
+        long min = VentoEscucha.minutosAtras();
+        notificarPago("💜 Recibiste " + AvisoPago.plata(monto) + " por " + AvisoPago.nombreApp(banco) + (min > 0 ? " · de hace " + min + " min" : ""), AvisoPago.frase(banco, monto, texto) + AvisoPago.deHace(min), texto,
                 AvisoPago.plata(monto), (AvisoPago.esBreB(texto) ? "Bre-B en " : "") + AvisoPago.nombreApp(banco), "ok");
     }
 

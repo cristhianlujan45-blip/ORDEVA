@@ -243,6 +243,33 @@ public class EscuchaPrueba {
           VentoEscucha.leerSms(s2, "85888", "", conv(new Object[]{"Recibiste 200. Para saber mas, consulta tus movimientos.", t - 20_000}, new Object[]{"Recibiste 300. Para saber mas, consulta tus movimientos.", t}), "dE:", false);
           VentoApp.ui.correr();
           chk("1.82.1 E) Dos SMS distintos ($200 y $300) por los dos lados: cada uno una vez", VentoApp.dichos.size() == 2 && VentoApp.dichos.contains("Llegaron 200 pesos por DaviPlata.") && VentoApp.dichos.contains("Llegaron 300 pesos por DaviPlata."), VentoApp.dichos); }
+        // 1.99.49 · «Me sonó uno de 3.500 y después otro de 1.400 que habían puesto antes» (Xiaomi, 23/11: Android le pasó
+        // el aviso a ORDEVA 595 s tarde). El pago de AHORA suena normal; el que llegó tarde dice de cuándo es.
+        {
+            long t = System.currentTimeMillis();
+            Preferencias s5 = nuevo();
+            VentoEscucha.tiempos(t - 1000, t - 500);
+            app(s5, "Nequi", "Nequi", "ANA RUIZ te envió $3.500", "N35:");
+            VentoApp.ui.correr();
+            chk("1.99.49: el pago de ahora suena normal: «Llegaron 3500 pesos por Nequi.»", VentoApp.dichos.contains("Llegaron 3500 pesos por Nequi."), VentoApp.dichos);
+            limpiar();
+            VentoEscucha.tiempos(t - 600_000L, t - 595_000L);
+            app(s5, "Nequi", "Nequi", "LUIS PEREZ te envió $1.400", "N14:");
+            VentoApp.ui.correr();
+            chk("1.99.49: el que Android pasó 10 min tarde dice de cuándo es: «Llegaron 1400 pesos por Nequi. Es de hace 10 minutos.»", VentoApp.dichos.contains("Llegaron 1400 pesos por Nequi. Es de hace 10 minutos."), VentoApp.dichos);
+            chk("1.99.49: … y la notificación también: «💜 Recibiste $1.400 por Nequi · de hace 10 min»", VentoApp.notifs.stream().anyMatch(n -> n[0].equals("💜 Recibiste $1.400 por Nequi · de hace 10 min")), VentoApp.avisos);
+            limpiar();
+            VentoEscucha.tiempos(t - 370_000L, t - 2000);
+            app(s5, "Nequi", "Nequi", "MARIA LOPEZ te envió $8.000", "N80:");
+            VentoApp.ui.correr();
+            chk("1.99.49: el que el BANCO mandó 6 min tarde también lo dice: «… Es de hace 6 minutos.»", VentoApp.dichos.contains("Llegaron 8000 pesos por Nequi. Es de hace 6 minutos."), VentoApp.dichos);
+            limpiar();
+            VentoEscucha.tiempos(t - 40_000L, t - 30_000L);
+            app(s5, "Nequi", "Nequi", "PEDRO DIAZ te envió $2.000", "N20:");
+            VentoApp.ui.correr();
+            chk("1.99.49: uno de hace menos de 2 min suena normal (sin «Es de hace»)", VentoApp.dichos.contains("Llegaron 2000 pesos por Nequi."), VentoApp.dichos);
+            VentoEscucha.tiempos(0, 0);
+        }
         System.out.println("RESULTADO " + ok + " bien " + mal + " mal");
         System.exit(mal > 0 ? 1 : 0);
     }

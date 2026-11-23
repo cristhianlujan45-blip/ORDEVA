@@ -434,13 +434,15 @@ function pagoHuella(t){
     // Con la app Android: por el MISMO camino que los pagos que entiende la app (notificación + 🪟 ventana fuera de ORDEVA,
     // también con el celular bloqueado). Antes un pago que entendía la página solo sacaba la notificación.
     if(!op.voz) try{ if(!window.ventoAvisoOn || window.ventoAvisoOn('pagos')){ const orig = origTxt;
-      const tit = '💜 Recibiste ' + plata(p.monto) + ' por ' + (p.breb ? 'Bre-B en ' : '') + p.app, fr = 'Recibiste ' + p.monto + ' pesos por ' + p.app + (p.de ? ', de ' + p.de : '') + '.' + (mesa ? ' ' + tableLabel(mesa) + '.' : '');
+      const tit = '💜 Recibiste ' + plata(p.monto) + ' por ' + (p.breb ? 'Bre-B en ' : '') + p.app + (op && op.hace > 0 ? ' · de hace ' + op.hace + ' min' : ''), fr = 'Recibiste ' + p.monto + ' pesos por ' + p.app + (p.de ? ', de ' + p.de : '') + '.' + (mesa ? ' ' + tableLabel(mesa) + '.' : '') + (op && op.hace > 0 ? ' Es de hace ' + op.hace + ' minutos.' : '');
       if(!pgNotificarAndroid(tit, fr, orig, plata(p.monto), (p.breb ? 'Bre-B en ' : '') + p.app, 'ok')) window.ventoAvisoCel && window.ventoAvisoCel(tit, fr + (orig ? '\n«' + orig + '»' : ''), 'pagos'); } }catch(e){}
     const suenaAqui = !window.ventoPagoSuenaAqui || window.ventoPagoSuenaAqui();
     if(suenaAqui) try{ window.ventoSonidos && window.ventoSonidos.success(); }catch(e){}
     // «Pago confirmado. 200 pesos desde DaviPlata» (o «desde Nequi»…), con quién pagó y la mesa si se sabe.
     // «Llegaron 3200 pesos por Nequi»: la cantidad siempre, sin el nombre de quién pagó (1.49.0).
-    if(!op.voz) window.ventoDecirPago('Llegaron ' + p.monto + ' pesos ' + (p.breb ? 'por Bre-B, en ' : 'por ') + p.app + (mesa ? ', de la ' + tableLabel(mesa) : ''));
+    // 1.99.49: si llegó tarde (el banco o Android lo pasaron tarde), dice de cuándo es: no se confunde con un pago nuevo.
+    const haceTxt = op && op.hace > 0 ? '. Es de hace ' + op.hace + ' minutos' : '';
+    if(!op.voz) window.ventoDecirPago('Llegaron ' + p.monto + ' pesos ' + (p.breb ? 'por Bre-B, en ' : 'por ') + p.app + (mesa ? ', de la ' + tableLabel(mesa) : '') + haceTxt);
     if(navigator.vibrate && suenaAqui) try{ navigator.vibrate([150, 80, 150]); }catch(e){}
     try{ window.mesoraCelebrar && window.mesoraCelebrar(['💜', '💰', '✨']); }catch(e){}
     pgPintar();
@@ -462,7 +464,7 @@ function pagoHuella(t){
       if(a && /^PRUEBA/.test(String(a.id || ''))){ const pp = pgLeer(a.txt); showToast('🧪 Prueba piloto: ' + (pp ? 'ORDEVA entendió ' + plata(pp.monto) + ' por ' + (pp.breb ? 'Bre-B · ' : '') + pp.app : 'aviso sin valor (espera el SMS)') + '. No se registró como pago.', 7000); return; }
       // a.crudo: la app Android no lo entendió y lo pasa tal cual; aquí se revisa con las reglas de la página (que siempre
       // están al día) y, si es plata recibida, se dice en voz alta («Recibiste … pesos por …»).
-      if(a && a.txt) pgRecibir(a.txt, 'and-' + a.id, { voz: !!a.voz, revisar: a.revisar || '', smsOk: !!a.smsOk, reemplaza: a.reemplaza || '', crudo: !!a.crudo }); }catch(e){} });
+      if(a && a.txt) pgRecibir(a.txt, 'and-' + a.id, { voz: !!a.voz, revisar: a.revisar || '', smsOk: !!a.smsOk, reemplaza: a.reemplaza || '', crudo: !!a.crudo, hace: Number(a.hace) || 0 }); }catch(e){} });
     if(l.length) try{ pgPintar(); }catch(e){}
   };
   setInterval(() => window.ventoAvisosNativos(), 5000);

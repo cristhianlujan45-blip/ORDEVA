@@ -211,11 +211,12 @@ public class VentoEscucha extends NotificationListenerService {
         // misma persona) SÍ son dos pagos: cada uno trae su propio «cuándo». Antes se tomaban como uno solo.
         long cuando = n.when != 0 ? n.when : sbn.getPostTime();
         tiempos(n.when, sbn.getPostTime());
-        // Al reconectar: lo de los últimos 30 min se toma (lo de más de 3 min, sin decirlo en voz alta); lo más viejo no
-        // (podría cuadrar por casualidad con el saldo de una mesa de ahora).
+        // Al reconectar: lo de los últimos 30 min se toma; lo más viejo no (podría cuadrar por casualidad con el saldo de una
+        // mesa de ahora). 1.99.49: lo de más de 3 min ya no queda callado (la página lo decía igual, sin decir de cuándo era,
+        // y se confundía con un pago nuevo): lo dice esta voz, con «Es de hace N minutos».
         long edad = Math.abs(System.currentTimeMillis() - sbn.getPostTime());
         if (atrasada && edad > 30 * 60_000L) return false;
-        boolean callado = atrasada && edad > 3 * 60_000L;
+        boolean callado = false;
         boolean alguno = false;
         if (sms) return resumen ? false : leerSms(sp, titulo, principal, mensajes, sbn.getKey() + ":" + cuando + ":", callado);
         if (resumen ? !contenidoVisto(sp, app, principal) : !porResumen(app, principal)) {
@@ -588,6 +589,7 @@ public class VentoEscucha extends NotificationListenerService {
             if (ahora - o.optLong("t") < VIGENCIA) out.put(o);
         }
         JSONObject o = new JSONObject().put("id", id).put("txt", txt).put("t", ahora).put("voz", voz);   // voz: ya se dijo en voz alta aquí
+        long hace = minutosAtras(); if (hace > 0) o.put("hace", hace);    // 1.99.49: de hace cuántos minutos es (la página lo dice)
         if (revisar != null) o.put("revisar", revisar);                  // no es la app oficial: «⚠️ Revisar», no «confirmado»
         if (smsOk) o.put("smsOk", true);                                  // SMS del banco y el dueño eligió confirmarlos
         if (reemplaza != null) o.put("reemplaza", reemplaza);             // confirma el SMS de este mismo pago
@@ -614,6 +616,9 @@ public class VentoEscucha extends NotificationListenerService {
     private static volatile long tBanco = 0, tLlego = 0;
     static void tiempos(long banco, long llego) { tBanco = banco; tLlego = llego; }
     static long horaBanco() { return tBanco; }
+    static long horaLlego() { return tLlego; }
+    /** 1.99.49: de hace cuántos minutos es el pago que se está diciendo (0 = de ahora). */
+    static long minutosAtras() { return AvisoPago.minutosAtras(tBanco, tLlego, System.currentTimeMillis()); }
     static String demora() {
         long b = tBanco, l = tLlego, ahora = System.currentTimeMillis();
         StringBuilder x = new StringBuilder();

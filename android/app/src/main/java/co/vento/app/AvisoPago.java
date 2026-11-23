@@ -328,6 +328,20 @@ public final class AvisoPago {
     }
 
     /** Con el texto del aviso: si llegó por la llave Bre-B lo dice («Pago confirmado. 20000 pesos por Bre-B, en Nequi.»). */
+    /** 1.99.49 · ¿De hace cuánto es este pago? (pedido del dueño: «me sonó uno de 3.500 y después otro de 1.400 que habían
+     *  puesto antes: que no haya confusión»). banco = la hora que trae el aviso o el SMS; llego = cuándo llegó al celular;
+     *  ahora = cuando se dice. Si es de hace 2 minutos o más (el banco lo mandó tarde o Android se lo pasó tarde a ORDEVA),
+     *  los minutos; si es de ahora (o de hace más de 1 hora, una hora rara), 0. */
+    static long minutosAtras(long banco, long llego, long ahora) {
+        long ref = llego > 0 ? (banco > 0 && banco < llego ? banco : llego) : banco;
+        if (ref <= 0) return 0;
+        long dt = ahora - ref;
+        if (dt < 100_000L || dt > 3600_000L) return 0;
+        return Math.max(2, Math.round(dt / 60000.0));
+    }
+    /** « Es de hace 10 minutos.» para decirlo después del valor (vacío si es de ahora). */
+    static String deHace(long minutos) { return minutos > 0 ? " Es de hace " + minutos + " minutos." : ""; }
+
     static String frase(String app, long monto, String texto) {
         return esBreB(texto) ? "Llegaron " + monto + " pesos por Bre-B, en " + nombreApp(app) + "." : frase(app, monto);
     }

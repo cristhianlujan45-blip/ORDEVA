@@ -17,7 +17,7 @@ public class VentoApp {
     static void mantenerDespierto() { }
     static void decirPago(String f) { dichos.add(f); }
     static void anunciarPago(String app, long monto, boolean notif) { anunciarPago(app, monto, notif, null); }
-    static void anunciarPago(String app, long monto, boolean notif, String texto) { dichos.add(AvisoPago.frase(app, monto, texto)); if (notif) notificarPago("💜 Recibiste " + AvisoPago.plata(monto) + " por " + AvisoPago.nombreApp(app), AvisoPago.frase(app, monto, texto), texto, AvisoPago.plata(monto), (AvisoPago.esBreB(texto) ? "Bre-B en " : "") + AvisoPago.nombreApp(app), "ok"); }
+    static void anunciarPago(String app, long monto, boolean notif, String texto) { long min = VentoEscucha.minutosAtras(); String fr = AvisoPago.frase(app, monto, texto) + AvisoPago.deHace(min); dichos.add(fr); if (notif) notificarPago("💜 Recibiste " + AvisoPago.plata(monto) + " por " + AvisoPago.nombreApp(app) + (min > 0 ? " · de hace " + min + " min" : ""), fr, texto, AvisoPago.plata(monto), (AvisoPago.esBreB(texto) ? "Bre-B en " : "") + AvisoPago.nombreApp(app), "ok"); }
     static void anunciarPagoAviso(String banco, long monto) { anunciarPagoAviso(banco, monto, null); }
     static void anunciarPagoAviso(String banco, long monto, String texto) { notificarPago("💜 Recibiste " + AvisoPago.plata(monto) + " por " + AvisoPago.nombreApp(banco), AvisoPago.frase(banco, monto, texto), texto, AvisoPago.plata(monto), (AvisoPago.esBreB(texto) ? "Bre-B en " : "") + AvisoPago.nombreApp(banco), "ok"); }
     static final List<String[]> notifs = new ArrayList<>();
