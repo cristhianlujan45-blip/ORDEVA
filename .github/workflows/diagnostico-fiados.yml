@@ -39,6 +39,14 @@ jobs:
           select json_build_object(
             'ahora_bogota', (now() at time zone 'America/Bogota')::text,
             'existe', (select count(*) from neg),
+            -- 1.99.41: cómo está configurado el plano del local (solo datos técnicos: tipo, módulos y tamaño del plano)
+            'configuracion', (select json_build_object(
+                'tipo', d.datos->>'businessType', 'modulos', d.datos->'modulos', 'modo_completo', d.datos->'modoCompleto',
+                'mesas', (select count(*) from jsonb_object_keys(coalesce(d.datos->'tables', '{}'::jsonb))),
+                'plano_zonas', jsonb_array_length(coalesce(d.datos->'plano'->'zonas', '[]'::jsonb)),
+                'plano_elementos', jsonb_array_length(coalesce(d.datos->'plano'->'elementos', '[]'::jsonb)),
+                'plano_usado', d.datos->'plano'->'usado', 'plano_claves', (select json_agg(k) from jsonb_object_keys(coalesce(d.datos->'plano', '{}'::jsonb)) k))
+              from datos_negocio d where d.negocio_id = (select id from neg)),
             'copias', (select coalesce(json_agg(x order by x.cuando desc), '[]') from (
               select dd.origen, (dd.cuando at time zone 'America/Bogota')::text cuando, dd.version,
                 jsonb_typeof(dd.j->'libreta') libreta_tipo,
