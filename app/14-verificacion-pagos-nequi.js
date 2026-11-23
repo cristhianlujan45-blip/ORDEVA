@@ -834,7 +834,14 @@ function pagoHuella(t){
   }
   // Avisos de apps de banco que hablaban de plata pero ORDEVA NO tomó como pago (vienen sin nombres ni números): se ven en
   // Ajustes → Pagos y se reportan para enseñarle a ORDEVA ese formato.
-  const pgDiagVistos = new Set();
+  /* 1.99.46 · Lo ya reportado se recuerda en este equipo (antes solo mientras la página estaba abierta): al recargar, los
+     mismos 25 apuntes del registro se volvían a mandar y los conteos salían inflados («378 veces volvió a conectar»), sin
+     poder saber cuántas veces pasó de verdad. */
+  const PG_DIAG_K = 'vento-pg-diag-vistos';
+  const pgDiagVistos = (() => { let l = []; try{ l = JSON.parse(localStorage.getItem(PG_DIAG_K) || '[]'); }catch(e){} const s0 = new Set(Array.isArray(l) ? l.slice(-400) : []);
+    const add = s0.add.bind(s0); let t = null;
+    s0.add = v => { const r = add(v); clearTimeout(t); t = setTimeout(() => { try{ localStorage.setItem(PG_DIAG_K, JSON.stringify([...s0].slice(-400))); }catch(e){} }, 300); return r; };
+    return s0; })();
   // Cada aviso del banco que ORDEVA NO tomó como pago (o que no entendió) llega solo a 🐞 Errores del panel de
   // administrador, sin nombres ni valores, aunque nadie abra Ajustes → Pagos: así se ve qué llegó y por qué no sonó.
   function pgDiagReportar(){
@@ -853,7 +860,9 @@ function pagoHuella(t){
       // no le pasó a ORDEVA (los tomó el barrido de la barra). Una vez por aviso (su hora), solo tiempos: sin valores ni nombres.
       const b = +((r.match(/el banco lo mandó (\d+) s tarde/) || [])[1] || 0), v = +((r.match(/(?:Vento|ORDEVA) lo leyó (\d+) s después/) || [])[1] || 0);
       if((b >= 20 || v >= 5) && !pgDiagVistos.has('t' + x.t)){ pgDiagVistos.add('t' + x.t);
-        try{ window.ventoError && window.ventoError('pago', 'Pago avisado tarde: ' + (b >= 20 ? 'el banco lo mandó ' + b + ' s tarde' : '') + (b >= 20 && v >= 5 ? ' y ' : '') + (v >= 5 ? 'Vento lo leyó ' + v + ' s después' : ''), { app: String(x.app || '').slice(0, 40), texto: String(x.txt || '').slice(0, 220), banco_s: b, vento_s: v, app_version: window.ventoAppVersion ? window.ventoAppVersion() : '' }, 'pago|demora|' + (b >= 20 ? 'banco' : 'vento')); }catch(e){} }
+        // 1.99.46: si el BANCO lo mandó tarde, ¿esa app del banco tenía ahorro de batería? (la causa más común)
+        let bat = ''; if(b >= 20) try{ const bb = pgBancosBat().find(z => String(x.app || '').toLowerCase().includes(String(z.nombre || '').toLowerCase())); if(bb) bat = bb.sinRestriccion ? ' · 🔋 ' + bb.nombre + ' sin restricciones' : ' · 🔋 ' + bb.nombre + ' CON ahorro de batería'; }catch(e){}
+        try{ window.ventoError && window.ventoError('pago', 'Pago avisado tarde: ' + (b >= 20 ? 'el banco lo mandó ' + b + ' s tarde' : '') + (b >= 20 && v >= 5 ? ' y ' : '') + (v >= 5 ? 'Vento lo leyó ' + v + ' s después' : '') + bat, { app: String(x.app || '').slice(0, 40), texto: String(x.txt || '').slice(0, 220), banco_s: b, vento_s: v, app_version: window.ventoAppVersion ? window.ventoAppVersion() : '' }, 'pago|demora|' + (b >= 20 ? 'banco' : 'vento')); }catch(e){} }
       // 1.72.6: 🔌 cuándo Android corta / vuelve a conectar la lectura y si el celular estaba bloqueado (causa del «no suena bloqueado»).
       if(/^🔌/.test(r) && !pgDiagVistos.has('t' + x.t)){ pgDiagVistos.add('t' + x.t);
         try{ window.ventoError && window.ventoError('pago', r.replace(/^\S+\s*/, ''), { app_version: window.ventoAppVersion ? window.ventoAppVersion() : '' }, 'pago|lectura|' + (/CORTÓ/.test(r) ? 'corta' : 'vuelve') + (/bloqueado/.test(r) ? '-bloq' : '-uso')); }catch(e){} }
@@ -862,6 +871,7 @@ function pagoHuella(t){
     return d;
   }
   setInterval(() => { try{ pgDiagReportar(); }catch(e){} }, 60000);
+  window.pagosDiagReportar = pgDiagReportar;   // (para las pruebas)
   function pgDiagPintar(){
     const A = AND(); if(!A || !A.pagosAvisosDiag) return;
     const d = pgDiagReportar() || {};
