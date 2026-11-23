@@ -32,3 +32,8 @@ estaba en el puesto 7 ($52.500) de 15 filas y el total era $766.125; con 1.99.42
 ## Pruebas
 - Nuevas: `libretanombres1942` (10/10) y `productosorden1942` (12/12).
 - Libreta y fiados: fiadosnombres 28/28, libreta 24/24, ventasfiados 16/16.
+
+# 1.99.43 — El último fiado, siempre de primero
+Pedido del dueño: «quiero que el último fiado que anotes salga de primero en la lista». En 1.99.42 salía de primero solo
+durante la primera hora; ahora siempre, marcado «🆕 Último fiado · hace 5 min / hoy 10:01 p. m. / ayer …». Si esa persona ya
+pagó todo, sale de primero el último fiado de quien todavía debe. Prueba `libretanombres1942` 12/12.

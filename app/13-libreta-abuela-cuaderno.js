@@ -713,20 +713,30 @@
     document.querySelectorAll('#lbDeben .lb-deudor').forEach(f => { const v = !q || lbNorm(f.dataset.persona).includes(q); f.hidden = !v; if(v) n++; });
     const nada = $l('lbDebenNada'); if(nada) nada.hidden = !(q && !n);
   }
-  /* 1.99.42 · El último fiado anotado (en la última hora) sale de PRIMERO, marcado «🆕 Recién anotado»: al cerrar una cuenta
-     con «Debe» y abrir la libreta, se ve de una vez (antes la lista iba solo de mayor a menor y Camila quedó en el puesto 7). */
-  const LB_RECIENTE_MS = 60 * 60 * 1000;
-  function lbReciente(){
-    const ahora = Date.now(); let mejor = null;
-    const ver = (n, f) => { const t = new Date(f).getTime(); if(n && t && ahora - t <= LB_RECIENTE_MS && ahora - t >= -5 * 60 * 1000 && (!mejor || t > mejor.t)) mejor = { n, t }; };
-    lbHist().forEach(h => { if((h.debt || 0) > 0){ const ps = lbPartes(h); if(ps[0]) ver(ps[0].n, h.date); } });
+  /* 1.99.43 · El último fiado anotado sale SIEMPRE de primero (pedido del dueño), marcado «🆕 Último fiado» con cuándo se
+     anotó. Si esa persona ya pagó todo, sale de primero el último fiado de alguien que todavía debe. (1.99.42 lo hacía solo
+     durante la primera hora.) */
+  function lbReciente(deben){
+    const ok = new Set(deben.map(x => lbNorm(x[0]) || x[0])); let mejor = null;
+    const ver = (n, f) => { const t = new Date(f).getTime(), k = lbNorm(n) || n; if(n && t && ok.has(k) && (!mejor || t > mejor.t)) mejor = { k, t }; };
+    lbHist().forEach(h => { if((h.debt || 0) > 0) lbPartes(h).forEach(x => ver(x.n, h.date)); });
     LB().movs.forEach(m => { if(m && m.tipo === 'debe') ver(m.persona, m.fecha); });
-    return mejor ? (lbNorm(mejor.n) || mejor.n) : '';
+    return mejor;
+  }
+  function lbHace(t){
+    const min = Math.round((Date.now() - t) / 60000);
+    if(min < 1) return 'ahora';
+    if(min < 60) return 'hace ' + min + ' min';
+    const f = new Date(t), hoy = new Date(), ayer = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 1);
+    const hora = f.toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' });
+    if(f.toDateString() === hoy.toDateString()) return 'hoy ' + hora;
+    if(f.toDateString() === ayer.toDateString()) return 'ayer ' + hora;
+    return f.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }) + ' ' + hora;
   }
   function lbPintar(){
     if(!$l('libretaOverlay') || !data) return;
     const d = lbDeudores();
-    const rec = lbReciente(), iRec = rec ? d.findIndex(x => (lbNorm(x[0]) || x[0]) === rec) : -1;
+    const recO = lbReciente(d), rec = recO ? recO.k : '', iRec = rec ? d.findIndex(x => (lbNorm(x[0]) || x[0]) === rec) : -1;
     if(iRec > 0) d.unshift(d.splice(iRec, 1)[0]);
     $l('lbTotDeben').textContent = d.length ? plata(d.reduce((s, x) => s + x[1], 0)) + ' · ' + d.length + (d.length === 1 ? ' persona' : ' personas') : '';
     const bus = $l('lbBuscarDeben');
@@ -736,7 +746,7 @@
       const abierto = lbAbrirPersona === p;
       const sinNombre = p.indexOf(LB_SIN) === 0;
       const nuevo = iRec >= 0 && (lbNorm(p) || p) === rec;
-      return '<div class="lb-fila lb-deudor' + (nuevo ? ' lb-nuevo' : '') + '" data-persona="' + esc2(p) + '"><span>' + (nuevo ? '<em class="lb-nuevo-t">🆕 Recién anotado</em>' : '') + esc2(p) + (sinNombre ? ' <button type="button" class="btn-ghost lb-nombrar" data-nombrar="' + esc2(p) + '">✏️ ¿Quién es?</button>' : '') + '<small>' + (mesas ? '🍽️ ' + mesas + (mesas === 1 ? ' cuenta de mesa' : ' cuentas de mesa') + ' · ' : '') + 'toca para ver su historial</small></span><b>' + plata(s) + '</b><button type="button" class="btn-ghost" data-pagotodo="' + esc2(p) + '">✅ Pagó todo</button></div>' +
+      return '<div class="lb-fila lb-deudor' + (nuevo ? ' lb-nuevo' : '') + '" data-persona="' + esc2(p) + '"><span>' + (nuevo ? '<em class="lb-nuevo-t">🆕 Último fiado · ' + lbHace(recO.t) + '</em>' : '') + esc2(p) + (sinNombre ? ' <button type="button" class="btn-ghost lb-nombrar" data-nombrar="' + esc2(p) + '">✏️ ¿Quién es?</button>' : '') + '<small>' + (mesas ? '🍽️ ' + mesas + (mesas === 1 ? ' cuenta de mesa' : ' cuentas de mesa') + ' · ' : '') + 'toca para ver su historial</small></span><b>' + plata(s) + '</b><button type="button" class="btn-ghost" data-pagotodo="' + esc2(p) + '">✅ Pagó todo</button></div>' +
         (abierto ? '<div class="lb-hist">' + lbHistorial(p).map(e => '<div class="lb-ev"><span>' + e.t + (e.d && e.d !== 'todo' ? ' · ' + esc2(e.d) : e.d === 'todo' ? ' (todo)' : '') + '<small>' + new Date(e.f).toLocaleString('es-CO', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) + '</small></span><b>' + plata(e.m) + '</b></div>').join('') + '</div>' : '');
     }).join('') : '<div class="lb-vacio">Nadie te debe nada 🎉</div>');
     lbFiltrarDeben();

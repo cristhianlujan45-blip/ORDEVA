@@ -7,7 +7,9 @@
 //  4. Un abono de la libreta escrito «TANIA» le baja a Tania (aunque se escribió distinto).
 //  5. Con 6 o más personas hay un buscador: «cami» deja solo a Camila; un nombre que no está dice que nadie con ese nombre debe.
 //  6. Se cierra una cuenta de mesa con «Debe» a nombre de «Lucía» ($8.000, la que menos debe): al abrir la libreta sale de
-//     PRIMERA, marcada «🆕 Recién anotado», y Camila y Camilo siguen cada uno aparte.
+//     PRIMERA, marcada «🆕 Último fiado», y Camila y Camilo siguen cada uno aparte.
+//  7. 1.99.43: sigue de primera aunque hayan pasado horas (antes solo la primera hora).
+//  8. Si Lucía paga todo, sale de primero el último fiado de quien todavía debe (Camila, anotada el 22).
 'use strict';
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html';
@@ -52,9 +54,18 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
     await p.evaluate(() => { data.tables[2] = { items: [{ productId: 'x', name: 'Aguila', price: 8000, qty: 1 }], people: [], payments: [{ note: 'Lucía', amount: 8000, method: 'debe' }] };
       closeTableToHistory(2); saveData(); window.libretaAbrir(); });
     await p.waitForTimeout(300);
-    const f6 = await p.evaluate(() => [...document.querySelectorAll('#lbDeben .lb-deudor')].map(f => ({ p: f.dataset.persona, m: f.querySelector('b').textContent, nuevo: f.classList.contains('lb-nuevo') && /Recién anotado/.test(f.textContent) })));
-    chk('6. El fiado recién anotado (Lucía, $8.000) sale de primero, marcado «🆕 Recién anotado»', f6[0] && f6[0].p === 'Lucía' && f6[0].m === '$8.000' && f6[0].nuevo && f6.filter(x => x.nuevo).length === 1, f6.slice(0, 3));
+    const f6 = await p.evaluate(() => [...document.querySelectorAll('#lbDeben .lb-deudor')].map(f => ({ p: f.dataset.persona, m: f.querySelector('b').textContent, nuevo: f.classList.contains('lb-nuevo') && /Último fiado/.test(f.textContent) })));
+    chk('6. El fiado recién anotado (Lucía, $8.000) sale de primero, marcado «🆕 Último fiado»', f6[0] && f6[0].p === 'Lucía' && f6[0].m === '$8.000' && f6[0].nuevo && f6.filter(x => x.nuevo).length === 1, f6.slice(0, 3));
     chk('6. … Camila ($52.500) y Camilo ($95.300) siguen cada uno aparte', f6.some(x => x.p === 'Camila' && x.m === '$52.500') && f6.some(x => x.p === 'Camilo' && x.m === '$95.300'), f6);
+    const primera = () => p.evaluate(() => { const f = document.querySelector('#lbDeben .lb-deudor'); return f ? { p: f.dataset.persona, nuevo: f.classList.contains('lb-nuevo'), t: (f.querySelector('.lb-nuevo-t') || {}).textContent || '' } : null; });
+    await p.evaluate(() => { const h = data.history.find(x => (x.payments || []).some(y => y.note === 'Lucía')); h.date = new Date(Date.now() - 5 * 3600 * 1000).toISOString(); saveData(); window.libretaAbrir(); });
+    await p.waitForTimeout(200);
+    let pr = await primera();
+    chk('7. Cinco horas después Lucía sigue de primera («🆕 Último fiado · …»)', pr && pr.p === 'Lucía' && pr.nuevo && /Último fiado · /.test(pr.t), pr);
+    await p.evaluate(() => { const h = data.history.find(x => (x.payments || []).some(y => y.note === 'Lucía')); h.debt = 0; saveData(); window.libretaAbrir(); });
+    await p.waitForTimeout(200);
+    pr = await primera();
+    chk('8. Lucía pagó todo: sale de primero el último fiado de quien todavía debe (Camila)', pr && pr.p === 'Camila' && pr.nuevo, pr);
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.stack || e)); }
   chk('Sin errores de página', !errs.length, errs.join(' | '));
   await b.close(); console.log('RESULTADO', ok, 'bien', mal, 'mal'); process.exit(mal ? 1 : 0);
