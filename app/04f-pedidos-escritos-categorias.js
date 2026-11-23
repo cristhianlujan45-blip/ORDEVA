@@ -108,6 +108,10 @@ function qsRegistrarVenta(cart, opts){
     entry.efectivoRecibido = Math.round(Number(opts.recibido)); entry.vueltas = Math.max(0, Math.round(Number(opts.vueltas) || 0));
   }
   if(entry.inc == null) entry.inc = (data.impuestoConsumo ? (Number(data.incRate) || 8) : 0);   // 🍽️ 1.82.0
+  /* 🧾 1.99.51 · La venta de mostrador (Caja POS) y los domicilios también llevan su número de factura (FV-…), como las
+     cuentas de mesa. Antes quedaban sin número: no salían al buscar por número ni en orden en el «Libro de facturas»
+     (en los datos del dueño, 42 ventas sin número). Si se deshace al instante, el número se devuelve. */
+  try{ if(!entry.invoiceNo && window.ventoFactura && window.ventoFactura.tomar){ const ft = window.ventoFactura.tomar(); entry.invoiceNo = ft.no; Object.defineProperty(entry, '_facturaDevolver', { value: ft.devolver, enumerable: false }); } }catch(e){}
   data.history.unshift(entry);
   entry._inv.forEach(it => { try{ invOnSale({ productId: it.productId }, it.qty); }catch(e){} });
   try{ window.ventoDian && window.ventoDian.alVender(entry); }catch(e){}   // 🧾 a la DIAN (si está prendida)
@@ -119,6 +123,7 @@ function qsDeshacerVenta(entry){
   const i = entry ? data.history.findIndex(h => h === entry || h.id === entry.id) : -1;
   if(i < 0) return false;
   const quitada = data.history.splice(i, 1)[0];
+  try{ const fd = entry._facturaDevolver || (quitada && quitada._facturaDevolver); if(fd) fd(); }catch(e){}   // 1.99.51: el número vuelve
   // 1.82.1: «_inv» no se guarda (no viaja a la nube ni sobrevive a recargar). Si no está (la venta llegó de la nube o se
   // recargó ORDEVA), se devuelve el inventario con los productos de la venta. Antes no devolvía nada.
   const inv = entry._inv || (quitada && quitada._inv) || (entry.items || []).filter(it => it && it.productId).map(it => ({ productId: it.productId, qty: Number(it.qty) || 0 }));

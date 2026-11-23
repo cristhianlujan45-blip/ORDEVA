@@ -35,3 +35,11 @@ Diagnóstico nuevo de solo lectura (integridad, solo conteos) con los datos real
 - si sobra plata de verdad: «⚠️ Pagaron $27.000 de más» con «↩️ Ya se lo devolví» (resta de los últimos pagos, anotando
   «devuelto») o «Dejar así». Pagos en dólares con vueltas en pesos no avisan.
 Prueba nueva `sobrepago1950` (8/8). Cuentas, cobros, propinas, cajas y fiados: 15 pruebas, todas bien.
+
+# 1.99.51 — Número de factura en las ventas de mostrador
+- Auditoría: 42 ventas sin número de factura; las recientes son TODAS de mostrador (Caja POS), p. ej. la de hoy
+  «Mostrador — Tania» (sin «N.º FV-…»). Tampoco tenía número la cuenta de UNA persona de la mesa al cobrarla.
+- Arreglo: la venta de mostrador, los domicilios y la cuenta de una persona llevan su número (el mismo consecutivo de las
+  cuentas de mesa, por equipo, sin repetirse). Deshacer la venta al instante devuelve el número. Las ventas viejas no cambian.
+- Prueba nueva `factura1951` (6/6). anularventas 27, dian 29, equipos 35, facturasorden 21, mejoras 32, tablero 26, v183 18,
+  cajapos 27, cajamas 45, flujocompleto 88, mesapersonas 22, cobrosimple 21, vueltas 25, sincstress 10 — todas bien.

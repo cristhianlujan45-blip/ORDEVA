@@ -1152,8 +1152,10 @@ document.getElementById('personChargeBtn').addEventListener('click', async ()=>{
     paymentsDetail.push({ note: 'Saldo sin registrar al cerrar', amount: balance, method: 'debe' });
   }
   const debt = paymentsDetail.filter(p=>p.method === 'debe').reduce((s,p)=>s+p.amount, 0);
+  let facturaP = null; try{ facturaP = window.ventoFactura && window.ventoFactura.tomar ? window.ventoFactura.tomar() : null; }catch(e){}   // 🧾 1.99.51: con su número
   data.history.unshift({
     id: ventoIdUnico('p'),
+    invoiceNo: facturaP ? facturaP.no : undefined,
     inc: (data.impuestoConsumo ? (Number(data.incRate) || 8) : 0),   // 🍽️ 1.82.0
     table: currentTable,
     businessName: data.businessName,
