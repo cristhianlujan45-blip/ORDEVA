@@ -347,11 +347,14 @@
   function lbDeudores(){ return lbPersonas().map(p => [p, lbSaldo(p)]).filter(x => x[1] > 0).sort((a, b) => b[1] - a[1]); }
   function lbEmpleadosMes(){ return [...new Set(LB().movs.filter(m => m.tipo === 'emp').map(m => m.persona))].map(p => [p, lbPagadoMes(p)]).filter(x => x[1] > 0); }
 
-  function lbAgregar(tipo, persona, monto, nota){
+  // opc (1.99.48): { solo: id de UNA cuenta que pagó (no se reparte en las demás), metodo: 'transferencia' }
+  function lbAgregar(tipo, persona, monto, nota, opc){
+    opc = opc || {};
     const m = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5), tipo, persona, monto: Math.round(monto), nota: nota || '', fecha: new Date().toISOString() };
+    if(opc.metodo && opc.metodo !== 'efectivo') m.metodo = opc.metodo;
     if(tipo === 'abono'){
       let resto = m.monto; m.aplic = [];
-      lbMesasDe(persona).sort((a, b) => new Date(a.date) - new Date(b.date)).forEach(h => {
+      lbMesasDe(persona).filter(h => !opc.solo || h.id === opc.solo).sort((a, b) => new Date(a.date) - new Date(b.date)).forEach(h => {
         if(resto <= 0) return;
         const toma = Math.min(resto, lbParteDe(h, persona), h.debt);   // 1.99.24: solo lo de esta persona (si en la cuenta deben varias)
         if(!(toma > 0)) return;
@@ -681,6 +684,8 @@
       if(dp && !e.target.closest('button')){ lbAbrirPersona = lbAbrirPersona === dp.dataset.persona ? null : dp.dataset.persona; lbPintar(); return; }
       const nb = e.target.closest('[data-nombrar]');
       if(nb){ lbNombrar(nb.dataset.nombrar); return; }
+      const pc = e.target.closest('[data-pagacta]');
+      if(pc){ lbPagarCuenta(pc.dataset.pagacta, pc.dataset.quien, pc.dataset.metodo); return; }
       const pt = e.target.closest('[data-pagotodo]');
       if(pt){
         const quien = pt.dataset.pagotodo;
@@ -715,6 +720,25 @@
     saveData(); lbAbrirPersona = nombre; lbPintar();
     try{ typeof renderHistorial === 'function' && renderHistorial(); }catch(e){}
     lbResponder('📒 Listo: esa cuenta quedó a nombre de ' + nombre + '.');
+  }
+  /* 1.99.48 · «Que el cliente me pague cuentas una por una, no todo de una vez» (pedido del dueño). Al abrir a la persona:
+     sus cuentas que deben, cada una con su día, su número y lo que debe, y «💵 Pagó esta» / «📱 Por transferencia». Solo
+     se salda ESA cuenta (antes un pago se repartía desde la más vieja). Pregunta antes de anotarlo. */
+  function lbCuentasHtml(p){
+    const l = lbMesasDe(p).sort((a, b) => new Date(a.date) - new Date(b.date)); if(!l.length) return '';
+    const fecha = d => { try{ return new Date(d).toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' }); }catch(e){ return ''; } };
+    const lugar = h => { try{ return h.tableName || (h.table ? tableLabel(h.table) : 'Venta'); }catch(e){ return h.tableName || 'Venta'; } };
+    return '<div class="lb-cuentas"><div class="lb-cuentas-t">💳 Cuentas que debe (' + l.length + ') · toca la que paga</div>' + l.map(h => '<div class="lb-cta"><span><b>' + esc2(h.invoiceNo || lugar(h)) + '</b><small>' + esc2(fecha(h.date)) + (h.invoiceNo ? ' · ' + esc2(lugar(h)) : '') + '</small></span><b class="lb-cta-v">' + plata(lbParteDe(h, p)) + '</b>' +
+      '<span class="lb-cta-b"><button type="button" class="btn-ghost" data-pagacta="' + esc2(h.id) + '" data-quien="' + esc2(p) + '" data-metodo="efectivo">💵 Pagó esta</button><button type="button" class="btn-ghost" data-pagacta="' + esc2(h.id) + '" data-quien="' + esc2(p) + '" data-metodo="transferencia">📱 Transferencia</button></span></div>').join('') + '</div>';
+  }
+  async function lbPagarCuenta(hid, quien, metodo){
+    const h = lbHist().find(x => x.id === hid), v = h ? lbParteDe(h, quien) : 0; if(!h || !(v > 0)) return;
+    const que = (h.invoiceNo ? 'la cuenta ' + h.invoiceNo : 'esa cuenta') + ' de ' + plata(v);
+    const ok = typeof showConfirm === 'function' ? await showConfirm({ icon: metodo === 'efectivo' ? '💵' : '📱', title: '¿' + quien.replace(LB_SIN, '') + ' pagó ' + que + '?', message: (metodo === 'efectivo' ? 'En efectivo' : 'Por transferencia') + '. Solo se salda esa cuenta; las demás siguen debiendo.', confirmText: 'Sí, pagó', cancelText: 'No' }) : true;
+    if(!ok) return;
+    lbAgregar('abono', quien, v, 'pagó ' + (h.invoiceNo || 'una cuenta'), { solo: hid, metodo });
+    const queda = lbSaldo(quien);
+    lbResponder('✅ ' + quien.replace(LB_SIN, '') + ' pagó ' + que + (metodo === 'efectivo' ? '' : ' por transferencia') + '. ' + (queda > 0 ? 'Todavía debe ' + plata(queda) + '.' : 'Quedó a paz y salvo.'));
   }
   function lbFiltrarDeben(){
     const b = $l('lbBuscarDeben'), q = lbNorm(b && !b.hidden ? b.value : '');
@@ -756,6 +780,7 @@
       const sinNombre = p.indexOf(LB_SIN) === 0;
       const nuevo = iRec >= 0 && (lbNorm(p) || p) === rec;
       return '<div class="lb-fila lb-deudor' + (nuevo ? ' lb-nuevo' : '') + '" data-persona="' + esc2(p) + '"><span>' + (nuevo ? '<em class="lb-nuevo-t">🆕 Último fiado · ' + lbHace(recO.t) + '</em>' : '') + esc2(p) + (sinNombre ? ' <button type="button" class="btn-ghost lb-nombrar" data-nombrar="' + esc2(p) + '">✏️ ¿Quién es?</button>' : '') + '<small>' + (mesas ? '🍽️ ' + mesas + (mesas === 1 ? ' cuenta de mesa' : ' cuentas de mesa') + ' · ' : '') + 'toca para ver su historial</small></span><b>' + plata(s) + '</b><button type="button" class="btn-ghost" data-pagotodo="' + esc2(p) + '">✅ Pagó todo</button></div>' +
+        (abierto ? lbCuentasHtml(p) : '') +
         (abierto ? '<div class="lb-hist">' + lbHistorial(p).map(e => '<div class="lb-ev"><span>' + e.t + (e.d && e.d !== 'todo' ? ' · ' + esc2(e.d) : e.d === 'todo' ? ' (todo)' : '') + '<small>' + new Date(e.f).toLocaleString('es-CO', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) + '</small></span><b>' + plata(e.m) + '</b></div>').join('') + '</div>' : '');
     }).join('') : '<div class="lb-vacio">Nadie te debe nada 🎉</div>');
     lbFiltrarDeben();
@@ -853,6 +878,9 @@
     '.lb-debe{border-color:#c0392b}.lb-abono{border-color:#27ae60}.lb-emp{border-color:#2980b9}.lb-prov{border-color:#8e44ad}.lb-pdeb{border-color:#d35400}' +
     '.lb-form{padding:12px;border-radius:14px;background:rgba(127,127,127,.12);display:flex;flex-direction:column;gap:8px}.lb-form-t{font-weight:700;font-size:17px}' +
     '.lb-form input{font-size:20px!important;padding:12px!important}.lb-form-a{display:flex;gap:8px}.lb-form-a button{flex:1;padding:14px;font-size:18px}' +
+    '.lb-cuentas{margin:4px 0 8px 10px;padding:8px 10px;border:1px solid var(--line,#4444);border-radius:12px}.lb-cuentas-t{font-size:12.5px;font-weight:800;opacity:.85;margin-bottom:4px}' +
+    '.lb-cta{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 8px;align-items:center;padding:6px 0;border-top:1px solid var(--line,#4444)}.lb-cta:first-of-type{border-top:0}' +
+    '.lb-cta>span:first-child{display:flex;flex-direction:column;min-width:0}.lb-cta small{font-size:12px;opacity:.75}.lb-cta-b{grid-column:1/-1;display:flex;gap:6px}.lb-cta-b .btn-ghost{flex:1;min-height:44px;font-size:13px;margin:0}' +
     '.lb-buscar{width:100%;box-sizing:border-box;min-height:44px;margin:2px 0 8px;padding:8px 12px;font-size:16px;border-radius:12px;border:1px solid var(--line,#444);background:var(--card,transparent);color:inherit}.lb-buscar[hidden],.lb-deudor[hidden]{display:none!important}' + '.lb-sec{margin-top:14px}.lb-sec-t{font-size:17px;font-weight:700;margin-bottom:6px;display:flex;justify-content:space-between}' +
     '.lb-fila{display:flex;align-items:center;gap:8px;padding:10px 4px;border-top:1px solid var(--line,#444);font-size:18px}.lb-fila span{flex:1}.lb-fila small{display:block;font-size:12px;opacity:.65}' +
     '.lb-nuevo{border:1px solid var(--amber,#c8a24a);border-radius:12px;padding-left:8px;padding-right:8px;background:color-mix(in srgb,var(--amber,#c8a24a) 10%,transparent)}.lb-nuevo-t{display:block;font-style:normal;font-size:12px;font-weight:800;color:var(--amber,#c8a24a)}' +

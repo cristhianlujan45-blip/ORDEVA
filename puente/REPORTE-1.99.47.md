@@ -27,3 +27,16 @@ Con los pantallazos del dueño (23/11).
 - Historial, caja y cierres: anularventas 27, facturasorden 21, mejoras 32, equipoactividad 32, graficas1929 45,
   cerrarcaja 27, doscierres 7, cajamas 45, cuadrefiados1946 8, v1954 23, erroresreal 33, letraancha1935 11,
   ordeva2pantallas 20, diseno1927 14 — todas bien.
+
+# 1.99.48 — Historial en pestañas y pagar una cuenta a la vez en la libreta
+Pedido del dueño: «arréglame este menú de los cierres para que no tenga que verlos todos primero y pueda ver los
+historiales aparte… y en la libreta de fiados, seleccionar cuál cuenta me paga el cliente, no todo de una vez».
+- **Historial en 2 pestañas:** «🧾 Ventas» (lo primero: resumen, filtros, buscador y las cuentas) y «🔒 Cierres de caja (N)»
+  (todos los cierres, sin las ventas). Se recuerda la última pestaña en el equipo. Las herramientas de la caja quedan arriba.
+- **Libreta → Me deben → tocar a la persona:** «💳 Cuentas que debe (N)», cada una con su número, su día, lo que debe,
+  «💵 Pagó esta» y «📱 Transferencia». Pregunta antes; salda SOLO esa cuenta (las demás siguen debiendo). En efectivo con la
+  caja abierta entra a la caja; por transferencia, no. Contabilidad lo cuenta con su medio de pago. «Me equivoqué» lo deshace.
+- **Revisión de correcciones y errores:** pruebas de anular, corregir y cobrar (anularventas 27, cobrosimple 21, vueltas 25,
+  esquinas 22), fiados y libreta (fiadosnombres 28, libreta 24, ventasfiados 16, libretanombres1942 12, cuadrefiados1946 8)
+  — todas bien. Errores de la app en los celulares en las últimas 48 h: ninguno.
+- Pruebas nuevas: `pagocuenta1948` (8/8); `historialorden1947` actualizada a las pestañas (9/9).

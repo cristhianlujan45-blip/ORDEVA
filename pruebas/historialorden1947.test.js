@@ -2,7 +2,7 @@
 // 412 px, con 6 cierres de caja y 36 ventas, revisa:
 //  1. Las herramientas de la caja en una fila de 3 (💵 Caja · 📊 Gráficas · 📗 Cierres Z) y siguen funcionando.
 //  2. Resumen general: el total vendido completo en una línea («$10.490.222», antes se partía).
-//  3. Cierres de caja: se ven los 3 últimos y «Ver los 6 cierres ▾» muestra todos.
+//  3. 1.99.48: pestañas «🧾 Ventas» (primero: sin los cierres encima) y «🔒 Cierres de caja (6)» (los 6, sin las ventas).
 //  4. El cierre que junta varios días lo dice («⚠️ junta 2 días») y su fecha es corta.
 //  5. «Todos · Pagaron · Deben» quedó encima del buscador de «Cuentas cerradas» y filtra como siempre.
 //  6. La página no se mueve de lado.
@@ -33,11 +33,13 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
     const tot = await p.evaluate(() => { const n = document.querySelectorAll('#histSummary .hist-stat .n')[1]; return { t: n.textContent, cabe: n.scrollWidth <= n.clientWidth + 1, alto: n.getBoundingClientRect().height }; });
     chk('2. El total vendido completo en una línea (' + tot.t + ')', tot.cabe && tot.alto < 40 && /\$10\.\d{3}\.\d{3}/.test(tot.t), tot);
     const vis = () => p.evaluate(() => [...document.querySelectorAll('#closuresList > .hist-row')].filter(r => r.getClientRects().length).length);
-    chk('3. Cierres: se ven los 3 últimos', (await vis()) === 3 && /Ver los 6 cierres/.test(await p.textContent('#hoCierresMas')));
-    await p.click('#hoCierresMas'); await p.waitForTimeout(200);
-    chk('3. … «Ver los 6 cierres» muestra todos', (await vis()) === 6);
+    const ventasVis = () => p.evaluate(() => !!document.getElementById('histList').getClientRects().length && !!document.getElementById('histSummary').getClientRects().length);
+    chk('3. Pestaña «🧾 Ventas» primero: las ventas a la vista, sin los cierres encima', (await vis()) === 0 && await ventasVis() && /Cierres de caja \(6\)/.test(await p.textContent('#hoTabs')));
+    await p.click('[data-ho-tab="cierres"]'); await p.waitForTimeout(300);
+    chk('3. … «🔒 Cierres de caja» muestra los 6, sin las ventas', (await vis()) === 6 && !(await ventasVis()));
     const f0 = await p.evaluate(() => document.querySelector('#closuresList .hist-row .hist-date').textContent);
     chk('4. El cierre que junta días lo dice, con la fecha corta', /junta 2 días/.test(f0) && !/2026/.test(f0) && f0.length < 90, f0);
+    await p.click('[data-ho-tab="ventas"]'); await p.waitForTimeout(300);
     const fl = await p.evaluate(() => { const f = document.getElementById('histFilter'); return { antesDelBuscador: f.nextElementSibling && f.nextElementSibling.id === 'histBuscarCaja' }; });
     await p.click('#histFilter [data-f="deben"]'); await p.waitForTimeout(300);
     const deben = await p.evaluate(() => [...document.querySelectorAll('#histList .hist-row')].filter(r => r.getClientRects().length).every(r => /DEBE/.test(r.textContent)));
