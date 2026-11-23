@@ -92,7 +92,13 @@ function vocabTexto(t){
   // vez que se toca la pantalla, así el dedo nunca espera a la animación.
   let quietoHasta = 0;
   ['pointerdown', 'touchstart', 'keydown'].forEach(n => window.addEventListener(n, () => { quietoHasta = performance.now() + 400; }, { passive: true, capture: true }));
-  setInterval(() => { if(document.hidden || performance.now() < quietoHasta || !canvas.getClientRects().length || document.querySelector('.overlay.show')) return; draw(); }, 45);   // con una ventana abierta (la mesa, cobrar…) tampoco: queda tapada y desenfocada, y redibujarla obligaba a recalcular el desenfoque de toda la pantalla
+  // 1.99.40: con la lluvia escondida (casi siempre: otros diseños o la app en segundo plano) se revisa 1 vez por segundo, no
+  // 22: antes el reloj de 45 ms despertaba el celular todo el tiempo solo para ver que no había nada que dibujar.
+  (function lluvia(){
+    const ve = !document.hidden && canvas.getClientRects().length && !document.querySelector('.overlay.show');
+    if(ve && performance.now() >= quietoHasta) draw();
+    setTimeout(lluvia, ve ? 45 : 1000);
+  })();   // con una ventana abierta (la mesa, cobrar…) tampoco: queda tapada y desenfocada, y redibujarla obligaba a recalcular el desenfoque de toda la pantalla
 })();
 
 let data = null;

@@ -852,8 +852,12 @@ function renderProductos(){
           <span class="pr-caret" aria-hidden="true">▾</span>
         </div>
       </summary>
-      <div class="pr-body">
-        ${cuentasHtml(p)}
+      <div class="pr-body"></div>
+    `;
+    // 1.99.40 · Memoria: el detalle (cuentas, inventario, acciones) se dibuja la PRIMERA vez que se abre el producto. Antes
+    // venía dibujado en todos: con 300 productos eran ~15.000 elementos en la página aunque nadie los abriera (Android
+    // cerraba la página por falta de memoria). Los botones funcionan igual (un solo «escuchador» en la lista, abajo).
+    row._cuerpo = `        ${cuentasHtml(p)}
         <div class="pr-inv">
           <span class="pr-inv-t">${invEsc(invPalabra()[0])}: ${p.stock == null ? 'sin control' : p.stock + ' ' + invPalabra()[1]}${p.stock != null ? ' · aviso ≤ ' + (p.minStock != null ? p.minStock : INV_DEF_MIN) : ''}</span>
           <div class="pr-inv-btns">
@@ -869,49 +873,36 @@ function renderProductos(){
           <button type="button" class="p-edit" data-id="${p.id}">✏️ Editar</button>
           <button type="button" class="p-del" data-id="${p.id}">🗑️ Eliminar</button>
         </div>
-      </div>
-    `;
+      `;
+    row.addEventListener('toggle', () => { if(row.open && row._cuerpo != null){ row.querySelector('.pr-body').innerHTML = row._cuerpo; row._cuerpo = null; } });
     list.appendChild(row);
   });
   window.__labelProductList = products;
-  list.querySelectorAll('.p-label').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
+  if(!list._delegado){
+    list._delegado = true;
+    list.addEventListener('click', async e => {
+      const t = e.target && e.target.closest ? e.target : null; if(!t) return;
+      const act = t.closest('[data-act]');
+      if(act && list.contains(act)){ e.preventDefault(); e.stopPropagation(); invAsk(act.dataset.id, act.dataset.act); return; }
+      const btn = t.closest('.p-label, .p-fav, .p-edit, .p-del'); if(!btn || !list.contains(btn)) return;
       const prod = data.products.find(p=>p.id === btn.dataset.id);
-      if(prod) printProductLabels([prod]);
+      if(btn.classList.contains('p-label')){ if(prod) printProductLabels([prod]); return; }
+      if(btn.classList.contains('p-fav')){ if(!prod) return; prod.favorite = !prod.favorite; saveData(); renderProductos(); return; }
+      if(btn.classList.contains('p-edit')){ openEditProductModal(btn.dataset.id); return; }
+      if(btn.classList.contains('p-del')){
+        const ok = await showConfirm({
+          title: '¿Eliminar producto?',
+          message: '¿Estás seguro que quieres eliminar "' + (prod ? prod.name : 'este producto') + '"? No podrás deshacer esta acción.',
+          confirmText: 'Sí, eliminar',
+          icon: '🗑️'
+        });
+        if(!ok) return;
+        data.products = data.products.filter(p=>p.id !== btn.dataset.id);
+        saveData();
+        renderProductos();
+      }
     });
-  });
-  list.querySelectorAll('.p-fav').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      const prod = data.products.find(p=>p.id === btn.dataset.id);
-      if(!prod) return;
-      prod.favorite = !prod.favorite;
-      saveData();
-      renderProductos();
-    });
-  });
-  list.querySelectorAll('.p-edit').forEach(btn=>{
-    btn.addEventListener('click', ()=> openEditProductModal(btn.dataset.id));
-  });
-  // Tocar el producto lo despliega con sus cuentas (costo, precio, IVA, margen y
-  // cuánto hay metido en la cantidad que tienes) y los botones de inventario.
-  list.querySelectorAll('[data-act]').forEach(btn=>{
-    btn.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); invAsk(btn.dataset.id, btn.dataset.act); });
-  });
-  list.querySelectorAll('.p-del').forEach(btn=>{
-    btn.addEventListener('click', async ()=>{
-      const prod = data.products.find(p=>p.id === btn.dataset.id);
-      const ok = await showConfirm({
-        title: '¿Eliminar producto?',
-        message: '¿Estás seguro que quieres eliminar "' + (prod ? prod.name : 'este producto') + '"? No podrás deshacer esta acción.',
-        confirmText: 'Sí, eliminar',
-        icon: '🗑️'
-      });
-      if(!ok) return;
-      data.products = data.products.filter(p=>p.id !== btn.dataset.id);
-      saveData();
-      renderProductos();
-    });
-  });
+  }
 }
 
 /* ---------- Editar producto ---------- */
