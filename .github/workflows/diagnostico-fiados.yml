@@ -12,6 +12,14 @@ on:
       negocio:
         description: 'primeros 8 caracteres del id del negocio'
         required: true
+      factura:
+        description: '(opcional) número de una factura para revisar, ej. FV-0131'
+        required: false
+        default: ''
+      nombre:
+        description: '(opcional) el nombre que el dueño busca en la libreta, ej. camila (solo se muestra ese)'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -25,9 +33,13 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
           NEGOCIO: ${{ github.event.inputs.negocio }}
+          FACTURA: ${{ github.event.inputs.factura }}
+          NOMBRE: ${{ github.event.inputs.nombre }}
         run: |
           if [ -z "$SUPABASE_ACCESS_TOKEN" ] || [ -z "$PROJECT_REF" ]; then echo "Faltan los secretos"; exit 1; fi
           if ! printf '%s' "$NEGOCIO" | grep -Eq '^[0-9a-f]{8}$'; then echo "negocio: 8 letras/números del id"; exit 1; fi
+          printf '%s' "$FACTURA" | grep -Eq '^[A-Za-z0-9-]{0,20}$' || { echo "factura: letras, números y guion"; exit 1; }
+          NOMBRE=$(printf '%s' "$NOMBRE" | tr 'A-Z' 'a-z'); printf '%s' "$NOMBRE" | grep -Eq '^[a-z ]{0,40}$' || { echo "nombre: solo letras sin tildes"; exit 1; }
           cat > /tmp/q.sql <<'SQL'
           with neg as (select id from negocios where left(id::text, 8) = '__NEG__' limit 1),
           rol_de as (select negocio_id, usuario_id, rol from miembros),
@@ -39,6 +51,24 @@ jobs:
           select json_build_object(
             'ahora_bogota', (now() at time zone 'America/Bogota')::text,
             'existe', (select count(*) from neg),
+            -- 1.99.41 (opcional): una factura y UN nombre que el dueño pidió revisar. No muestra ningún otro nombre: las notas de
+            -- los pagos solo se comparan (sin tildes ni mayúsculas) con el nombre pedido.
+            'revisar', (select json_build_object(
+                'factura', (select json_agg(json_build_object(
+                    'fecha', h->>'date', 'deuda', h->'debt', 'total', h->'total', 'persona_es_el_nombre', translate(lower(coalesce(h->>'person', '')), 'áéíóúâêîôûäëïöüàèìòùñ', 'aeiouaeiouaeiouaeioun') = '__NOMBRE__',
+                    'tiene_persona', coalesce(trim(h->>'person'), '') <> '', 'mesa', h->>'tableName', 'abonos_libreta', h->'abonosLib', 'pagada_despues', h->'paidLater',
+                    'pagos', (select json_agg(json_build_object('metodo', p->>'method', 'valor', p->'amount', 'nota_es_el_nombre', translate(lower(trim(coalesce(p->>'note', ''))), 'áéíóúâêîôûäëïöüàèìòùñ', 'aeiouaeiouaeiouaeioun') = '__NOMBRE__',
+                                       'nota_vacia_o_generica', coalesce(trim(p->>'note'), '') in ('', 'Saldo sin registrar al cerrar', 'Queda debiendo')))
+                              from jsonb_array_elements(case when jsonb_typeof(h->'payments') = 'array' then h->'payments' else '[]'::jsonb end) p)))
+                  from datos_negocio d, jsonb_array_elements(case when jsonb_typeof(d.datos->'history') = 'array' then d.datos->'history' else '[]'::jsonb end) h
+                  where d.negocio_id = (select id from neg) and '__FACTURA__' <> '' and h->>'invoiceNo' = '__FACTURA__'),
+                'cuentas_que_deben_con_ese_nombre', (select count(*) from datos_negocio d, jsonb_array_elements(case when jsonb_typeof(d.datos->'history') = 'array' then d.datos->'history' else '[]'::jsonb end) h
+                  where d.negocio_id = (select id from neg) and '__NOMBRE__' <> '' and (case when jsonb_typeof(h->'debt') = 'number' then (h->>'debt')::numeric else 0 end) > 0
+                    and exists (select 1 from jsonb_array_elements(case when jsonb_typeof(h->'payments') = 'array' then h->'payments' else '[]'::jsonb end) p
+                                where p->>'method' = 'debe' and translate(lower(trim(coalesce(p->>'note', ''))), 'áéíóúâêîôûäëïöüàèìòùñ', 'aeiouaeiouaeiouaeioun') = '__NOMBRE__')),
+                'libreta_de_ese_nombre', (select json_agg(json_build_object('tipo', m->>'tipo', 'monto', m->'monto', 'a_mesas', m->'aMesas', 'fecha', m->>'fecha', 'nota', left(m->>'nota', 40)) order by m->>'fecha')
+                  from datos_negocio d, jsonb_array_elements(case when jsonb_typeof(d.datos->'libreta'->'movs') = 'array' then d.datos->'libreta'->'movs' else '[]'::jsonb end) m
+                  where d.negocio_id = (select id from neg) and '__NOMBRE__' <> '' and translate(lower(trim(coalesce(m->>'persona', ''))), 'áéíóúâêîôûäëïöüàèìòùñ', 'aeiouaeiouaeiouaeioun') = '__NOMBRE__'))),
             -- 1.99.41: cómo está configurado el plano del local (solo datos técnicos: tipo, módulos y tamaño del plano)
             'configuracion', (select json_build_object(
                 'tipo', d.datos->>'businessType', 'modulos', d.datos->'modulos', 'modo_completo', d.datos->'modoCompleto',
@@ -124,7 +154,7 @@ jobs:
               order by c.version desc limit 120) x)
           ) resultado;
           SQL
-          sed -i "s/__NEG__/$NEGOCIO/" /tmp/q.sql
+          sed -i "s/__NEG__/$NEGOCIO/; s/__FACTURA__/$FACTURA/g; s/__NOMBRE__/$NOMBRE/g" /tmp/q.sql
           jq -n --rawfile q /tmp/q.sql '{query: $q}' > /tmp/q.json
           curl -sS -X POST "https://api.supabase.com/v1/projects/$PROJECT_REF/database/query" \
             -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H 'Content-Type: application/json' --data @/tmp/q.json > /tmp/r.json
