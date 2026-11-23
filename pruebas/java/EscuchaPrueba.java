@@ -243,6 +243,31 @@ public class EscuchaPrueba {
           VentoEscucha.leerSms(s2, "85888", "", conv(new Object[]{"Recibiste 200. Para saber mas, consulta tus movimientos.", t - 20_000}, new Object[]{"Recibiste 300. Para saber mas, consulta tus movimientos.", t}), "dE:", false);
           VentoApp.ui.correr();
           chk("1.82.1 E) Dos SMS distintos ($200 y $300) por los dos lados: cada uno una vez", VentoApp.dichos.size() == 2 && VentoApp.dichos.contains("Llegaron 200 pesos por DaviPlata.") && VentoApp.dichos.contains("Llegaron 300 pesos por DaviPlata."), VentoApp.dichos); }
+        // 1.99.52 · El caso real (23/11, Samsung, SMS de Nequi 890806): llega el SMS de $1.400 (directo y luego en la
+        // conversación de la app de mensajes); 6 min después llega el de $3.500 y la conversación trae los DOS. Antes el de
+        // $1.400 volvía a sonar como pago nuevo; ahora cada pago suena una sola vez.
+        {
+            long t = System.currentTimeMillis();
+            Preferencias s6 = nuevo();
+            String sa = "Nequi: Recibiste $1.400 de LUIS PEREZ en tu cuenta. Codigo de transaccion M123", sb = "Nequi: Recibiste $3.500 de ANA RUIZ en tu cuenta. Codigo de transaccion M456";
+            SmsBanco.recibir(s6, "890806", sa, t - 370_000L);
+            VentoEscucha.leerSms(s6, "890806", sa, conv(new Object[]{sa, t - 369_000L}), "c1:", false);
+            SmsBanco.recibir(s6, "890806", sb, t - 2000);
+            VentoEscucha.leerSms(s6, "890806", sb, conv(new Object[]{sa, t - 369_000L}, new Object[]{sb, t - 1000}), "c2:", false);
+            VentoEscucha.leerSms(s6, "890806", sb, conv(new Object[]{sa, t - 369_000L}, new Object[]{sb, t - 1000}), "c3:", false);   // la app de mensajes la vuelve a publicar
+            VentoApp.ui.correr();
+            long n14 = VentoApp.dichos.stream().filter(x -> x.contains("1400")).count(), n35 = VentoApp.dichos.stream().filter(x -> x.contains("3500")).count();
+            chk("1.99.52: con la conversación de la app de mensajes, $1.400 suena UNA vez y $3.500 UNA vez (antes $1.400 sonaba otra vez después del $3.500)", n14 == 1 && n35 == 1, VentoApp.dichos);
+            // Dos pagos IGUALES de verdad (dos SMS de $1.400 a distinta hora) siguen siendo dos.
+            limpiar();
+            Preferencias s7 = nuevo();
+            SmsBanco.recibir(s7, "890806", sa, t - 60_000L);
+            VentoEscucha.leerSms(s7, "890806", sa, conv(new Object[]{sa, t - 59_000L}), "d1:", false);
+            SmsBanco.recibir(s7, "890806", sa, t - 2000);
+            VentoEscucha.leerSms(s7, "890806", sa, conv(new Object[]{sa, t - 59_000L}, new Object[]{sa, t - 1000}), "d2:", false);
+            VentoApp.ui.correr();
+            chk("1.99.52: dos pagos iguales de verdad (dos SMS de $1.400, a distinta hora) siguen sonando los dos", VentoApp.dichos.stream().filter(x -> x.contains("1400")).count() == 2, VentoApp.dichos);
+        }
         // 1.99.49 · «Me sonó uno de 3.500 y después otro de 1.400 que habían puesto antes» (Xiaomi, 23/11: Android le pasó
         // el aviso a ORDEVA 595 s tarde). El pago de AHORA suena normal; el que llegó tarde dice de cuándo es.
         {

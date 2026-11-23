@@ -263,6 +263,11 @@ public class VentoEscucha extends NotificationListenerService {
             // Los de antes: solo los de los últimos 10 min (los más viejos ya se dijeron o no son de ahora). Cada mensaje se
             // reconoce por su hora y su texto: el mismo nunca suena dos veces.
             if (i != nuevo && ahora - hora > 10 * 60_000L) continue;
+            // 1.99.52: cada mensaje de la conversación se maneja UNA sola vez (su hora + su texto). Antes, cuando llegaba un
+            // SMS nuevo, la app de mensajes volvía a mostrar la conversación con el SMS ANTERIOR; la marca del lector directo
+            // ya se había gastado y ese pago viejo sonaba otra vez como nuevo (23/11, Samsung: «$3.500 y después otra de
+            // $1.400 que habían puesto antes»: el SMS de $1.400 de las 3:31 se volvió a tomar a las 3:37).
+            if (!marcarVisto(sp, "SV:" + hora + ":" + Integer.toHexString(String.valueOf(m[0]).replaceAll("\\s+", " ").trim().toLowerCase().hashCode()))) continue;
             // 1.72.6: ya lo tomó el lector directo de SMS (SmsBanco), apenas llegó: este aviso no vuelve a sonar.
             if (SmsBanco.yaTomado(sp, remitente, (String) m[0])) continue;
             tiempos(hora, ahora);
