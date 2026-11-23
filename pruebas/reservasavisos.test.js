@@ -69,6 +69,11 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     }, [6, 8, 10, 12].map(n => { const x = dia(n); return { d: x.getDate(), m: MES[x.getMonth()], mc: MESC[x.getMonth()], en: MEN[x.getMonth()] }; }));
     const iso = n => { const x = dia(n); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
     chk('1. Booking (español): nueva, «Juan Pérez», 2 personas, fechas y código', casos[0].t === 'nueva' && casos[0].c === 'Juan Pérez' && casos[0].p === 2 && casos[0].d === iso(6) && casos[0].h === iso(8) && casos[0].k === '4567891234', casos[0]);
+    // 1.99.41: el rango con un solo mes al final («del 29 al 1 de diciembre») es del 29 de NOVIEMBRE al 1 de diciembre (antes
+    // salía 29 dic → 1 ene). Con fechas fijas, para que no dependa del día en que corre la prueba.
+    const fx = await p.evaluate(() => { const F = window.ventoReservasAvisos.fechas, f = x => x ? x.map(d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')).join('→') : null;
+      return { mes: f(F('Juan reservó del 29 al 1 de diciembre', new Date(2026, 10, 23))), anio: f(F('del 30 al 2 de enero', new Date(2026, 11, 20))), igual: f(F('del 5 al 7 de noviembre', new Date(2026, 10, 1))), ingles: f(F('29 to 2 december', new Date(2026, 10, 23))) }; });
+    chk('1b. «del 29 al 1 de diciembre» = 29 nov → 1 dic; «del 30 al 2 de enero» = 30 dic → 2 ene; mismo mes igual', fx.mes === '2026-11-29→2026-12-01' && fx.anio === '2026-12-30→2027-01-02' && fx.igual === '2026-11-05→2026-11-07' && fx.ingles === '2026-11-29→2026-12-02', fx);
     chk('1. Booking (inglés): «John Smith», 3 personas', casos[1].t === 'nueva' && casos[1].c === 'John Smith' && casos[1].p === 3 && casos[1].d === iso(6) && casos[1].h === iso(8), casos[1]);
     chk('1. Airbnb: «María Gómez», llega y «2 noches», código HM…', casos[2].t === 'nueva' && casos[2].c === 'María Gómez' && casos[2].d === iso(10) && casos[2].h === iso(12) && casos[2].k === 'HMABC12345', casos[2]);
     chk('1. Cancelación de Booking: «cancelada» de Juan Pérez', casos[3].t === 'cancelada' && casos[3].c === 'Juan Pérez', casos[3]);
