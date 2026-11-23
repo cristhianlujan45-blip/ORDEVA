@@ -99,8 +99,13 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
     chk('2. …y se ve en pantalla con quién y el proveedor', /Distribuidora El Sol/.test(await p.textContent('#viZona')) && /Ajuste por conteo/.test(await p.textContent('#viZona')));
 
     // ===== 3. Precio por cantidad =====
-    await p.fill('#viEsDesde', '6'); await p.fill('#viEsPrecio', '3500'); await p.click('#viEsAdd');
-    chk('3. 💲 Águila: desde 6 unidades a $3.500', await D(() => JSON.stringify(data.products.find(x => x.id === 'ag').escalas) === '[{"desde":6,"precio":3500}]'));
+    await p.fill('#viEsDesde', '6'); await p.fill('#viEsPrecio', '3500');
+    // 1.99.44: en GitHub (1.99.43) este paso falló una vez sin poder repetirlo aquí: se anota qué había justo antes y después del toque.
+    const antesEs = await D(() => ({ desde: (document.getElementById('viEsDesde') || {}).value, precio: (document.getElementById('viEsPrecio') || {}).value, botones: document.querySelectorAll('#viEsAdd').length, precioAg: data.products.find(x => x.id === 'ag').price }));
+    await p.click('#viEsAdd');
+    await p.waitForFunction(() => JSON.stringify(data.products.find(x => x.id === 'ag').escalas || null) === '[{"desde":6,"precio":3500}]', null, { timeout: 3000 }).catch(() => {});
+    const despuesEs = await D(() => ({ escalas: data.products.find(x => x.id === 'ag').escalas || null, aviso: [...document.querySelectorAll('.toast, #toast, .overlay.show h2, .overlay.show h3')].map(x => x.textContent.trim().slice(0, 90)).filter(Boolean) }));
+    chk('3. 💲 Águila: desde 6 unidades a $3.500', JSON.stringify(despuesEs.escalas) === '[{"desde":6,"precio":3500}]', { antesEs, despuesEs });
     const pc = await D(() => { ventoPOS.vaciar(); ventoPOS.agregar('ag', 5); const a = ventoPOS.carrito()[0].price; ventoPOS.agregar('ag', 1); const b2 = ventoPOS.carrito()[0].price; ventoPOS.vaciar(); return [a, b2]; });
     chk('3. En la caja: 5 Águilas a $4.000; al llevar la 6ª, todas a $3.500', pc[0] === 4000 && pc[1] === 3500, pc);
     const vMay = await vender([['ag', 6]]);
