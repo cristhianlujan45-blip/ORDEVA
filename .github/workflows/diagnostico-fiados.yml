@@ -92,7 +92,11 @@ jobs:
                 'cierres_que_juntan_dias', (select count(*) from jsonb_array_elements(coalesce(d.datos->'closures', '[]'::jsonb)) c
                     where c->>'from' is not null and ((c->>'date')::timestamptz at time zone 'America/Bogota')::date - ((c->>'from')::timestamptz at time zone 'America/Bogota')::date >= 2),
                 'turno_abierto', d.datos->'turno' is not null and jsonb_typeof(d.datos->'turno') = 'object',
-                'tamano_kb', round(octet_length(d.datos::text) / 1024.0))
+                'tamano_kb', round(octet_length(d.datos::text) / 1024.0),
+                -- qué parte pesa (KB por sección, las 12 más pesadas) y cuántas fotos van dentro de los datos
+                'peso_por_seccion_kb', (select json_object_agg(k, kb) from (select k, round(octet_length(v::text) / 1024.0) kb from jsonb_each(d.datos) e(k, v) order by octet_length(v::text) desc limit 12) x),
+                'fotos_en_productos', (select count(*) from jsonb_array_elements(coalesce(d.datos->'products', '[]'::jsonb)) p where coalesce(p->>'photo', p->>'foto', p->>'img', '') like 'data:%'),
+                'fotos_kb', (select round(coalesce(sum(octet_length(coalesce(p->>'photo', p->>'foto', p->>'img', ''))), 0) / 1024.0) from jsonb_array_elements(coalesce(d.datos->'products', '[]'::jsonb)) p where coalesce(p->>'photo', p->>'foto', p->>'img', '') like 'data:%'))
               from datos_negocio d where d.negocio_id = (select id from neg)),
             -- 1.99.41 (opcional): una factura y UN nombre que el dueño pidió revisar. No muestra ningún otro nombre: las notas de
             -- los pagos solo se comparan (sin tildes ni mayúsculas) con el nombre pedido.
