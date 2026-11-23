@@ -1,0 +1,42 @@
+# ORDEVA · 🔎 ¿Se escapó algún pago? (SOLO LECTURA, se corre a mano).
+# Toma los avisos de banco que ORDEVA no entendió (en 🐞 Errores ya vienen SIN nombres ni números) de los últimos días y
+# los pasa por las mismas reglas de la app Android (AvisoPago). Imprime solo palabras clave y el motivo, NUNCA el texto.
+name: Diagnóstico de formatos de avisos
+
+on:
+  workflow_dispatch:
+    inputs:
+      dias:
+        description: 'días hacia atrás (1 a 60)'
+        required: false
+        default: '14'
+
+permissions:
+  contents: read
+
+jobs:
+  formatos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Revisar (solo lectura)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          DIAS: ${{ github.event.inputs.dias }}
+        run: |
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ] || [ -z "$PROJECT_REF" ]; then echo "Faltan los secretos"; exit 1; fi
+          DIAS=${DIAS:-14}; printf '%s' "$DIAS" | grep -Eq '^[0-9]{1,2}$' || { echo "dias: un número"; exit 1; }
+          printf '%s' "select coalesce(json_agg(x), '[]') r from (select coalesce(detalle->>'app', '') app, coalesce(detalle->>'texto', '') texto from app_errores where tipo = 'pago' and ultimo > now() - make_interval(days => $DIAS) and (mensaje like 'Aviso de pago que ORDEVA no entendió%' or mensaje like '%no lo entendí%' or mensaje like '%no se entendió el valor%') and coalesce(detalle->>'texto', '') <> '') x" > /tmp/q.sql
+          jq -n --rawfile q /tmp/q.sql '{query: $q}' > /tmp/q.json
+          curl -sS -X POST "https://api.supabase.com/v1/projects/$PROJECT_REF/database/query" -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H 'Content-Type: application/json' --data @/tmp/q.json \
+            | jq -r '.[0].r[] | (.app | gsub("[\\t\\n]"; " ")) + "\t" + (.texto | gsub("[\\t\\n]"; " "))' > /tmp/avisos.tsv
+          echo "Avisos encontrados: $(wc -l < /tmp/avisos.tsv)"
+          S=android/app/src/main/java/co/vento/app
+          javac -encoding UTF-8 -d /tmp/c "$S/AvisoPago.java" pruebas/diagnostico/FormatosAvisos.java
+          java -Dstdout.encoding=UTF-8 -cp /tmp/c co.vento.app.FormatosAvisos /tmp/avisos.tsv
+          rm -f /tmp/avisos.tsv
