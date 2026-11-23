@@ -191,10 +191,23 @@ function iniAuto(){
 
 /* ---------- Historial: pagó / debe + filtro ---------- */
 let filtro='todos';
+/* 1.99.46 · «Pagó» en el Historial cuenta SOLO lo que faltaba (h.debt). Antes pasaba TODO lo fiado a pagado: si ya había
+   abonado una parte en la libreta, Contabilidad contaba ese abono dos veces (30.000 fiados, 10.000 abonados → 40.000).
+   Lo ya abonado queda como estaba (fiado ya cubierto, como hace la libreta). En efectivo y con la caja abierta, lo que
+   entra queda también como entrada de la caja (el cuadre dice lo que de verdad debe haber). */
 function pagarDeuda(h,m){
-  (h.payments||[]).forEach(p=>{if(p.method==='debe'){p.method=m;p.note=(p.note||'Pago')+' (pagó después)';}});
-  h.debt=0;h.paidLater=new Date().toISOString();saveData();renderHistorial();showToast('Deuda marcada como pagada.');try{window.libretaPintar&&window.libretaPintar();}catch(e){}
+  let falta=Math.max(0,Math.round(Number(h.debt)||0));const pagado=falta;const ps=h.payments||[];const out=[];
+  ps.forEach(p=>{
+    if(p.method!=='debe'||!(falta>0)){out.push(p);return;}
+    const a=Number(p.amount)||0,toma=Math.min(a,falta);falta-=toma;
+    if(toma>=a){p.method=m;p.note=(p.note||'Pago')+' (pagó después)';out.push(p);}
+    else{out.push(Object.assign({},p,{amount:a-toma}));out.push(Object.assign({},p,{method:m,amount:toma,note:(p.note||'Pago')+' (pagó después)'}));}
+  });
+  h.payments=out;h.debt=0;h.paidLater=new Date().toISOString();
+  if(m==='efectivo'&&pagado>0)try{const T=window.ventoTurno;if(T&&T.turno&&T.turno())T.movimiento('entrada',pagado,'Fiado cobrado · '+String(h.person||h.tableName||(h.invoiceNo||'')).slice(0,60));}catch(e){}
+  saveData();renderHistorial();showToast('Deuda marcada como pagada.');try{window.libretaPintar&&window.libretaPintar();}catch(e){}
 }
+window.pagarDeuda=pagarDeuda;
 function mejorarHist(){
   if(typeof data==='undefined'||!data)return;
   $('histList').querySelectorAll(':scope > .hist-row').forEach(row=>{

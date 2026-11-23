@@ -279,6 +279,7 @@
     return LB().movs.filter(m => m.tipo === 'emp' && m.persona === p && new Date(m.fecha).getTime() >= ini).reduce((s, m) => s + m.monto, 0);
   }
   function lbQuitarMov(m){
+    if(m.cajaMov) try{ window.ventoTurno && window.ventoTurno.quitarMov && window.ventoTurno.quitarMov(m.cajaMov); }catch(e){}   // 1.99.46: y su entrada de caja
     if(m.compra){ const pu = ((typeof data !== 'undefined' && data && data.purchases) || []).find(x => x.pagadoMov === m.id); if(pu) delete pu.pagadoMov; }
     (m.aplic || []).forEach(x => {
       const h = lbHist().find(y => y.id === x.hid); if(!h) return;
@@ -362,6 +363,14 @@
       m.aMesas = m.monto - resto;
     }
     if(tipo === 'prov') m.enlazada = lbEnlazarCompra(m);
+    /* 1.99.46 · Lo que pagan de un fiado en efectivo ENTRA a la caja: con la caja abierta queda como «entrada» («Fiado
+       cobrado · Juan»), así el cuadre dice lo que de verdad debe haber (antes contaba solo las ventas y al contar salían
+       «sobran $30.000»). Contabilidad ya lo contaba como entrada (libretaConta); la entrada de caja no se cuenta otra vez
+       allá. Sin caja abierta no se abre ninguna. */
+    if(tipo === 'abono' && (m.metodo || 'efectivo') === 'efectivo') try{
+      const T = window.ventoTurno;
+      if(T && T.turno && T.turno()){ const mv = T.movimiento('entrada', m.monto, 'Fiado cobrado · ' + String(persona).replace(LB_SIN, '').slice(0, 60)); if(mv) m.cajaMov = mv.id; }
+    }catch(e){}
     LB().movs.push(m); saveData(); lbPintar();
     try{ typeof renderConta === 'function' && renderConta(); }catch(e){}
     return m;
