@@ -674,7 +674,7 @@ function renderInventario(){
   const ps = data.products.filter(p => !p.combo).sort((a, b) => ord[invStatus(a)] - ord[invStatus(b)] || a.name.localeCompare(b.name));
   const n = s => ps.filter(p => invStatus(p) === s).length;
   const sum = document.getElementById('invSummary');
-  if(sum) sum.innerHTML = `<span class="inv-chip inv-out">🚫 ${n('out')} agotados</span><span class="inv-chip inv-low">⚠️ ${n('low')} por agotarse</span><span class="inv-chip inv-ok">✅ ${n('ok')} con stock</span>`;
+  if(sum) sum.innerHTML = `<span class="inv-chip inv-out"><b>${n('out')}</b> <small>🚫 agotados</small></span><span class="inv-chip inv-low"><b>${n('low')}</b> <small>⚠️ por agotarse</small></span><span class="inv-chip inv-ok"><b>${n('ok')}</b> <small>✅ con stock</small></span>`;   // 1.99.42: el número grande y lo que es debajo (antes en 2 renglones de píldoras)
   const sinCtl = ps.filter(p => p.stock == null).length;
   const nDup = dupGroups().length;
   const avisoDup = nDup ? '<div class="inv-aviso">⚠️ Hay ' + nDup + ' producto(s) repetido(s).<button class="btn-ghost" data-act="dups">Unir repetidos</button></div>' : '';

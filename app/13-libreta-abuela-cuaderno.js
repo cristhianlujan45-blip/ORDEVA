@@ -243,16 +243,31 @@
   const lbDeudaOriginal = h => (h.debt || 0) + lbAbonosMesa(h) + lbPagoDespues(h);
   const lbFiadosMesa = () => lbHist().filter(h => lbDeudaOriginal(h) > 0 && ((h.debt || 0) > 0 || h.abonosLib || h.paidLater));
   function lbPersonasLib(){ return [...new Set(LB().movs.map(m => m.persona))]; }
-  function lbPersonas(){ return [...new Set(lbPersonasLib().concat(...lbFiadosMesa().map(lbNombresDe)))]; }
+  /* 1.99.42 · Una sola fila por persona aunque su nombre quedó escrito distinto en las cuentas («Tania», «tania», «Tânia»):
+     antes salía 3 veces, cada vez con TODAS sus cuentas, y el «Me deben» las sumaba 3 veces. Se juntan como las junta la
+     cuenta de cada quien (sin tildes ni mayúsculas). El nombre que se muestra: el de la libreta si lo tiene; si no, el que
+     más se usó (y, si empatan, el que empieza con mayúscula). */
+  function lbPersonas(){
+    const lib = lbPersonasLib(), cuenta = new Map(), orden = [];
+    lbFiadosMesa().forEach(h => lbNombresDe(h).forEach(n => { const k = lbNorm(n) || n; if(!cuenta.has(k)){ cuenta.set(k, new Map()); orden.push(k); } const v = cuenta.get(k); v.set(n, (v.get(n) || 0) + 1); }));
+    const out = [], ya = new Set();
+    lib.forEach(n => { const k = lbNorm(n) || n; if(!ya.has(k)){ ya.add(k); out.push(n); } });
+    orden.forEach(k => { if(ya.has(k)) return; ya.add(k);
+      const v = [...cuenta.get(k)].sort((a, b) => b[1] - a[1] || (/^\p{Lu}/u.test(b[0]) ? 1 : 0) - (/^\p{Lu}/u.test(a[0]) ? 1 : 0));
+      out.push(v[0][0]); });
+    return out;
+  }
+  // La misma persona en la libreta aunque se haya escrito distinto (sin tildes ni mayúsculas).
+  const lbEsDe = (m, p) => m.persona === p || (lbNorm(m.persona) || m.persona) === (lbNorm(p) || p);
   const lbMesasDe = p => lbHist().filter(h => (h.debt || 0) > 0 && lbParteDe(h, p) > 0);
   function lbSaldo(p){
-    const lib = LB().movs.filter(m => m.persona === p).reduce((s, m) => s + (m.tipo === 'debe' ? m.monto : m.tipo === 'abono' ? -(m.monto - (m.aMesas || 0)) : 0), 0);
+    const lib = LB().movs.filter(m => lbEsDe(m, p)).reduce((s, m) => s + (m.tipo === 'debe' ? m.monto : m.tipo === 'abono' ? -(m.monto - (m.aMesas || 0)) : 0), 0);
     return lib + lbMesasDe(p).reduce((s, h) => s + lbParteDe(h, p), 0);
   }
   // Todo lo que pasó con una persona, en orden: cuándo quedó debiendo y cuándo pagó.
   function lbHistorial(p){
     const ev = [];
-    LB().movs.filter(m => m.persona === p).forEach(m => ev.push({ f: m.fecha, t: m.tipo === 'debe' ? '📕 Quedó debiendo' : m.tipo === 'abono' ? '✅ Pagó' : '👷 Le pagaste', m: m.monto, d: m.nota === 'pagó todo' ? 'todo' : '' }));
+    LB().movs.filter(m => lbEsDe(m, p)).forEach(m => ev.push({ f: m.fecha, t: m.tipo === 'debe' ? '📕 Quedó debiendo' : m.tipo === 'abono' ? '✅ Pagó' : '👷 Le pagaste', m: m.monto, d: m.nota === 'pagó todo' ? 'todo' : '' }));
     lbHist().filter(h => lbDeudaOriginal(h) > 0 && lbNombresDe(h).some(n => lbNorm(n) === lbNorm(p))).forEach(h => {
       ev.push({ f: h.date, t: '📕 Quedó debiendo', m: lbOrigDe(h, p), d: h.tableName || (i18nPut(espacioN()) + ' ' + h.table) });
       if(lbPagoDespues(h) > 0 && h.paidLater) ev.push({ f: h.paidLater, t: '✅ Pagó', m: lbPagoDespues(h), d: (h.tableName || 'Mesa') + ' · desde Historial' });
@@ -583,7 +598,10 @@
       '<input id="lbPersona" class="mz-in" list="lbPersonasList" placeholder="Nombre" autocomplete="off"><datalist id="lbPersonasList"></datalist>' +
       '<input id="lbMonto" class="mz-in" type="number" inputmode="numeric" placeholder="¿Cuánta plata?" min="0" step="500">' +
       '<div class="lb-form-a"><button type="button" class="btn-close" id="lbFormNo">Cancelar</button><button type="button" class="btn-primary" id="lbFormSi">Guardar</button></div></div>' +
-      '<div class="lb-sec"><div class="lb-sec-t">📕 Me deben <b id="lbTotDeben"></b></div><div id="lbDeben"></div></div>' +
+      '<div class="lb-sec"><div class="lb-sec-t">📕 Me deben <b id="lbTotDeben"></b></div>' +
+      // 1.99.42 · Con muchos que deben, buscar a uno por su nombre (antes había que bajar toda la lista: «no aparece Camila»).
+      '<input type="search" id="lbBuscarDeben" class="lb-buscar" placeholder="🔎 Buscar quién me debe" aria-label="Buscar quién me debe" autocomplete="off" hidden>' +
+      '<div id="lbDeben"></div></div>' +
       '<div class="lb-sec"><div class="lb-sec-t">👷 Pagos a empleados este mes <b id="lbTotEmp"></b></div><div id="lbEmp"></div></div>' +
       '<div class="lb-sec"><div class="lb-sec-t">🧾 Le debo a proveedores <b id="lbTotDebo"></b></div><div id="lbDebo"></div></div>' +
       '<div class="lb-sec"><div class="lb-sec-t">📦 Pagado a proveedores este mes <b id="lbTotProv"></b></div><div id="lbProv"></div></div>' +
@@ -689,17 +707,26 @@
     try{ typeof renderHistorial === 'function' && renderHistorial(); }catch(e){}
     lbResponder('📒 Listo: esa cuenta quedó a nombre de ' + nombre + '.');
   }
+  function lbFiltrarDeben(){
+    const b = $l('lbBuscarDeben'), q = lbNorm(b && !b.hidden ? b.value : '');
+    let n = 0;
+    document.querySelectorAll('#lbDeben .lb-deudor').forEach(f => { const v = !q || lbNorm(f.dataset.persona).includes(q); f.hidden = !v; if(v) n++; });
+    const nada = $l('lbDebenNada'); if(nada) nada.hidden = !(q && !n);
+  }
   function lbPintar(){
     if(!$l('libretaOverlay') || !data) return;
     const d = lbDeudores();
-    $l('lbTotDeben').textContent = d.length ? plata(d.reduce((s, x) => s + x[1], 0)) : '';
-    $l('lbDeben').innerHTML = d.length ? d.map(([p, s]) => {
+    $l('lbTotDeben').textContent = d.length ? plata(d.reduce((s, x) => s + x[1], 0)) + ' · ' + d.length + (d.length === 1 ? ' persona' : ' personas') : '';
+    const bus = $l('lbBuscarDeben');
+    if(bus){ bus.hidden = d.length < 6; if(!bus._ok){ bus._ok = 1; bus.addEventListener('input', lbFiltrarDeben); } }
+    $l('lbDeben').innerHTML = (d.length ? '<div class="lb-vacio" id="lbDebenNada" hidden>Nadie con ese nombre te debe.</div>' : '') + (d.length ? d.map(([p, s]) => {
       const mesas = lbMesasDe(p).length;
       const abierto = lbAbrirPersona === p;
       const sinNombre = p.indexOf(LB_SIN) === 0;
       return '<div class="lb-fila lb-deudor" data-persona="' + esc2(p) + '"><span>' + esc2(p) + (sinNombre ? ' <button type="button" class="btn-ghost lb-nombrar" data-nombrar="' + esc2(p) + '">✏️ ¿Quién es?</button>' : '') + '<small>' + (mesas ? '🍽️ ' + mesas + (mesas === 1 ? ' cuenta de mesa' : ' cuentas de mesa') + ' · ' : '') + 'toca para ver su historial</small></span><b>' + plata(s) + '</b><button type="button" class="btn-ghost" data-pagotodo="' + esc2(p) + '">✅ Pagó todo</button></div>' +
         (abierto ? '<div class="lb-hist">' + lbHistorial(p).map(e => '<div class="lb-ev"><span>' + e.t + (e.d && e.d !== 'todo' ? ' · ' + esc2(e.d) : e.d === 'todo' ? ' (todo)' : '') + '<small>' + new Date(e.f).toLocaleString('es-CO', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) + '</small></span><b>' + plata(e.m) + '</b></div>').join('') + '</div>' : '');
-    }).join('') : '<div class="lb-vacio">Nadie te debe nada 🎉</div>';
+    }).join('') : '<div class="lb-vacio">Nadie te debe nada 🎉</div>');
+    lbFiltrarDeben();
     const e = lbEmpleadosMes();
     $l('lbTotEmp').textContent = e.length ? plata(e.reduce((s, x) => s + x[1], 0)) : '';
     $l('lbEmp').innerHTML = e.length ? e.map(([p, s]) => '<div class="lb-fila"><span>' + esc2(p) + '</span><b>' + plata(s) + '</b></div>').join('') : '<div class="lb-vacio">Todavía no hay pagos este mes.</div>';
@@ -794,7 +821,7 @@
     '.lb-debe{border-color:#c0392b}.lb-abono{border-color:#27ae60}.lb-emp{border-color:#2980b9}.lb-prov{border-color:#8e44ad}.lb-pdeb{border-color:#d35400}' +
     '.lb-form{padding:12px;border-radius:14px;background:rgba(127,127,127,.12);display:flex;flex-direction:column;gap:8px}.lb-form-t{font-weight:700;font-size:17px}' +
     '.lb-form input{font-size:20px!important;padding:12px!important}.lb-form-a{display:flex;gap:8px}.lb-form-a button{flex:1;padding:14px;font-size:18px}' +
-    '.lb-sec{margin-top:14px}.lb-sec-t{font-size:17px;font-weight:700;margin-bottom:6px;display:flex;justify-content:space-between}' +
+    '.lb-buscar{width:100%;box-sizing:border-box;min-height:44px;margin:2px 0 8px;padding:8px 12px;font-size:16px;border-radius:12px;border:1px solid var(--line,#444);background:var(--card,transparent);color:inherit}.lb-buscar[hidden],.lb-deudor[hidden]{display:none!important}' + '.lb-sec{margin-top:14px}.lb-sec-t{font-size:17px;font-weight:700;margin-bottom:6px;display:flex;justify-content:space-between}' +
     '.lb-fila{display:flex;align-items:center;gap:8px;padding:10px 4px;border-top:1px solid var(--line,#444);font-size:18px}.lb-fila span{flex:1}.lb-fila small{display:block;font-size:12px;opacity:.65}' +
     '.lb-deudor{cursor:pointer}.lb-hist{margin:0 0 8px 10px;padding:6px 10px;border-left:3px solid var(--amber,#c8a24a);background:rgba(127,127,127,.08);border-radius:0 10px 10px 0;animation:mzIn .25s ease-out}' +
     '.lb-ev{display:flex;gap:8px;padding:6px 0;font-size:15px}.lb-ev span{flex:1}.lb-ev small{display:block;font-size:12px;opacity:.65}' +

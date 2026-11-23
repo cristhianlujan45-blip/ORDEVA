@@ -182,6 +182,14 @@ function categoryName(categoryId){
   return cat ? cat.name : 'Sin categoría';
 }
 
+/* 1.99.42 · El nombre de una categoría como se ve. Las que llegaron de la base libre de productos por código de barras
+   venían como «es:Mercado/Bebidas/Gaseosas y sodas ›»: se muestra solo «Gaseosas y sodas». No cambia lo guardado. */
+function catNombreVisible(n){
+  let t = String(n == null ? '' : n).replace(/^[a-z]{2}:/i, '').replace(/[›»>]+\s*$/, '').trim();
+  const partes = t.split(/\s*[\/>›]\s*/).filter(Boolean);
+  t = partes.length ? partes[partes.length - 1] : t;
+  return t ? t.charAt(0).toUpperCase() + t.slice(1) : String(n || '');
+}
 function renderCategoryBar(){
   const bar = document.getElementById('categoryBar');
   bar.innerHTML = '';
@@ -197,7 +205,9 @@ function renderCategoryBar(){
     const chip = document.createElement('button');
     chip.type = 'button';
     chip.className = 'chip' + (currentCategoryFilter === cat.id ? ' active' : '');
-    chip.innerHTML = `<span class="dot" style="background:${categoryColorVar(cat.id)}"></span>${cat.name}<span class="chip-del" data-id="${cat.id}" title="Eliminar categoría">✕</span>`;
+    const nom = catNombreVisible(cat.name).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    // La ✕ para borrarla solo se ve en la categoría escogida (antes cada una tenía su ✕: mucho ruido y fácil de tocar sin querer).
+    chip.innerHTML = `<span class="dot" style="background:${categoryColorVar(cat.id)}"></span>${nom}<span class="chip-del" data-id="${cat.id}" title="Eliminar categoría" role="button" aria-label="Eliminar la categoría ${nom}">✕</span>`;
     chip.addEventListener('click', (e)=>{
       if(e.target.classList.contains('chip-del')) return;
       currentCategoryFilter = cat.id;
@@ -222,6 +232,9 @@ function renderCategoryBar(){
   addChip.textContent = '+ Categoría';
   addChip.addEventListener('click', ()=> abrirNuevaCategoria());
   bar.appendChild(addChip);
+  // La escogida queda a la vista en la fila que se desliza.
+  const act = bar.querySelector('.chip.active');
+  if(act && act !== allChip) requestAnimationFrame(() => { try{ const br = bar.getBoundingClientRect(), r = act.getBoundingClientRect(); if(r.left < br.left || r.right > br.right) bar.scrollLeft += r.left - br.left - 40; }catch(e){} });
 
   bar.querySelectorAll('.chip-del').forEach(btn=>{
     btn.addEventListener('click', async (e)=>{
