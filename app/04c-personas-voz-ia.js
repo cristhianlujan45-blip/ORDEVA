@@ -287,7 +287,56 @@ document.addEventListener('click', (e)=>{
   if(!e.target.closest('.product-search-wrap') || e.target.closest('.mesa-scan')) hideProductSuggestions();
 });
 
+/* 1.99.50 · Pagado de MÁS al quitar o bajar productos. En los datos del dueño: una venta de $74.800 con pagos por
+   $101.800 (se cobró un producto de $27.000 por aparte y después se quitó de la cuenta) — Contabilidad contaba $27.000 que
+   ya no eran del negocio. Ahora, si lo registrado pasa del total de la cuenta:
+   • lo que sobra de un «Debe» (fiado) se ajusta solo (no es plata que se recibió);
+   • si sobra plata de verdad, la cuenta lo avisa con «↩️ Ya se lo devolví» (resta ese valor de los últimos pagos) o
+     «Dejar así». No cambia nada solo con la plata recibida. */
+function sobrepagoMesa(id){
+  const t = data.tables && data.tables[id]; if(!t || !Array.isArray(t.payments) || !t.payments.length) return 0;
+  const total = tableTotal(id);
+  const vueltasUsd = t.payments.reduce((a, p) => a + (p && p.method === 'usd' ? Math.max(0, Number(p.vueltasCop) || 0) : 0), 0);   // 💵 pago en dólares con vueltas en pesos
+  let exceso = Math.round(tablePaid(id) - vueltasUsd + tableDebt(id) - total);
+  if(exceso <= 0) return 0;
+  // 1) lo fiado que sobra: se baja solo (empezando por el último)
+  let cambio = false;
+  for(let i = t.payments.length - 1; i >= 0 && exceso > 0; i--){
+    const p = t.payments[i]; if(!p || p.method !== 'debe') continue;
+    const q = Math.min(Number(p.amount) || 0, exceso); p.amount = Math.round((Number(p.amount) || 0) - q); exceso -= q; cambio = true;
+  }
+  if(cambio){ t.payments = t.payments.filter(p => !(p.method === 'debe' && !(p.amount > 0))); try{ saveData(); }catch(e){} }
+  return Math.max(0, exceso);
+}
+window.sobrepagoMesa = sobrepagoMesa;
+function sobrepagoAviso(id){
+  const box0 = document.getElementById('spAviso'), ex = id == null ? 0 : sobrepagoMesa(id);
+  const t = data.tables && data.tables[id];
+  if(!ex || (t && t.sobrepagoOk === Math.round(tablePaid(id)))){ if(box0) box0.hidden = true; return; }
+  const cont = document.getElementById('itemsContainer'); if(!cont || !cont.parentNode) return;
+  let box = box0;
+  if(!box){ box = document.createElement('div'); box.id = 'spAviso'; box.className = 'sp-aviso'; box.setAttribute('role', 'alert');
+    box.addEventListener('click', ev => {
+      const b = ev.target.closest('[data-sp]'); if(!b) return;
+      const tt = data.tables[currentTable]; if(!tt) return;
+      if(b.dataset.sp === 'dejar'){ tt.sobrepagoOk = Math.round(tablePaid(currentTable)); saveData(); box.hidden = true; return; }
+      let falta = sobrepagoMesa(currentTable);
+      for(let i = tt.payments.length - 1; i >= 0 && falta > 0; i--){
+        const p = tt.payments[i]; if(!p || p.method === 'debe') continue;
+        const q = Math.min(Number(p.amount) || 0, falta); p.amount = Math.round((Number(p.amount) || 0) - q); falta -= q;
+        p.note = ((p.note || '') + ' (devuelto ' + fmt(q) + ')').trim();
+      }
+      tt.payments = tt.payments.filter(p => p.method === 'debe' || p.amount > 0);
+      saveData(); try{ renderModalItems(); }catch(e){} try{ renderMesas(); }catch(e){}
+      showToast('↩️ Listo: se restó lo devuelto de los pagos de esta cuenta.');
+    });
+    cont.parentNode.insertBefore(box, cont); }
+  box.hidden = false;
+  box.innerHTML = '⚠️ <b>Pagaron ' + fmt(ex) + ' de más</b>: lo cobrado pasa del total de la cuenta (se quitó o se bajó algo que ya estaba pagado).' +
+    '<div class="sp-btns"><button type="button" class="btn-primary" data-sp="devolver">↩️ Ya se lo devolví</button><button type="button" class="btn-ghost" data-sp="dejar">Dejar así</button></div>';
+}
 function renderModalItems(){
+  try{ if(currentTable != null) setTimeout(() => { try{ sobrepagoAviso(currentTable); }catch(e){} }, 0); }catch(e){}
   try{ if(currentTable != null && window.grupoBarPintar) setTimeout(() => window.grupoBarPintar(currentTable), 0); }catch(e){}
   const t = data.tables[currentTable];
   const container = document.getElementById('itemsContainer');

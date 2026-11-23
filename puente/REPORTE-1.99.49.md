@@ -21,3 +21,17 @@ que no suceda eso, que me la notifique al instante y que no haya confusión».
 - Android (sin celular): 378/378 (+10 nuevas: pago de ahora, Android 10 min tarde, banco 6 min tarde, menos de 2 min).
 - Página: pagosdiag1946 9/9 (pago tardío por la página), pagosaviso 95, confirmapago 61, alertaspagos 13, pagosequipos 51,
   pagosguia 29, pagosprivados 12, pagossuenan 13, pagostodos 17, pagocuenta1948 8.
+
+# 1.99.50 — Auditoría de los datos del negocio y «pagado de más»
+Diagnóstico nuevo de solo lectura (integridad, solo conteos) con los datos reales de la agropecuaria:
+- Sin facturas repetidas, sin deudas negativas ni mayores que la venta, sin fechas futuras, sin inventario negativo, sin
+  productos sin precio ni con costo mayor que el precio, sin cuentas abiertas olvidadas.
+- 4 nombres de producto repetidos: son el mismo producto en distinto tamaño (ORDEVA no los toma como repetidos: bien).
+- 8 de 14 cierres juntan varios días (el cierre automático perdido, arreglado en la 1.99.47, y días sin ventas).
+- **2 ventas viejas con pagos MAYORES que el total** (8 nov: $74.800 con pagos por $101.800; 2 oct: $34.600 con $36.200):
+  se cobró un producto aparte y después se quitó o se bajó de la cuenta; el pago quedó completo.
+**Arreglo:** en la cuenta abierta, si lo registrado pasa del total:
+- lo fiado que sobra se ajusta solo (no es plata recibida);
+- si sobra plata de verdad: «⚠️ Pagaron $27.000 de más» con «↩️ Ya se lo devolví» (resta de los últimos pagos, anotando
+  «devuelto») o «Dejar así». Pagos en dólares con vueltas en pesos no avisan.
+Prueba nueva `sobrepago1950` (8/8). Cuentas, cobros, propinas, cajas y fiados: 15 pruebas, todas bien.
