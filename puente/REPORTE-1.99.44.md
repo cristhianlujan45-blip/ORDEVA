@@ -31,3 +31,10 @@ Restaurantes y bares: sin cambios en sus mesas (todas siguen en el plano).
 - Nueva: `planomesas1944` (15/15): cigarrería con «Tienda con mesas», tocar una mesa abre su cuenta, agropecuaria con 10
   cuentas («➕ Mesa» usa la libre, no toca la que tiene productos ni la de «Camila»), quitar del plano y deshacer, hotel,
   bar y restaurante.
+
+# 1.99.45 — Mapa: un toque desde «Vender» y entero en la pantalla
+- Tienda / cigarrería con mesas en el plano: en «Vender», junto a «📊 Caja de hoy» y «📒 Fiados», sale «🗺️ Mesas · N
+  ocupadas», que abre el mapa en un toque (antes: Más → Mapa del local).
+- Tableta y computador: el plano cabe entero en la pantalla (en un computador medía 840 px de alto y había que bajar para ver
+  la entrada). «🔍 Acercar» sigue agrandándolo.
+- Prueba `planomesas1944` 18/18.

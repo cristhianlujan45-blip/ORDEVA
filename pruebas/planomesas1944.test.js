@@ -9,6 +9,8 @@
 //  5. Hotel: «➕ Habitación», las habitaciones dicen «Hab. N» completo; ningún nombre del plano queda cortado (ascensor,
 //     escaleras) en el hotel ni en el bar («DJ / Tarima»).
 //  6. Restaurante: siguen todas sus mesas en el plano (no cambia).
+//  8. 1.99.45: en un computador (1440 × 900) el plano cabe entero en la pantalla (antes 840 px de alto).
+//  7. 1.99.45: en «Vender» de la cigarrería sale «🗺️ Mesas» (con cuántas están ocupadas) y abre el mapa en un toque.
 'use strict';
 const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
 const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html';
@@ -44,6 +46,12 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
     chk('1. … sin nombres cortados', !(await cortados(p)).length, await cortados(p));
     await p.click('#plLienzo .pl-mesa[data-id="2"]'); await p.waitForTimeout(600);
     chk('2. Tocar «Mesa 2» en el plano abre su cuenta', await p.evaluate(() => document.getElementById('overlay').classList.contains('show') && /Mesa 2/.test(document.getElementById('overlay').textContent)));
+    await p.evaluate(() => { document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')); data.tables[2].items = [{ productId: 'x', name: 'Cerveza', price: 4000, qty: 2 }]; saveData(); });
+    await pl(p, 'vender'); await p.waitForTimeout(1600);
+    const bm = await p.evaluate(() => { const b = [...document.querySelectorAll('[data-mesasmapa]')].find(x => x.getClientRects().length); return b ? b.textContent : null; });
+    chk('7. En «Vender» sale «🗺️ Mesas · 1 ocupada»', bm === '🗺️ Mesas · 1 ocupada', bm);
+    await p.evaluate(() => [...document.querySelectorAll('[data-mesasmapa]')].find(x => x.getClientRects().length).click()); await p.waitForTimeout(600);
+    chk('7. … y abre el mapa con las 4 mesas', await p.evaluate(() => document.body.classList.contains('pl-ver') && document.querySelectorAll('#plLienzo .pl-mesa').length === 4 && !!document.getElementById('plLienzo').getClientRects().length));
     await C.ctx.close();
 
     // ===== 3 y 4. Agropecuaria con 10 cuentas =====
@@ -88,6 +96,17 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
     await pl(p, 'plantilla', 'restaurante'); await p.waitForTimeout(500);
     chk('6. Restaurante: todas sus mesas en el plano', await p.evaluate(() => document.querySelectorAll('#plLienzo .pl-mesa').length === Object.keys(data.tables).length && Object.keys(data.tables).length > 0));
     await R.ctx.close();
+    // ===== 8. Computador =====
+    { const ctx = await b.newContext({ viewport: { width: 1440, height: 900 } });
+      await ctx.route('**/*', r => new URL(r.request().url()).hostname === 'localhost' ? r.continue() : r.abort());
+      await ctx.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento-guia-tour', '1'); }catch(e){} });
+      const q = await ctx.newPage(); q.on('pageerror', e => errs.push('pc: ' + e.message));
+      await q.goto(BASE); await q.waitForTimeout(900);
+      await q.evaluate(async () => { await enterApp('test', null); document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')); ventoPlano.abrir(); });
+      await q.waitForTimeout(500); await pl(q, 'plantilla', 'restaurante'); await q.waitForTimeout(400); await pl(q, 'listo'); await q.waitForTimeout(400);
+      const r = await q.evaluate(() => { const l = document.getElementById('plLienzo'); l.scrollIntoView({ block: 'start' }); const b = l.getBoundingClientRect(); return { alto: Math.round(b.height), cabe: b.height <= innerHeight - 40 }; });
+      chk('8. Computador: el plano cabe entero en la pantalla (' + r.alto + ' px de alto)', r.cabe, r);
+      await ctx.close(); }
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.stack || e)); }
   chk('Sin errores de página', !errs.length, errs.join(' | '));
   await b.close(); console.log('RESULTADO', ok, 'bien', mal, 'mal'); process.exit(mal ? 1 : 0);
