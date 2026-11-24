@@ -107,3 +107,9 @@ de $1.400 a distinta hora) siguen sonando los dos.
 - Error real: el asistente («¿quién me debe?», «¿cuánto me deben?») sumaba solo las cuentas fiadas del Historial. La libreta «Me deben» suma también lo anotado en ella («Rosa me debe 20 mil»). Con los datos reales del negocio: Historial $328.600, libreta $355.125.
 - Ahora el asistente usa la misma lista de la libreta (window.libretaDeudores): total, personas y lo de cada una.
 - Prueba: pruebas/fiadostotal1962.test.js 6/6; cierrefuera1961 8, cuadre1954 5, cuadrefiados1946 8, fiadosnombres 28, laya1953 6, libreta 24, libretacaja1955 17, pagocuenta1948 8.
+
+## 1.99.63 — Devoluciones y caja; la libreta no se cuenta dos veces
+- Error real: con la caja abierta, devolver plata en efectivo restaba dos veces: bajaba el pago de la venta (eso ya baja lo que la caja espera) Y anotaba la salida completa. Venta $70.000 en efectivo, devuelve $35.000 → la caja esperaba $0 (al contar: «sobran $35.000»). Ahora en efectivo baja primero el pago en efectivo y solo lo que se había pagado por otro medio es salida. Sin efectivo (saldo a favor / otro medio) baja primero lo fiado y los otros medios; si toca el efectivo, queda como entrada («esa plata sigue en la caja»).
+- Una devolución en efectivo (y la venta de un bono en efectivo) con la caja cerrada ABRÍA una caja sola con base $0 (movimiento() abre una si no hay). Ahora solo con la caja abierta.
+- Error mío de la 1.99.55: con la caja abierta, pagar en efectivo desde la libreta a un proveedor o empleado se contaba DOS veces en Contabilidad (el gasto de la libreta y el de la salida de caja). Ahora la salida de caja de la libreta no crea otro gasto (movimiento(..., { sinContab: true })).
+- Prueba: pruebas/devolucioncaja1963.test.js 7/7 (con el código de antes: 2 bien 5 mal).

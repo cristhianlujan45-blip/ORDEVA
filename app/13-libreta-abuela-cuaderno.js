@@ -379,7 +379,7 @@
     // los fiados cobrados: el cuadre decía que debía haber más plata de la que había). Se quita con el movimiento.
     if((tipo === 'prov' || tipo === 'emp') && (m.metodo || 'efectivo') === 'efectivo') try{
       const T = window.ventoTurno;
-      if(T && T.turno && T.turno()){ const mv = T.movimiento('salida', m.monto, (tipo === 'emp' ? 'Pago a ' : 'Pago al proveedor ') + String(persona).replace(LB_SIN, '').slice(0, 60)); if(mv) m.cajaMov = mv.id; }
+      if(T && T.turno && T.turno()){ const mv = T.movimiento('salida', m.monto, (tipo === 'emp' ? 'Pago a ' : 'Pago al proveedor ') + String(persona).replace(LB_SIN, '').slice(0, 60), { sinContab: true }); if(mv) m.cajaMov = mv.id; }   // 1.99.63: el gasto ya lo cuenta la libreta
     }catch(e){}
     LB().movs.push(m); saveData(); lbPintar();
     try{ typeof renderConta === 'function' && renderConta(); }catch(e){}
