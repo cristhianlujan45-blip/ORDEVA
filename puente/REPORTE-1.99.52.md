@@ -136,3 +136,12 @@ de $1.400 a distinta hora) siguen sonando los dos.
 - La batería COMPLETA de pruebas (246, no terminaba desde el 22 de nov. porque las publicaciones la cancelaban) pasó la 1.99.65 salvo appoweb, que falla también aquí (no es casualidad).
 - Causa: cuando Google devuelve al navegador una conexión de YouTube empezada en la app, la página saltaba a la app a los 300 ms pasara lo que pasara. Con la página aún cargando, el salto cortaba la carga (y la pantalla «Google listo» con su botón podía no alcanzar a salir). Ahora salta 300 ms después de que la página cargó.
 - Prueba: appoweb 25/25, googlevuelta 6/6.
+
+## 1.99.67 — Libreta por voz con productos de distinto tamaño
+- Errores reales:
+  - «José me debe 2 purinas» → $16.000 (la Purina 1 kg, sin preguntar).
+  - «José me debe 2 purinas de 5 kilos» → a «José 2 Kilos», 5 × Purina 1 kg = $40.000 (el tamaño se tomaba como cantidad y como nombre).
+  - «José me debe una purina de 1 kg» → a «José Kg».
+  - «Pedro me debe 5 kilos de maíz» → a «Pedro Kilos».
+- Ahora: el tamaño de un producto que se nombró se quita de la frase y escoge el producto («2 × Purina 5 kg» = $70.000 a José). Sin tamaño y con dos del mismo nombre a distinto precio, pregunta cuál y no anota nada. Por kilo: «5 kilos de maíz» = 5 kg a Pedro.
+- Prueba: pruebas/libretatamano1966.test.js 7/7. libreta 24, fiadosnombres 28, libretanombres1942 12, vozcomandos 109, cajavoz 59 y 9 más de libreta/caja.

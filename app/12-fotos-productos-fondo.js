@@ -427,7 +427,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-11-24 · v1.99.66';
+const MESORA_VERSION = '2026-11-24 · v1.99.67';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve){   // «ORDEVA 1.99.2 · 14 nov 2026» (antes «versión v1.99.2 (2026-11-14)», con la «v» repetida y la fecha en formato técnico)
   const pz = MESORA_VERSION.split('·'), num = pz.pop().trim().replace(/^v/i, ''), f = (pz[0] || '').trim().split('-');

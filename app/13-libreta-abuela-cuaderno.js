@@ -331,17 +331,31 @@
     return pu || null;
   }
   // Productos fiados por nombre («José me debe 2 cervezas»): el valor sale del precio del producto.
+  /* 1.99.66 · Tamaños dichos en la frase («de 5 kilos», «de 1 kg», «media libra»). */
+  const LB_TAM = /\b(?:de\s+)?(\d+(?:[.,]\d+)?|un|una|medio|media)\s*(kgs?|kilos?|kilogramos?|k|lbs?|libras?|grs?|gramos?|g|ml|cc|mililitros?|lts?|litros?|l)\b/i;
+  const lbUnidad = u => { u = String(u || '').toLowerCase(); return /^(kgs?|kilos?|kilogramos?|k)$/.test(u) ? 'kg' : /^(lbs?|libras?)$/.test(u) ? 'lb' : /^(grs?|gramos?|g)$/.test(u) ? 'g' : /^(ml|cc|mililitros?)$/.test(u) ? 'ml' : /^(lts?|litros?|l)$/.test(u) ? 'l' : u; };
+  const lbCant = n => { n = String(n || '').toLowerCase(); return n === 'un' || n === 'una' ? 1 : n === 'medio' || n === 'media' ? 0.5 : Number(n.replace(',', '.')); };
+  const lbTamDe = txt => { const m = lbNorm(String(txt || '')).match(LB_TAM); return m ? { n: lbCant(m[1]), u: lbUnidad(m[2]) } : null; };
+  const lbMismoTam = (a, b) => !!(a && b && a.u === b.u && Math.abs(a.n - b.n) < 1e-9);
   function lbProductosEn(t){
     const ps = (typeof data !== 'undefined' && data && data.products) || [];
     const sing = w => w.replace(/(es|s)$/, '');
     const pal = t.split(' ').map(sing);
-    let mejor = null, punt = 0;
+    let punt = 0, cands = [];
     ps.forEach(p => {
       const ws = lbNorm(p.name).split(' ').filter(w => w.length > 2).map(sing);
       const n = ws.filter(w => pal.includes(w)).length;
-      if(n > punt && Number(p.price) > 0){ punt = n; mejor = p; }
+      if(!(n > 0) || !(Number(p.price) > 0)) return;
+      if(n > punt){ punt = n; cands = [p]; } else if(n === punt) cands.push(p);
     });
-    return mejor;
+    if(cands.length <= 1) return cands[0] || null;
+    // 1.99.66: varios con el mismo nombre (Purina 1 kg y Purina 5 kg): el tamaño que se dijo; si no se dijo y cuestan
+    // distinto, se pregunta (antes se anotaba el primero: «2 purinas» = $16.000 aunque fueran las de 5 kg).
+    const tam = lbEntender.tam || null;
+    if(tam){ const c = cands.filter(p => lbMismoTam(lbTamDe(p.size), tam)); if(c.length === 1) return c[0]; }
+    const mismos = cands.filter(p => lbNorm(p.name) === lbNorm(cands[0].name));
+    if(mismos.length > 1 && new Set(mismos.map(p => Number(p.price))).size > 1) return { ambiguo: mismos };
+    return cands[0];
   }
 
   function lbDeudores(){ return lbPersonas().map(p => [p, lbSaldo(p)]).filter(x => x[1] > 0).sort((a, b) => b[1] - a[1]); }
@@ -414,6 +428,20 @@
   // o «Agro Sur Transferencia» como otra persona) y el pago queda como transferencia (no entra ni sale de la caja).
   const LB_MET = /\s*,?\s*\b(?:(?:por|con|en|via|vía|desde|por medio de)\s+)?(?:(?:una?|la|el)\s+)?(?:nequi|daviplata|davi ?plata|transferencia|transferencias|consignaci[oó]n)\b/gi;
   function lbEntender(raw, soloSeguro){
+    // 1.99.66: «José me debe 2 purinas de 5 kilos»: «de 5 kilos» es el tamaño (no la cantidad ni parte del nombre). Se
+    // quita de la frase si hay un producto con ese tamaño y se usa para escoger el producto.
+    if(!lbEntender.tam){ const m = String(raw == null ? '' : raw).match(LB_TAM);
+      if(m){ const tam = { n: lbCant(m[1]), u: lbUnidad(m[2]) }, rn = lbNorm(String(raw)).split(' ').map(w => w.replace(/(es|s)$/, ''));
+        const nombrado = p => lbNorm(p.name).split(' ').filter(w => w.length > 2).some(w => rn.includes(w.replace(/(es|s)$/, '')));
+        const P = ((typeof data !== 'undefined' && data && data.products) || []).filter(nombrado);
+        if(P.some(p => lbMismoTam(lbTamDe(p.size), tam))){   // el tamaño de un producto que se nombró: no es cantidad ni nombre
+          lbEntender.tam = tam;
+          try{ return lbEntender(String(raw).replace(m[0], ' ').replace(/\s+/g, ' ').trim(), soloSeguro); } finally { lbEntender.tam = null; }
+        }
+        if(P.some(p => p.unidad && lbUnidad(p.unidad) === tam.u)){   // por kilo / libra: «5 kilos de maíz» = 5 de maíz
+          lbEntender.tam = { soloUnidad: true };
+          try{ return lbEntender(String(raw).replace(m[0], ' ' + m[1] + ' ').replace(/\s+/g, ' ').trim(), soloSeguro); } finally { lbEntender.tam = null; }
+        } } }
     { const nr = String(raw == null ? '' : raw).replace(LB_MET, ' ').replace(/\s+/g, ' ').trim();
       if(nr && nr !== String(raw).trim()){
         lbEntender.metodo = 'transferencia'; lbEntender.usado = false;
@@ -558,7 +586,9 @@
     let notaProd = '';
     if(debe && !(monto >= 50)){
       const pr = lbProductosEn(t);
-      if(pr){ const q = monto > 0 && monto < 50 ? monto : 1; notaProd = q + ' × ' + pr.name; monto = Math.round(q * Number(pr.price));
+      if(pr && pr.ambiguo){ if(soloSeguro) return null;
+        return { texto: '¿Cuál ' + pr.ambiguo[0].name + '? ' + pr.ambiguo.map(p => (p.size || 'sin tamaño') + ' (' + plata(p.price) + ')').join(' o ') + '. Di por ejemplo: «' + (lbNombre(String(resto || '').split(' ').filter(w => !lbNorm(pr.ambiguo[0].name).split(' ').some(x => x.length > 2 && w.replace(/(es|s)$/, '') === x.replace(/(es|s)$/, ''))).join(' ')) || 'Juan') + ' me debe 2 ' + pr.ambiguo[0].name + ' de ' + (pr.ambiguo.find(p => p.size) || {}).size + '».' }; }
+      if(pr){ const q = monto > 0 && monto < 50 ? monto : 1; notaProd = q + ' × ' + pr.name + (pr.size && lbEntender.tam && !lbEntender.tam.soloUnidad ? ' ' + pr.size : '') + (pr.unidad && lbEntender.tam && lbEntender.tam.soloUnidad ? ' ' + pr.unidad : ''); monto = Math.round(q * Number(pr.price));
         resto = resto.split(' ').filter(w => !lbNorm(pr.name).split(' ').some(x => x.length > 2 && (w === x || w.replace(/(es|s)$/, '') === x.replace(/(es|s)$/, '')))).join(' '); }
     }
     const persona = lbNombre(resto);
