@@ -54,6 +54,10 @@ jobs:
             -- 1.99.50: integridad de los datos del negocio (SOLO conteos, sin nombres ni valores de nadie).
             'integridad', (select json_build_object(
                 'ventas', jsonb_array_length(coalesce(d.datos->'history', '[]'::jsonb)),
+                -- 1.99.55: apuntes de la libreta con «nequi / daviplata / transferencia» pegado al nombre (error de antes), por tipo
+                'libreta_nombre_con_medio', (select json_object_agg(t, c) from (select m->>'tipo' t, count(*) c
+                    from jsonb_array_elements(case when jsonb_typeof(d.datos->'libreta'->'movs') = 'array' then d.datos->'libreta'->'movs' else '[]'::jsonb end) m
+                    where lower(coalesce(m->>'persona', '')) ~ '(nequi|davi ?plata|transferencia|consignaci)' group by 1) x),
                 'factura_repetida', (select count(*) from (select h->>'invoiceNo' n from jsonb_array_elements(coalesce(d.datos->'history', '[]'::jsonb)) h
                     where coalesce(h->>'invoiceNo', '') <> '' group by 1 having count(*) > 1) x),
                 'sin_numero', (select count(*) from jsonb_array_elements(coalesce(d.datos->'history', '[]'::jsonb)) h where coalesce(h->>'invoiceNo', '') = '' and h->'dian' is null),
