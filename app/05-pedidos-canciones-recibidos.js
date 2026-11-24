@@ -24,7 +24,8 @@
     return items.map(it=>{
       const product=matchProductVoice(it.productText);
       const qn=Math.max(1,it.qty||1);
-      return product?{ok:true,name:product.name,qty:qn}:{ok:false,name:it.productText,qty:qn};
+      const amb=!product&&window.__vozAmbiguo;   // 1.99.70: varios tamaños del mismo producto: se dice cuáles
+      return product?{ok:true,name:(typeof vozNombreConTam==='function'?vozNombreConTam(product):product.name),qty:qn}:{ok:false,name:it.productText+(amb?' (¿'+amb.map(p=>p.size||'sin tamaño').join(' o ')+'?)':''),qty:qn};
     });
   }
 
