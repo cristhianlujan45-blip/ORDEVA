@@ -2307,7 +2307,7 @@ Devuelve SOLO JSON válido con estas claves: {"intent":"order|repeat_last_round|
 }
 
 function getVoiceSalesTotal(){
-  const closed = (data.history || []).reduce((sum, h) => sum + (Number(h.total) || 0), 0);
+  const closed = (data.history || []).reduce((sum, h) => sum + (window.ventaSinPropina ? window.ventaSinPropina(h) : (Number(h.total) || 0)), 0);   // 1.99.57: sin propinas
   const open = Object.keys(data.tables || {}).reduce((sum, id) => sum + tableTotal(Number(id)), 0);
   return closed + open;
 }

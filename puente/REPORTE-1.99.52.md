@@ -61,3 +61,13 @@ de $1.400 a distinta hora) siguen sonando los dos.
 - Los botones «Me pagaron», «Pagué a un empleado» y «Pagué a un proveedor» ahora preguntan cómo fue: 💵 Efectivo (por defecto) o 📱 Transferencia. Con la 1.99.55 el efectivo entra o sale de la caja, así que hacía falta poder decir que fue por transferencia sin hablar.
 - Diagnóstico real (solo conteos): la libreta del negocio no tiene ningún nombre con «nequi/transferencia» pegado (3 apuntes, todos «me debe»). No hay nada que limpiar.
 - Prueba: libretacaja1955 16/16; libreta 24, libretanombres1942 12, fiadosnombres 28, pagocuenta1948 8, cuadrefiados1946 8.
+
+## 1.99.57 — Las propinas no son venta (mismas cifras en todas las pantallas)
+- Auditoría de consistencia: las mismas ventas del día deben dar lo mismo en Cierre, Contabilidad, Estadísticas, Corte X, «Hoy» del punto de venta, el asistente y Laya.
+- El cierre de caja y Contabilidad ya sacaban la propina de «Vendido» (es de los empleados). Pero la sumaban como venta:
+  - Estadísticas («💰 Ventas», horas, mesas, empleados, comparativo semana/mes, vs. período anterior) y mostraba «🙏 Propina» como producto vendido.
+  - El análisis de ventas (app/23): la sumaba a las ventas y a la GANANCIA.
+  - Laya «¿cuánto hay en caja?» («Hoy vendiste…»), el asistente («¿cuánto vendí?», ventas de hoy/semana) y el total por voz.
+  - El Corte X (total y por cajero) y la pantalla «Hoy» del punto de venta.
+- Ahora todas usan la venta sin propina. El Corte X muestra «🤝 Propinas» en su renglón (ya van dentro de los medios de pago, como en el cierre). La descarga de Excel de Estadísticas sigue con lo cobrado renglón por renglón.
+- Prueba: pruebas/propinas1957.test.js 12/12.

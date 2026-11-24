@@ -38,7 +38,9 @@
     const H = data.history.filter(e => { const t = Date.parse(e.date || e.closedAt || 0); return t >= ini && t < fin && !e.anulada && !e.voided; });
     let total = 0, costo = 0, sinCosto = 0, unidades = 0; const prod = {}, horas = {};
     H.forEach(e => {
-      total += Number(e.total) || 0; const hr = new Date(Date.parse(e.date)).getHours(); horas[hr] = (horas[hr] || 0) + (Number(e.total) || 0);
+      // 🤝 1.99.57: sin la propina (es de los empleados): antes sumaba a las ventas y a la GANANCIA
+      const ve = (Number(e.total) || 0) - (window.propinaDe ? window.propinaDe(e) : 0);
+      total += ve; const hr = new Date(Date.parse(e.date)).getHours(); horas[hr] = (horas[hr] || 0) + ve;
       (e.items || []).forEach(i => {
         const q = Number(i.qty) || 0, v = q * (Number(i.price) || 0); unidades += q;
         const k = String(i.name || '').replace(/^🛵 /, ''); if(!/domicilio|propina/i.test(k)){ prod[k] = prod[k] || { q: 0, v: 0 }; prod[k].q += q; prod[k].v += v; }

@@ -489,7 +489,7 @@ function asisSales(){
   let hoy = 0, nHoy = 0, sem = 0, ganHoy = 0, hoySinCosto = false;
   const stats = {};
   (data.history || []).forEach(h => {
-    const t = new Date(h.date).getTime(), tot = Number(h.total) || 0;
+    const t = new Date(h.date).getTime(), tot = (window.ventaSinPropina ? window.ventaSinPropina(h) : (Number(h.total) || 0));   // 1.99.57: sin propinas
     const esHoy = t >= start.getTime();
     if(esHoy){ hoy += tot; nHoy++; }
     if(t >= d7) sem += tot;
@@ -681,7 +681,7 @@ function asisDeudas(){
 }
 function asisVentasEntre(desde, hasta){
   let total = 0, n = 0;
-  (data.history || []).forEach(h => { const t = new Date(h.date).getTime(); if(t >= desde && t < hasta){ total += Number(h.total) || 0; n++; } });
+  (data.history || []).forEach(h => { const t = new Date(h.date).getTime(); if(t >= desde && t < hasta){ total += (Number(h.total) || 0) - (window.propinaDe ? window.propinaDe(h) : 0); n++; } });   // 1.99.57: sin propinas
   return { total, n };
 }
 function asisAyudaTexto(){

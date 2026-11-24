@@ -285,7 +285,7 @@ const stKpi = (l, v) => '<div class="st-kpi"><small>' + l + '</small><b>' + v + 
 
 // ---------- Comparativo por semana y mes calendario (independiente del filtro de período) ----------
 function stStartOfWeek(d){ const x = new Date(d); const day = (x.getDay() + 6) % 7; x.setDate(x.getDate() - day); x.setHours(0, 0, 0, 0); return x; }
-function stSumBetween(from, to){ return (data.history || []).reduce((s, h) => { const t = new Date(h.date).getTime(); return (t >= from && t < to) ? s + (h.total || 0) : s; }, 0); }
+function stSumBetween(from, to){ return (data.history || []).reduce((s, h) => { const t = new Date(h.date).getTime(); return (t >= from && t < to) ? s + (Number(h.total) || 0) - (window.propinaDe ? window.propinaDe(h) : 0) : s; }, 0); }   // 1.99.57: sin propinas
 function stPctChange(cur, prev){
   if(prev === 0 && cur === 0) return '—';
   if(prev === 0) return '▲ 100%';
@@ -405,24 +405,28 @@ function renderStats(){
   const from = stPer === 'hoy' ? +d0 : stPer === '7' ? +d0 - 6 * 864e5 : stPer === '30' ? +d0 - 29 * 864e5 : 0;
   const H = (data.history || []).filter(h => new Date(h.date).getTime() >= from);
   const cn = {}, catOf = {}; data.categories.forEach(k => cn[k.id] = k.name); data.products.forEach(p => catOf[cartaNrm(p.name)] = cn[p.categoryId] || 'Otros');
-  const total = H.reduce((a, h) => a + (h.total || 0), 0), debt = H.reduce((a, h) => a + (h.debt || 0), 0);
+  // 🤝 1.99.57: sin las propinas (son de los empleados), como en el cierre de caja y en Contabilidad. Antes Estadísticas
+  // las sumaba a lo vendido y mostraba «🙏 Propina» como un producto.
+  const vtaH = h => (Number(h.total) || 0) - (window.propinaDe ? window.propinaDe(h) : 0);
+  const esPropina = it => it && !it.productId && /^🙏\s*Propina/i.test(String(it.name || ''));
+  const total = H.reduce((a, h) => a + vtaH(h), 0), debt = H.reduce((a, h) => a + (h.debt || 0), 0);
   let units = 0; const prod = {}, cats = {}, mesas = {}, emps = {}, meth = {}, hours = Array(24).fill(0), tl = {};
   let knownRevenue = 0, margin = 0, hasCostData = false; const profit = {};
   H.forEach(h => {
-    const dt = new Date(h.date); hours[dt.getHours()] += h.total || 0;
+    const dt = new Date(h.date), hv = vtaH(h); hours[dt.getHours()] += hv;
     const tk = stPer === 'hoy' ? dt.getHours() : stPer === 'todo' ? dt.getFullYear() + '-' + dt.getMonth() : dt.toDateString();
-    tl[tk] = (tl[tk] || 0) + (h.total || 0);
-    const mk = h.tableName || (h.table != null ? i18nPut(espacioN()) + ' ' + h.table : '—'); mesas[mk] = (mesas[mk] || 0) + (h.total || 0);
-    if(h.by){ const ek = h.by; emps[ek] = emps[ek] || { v: 0, n: 0 }; emps[ek].v += h.total || 0; emps[ek].n++; }
+    tl[tk] = (tl[tk] || 0) + hv;
+    const mk = h.tableName || (h.table != null ? i18nPut(espacioN()) + ' ' + h.table : '—'); mesas[mk] = (mesas[mk] || 0) + hv;
+    if(h.by){ const ek = h.by; emps[ek] = emps[ek] || { v: 0, n: 0 }; emps[ek].v += hv; emps[ek].n++; }
     (h.payments || []).forEach(p => { meth[p.method] = (meth[p.method] || 0) + (p.amount || 0); });
-    (h.items || []).forEach(it => { const v = it.qty * it.price; units += it.qty; const nv = nombreVigente(it.name); const P = prod[nv] = prod[nv] || { q: 0, v: 0 }; P.q += it.qty; P.v += v; const c = catOf[cartaNrm(nv)] || 'Otros'; cats[c] = (cats[c] || 0) + v;
+    (h.items || []).forEach(it => { if(esPropina(it)) return; const v = it.qty * it.price; units += it.qty; const nv = nombreVigente(it.name); const P = prod[nv] = prod[nv] || { q: 0, v: 0 }; P.q += it.qty; P.v += v; const c = catOf[cartaNrm(nv)] || 'Otros'; cats[c] = (cats[c] || 0) + v;
       if(it.cost != null){ hasCostData = true; const g = v - it.qty * it.cost; knownRevenue += v; margin += g; const G = profit[nombreVigente(it.name)] = profit[nombreVigente(it.name)] || { q: 0, g: 0 }; G.q += it.qty; G.g += g; }
     });
   });
   let prevTotal = null;                          // ventas del período anterior de igual duración (para comparar)
   if(stPer !== 'todo'){
     const span = stPer === 'hoy' ? 864e5 : stPer === '7' ? 7 * 864e5 : 30 * 864e5, pf = from - span;
-    prevTotal = data.history.reduce((a, h) => { const t = new Date(h.date).getTime(); return t >= pf && t < from ? a + (h.total || 0) : a; }, 0);
+    prevTotal = data.history.reduce((a, h) => { const t = new Date(h.date).getTime(); return t >= pf && t < from ? a + vtaH(h) : a; }, 0);
   }
   let tItems = [];                               // ventas en el tiempo
   if(stPer === 'hoy') tItems = hours.map((v, i) => ({ l: i + 'h', v, t: i + ':00 · ' + stMoney(v) }));

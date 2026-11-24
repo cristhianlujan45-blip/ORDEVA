@@ -235,7 +235,7 @@
   function cajaHoy(){
     const d0 = new Date(); d0.setHours(0, 0, 0, 0);
     let ef = 0, tr = 0, fi = 0, tot = 0;
-    (data.history || []).forEach(h => { if(!(new Date(h.date) >= d0)) return; tot += (Number(h.total) || 0);
+    (data.history || []).forEach(h => { if(!(new Date(h.date) >= d0)) return; tot += (Number(h.total) || 0) - (window.propinaDe ? window.propinaDe(h) : 0);   // 1.99.57: sin propinas
       (h.payments || []).forEach(p => { const v = Number(p.amount) || 0; if(p.method === 'efectivo') ef += v; else if(p.method === 'usd') ef -= Math.max(0, Number(p.vueltasCop) || 0); else if(p.method === 'debe') fi += v; else tr += v; }); });
     const partes = [plata(ef) + ' en efectivo'].concat(tr ? [plata(tr) + ' por transferencia u otros medios'] : []).concat(fi ? [plata(fi) + ' fiado'] : []);
     const ventas = 'Hoy vendiste ' + plata(tot) + ': ' + partes.join(', ') + '.';
