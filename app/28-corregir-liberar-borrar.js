@@ -151,12 +151,14 @@
     const metodos = Object.assign({}, typeof methodLabelHist === 'object' ? methodLabelHist : { efectivo: 'Efectivo', debe: 'Debe' });
     if(unPago && pagos[0].method && !metodos[pagos[0].method]) metodos[pagos[0].method] = pagos[0].method;
     ventana('<h2 style="margin:0 0 4px">✏️ Corregir venta</h2><p style="margin:0 0 10px;font-size:13.5px;opacity:.85">' + e(nombreVenta(h)) + '. Cambia las cantidades (0 = quitar).</p>' +
-      its.map((it, i) => '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)"><span style="flex:1;min-width:0">' + e(it.name) + ' <small style="opacity:.7">' + fmt(it.price) + '</small></span><input data-q="' + i + '" type="number" min="0" step="1" value="' + (+it.qty || 0) + '" style="width:72px;text-align:center"></div>').join('') +
+      its.map((it, i) => '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)"><span style="flex:1;min-width:0">' + e(it.name) + ' <small style="opacity:.7">' + fmt(it.price) + '</small></span><input data-q="' + i + '" type="number" min="0" step="' + (it.unidad || !Number.isInteger(+it.qty || 0) ? 'any' : '1') + '" inputmode="decimal" value="' + (+it.qty || 0) + '" style="width:72px;text-align:center"></div>').join('') +
       (unPago ? '<label style="display:flex;flex-direction:column;gap:4px;margin-top:10px;font-size:13px">Medio de pago<select id="vfMetodo">' + Object.keys(metodos).map(k => '<option value="' + e(k) + '"' + (k === pagos[0].method ? ' selected' : '') + '>' + e(metodos[k]) + '</option>').join('') + '</select></label>' : '') +
       '<div id="vfTotal" style="font-weight:800;font-size:17px;margin:12px 0 4px"></div>' +
       '<div class="modal-actions"><button type="button" class="btn-ghost" id="vfNo">Cancelar</button><button type="button" class="btn-primary" id="vfSi">Guardar corrección</button></div>', (ov, cerrar) => {
-      const qs = () => its.map((it, i) => Math.max(0, Math.round(+ov.querySelector('[data-q="' + i + '"]').value || 0)));
-      const total = () => qs().reduce((s, q, i) => s + q * its[i].price, 0);
+      // 1.99.65: con decimales (venta por kilo: 2,5 kg). Antes se redondeaba a entero: corregir OTRO renglón volvía 2,5 kg en
+      // 3 kg (cambiaba el total y descontaba medio kilo de más).
+      const qs = () => its.map((it, i) => { const v = String(ov.querySelector('[data-q="' + i + '"]').value || '').replace(',', '.'); return Math.max(0, Math.round((+v || 0) * 1000) / 1000); });
+      const total = () => Math.round(qs().reduce((s, q, i) => s + q * its[i].price, 0));
       const pinta = () => { ov.querySelector('#vfTotal').textContent = 'Total: ' + fmt(h.total) + ' → ' + fmt(total()); };
       ov.oninput = pinta; pinta();   // (no addEventListener: la ventanita se reutiliza y el anterior seguía vivo)
       ov.querySelector('#vfNo').onclick = cerrar;

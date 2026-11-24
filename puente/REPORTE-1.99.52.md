@@ -127,3 +127,5 @@ de $1.400 a distinta hora) siguen sonando los dos.
 - Ahora las ventas de cuentas y de venta rápida guardan el id y el tamaño. «Lo más vendido» (Estadísticas, asistente, Laya, resumen del cierre) separa los tamaños; en ventas viejas con id, el tamaño sale del producto.
 - Liberar una venta (volver a su cuenta) buscaba el producto por nombre y perdía el tamaño: ahora usa el id.
 - Prueba: pruebas/tamanosventas1965.test.js 8/8 (con el código de antes: 1 bien 6 mal); anularventas, inventariodevuelve1958.
+- Error real (ventas por kilo): «Corregir venta» redondeaba las cantidades a entero. Al corregir OTRO renglón, 2,5 kg de maíz pasaban a 3 kg: subía el total y se descontaba medio kilo de más. Ahora acepta decimales (y coma). La devolución también acepta medio kilo.
+- Prueba: pruebas/pesocorregir1966.test.js 4/4; anularventas 27, inventariodevuelve1958 10, devolucioncaja1963 7, mejoras 32, cajamas 45.
