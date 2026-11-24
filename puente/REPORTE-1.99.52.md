@@ -164,4 +164,4 @@ de $1.400 a distinta hora) siguen sonando los dos.
 
 ## 1.99.71 — Recibo de una cuenta con el tamaño
 - El recibo de una cuenta abierta (compartir por WhatsApp / imprimir) no pasaba el tamaño de cada renglón: salía «2 x Purina». Ahora «2 x Purina (5 kg)», igual que el del Historial (que ya lo trae desde la 1.99.65). Carta (QR), etiquetas y la caja POS ya mostraban el tamaño.
-- Prueba: tamanosventas1965 9/9.
+- Prueba: tamanosventas1965 9/9; agencia 13, cajamas 45, cajapos 27, cajapro 56, dian 29, equipos 35, impuestoconsumo 10, mesacomoda 16, tableta1932 16, v183 18.
