@@ -1429,7 +1429,7 @@ function histMedios(h){
 function histRef(h){ const n = histNumero(h), m = histMedios(h); return (n ? 'N.º ' + n : '') + (n && m ? ' · ' : '') + m; }
 function histTextoBusca(h){
   return [histNumero(h), h.tableName || ('mesa ' + h.table), h.person, h.cliente, h.by, h.observacion, histMedios(h), Math.round(Number(h.total) || 0),
-    ((h.items || []).map(it => it.name + ' ' + (it.person || '')).join(' ')), ((h.payments || []).map(p => p.note || '').join(' '))].join(' ')
+    ((h.items || []).map(it => it.name + ' ' + (it.size || '') + ' ' + (it.person || '')).join(' ')), ((h.payments || []).map(p => p.note || '').join(' '))].join(' ')
     .toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 function histCoincide(h, q){

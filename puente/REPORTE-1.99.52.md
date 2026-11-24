@@ -165,3 +165,8 @@ de $1.400 a distinta hora) siguen sonando los dos.
 ## 1.99.71 — Recibo de una cuenta con el tamaño
 - El recibo de una cuenta abierta (compartir por WhatsApp / imprimir) no pasaba el tamaño de cada renglón: salía «2 x Purina». Ahora «2 x Purina (5 kg)», igual que el del Historial (que ya lo trae desde la 1.99.65). Carta (QR), etiquetas y la caja POS ya mostraban el tamaño.
 - Prueba: tamanosventas1965 9/9; agencia 13, cajamas 45, cajapos 27, cajapro 56, dian 29, equipos 35, impuestoconsumo 10, mesacomoda 16, tableta1932 16, v183 18.
+
+## 1.99.72 — Buscar en el Historial por tamaño
+- El buscador del Historial miraba el nombre del producto pero no su tamaño: «purina 5 kg» no encontraba esa venta. Ahora sí (ventas desde la 1.99.65, que guardan el tamaño).
+- Diagnóstico (solo conteos): renglones vendidos con y sin id de producto por día, para confirmar con datos reales que desde la 1.99.65 las ventas guardan el producto.
+- Prueba: tamanosventas1965 10/10; historialorden1947 9.
