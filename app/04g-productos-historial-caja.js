@@ -1317,7 +1317,7 @@ function currentTableReceiptData(){
     businessName: data.businessName,
     tableLabel: tableLabel(currentTable),
     dateStr: new Date().toLocaleString('es-CO'),
-    items: (t.items||[]).map(it=>({name:it.name, qty:it.qty, price:it.price, person: personLookupName(t, it.personId)})),
+    items: (t.items||[]).map(it=>({name:it.name, qty:it.qty, price:it.price, size: it.size || '', person: personLookupName(t, it.personId)})),   // 1.99.71: con el tamaño (Purina 1 kg / 5 kg)
     payments: (t.payments||[]).map(p=>({note:p.note, amount:p.amount, method:p.method||'efectivo'})),
     total: tableTotal(currentTable),
     debt: tableDebt(currentTable),

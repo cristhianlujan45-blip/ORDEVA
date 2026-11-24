@@ -20,11 +20,13 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
       data.products = [{ id: 'pa1', name: 'Purina', size: '1 kg', price: 8000, cost: 6000, stock: 10 }, { id: 'pa5', name: 'Purina', size: '5 kg', price: 35000, cost: 28000, stock: 10 }];
       data.history = []; data.closures = []; data.tables = data.tables || {};
       data.tables[1] = { items: [{ productId: 'pa5', name: 'Purina', price: 35000, size: '5 kg', qty: 2, personId: null, history: [] }], payments: [{ method: 'efectivo', amount: 70000, note: '' }], people: [] };
+      currentTable = 1; const recibo = buildReceiptText(currentTableReceiptData());
       const e = closeTableToHistory(1);
-      const guardado = e && e.items[0];
-      return { id: guardado && guardado.productId, size: guardado && guardado.size, hid: e && e.id };
+      const guardado = e && e.items[0]; window.__recibo = recibo; window.__reciboHist = buildReceiptText(histReceiptData(e));
+      return { id: guardado && guardado.productId, size: guardado && guardado.size, hid: e && e.id, recibo: window.__recibo, reciboHist: window.__reciboHist };
     });
     chk('1. La venta de la cuenta guarda el id del producto y «5 kg»', r.id === 'pa5' && r.size === '5 kg', r);
+    chk('1. El recibo de la cuenta y el del Historial dicen «Purina (5 kg)»', /2 x Purina \(5 kg\)/.test(r.recibo || '') && /2 x Purina \(5 kg\)/.test(r.reciboHist || ''), { a: r.recibo, b: r.reciboHist });
     await p.evaluate(id => { window.ventoVentaFix('borrar', id); }, r.hid); await p.waitForSelector('#vfMotivo', { timeout: 5000 }); await p.click('#vfSi'); await p.waitForTimeout(300);
     const st = await p.evaluate(() => ({ pa1: data.products.find(x => x.id === 'pa1').stock, pa5: data.products.find(x => x.id === 'pa5').stock }));
     chk('2. Anularla devuelve a la Purina 5 kg (10 → 12), la de 1 kg igual', st.pa5 === 12 && st.pa1 === 10, st);

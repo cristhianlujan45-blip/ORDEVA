@@ -161,3 +161,7 @@ de $1.400 a distinta hora) siguen sonando los dos.
 - «Se está acabando Purina», «Por agotarse: Purina: quedan 2», «Te quedan 2 de Purina», la lista de compras / pedido a proveedores («10 × Purina») no decían cuál de las dos: con dos tamaños se podía pedir el equivocado. Ahora dicen el tamaño cuando hay otro producto con el mismo nombre («Purina 5 kg»); los demás siguen igual.
 - Pedidos recibidos escritos: un producto con varios tamaños sale «purina (¿1 kg o 5 kg?)» en la vista previa (antes solo «⚠️»).
 - Prueba: asistamano1969 9/9; laya1953 6, layafinanzas 10, agente 17, tablero 26, mejoras 32, pedidostienda 29, comanda 12, canalseguro 16, herramientas 28, opciones 20.
+
+## 1.99.71 — Recibo de una cuenta con el tamaño
+- El recibo de una cuenta abierta (compartir por WhatsApp / imprimir) no pasaba el tamaño de cada renglón: salía «2 x Purina». Ahora «2 x Purina (5 kg)», igual que el del Historial (que ya lo trae desde la 1.99.65). Carta (QR), etiquetas y la caja POS ya mostraban el tamaño.
+- Prueba: tamanosventas1965 9/9.
