@@ -116,3 +116,8 @@ de $1.400 a distinta hora) siguen sonando los dos.
 - CI de la 1.99.62 falló en dos pruebas por cómo están escritas (aquí pasan):
   - mejoras paso 3: la ventana del producto se redibujó por un aviso de Laya y borró «desde» antes del toque (ya había pasado en la 1.99.43). Ahora reescribe y reintenta hasta 3 veces.
   - stocklogpartes paso 3: comparaba dos consumos por día calculados con milisegundos de diferencia con tolerancia 1e-9 (difieren en la 8.ª cifra). Ahora tolerancia relativa de una millonésima.
+
+## 1.99.64 — Borrar y unir productos
+- «¿Eliminar producto?» decía solo el nombre («Purina»): con dos del mismo nombre no se sabía cuál. Ahora dice el tamaño («Purina 5 kg») y avisa si está dentro de un combo (al venderlo ya no se descontaría) y si está en cuentas abiertas.
+- Unir productos repetidos (Productos → duplicados, y Laya «fusionar»): los combos que traían el producto que se va quedaban apuntando a un producto que ya no existe (dejaban de descontarlo). Ahora pasan al que se queda, igual que su kárdex y sus lotes con vencimiento.
+- Prueba: pruebas/productosborrar1964.test.js 8/8 (con el código de antes: 2 bien 6 mal). diseno199 50, inventariodevuelve1958 10, memoria1940 10, productosorden1942 12, recetas 21, sincroniza 27.

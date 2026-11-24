@@ -572,6 +572,11 @@ function dupMerge(keep, gone){                 // pasa stock, cuentas de mesa y 
     t.items = t.items.filter(it => { const k = it.productId + '|' + (it.personId || ''), f = seen[k]; if(!f){ seen[k] = it; return true; } f.qty += it.qty; f.history = (f.history || []).concat(it.history || []); return false; });
   });
   (data.stockLog || []).forEach(l => { if(l.p === gone.id) l.p = keep.id; });
+  // 1.99.64: también los combos que lo traían (antes quedaban apuntando a un producto que ya no existe y dejaban de
+  // descontarlo), el kárdex y los lotes con vencimiento.
+  data.products.forEach(c => { if(c && Array.isArray(c.combo)) c.combo.forEach(x => { if(x && x.id === gone.id) x.id = keep.id; }); });
+  (data.kardex || []).forEach(k => { if(k && k.p === gone.id) k.p = keep.id; });
+  if(Array.isArray(gone.lotes) && gone.lotes.length) keep.lotes = (Array.isArray(keep.lotes) ? keep.lotes : []).concat(gone.lotes);
   data.products = data.products.filter(p => p.id !== gone.id);
 }
 function dupOpen(){

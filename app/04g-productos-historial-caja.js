@@ -890,9 +890,16 @@ function renderProductos(){
       if(btn.classList.contains('p-fav')){ if(!prod) return; prod.favorite = !prod.favorite; saveData(); renderProductos(); return; }
       if(btn.classList.contains('p-edit')){ openEditProductModal(btn.dataset.id); return; }
       if(btn.classList.contains('p-del')){
+        // 1.99.64: con el tamaño (dos «Purina» de distinto tamaño) y avisando si está dentro de un combo o en cuentas abiertas.
+        const nomP = prod ? prod.name + (prod.size ? ' ' + prod.size : '') : 'este producto';
+        const enCombos = prod ? data.products.filter(c => c && c.id !== prod.id && Array.isArray(c.combo) && c.combo.some(x => x && x.id === prod.id)).map(c => c.name) : [];
+        const enCuentas = prod ? Object.values(data.tables || {}).filter(t => (t.items || []).some(it => it && it.productId === prod.id)).length : 0;
         const ok = await showConfirm({
           title: '¿Eliminar producto?',
-          message: '¿Estás seguro que quieres eliminar "' + (prod ? prod.name : 'este producto') + '"? No podrás deshacer esta acción.',
+          message: '¿Estás seguro que quieres eliminar "' + nomP + '"? No podrás deshacer esta acción.' +
+            (enCombos.length ? '\n\n⚠️ Está dentro de ' + (enCombos.length === 1 ? 'el combo «' + enCombos[0] + '»' : 'los combos «' + enCombos.join('», «') + '»') + ': al venderlo ya no se descontará este producto del inventario. Revisa el combo después.' : '') +
+            (enCuentas ? '\n\n🧾 Está en ' + enCuentas + (enCuentas === 1 ? ' cuenta abierta' : ' cuentas abiertas') + ': esas cuentas no cambian.' : '') +
+            '\n\nLas ventas que ya se hicieron no cambian.',
           confirmText: 'Sí, eliminar',
           icon: '🗑️'
         });
