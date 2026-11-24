@@ -131,3 +131,8 @@ de $1.400 a distinta hora) siguen sonando los dos.
 - Prueba: pruebas/pesocorregir1966.test.js 4/4; anularventas 27, inventariodevuelve1958 10, devolucioncaja1963 7, mejoras 32, cajamas 45.
 - Venta rápida: la cantidad se leía con parseInt: 2,5 kg cobraba 2 kg sin avisar (y «+» con 2,5 daba 3). Ahora acepta decimales y el total se redondea a pesos. Si se escribe a mano «purina» y hay dos tamaños, pide escoger en la lista (antes tomaba la primera); «Purina 5 kg» escrito completo sí la agrega.
 - Prueba: ventarapida1959 13/13.
+
+## 1.99.66 — Volver a la app después de conectar YouTube
+- La batería COMPLETA de pruebas (246, no terminaba desde el 22 de nov. porque las publicaciones la cancelaban) pasó la 1.99.65 salvo appoweb, que falla también aquí (no es casualidad).
+- Causa: cuando Google devuelve al navegador una conexión de YouTube empezada en la app, la página saltaba a la app a los 300 ms pasara lo que pasara. Con la página aún cargando, el salto cortaba la carga (y la pantalla «Google listo» con su botón podía no alcanzar a salir). Ahora salta 300 ms después de que la página cargó.
+- Prueba: appoweb 25/25, googlevuelta 6/6.

@@ -88,7 +88,10 @@
         document.body.appendChild(d);
       };
       if(document.body) pintar(); else document.addEventListener('DOMContentLoaded', pintar);
-      setTimeout(function(){ try{ location.href = ir; }catch(e){} }, 300);
+      // 1.99.66: se va a la app cuando la página ya cargó (y se ve «Google listo» con su botón). Antes iba a los 300 ms
+      // pasara lo que pasara: con la página aún cargando, el salto cortaba la carga y el botón podía no alcanzar a salir.
+      var irApp = function(){ setTimeout(function(){ try{ location.href = ir; }catch(e){} }, 300); };
+      if(document.readyState !== 'loading') irApp(); else document.addEventListener('DOMContentLoaded', irApp);
     }
   }catch(e){}
 })();
