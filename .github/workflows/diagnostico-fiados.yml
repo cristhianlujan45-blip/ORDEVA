@@ -54,6 +54,12 @@ jobs:
             -- 1.99.50: integridad de los datos del negocio (SOLO conteos, sin nombres ni valores de nadie).
             'integridad', (select json_build_object(
                 'ventas', jsonb_array_length(coalesce(d.datos->'history', '[]'::jsonb)),
+                -- 1.99.72: renglones vendidos (sin propina ni domicilio) con y sin el id del producto, por día (últimos 3 días)
+                'renglones_con_id_por_dia', (select json_object_agg(dia, json_build_object('con_id', con, 'sin_id', sin)) from (
+                    select left(h->>'date', 10) dia, count(*) filter (where coalesce(i->>'productId', '') <> '') con, count(*) filter (where coalesce(i->>'productId', '') = '') sin
+                    from jsonb_array_elements(coalesce(d.datos->'history', '[]'::jsonb)) h, jsonb_array_elements(coalesce(h->'items', '[]'::jsonb)) i
+                    where (h->>'date') >= to_char(now() - interval '3 days', 'YYYY-MM-DD') and coalesce(i->>'name', '') !~* '(propina|domicilio)'
+                    group by 1) x),
                 -- 1.99.55: apuntes de la libreta con «nequi / daviplata / transferencia» pegado al nombre (error de antes), por tipo
                 'libreta_nombre_con_medio', (select json_object_agg(t, c) from (select m->>'tipo' t, count(*) c
                     from jsonb_array_elements(case when jsonb_typeof(d.datos->'libreta'->'movs') = 'array' then d.datos->'libreta'->'movs' else '[]'::jsonb end) m
