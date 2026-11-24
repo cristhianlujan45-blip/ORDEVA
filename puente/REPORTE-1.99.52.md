@@ -129,3 +129,5 @@ de $1.400 a distinta hora) siguen sonando los dos.
 - Prueba: pruebas/tamanosventas1965.test.js 8/8 (con el código de antes: 1 bien 6 mal); anularventas, inventariodevuelve1958.
 - Error real (ventas por kilo): «Corregir venta» redondeaba las cantidades a entero. Al corregir OTRO renglón, 2,5 kg de maíz pasaban a 3 kg: subía el total y se descontaba medio kilo de más. Ahora acepta decimales (y coma). La devolución también acepta medio kilo.
 - Prueba: pruebas/pesocorregir1966.test.js 4/4; anularventas 27, inventariodevuelve1958 10, devolucioncaja1963 7, mejoras 32, cajamas 45.
+- Venta rápida: la cantidad se leía con parseInt: 2,5 kg cobraba 2 kg sin avisar (y «+» con 2,5 daba 3). Ahora acepta decimales y el total se redondea a pesos. Si se escribe a mano «purina» y hay dos tamaños, pide escoger en la lista (antes tomaba la primera); «Purina 5 kg» escrito completo sí la agrega.
+- Prueba: ventarapida1959 13/13.

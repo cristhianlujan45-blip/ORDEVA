@@ -33,6 +33,22 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
       const pid = await p.evaluate(() => document.getElementById('qsProductId').value);
       chk('Al escoger «Purina 5 kg» queda ese producto', pid === 'pa5', pid);
     }
+    // 1.99.65: kilos con decimales y nombres repetidos escritos a mano
+    const kg = await p.evaluate(async () => { data.products.push({ id: 'mz', name: 'Maíz', price: 2000, stock: 40, unidad: 'kg' }); quickSaleCart.length = 0; qsOpen('mostrador');
+      const q = document.getElementById('qsQty'); const r = {};
+      document.getElementById('qsSearch').value = 'Maíz'; document.getElementById('qsProductId').value = ''; q.value = '2.5'; document.getElementById('qsAddBtn').click();
+      r.cart = quickSaleCart.map(x => x.name + ' ' + x.qty); r.total = qsTotal();
+      q.value = '2.5'; document.getElementById('qsQtyPlus').click(); r.mas = q.value;
+      let toast = ''; const t0 = window.showToast; window.showToast = m => { toast = m; };
+      document.getElementById('qsSearch').value = 'purina'; document.getElementById('qsProductId').value = ''; q.value = '1'; document.getElementById('qsAddBtn').click();
+      window.showToast = t0; r.toast = toast; r.cart2 = quickSaleCart.length;
+      document.getElementById('qsSearch').value = 'Purina 5 kg'; document.getElementById('qsProductId').value = ''; q.value = '1'; document.getElementById('qsAddBtn').click();
+      r.cart3 = quickSaleCart.map(x => x.productId + ' ' + x.qty);
+      return r; });
+    chk('Venta rápida: 2,5 kg de maíz quedan 2,5 (antes 2) y el total es $5.000', JSON.stringify(kg.cart) === '["Maíz 2.5"]' && kg.total === 5000, kg);
+    chk('Venta rápida: «+» con 2,5 da 3,5', kg.mas === '3.5', kg);
+    chk('Venta rápida: «purina» escrito a mano con dos tamaños pide escoger y no agrega', /Hay 2 «Purina»/.test(kg.toast) && kg.cart2 === 1, kg);
+    chk('Venta rápida: «Purina 5 kg» escrito a mano agrega la de 5 kg', kg.cart3.includes('pa5 1'), kg);
     // El mismo error en otras dos ventanas
     const ex = await p.evaluate(async () => { document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show'));
       const v = id => { const el = document.getElementById(id); return !!el.getClientRects().length && getComputedStyle(el).display !== 'none'; };

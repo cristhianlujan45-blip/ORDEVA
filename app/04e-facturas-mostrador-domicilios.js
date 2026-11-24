@@ -1990,13 +1990,13 @@ document.addEventListener('click', (e)=>{
 });
 document.getElementById('qsQtyMinus').addEventListener('click', ()=>{
   const qtyInput = document.getElementById('qsQty');
-  const antes = parseInt(qtyInput.value,10) || 0, val = Math.max(0, antes - 1);
+  const antes = parseFloat(String(qtyInput.value || '').replace(',', '.')) || 0, val = Math.max(0, Math.round((antes - 1) * 1000) / 1000);
   qtyInput.value = val;
   if(val < antes) sonidoPos('remove');
 });
 document.getElementById('qsQtyPlus').addEventListener('click', ()=>{
   const qtyInput = document.getElementById('qsQty');
-  qtyInput.value = Math.max(0, (parseInt(qtyInput.value,10) || 0) + 1);
+  qtyInput.value = Math.max(0, Math.round(((parseFloat(String(qtyInput.value || '').replace(',', '.')) || 0) + 1) * 1000) / 1000);
   sonidoPos('add');
 });
 
@@ -2005,7 +2005,7 @@ function qsEnvioValor(){
   const v = parseFloat(document.getElementById('qsEnvio').value);
   return isFinite(v) && v > 0 ? v : 0;
 }
-function qsTotal(){ return quickSaleCart.reduce((s,it)=>s+it.price*it.qty,0) + qsEnvioValor(); }
+function qsTotal(){ return Math.round(quickSaleCart.reduce((s,it)=>s+it.price*it.qty,0)) + qsEnvioValor(); }   // 1.99.65: redondeado (kilos con decimales)
 
 function qsRenderCart(){
   const container = document.getElementById('qsItemsContainer');
@@ -2071,10 +2071,14 @@ document.getElementById('qsAddBtn').addEventListener('click', ()=>{
   let product = data.products.find(p=>p.id === idInput.value);
   if(!product){
     const typed = searchInput.value.trim().toLowerCase();
-    product = data.products.find(p=>p.name.toLowerCase() === typed);
+    // 1.99.65: con dos productos del mismo nombre (Purina 1 kg y 5 kg) no se escoge uno a ciegas: que elija el tamaño.
+    const mismos = data.products.filter(p => p.name.toLowerCase() === typed || (p.name + (p.size ? ' ' + p.size : '')).toLowerCase() === typed);
+    if(mismos.length > 1 && !mismos.some(p => (p.name + (p.size ? ' ' + p.size : '')).toLowerCase() === typed)){ showToast('Hay ' + mismos.length + ' «' + mismos[0].name + '» (' + mismos.map(p => p.size || 'sin tamaño').join(', ') + '): elige el tamaño en la lista.'); return; }
+    product = mismos.find(p => (p.name + (p.size ? ' ' + p.size : '')).toLowerCase() === typed) || mismos[0];
   }
   if(!product){ showToast('Selecciona un producto de la lista de sugerencias.'); return; }
-  const qty = Math.max(0, parseInt(qtyInput.value,10) || 0);
+  // 1.99.65: con decimales (2,5 kg). Antes parseInt cobraba 2 kg sin avisar.
+  const qty = Math.max(0, Math.round((parseFloat(String(qtyInput.value || '').replace(',', '.')) || 0) * 1000) / 1000);
   if(qty <= 0){ showToast('Indica una cantidad mayor que 0.'); return; }
   qsAddToCart(product, qty, true);
   searchInput.value = '';
