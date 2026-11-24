@@ -96,3 +96,9 @@ de $1.400 a distinta hora) siguen sonando los dos.
 - «Efectivo que debe haber» en negativo se veía «$-20.000». Ahora «−$20.000» con la nota «Salió más efectivo del que entró…» (si esos pagos no salieron del cajón, márcalos como transferencia en la libreta).
 - Laya «¿cuánto hay en caja?» sin caja abierta decía solo el efectivo de las ventas de HOY; «Cuadre» decía otra cifra (desde el último cierre, con fiados cobrados y pagos de la libreta). Ahora las dos usan la misma cuenta (window.ventoCuentaCaja) y Laya dice el detalle.
 - Prueba: libretacaja1955 17/17; laya1953 6, propinas1957 13, cuadre1954 5, vistasencilla 45, cuadrefiados1946 8.
+
+## 1.99.61 — El arqueo del cierre cuenta los fiados cobrados y los pagos de la libreta
+- Error real (el dueño cierra sin abrir la caja con base): el arqueo del cierre decía «Debía haber» = solo lo vendido en efectivo. Con un fiado pagado en efectivo ese día, al contar salía «sobran»; con un pago a proveedor desde la libreta, «faltan». En la prueba: debía haber $10.000 y al contar $36.000 → «sobran $26.000».
+- Ahora, sin caja abierta, el arqueo (y el cierre automático sin contar) suma «Fiados que pagaron en efectivo» como entrada y resta «Pagos en efectivo de la libreta» como salida, del mismo periodo. Quedan en el resumen del cierre (WhatsApp e imagen). Con la caja abierta no cambia nada (eso ya lo llevan sus entradas y salidas).
+- Una sola cuenta para «Cuadre», Laya y el cierre (window.ventoMovsSinCaja).
+- Prueba: pruebas/cierrefuera1961.test.js 8/8 (con el código de antes: 3 bien 5 mal).

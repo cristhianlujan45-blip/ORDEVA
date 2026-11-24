@@ -1744,8 +1744,15 @@ async function closeCashRegister(opts){
   const stats = computeClosureStats(fromISO, toISO, cajaN);
   // 🧮 Arqueo: contar el efectivo de la caja (base + ventas en efectivo + entradas − salidas). Cancelar = no se cierra.
   let caja = null;
+  // 1.99.61: sin caja abierta, los fiados cobrados y los pagos de la libreta en efectivo de este periodo (lo mismo que «Cuadre»)
+  let fuera = [];
+  try{ if(window.ventoTurno && !window.ventoTurno.turno() && !(window.ventoTurno.variasCajas && window.ventoTurno.variasCajas()) && window.ventoMovsSinCaja){
+    const M = window.ventoMovsSinCaja(fromISO ? new Date(fromISO).getTime() : 0, new Date(toISO).getTime() + 1);
+    if(M.fiEf > 0) fuera.push({ tipo: 'entrada', monto: M.fiEf, motivo: 'Fiados que pagaron en efectivo' });
+    if(M.salEf > 0) fuera.push({ tipo: 'salida', monto: M.salEf, motivo: 'Pagos en efectivo de la libreta' });
+  } }catch(e){ fuera = []; }
   if(window.ventoTurno && (stats.tickets.length || window.ventoTurno.turno())){
-    caja = auto ? window.ventoTurno.sinContar(stats.totalEfectivo) : await window.ventoTurno.arqueo(stats.totalEfectivo, { recibido: stats.totalRecibido, vueltas: stats.totalVueltas });
+    caja = auto ? window.ventoTurno.sinContar(stats.totalEfectivo, { movs: fuera }) : await window.ventoTurno.arqueo(stats.totalEfectivo, { recibido: stats.totalRecibido, vueltas: stats.totalVueltas, movs: fuera });
     if(!caja){ deshacerCierreAbiertas(); saveData(); renderMesas(); return; }   // 🔒 1.95.4: cancelar el conteo deja las mesas como estaban
   }
   if(stats.tickets.length === 0 && !caja){
