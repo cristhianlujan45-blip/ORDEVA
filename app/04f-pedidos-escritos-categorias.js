@@ -570,7 +570,7 @@ function asisLocal(q){
   if(/\b(acab|agot|poco|bajo|quedan?|reponer|surtir|pedir al proveedor)/.test(t) && !/\bmargen\b/.test(t)){
     const low = data.products.filter(p => ['out', 'low'].includes(invStatus(p)));
     if(!low.length) return 'Todo bien: no hay productos agotados ni por acabarse (de los que tienen control de stock).';
-    return 'Estos se están acabando:\n' + bullets(low.slice(0, 15).map(p => p.name + (p.stock <= 0 ? ' — agotado' : ' — quedan ' + p.stock)));
+    return 'Estos se están acabando:\n' + bullets(low.slice(0, 15).map(p => (typeof vozNombreConTam === 'function' ? vozNombreConTam(p) : p.name) + (p.stock <= 0 ? ' — agotado' : ' — quedan ' + p.stock)));
   }
   if(/\b(perd|pierdo|perdiendo|perdida)/.test(t)){
     const bad = data.products.filter(p => { const m = asisMargin(p); return m && m.pct < 0; });
@@ -906,7 +906,7 @@ function asisLocalMas(raw){
     if(p){
       if(quiereStock && !quierePrecio){
         if(p.stock == null) return p.name + ' no tiene control de stock. Actívalo en Inventario para saber cuántas te quedan.';
-        return p.stock <= 0 ? p.name + ' está agotado. ⚠️' : 'Te quedan ' + p.stock + ' de ' + p.name + (invStatus(p) === 'low' ? ' (ya se está acabando).' : '.');
+        return p.stock <= 0 ? (typeof vozNombreConTam === 'function' ? vozNombreConTam(p) : p.name) + ' está agotado. ⚠️' : 'Te quedan ' + p.stock + ' de ' + (typeof vozNombreConTam === 'function' ? vozNombreConTam(p) : p.name) + (invStatus(p) === 'low' ? ' (ya se está acabando).' : '.');
       }
       return p.name + (p.size ? ' (' + p.size + ')' : '') + ' está a ' + fmt(p.price) + (p.stock != null ? ' y te quedan ' + p.stock + '.' : '.');
     }

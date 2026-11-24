@@ -102,7 +102,7 @@
     const htmlPend = pend.length ? '<h3 class="ll-h">📦 Pedidos por llegar</h3>' + pend.map(o => '<div class="ll-pend"><span><b>' + esc(o.prov) + '</b><small>Pedido el ' + esc(fecha(o.at)) + ' · ' + o.items.map(i => i.q + ' ' + esc(i.n)).join(', ').slice(0, 140) + '</small></span>' +
       '<div class="ll-acc"><button type="button" class="btn-primary" data-ll="llego" data-id="' + o.id + '">✅ Llegó: sumar al inventario</button><button type="button" class="btn-ghost" data-ll="factura">📸 Escanear la factura</button><button type="button" class="btn-ghost" data-ll="quitar" data-id="' + o.id + '" title="No va a llegar">✕</button></div></div>').join('') : '';
     const htmlGrupos = Object.keys(grupos).map(prov => {
-      const filas = grupos[prov].map(([x, i]) => '<div class="ll-fila"><span><b>' + esc(x.p.name) + '</b><small>quedan ' + x.quedan + (x.porDia ? ' · se venden ~' + (Math.round(x.porDia * 10) / 10) + '/día' : '') + '</small></span><input type="number" min="0" inputmode="numeric" data-i="' + i + '" value="' + x.pedir + '"></div>').join('');
+      const filas = grupos[prov].map(([x, i]) => '<div class="ll-fila"><span><b>' + esc((typeof vozNombreConTam === 'function' ? vozNombreConTam(x.p) : x.p.name)) + '</b><small>quedan ' + x.quedan + (x.porDia ? ' · se venden ~' + (Math.round(x.porDia * 10) / 10) + '/día' : '') + '</small></span><input type="number" min="0" inputmode="numeric" data-i="' + i + '" value="' + x.pedir + '"></div>').join('');
       const ya = pend.find(o => o.prov === prov);
       const cab = prov === SIN_PROV ? '<div class="ll-ph"><b>' + esc(prov) + '</b></div>'
         : '<div class="ll-ph"><b>' + esc(prov) + '</b><input type="tel" data-tel="' + esc(prov) + '" placeholder="WhatsApp del proveedor" value="' + esc(telDe(prov)) + '"><button type="button" class="btn-primary" data-ll="wa1" data-prov="' + esc(prov) + '">📲 Enviar</button></div>' + (ya ? '<small class="ll-ya">Ya le pediste el ' + esc(fecha(ya.at)) + '</small>' : '');
@@ -157,7 +157,7 @@
     }
     if(a.compras){
       const l = listaCompras();
-      if(l.length) out.push({ id: 'compras-' + l.map(x => x.p.id + ':' + x.quedan).join(','), icono: '🛒', prio: 5, texto: (l.length === 1 ? 'Se acaba ' + l[0].p.name + ' (quedan ' + l[0].quedan + ').' : l.length + ' productos se acaban (' + l.slice(0, 3).map(x => x.p.name).join(', ') + (l.length > 3 ? '…' : '') + ').') + ' Te armé la lista de compras.', acciones: [{ label: 'Ver lista', op: 'listaCompra' }] });
+      if(l.length) out.push({ id: 'compras-' + l.map(x => x.p.id + ':' + x.quedan).join(','), icono: '🛒', prio: 5, texto: (l.length === 1 ? 'Se acaba ' + (typeof vozNombreConTam === 'function' ? vozNombreConTam(l[0].p) : l[0].p.name) + ' (quedan ' + l[0].quedan + ').' : l.length + ' productos se acaban (' + l.slice(0, 3).map(x => x.p.name).join(', ') + (l.length > 3 ? '…' : '') + ').') + ' Te armé la lista de compras.', acciones: [{ label: 'Ver lista', op: 'listaCompra' }] });
     }
     if(a.precios && esAdmin()){
       try{
@@ -281,7 +281,7 @@
     if(/\b(lista de compras?|que (debo|tengo que|hay que|toca) comprar|que compro|que pido|pedido (al|a los|para el) proveedor|armame el pedido|arma el pedido|surtir)\b/.test(t)){
       const l = listaCompras(); reg('sugerencia', 'Lista de compras (' + l.length + ')');
       if(!l.length) return { text: '✅ No hay nada urgente por comprar: todo tiene stock suficiente.' };
-      return { text: '🛒 Para cubrir una semana de ventas te sugiero pedir:\n' + bul(l.slice(0, 12).map(x => x.pedir + ' × ' + x.p.name + ' (quedan ' + x.quedan + ' · ' + x.prov + ')')), actions: [{ tipo: 'laya', op: 'listaCompra', label: '🛒 Abrir la lista (WhatsApp / copiar)' }] };
+      return { text: '🛒 Para cubrir una semana de ventas te sugiero pedir:\n' + bul(l.slice(0, 12).map(x => x.pedir + ' × ' + (typeof vozNombreConTam === 'function' ? vozNombreConTam(x.p) : x.p.name) + ' (quedan ' + x.quedan + ' · ' + x.prov + ')')), actions: [{ tipo: 'laya', op: 'listaCompra', label: '🛒 Abrir la lista (WhatsApp / copiar)' }] };
     }
     // «sube el precio de la poker a 4500», «pon la aguila a 4.000», «cambia el precio del tinto a 2500»
     const mp = t.match(/\b(?:sube|subele|baja|bajale|cambia|cambiale|pon|ponle|deja|actualiza)\b(?: el)?(?: precio)?(?: de| del| a| al)?(?: la| el| los| las)? (.+?) (?:a|en|por) \$? ?(\d[\d .]*)(?: pesos| mil)?$/);

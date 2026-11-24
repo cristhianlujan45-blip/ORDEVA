@@ -23,6 +23,13 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
     chk('«llegaron 3 purinas de un kilo» → suma a la de 1 kg', r.llegan1 && r.llegan1.actions && r.llegan1.actions[0].id === 'pa1' && r.llegan1.actions[0].sumarStock === 3, r.llegan1);
     chk('Sin tamaño: pregunta cuál y no deja nada para aplicar', r.sinTam && !r.sinTam.actions && /¿Cuál Purina\? 1 kg \(\$\s?8\.000\) o 5 kg \(\$\s?35\.000\)/.test(r.sinTam.text), r.sinTam);
     chk('Un producto sin tamaños repetidos sigue igual (vasijas)', r.vasija && r.vasija.actions && r.vasija.actions[0].id === 'v', r.vasija);
+    // 1.99.70: los avisos de inventario dicen el tamaño cuando hay varios con el mismo nombre
+    const inv = await p.evaluate(async () => { data.products.find(x => x.id === 'pa5').stock = 2; data.products.find(x => x.id === 'pa5').minStock = 5; data.products.find(x => x.id === 'pa1').minStock = 2; data.products.find(x => x.id === 'v').minStock = 5;
+      const laya = ((await window.Laya.responder('qué productos están por agotarse')) || {}).text || '';
+      return { laya, asis: asisLocalMas('que se esta acabando') || asisLocal('que se esta acabando') || '', quedan: asisLocalMas('cuantas purinas de 5 kilos quedan') || asisLocal('cuantas purinas de 5 kilos quedan') || '' }; });
+    chk('Laya «por agotarse»: «Purina 5 kg: quedan 2» y «Vasija: quedan 3» (sin tamaño, no hay otra)', /Purina 5 kg: quedan 2/.test(inv.laya) && /Vasija: quedan 3/.test(inv.laya), inv.laya);
+    chk('Asistente «qué se está acabando»: con el tamaño', /Purina 5 kg — quedan 2/.test(inv.asis), inv.asis);
+    chk('«¿Cuántas purinas de 5 kilos quedan?» → «Te quedan 2 de Purina 5 kg»', /Te quedan 2 de Purina 5 kg/.test(inv.quedan), inv.quedan);
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.stack || e)); }
   chk('Sin errores de página', !errs.length, errs.join(' | '));
   await b.close(); console.log('RESULTADO', ok, 'bien', mal, 'mal'); process.exit(mal ? 1 : 0);

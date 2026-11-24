@@ -156,3 +156,8 @@ de $1.400 a distinta hora) siguen sonando los dos.
 - Error real: «sube el precio de la purina de 5 kilos a 36000» proponía cambiarle el precio a la Purina 1 kg; «llegaron 10 purinas de 5 kilos» las sumaba a la de 1 kg (asisFindProduct no miraba el tamaño).
 - Ahora el tamaño dicho escoge el producto; sin tamaño, pregunta «¿Cuál Purina? 1 kg ($8.000) o 5 kg ($35.000)…» y no deja nada para aplicar.
 - Prueba: pruebas/asistamano1969.test.js 6/6; inventariodevuelve1958 10, laya1953 6, agente 17.
+
+## 1.99.70 — Avisos de inventario y lista de compras con el tamaño
+- «Se está acabando Purina», «Por agotarse: Purina: quedan 2», «Te quedan 2 de Purina», la lista de compras / pedido a proveedores («10 × Purina») no decían cuál de las dos: con dos tamaños se podía pedir el equivocado. Ahora dicen el tamaño cuando hay otro producto con el mismo nombre («Purina 5 kg»); los demás siguen igual.
+- Pedidos recibidos escritos: un producto con varios tamaños sale «purina (¿1 kg o 5 kg?)» en la vista previa (antes solo «⚠️»).
+- Prueba: asistamano1969 9/9; laya1953 6, layafinanzas 10, agente 17, tablero 26, mejoras 32, pedidostienda 29, comanda 12, canalseguro 16, herramientas 28, opciones 20.

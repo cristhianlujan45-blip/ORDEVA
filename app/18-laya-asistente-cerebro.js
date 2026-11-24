@@ -136,7 +136,7 @@
     nuevos(){ const lim = Date.now() - 30 * DIA, l = data.products.filter(p => { const m = /(\d{12,13})/.exec(String(p.id)); return m && +m[1] >= lim; });
       return l.length ? '🆕 Productos nuevos (últimos 30 días): ' + l.length + '\n' + bul(l.slice(-10).map(p => p.name)) : 'No hay productos nuevos en los últimos 30 días.'; },
     agotados(){ const l = agotados(); return l.length ? '🚫 Agotados (' + l.length + '):\n' + bul(l.map(p => p.name)) : 'No hay productos agotados. ✅'; },
-    bajos(){ const l = bajos(); return l.length ? '⚠️ Por agotarse (' + l.length + '):\n' + bul(l.map(p => p.name + ': quedan ' + p.stock)) : 'Nada se está agotando. ✅'; },
+    bajos(){ const l = bajos(); return l.length ? '⚠️ Por agotarse (' + l.length + '):\n' + bul(l.map(p => (typeof vozNombreConTam === 'function' ? vozNombreConTam(p) : p.name) + ': quedan ' + p.stock)) : 'Nada se está agotando. ✅'; },
     precios(){ const l = cambiosPrecio(); if(!l.length) return 'No veo cambios de precio de compra: hace falta al menos dos facturas del mismo producto.';
       const sub = l.filter(x => x.pct > 0), baj = l.filter(x => x.pct < 0);
       return (sub.length ? '📈 Subieron de precio:\n' + bul(sub.slice(0, 8).map(x => x.p.name + ': ' + plata(x.de) + ' → ' + plata(x.a) + ' (+' + x.pct + '%)' + (x.prov ? ' · ' + x.prov : ''))) : 'Ningún producto subió de precio.') +
@@ -387,7 +387,7 @@
     }
     if(/\b(se va a agotar|se van a agotar|va a faltar|prediccion|predice|proyeccion|cuanto me dura|cuantos dias|alcanza)\b/.test(t)){
       const l = prediccion().filter(x => x.dias < 21); if(!l.length) return { text: 'Con las ventas de los últimos 14 días, ningún producto con control de stock parece agotarse en las próximas 3 semanas. (Es una estimación, no una certeza.)' };
-      return { text: '📈 Estimación (según el consumo de los últimos 14 días, no es una certeza):\n' + bul(l.slice(0, 10).map(x => x.p.name + ': quedan ' + x.p.stock + ', se venden ~' + (Math.round(x.porDia * 10) / 10) + ' al día → ' + (x.dias < 1 ? 'podría agotarse hoy' : 'alcanza para ~' + Math.round(x.dias) + ' día(s)'))) };
+      return { text: '📈 Estimación (según el consumo de los últimos 14 días, no es una certeza):\n' + bul(l.slice(0, 10).map(x => (typeof vozNombreConTam === 'function' ? vozNombreConTam(x.p) : x.p.name) + ': quedan ' + x.p.stock + ', se venden ~' + (Math.round(x.porDia * 10) / 10) + ' al día → ' + (x.dias < 1 ? 'podría agotarse hoy' : 'alcanza para ~' + Math.round(x.dias) + ' día(s)'))) };
     }
     if(/\b(cuanto (lleva|llevan|tarda|tardan)|tiempos?|demora\w*|atrasad\w*|lento|lentos|cuanto se demoran)\b/.test(t) && /\b(pedido|pedidos|preparacion|cocina|barra|despacho|mesa)\b/.test(t + ' ' + pn)){
       const x = tiempos(); if(!x.act.length) return { text: 'No hay pedidos activos ahora.' + (x.med != null ? ' Normalmente un pedido tarda ~' + Math.round(x.med) + ' min en estar listo.' : '') };
@@ -530,7 +530,7 @@
   function revisar(){
     if(!listo()) return;
     agotados().slice(0, 3).forEach(p => avisar('ago-' + p.id + '-' + (p.stock || 0), 'se agotó ' + p.name + '.'));
-    const b = bajos(); if(b.length) avisar('bajo-' + b.map(p => p.id).join(','), b.length === 1 ? 'se está acabando ' + b[0].name + ' (quedan ' + b[0].stock + ').' : b.length + ' productos se están acabando: ' + b.slice(0, 3).map(p => p.name).join(', ') + '.');
+    const b = bajos(); if(b.length) avisar('bajo-' + b.map(p => p.id).join(','), b.length === 1 ? 'se está acabando ' + (typeof vozNombreConTam === 'function' ? vozNombreConTam(b[0]) : b[0].name) + ' (quedan ' + b[0].stock + ').' : b.length + ' productos se están acabando: ' + b.slice(0, 3).map(p => p.name).join(', ') + '.');
     const d = duplicados().filter(x => x.conf >= 90); if(d.length) avisar('dup-' + d.length, 'hay ' + d.length + ' producto(s) que parecen repetidos. Dime «ORDEVA, busca productos duplicados».', DIA);
     const c = cambiosPrecio().filter(x => x.pct >= 10 && Date.now() - x.t < 3 * DIA); c.slice(0, 2).forEach(x => avisar('pre-' + x.p.id + '-' + x.a, x.p.name + ' subió ' + x.pct + '% en la última factura (' + plata(x.de) + ' → ' + plata(x.a) + ').', 7 * DIA));
     const f = (data.purchases || [])[0]; if(f && f.avisos && f.avisos.length && Date.now() - Date.parse(f.procesadaEn || f.at) < 36e5) avisar('fac-' + f.id, 'la factura ' + (f.invoiceNumber || '') + ' de ' + (f.supplier || 'proveedor') + ' se guardó con ' + f.avisos.length + ' aviso(s). Revísala en Facturas anteriores.', DIA);
