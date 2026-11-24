@@ -1559,7 +1559,10 @@ function renderHistorial(masPagina){
       const vis = an.filter(a => { if(!a) return false; const ref = a.tipo === 'cierre' ? { date: (a.cierre || {}).date, tableName: 'cierre de caja', total: (a.cierre || {}).totalSold } : a.tipo === 'compra' ? { date: (a.compra || {}).procesadaEn || (a.compra || {}).at, tableName: 'factura proveedor ' + ((a.compra || {}).supplier || ''), total: (a.compra || {}).total, items: (a.compra || {}).items } : (a.venta || {});
         if(mes && histMesDe(ref) !== mes) return false; return !q || histCoincide(ref, q) || String(a.motivo || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').indexOf(q) >= 0; });
       window.__histVisibles = []; window.__histAnuladasVisibles = vis;
-      const res = document.getElementById('histBuscarRes'); if(res){ res.hidden = false; res.textContent = vis.length + (vis.length === 1 ? ' anulada' : ' anuladas') + ' · ' + fmt(vis.reduce((t, a) => t + (a.tipo === 'venta' ? Number((a.venta || {}).total) || 0 : 0), 0)) + ' que ya no cuentan'; }
+      const res = document.getElementById('histBuscarRes'); if(res){ res.hidden = false; // 1.99.57: las facturas de proveedor anuladas se cuentan aparte (antes entraban en el número pero no en la plata)
+        const nC = vis.filter(a => a.tipo === 'compra').length, nV = vis.length - nC;
+        res.textContent = (nV || !nC ? nV + (nV === 1 ? ' anulada' : ' anuladas') + ' · ' + fmt(vis.reduce((t, a) => t + (a.tipo === 'venta' ? Number((a.venta || {}).total) || 0 : 0), 0)) + ' que ya no cuentan' : '') +
+          (nC ? (nV ? ' · ' : '') + nC + (nC === 1 ? ' factura de proveedor anulada' : ' facturas de proveedor anuladas') + ' · ' + fmt(vis.reduce((t, a) => t + (a.tipo === 'compra' ? Number((a.compra || {}).total) || 0 : 0), 0)) : ''); }
       const fr = document.createDocumentFragment();
       vis.slice(0, histMostrar).forEach(a => fr.appendChild(histFilaAnulada(a)));
       if(!vis.length){ const v = document.createElement('div'); v.className = 'empty-state'; v.textContent = 'No hay anuladas con esa búsqueda.'; fr.appendChild(v); }

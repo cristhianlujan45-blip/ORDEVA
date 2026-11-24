@@ -55,8 +55,9 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
     chk('5. Y no se cuenta aparte en contabilidad', await p.evaluate(() => (window.libretaConta(0, Date.now() + 1000) || []).filter(m => m.tipo === 'gasto').length) === 0);
     chk('6. Queda en anuladas con el motivo', r.an.length === 1 && r.an[0].m === 'la apliqué dos veces' && r.an[0].items === 2, r);
     const fila = await p.evaluate(() => { const c = document.getElementById('histFAnuladas'); document.querySelectorAll('#histFilter button').forEach(x => x.classList.toggle('on', x === c));
-      renderHistorial(); const row = document.querySelector('#histList .hist-row.anulada'); return row ? row.innerText.replace(/\s+/g, ' ') : ''; });
+      renderHistorial(); const row = document.querySelector('#histList .hist-row.anulada'); return (row ? row.innerText.replace(/\s+/g, ' ') : '') + ' || ' + document.getElementById('histBuscarRes').textContent; });
     chk('6. Se ve en Historial → «Anuladas» (factura, ANULADA, motivo, total)', /Factura de Agro Sur/.test(fila) && /ANULADA/.test(fila) && /la apliqué dos veces/.test(fila) && /30\.000/.test(fila), fila);
+    chk('6. El resumen de «Anuladas» la cuenta aparte con su valor', /1 factura de proveedor anulada · \$\s?30\.000/.test(fila) && !/^1 anulada/.test(fila.split(' || ')[1] || ''), fila);
     // 7. Otro equipo que todavía la tenía
     const otro = await p.evaluate(() => { const o = JSON.parse(JSON.stringify(data)); o.purchases.unshift(JSON.parse(JSON.stringify(data.anuladas[0].compra))); o.inventarioMov.push({ id: 'x', compraId: window.__t2, qty: 10 });
       window.ventoQuitarAnuladas(o); return { c: o.purchases.map(x => x.id), m: o.inventarioMov.map(x => x.compraId) }; });
