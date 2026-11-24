@@ -800,7 +800,7 @@ function handleVoiceTranscriptLocal(rawText){
     const label = mode === 'subtract' ? 'No estaba en el pedido de ' + tableLabel(tableId) + ': ' : 'No encontré: ';
     const msg2 = label + notFound.join(', ') + '.';
     showToast(msg2);
-    if(!added.length) speakVoice(mode === 'subtract' ? 'Ese producto no está en el pedido.' : 'No encontré ese producto. Intenta de nuevo.');
+    if(!added.length) speakVoice(mode === 'subtract' ? 'Ese producto no está en el pedido.' : notFound.some(x => /¿/.test(x)) ? '¿Cuál? Hay varios tamaños. Dilo con el tamaño, por ejemplo: ' + notFound[0].replace(/\s*\(¿.*$/, '') + ' de ' + ((window.__vozAmbiguo || []).find(p => p.size) || {}).size + '.' : 'No encontré ese producto. Intenta de nuevo.');   // 1.99.68
   }
 }
 

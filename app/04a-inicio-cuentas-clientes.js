@@ -1723,7 +1723,28 @@ function matchVoiceTableName(text){
   return best;
 }
 
+/* 1.99.68 · Productos del mismo nombre y distinto tamaño (Purina 1 kg y Purina 5 kg): por voz siempre entraba el primero,
+   aunque se dijera «purina de 5 kilos». Ahora el tamaño dicho escoge; si no se dijo, no se agrega ninguno y se pregunta
+   (window.__vozAmbiguo). */
+const VOZ_NUM = { un: 1, una: 1, uno: 1, medio: 0.5, media: 0.5, dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6, siete: 7, ocho: 8, nueve: 9, diez: 10, doce: 12, quince: 15, veinte: 20, veinticinco: 25, treinta: 30, cuarenta: 40, cincuenta: 50 };
+const VOZ_TAM = /\b(?:de\s+)?(\d+(?:[.,]\d+)?|un|una|uno|medio|media|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|doce|quince|veinte|veinticinco|treinta|cuarenta|cincuenta)\s*(kgs?|kilos?|kilogramos?|k|lbs?|libras?|grs?|gramos?|g|ml|cc|mililitros?|lts?|litros?|l)\b/;
+function vozUnidad(u){ u = String(u || ''); return /^(kgs?|kilos?|kilogramos?|k)$/.test(u) ? 'kg' : /^(lbs?|libras?)$/.test(u) ? 'lb' : /^(grs?|gramos?|g)$/.test(u) ? 'g' : /^(ml|cc|mililitros?)$/.test(u) ? 'ml' : /^(lts?|litros?|l)$/.test(u) ? 'l' : u; }
+function vozTamDe(txt){ const tk = normVoiceText(String(txt || '')).match(/\btam(\d+(?:p\d+)?)(kg|lb|g|ml|l)\b/); if(tk) return { n: Number(tk[1].replace('p', '.')), u: tk[2], txt: tk[0] }; const m = normVoiceText(String(txt || '')).match(VOZ_TAM); if(!m) return null; const n = VOZ_NUM[m[1]] != null ? VOZ_NUM[m[1]] : Number(String(m[1]).replace(',', '.')); return { n, u: vozUnidad(m[2]), txt: m[0] }; }
 function matchProductVoice(text){
+  window.__vozAmbiguo = null;
+  const q0 = normVoiceText(text), tam = vozTamDe(q0);
+  let base = tam ? matchProductVoiceBase(q0.replace(tam.txt, ' ').replace(/\s+/g, ' ').trim()) : null;
+  if(!base) base = matchProductVoiceBase(text);
+  if(!base) return null;
+  const herm = (data.products || []).filter(p => p && !p.combo && !p.oculto && normVoiceText(p.name) === normVoiceText(base.name));
+  if(herm.length < 2) return base;
+  if(tam){ const c = herm.filter(p => { const t = vozTamDe(p.size); return t && t.u === tam.u && Math.abs(t.n - tam.n) < 1e-9; }); if(c.length === 1) return c[0]; }
+  if(new Set(herm.map(p => normVoiceText(p.size || ''))).size > 1){ window.__vozAmbiguo = herm; return null; }
+  return base;
+}
+// El nombre para decirlo: con el tamaño solo si hay otro producto con el mismo nombre («Purina 5 kg»).
+function vozNombreConTam(p){ if(!p || !p.size) return p ? p.name : ''; const n = normVoiceText(p.name); return (data.products || []).some(x => x !== p && !x.combo && normVoiceText(x.name) === n) ? p.name + ' ' + p.size : p.name; }
+function matchProductVoiceBase(text){
   const q = normVoiceText(text);
   if(!q) return null;
 
@@ -1830,6 +1851,22 @@ function collapseRepeatedVoicePhrase(text){
 // igual en dos ítems. No corta un número que viene DESPUÉS del nombre del
 // producto sin cantidad inicial (ej. "corrige poker a 5"), porque ahí el
 // ítem no arrancó con una cantidad.
+// 1.99.68: el tamaño dicho justo después del nombre de un producto que TIENE ese tamaño se pega al producto como una sola
+// palabra («purinas tam5kg»): así no se toma como otra cantidad ni otro producto. «5 kilos de maíz» (por kilo) no cambia.
+function vozPegarTamanos(text){
+  const re = new RegExp(VOZ_TAM.source, 'g'); let out = text, m;
+  const conTam = (data.products || []).filter(p => p && p.size && vozTamDe(p.size));
+  if(!conTam.length) return text;
+  const reemplazos = [];
+  while((m = re.exec(text))){
+    const antes = text.slice(0, m.index).trim().split(' '), w = stemVoiceText(antes[antes.length - 1] || '');
+    const n = VOZ_NUM[m[1]] != null ? VOZ_NUM[m[1]] : Number(String(m[1]).replace(',', '.')), u = vozUnidad(m[2]);
+    const es = conTam.some(p => { const t = vozTamDe(p.size); const ws = stemVoiceText(normVoiceText(p.name)).split(' '); return t.u === u && Math.abs(t.n - n) < 1e-9 && w && ws[ws.length - 1] === w; });
+    if(es) reemplazos.push({ txt: m[0], tok: ' tam' + String(n).replace('.', 'p') + u + ' ' });
+  }
+  reemplazos.forEach(r => { out = out.replace(r.txt, r.tok); });
+  return out.replace(/\s+/g, ' ').trim();
+}
 function splitVoiceChunks(text){
   const words = text.split(' ').filter(Boolean);
   const isQtyWord = w => /^\d+$/.test(w) || NUM_WORDS_VOICE[w] !== undefined;
@@ -1925,6 +1962,7 @@ function parseVoiceCommand(rawText){
   // la lista de productos.
   text = text.replace(/^(?:y|tambien|también)\s+/, '').replace(/\s+(?:y|tambien|también)$/, '').trim();
 
+  text = vozPegarTamanos(text);   // 1.99.68: «purinas de 5 kilos» → un solo producto (antes «kilos» quedaba como otro, con 5)
   const chunks = splitVoiceChunks(text).map(c => c.trim()).filter(Boolean);
   const items = chunks.map(chunk => {
     const words = chunk.split(' ').filter(Boolean);
@@ -2173,24 +2211,24 @@ function aplicarItemsVoz(tableId, items, mode){
   const notFound = [];
   items.forEach(it => {
     const product = matchProductVoice(it.productText);
-    if(!product){ notFound.push(it.productText); return; }
+    if(!product){ const amb = window.__vozAmbiguo; notFound.push(amb ? it.productText + ' (¿' + amb.map(p => p.size || 'sin tamaño').join(' o ') + '? dilo con el tamaño)' : it.productText); return; }
     const existing = t.items.find(x => x.productId === product.id && !x.personId);
 
     if(mode === 'set'){
       const target = Math.max(0, it.qty);
       if(target === 0){
         if(existing){ try{ invOnSale(existing, -existing.qty); }catch(e){} t.items.splice(t.items.indexOf(existing), 1); sonidoPos('remove'); }
-        added.push({ name: product.name, qty: 0 });
+        added.push({ name: vozNombreConTam(product), qty: 0 });
       } else if(existing){
         const diff = target - existing.qty;
         existing.qty = target;
         if(diff !== 0) recordItemHistory(existing, diff);
-        added.push({ name: product.name, qty: target });
+        added.push({ name: vozNombreConTam(product), qty: target });
       } else {
         const newItem = { productId: product.id, name: product.name, price: product.price, size: product.size || '', qty: target, personId: null, history: [] };
         recordItemHistory(newItem, target);
         t.items.push(newItem);
-        added.push({ name: product.name, qty: target });
+        added.push({ name: vozNombreConTam(product), qty: target });
       }
     } else if(mode === 'subtract'){
       const qn = Math.max(1, it.qty || 1);
@@ -2200,11 +2238,11 @@ function aplicarItemsVoz(tableId, items, mode){
           try{ invOnSale(existing, -existing.qty); }catch(e){}
           t.items.splice(t.items.indexOf(existing), 1);
           sonidoPos('remove');
-          added.push({ name: product.name, qty: 0 });
+          added.push({ name: vozNombreConTam(product), qty: 0 });
         } else {
           existing.qty = newQty;
           recordItemHistory(existing, -qn);
-          added.push({ name: product.name, qty: newQty });
+          added.push({ name: vozNombreConTam(product), qty: newQty });
         }
       } else {
         notFound.push(it.productText);
@@ -2219,7 +2257,7 @@ function aplicarItemsVoz(tableId, items, mode){
         recordItemHistory(newItem, qn);
         t.items.push(newItem);
       }
-      added.push({ name: product.name, qty: qn });
+      added.push({ name: vozNombreConTam(product), qty: qn });
     }
   });
   if(added.length){

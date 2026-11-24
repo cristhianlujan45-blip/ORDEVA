@@ -145,3 +145,8 @@ de $1.400 a distinta hora) siguen sonando los dos.
   - «Pedro me debe 5 kilos de maíz» → a «Pedro Kilos».
 - Ahora: el tamaño de un producto que se nombró se quita de la frase y escoge el producto («2 × Purina 5 kg» = $70.000 a José). Sin tamaño y con dos del mismo nombre a distinto precio, pregunta cuál y no anota nada. Por kilo: «5 kilos de maíz» = 5 kg a Pedro.
 - Prueba: pruebas/libretatamano1966.test.js 7/7. libreta 24, fiadosnombres 28, libretanombres1942 12, vozcomandos 109, cajavoz 59 y 9 más de libreta/caja.
+
+## 1.99.68 — Pedidos por voz con productos de distinto tamaño
+- Error real: por voz, TODAS las frases con «purina» agregaban la Purina 1 kg, aunque se dijera «purina de 5 kilos». Además el lector partía «dos purinas de 5 kilos» en dos productos («purinas» × 2 y «kilos» × 5).
+- Ahora el tamaño dicho después del nombre de un producto que tiene ese tamaño se pega al producto antes de partir la frase, y escoge el producto («dos purinas de 5 kilos a la mesa 3» → 2 × Purina 5 kg, y lo dice con el tamaño). Sin tamaño y con varios, no agrega nada y pregunta cuál («¿Cuál? Hay varios tamaños…»). «5 kilos de maíz» (por kilo) no cambia.
+- Prueba: pruebas/voztamano1968.test.js 5/5.
