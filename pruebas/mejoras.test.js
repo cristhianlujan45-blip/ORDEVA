@@ -121,7 +121,9 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
     const dv = await D(id => { const h = data.history.find(x => x.id === id); return { total: h.total, em: h.items.find(i => i.name === 'Empanada').qty, pago: h.payments[0].amount, dev: h.devoluciones, stockEm: data.products.find(x => x.id === 'em').stock, caja: ventoTurno.resumen() }; }, vDev);
     chk('4. La venta baja a $8.000 (2 empanadas + gaseosa) y queda anotada la devolución con su motivo', dv.total === 8000 && dv.em === 2 && dv.pago === 8000 && dv.dev.length === 1 && dv.dev[0].motivo === 'Llegaron frías', dv);
     chk('4. Las 2 empanadas vuelven al inventario (16 + 2 = 18) con su línea en el kárdex', dv.stockEm === 18 && await D(() => ventoInventario.kardex(data.products.find(x => x.id === 'em'))[0].tipo === 'devolucion'), dv.stockEm);
-    chk('4. Los $5.000 devueltos salen de la caja (salida «Devolución: Llegaron frías»)', dv.caja.salidas === 5000 && /Devolución: Llegaron frías/.test(dv.caja.movs[0].motivo), dv.caja);
+    // 1.99.63: la devolución en efectivo baja el pago en efectivo de la venta (eso ya baja lo que la caja espera); antes además
+    // se anotaba una salida y se restaba dos veces (esperaba $53.000 con $58.000 en el cajón).
+    chk('4. Los $5.000 devueltos salen de la caja UNA vez: espera $58.000 (base 50.000 + 13.000 − 5.000)', dv.caja.esperado === 58000 && dv.caja.salidas === 0, dv.caja);
     await p.evaluate(() => { const b = document.querySelector('nav button[data-view="historial"]'); b && b.click(); renderHistorial(); });
     chk('4. En el historial cada venta tiene «↩️ Devolución»', await D(() => !!document.querySelector('.hist-fix[data-fix="devolver"]')));
 
