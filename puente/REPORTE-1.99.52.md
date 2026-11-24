@@ -71,4 +71,4 @@ de $1.400 a distinta hora) siguen sonando los dos.
   - El Corte X (total y por cajero) y la pantalla «Hoy» del punto de venta.
 - Ahora todas usan la venta sin propina. El Corte X muestra «🤝 Propinas» en su renglón (ya van dentro de los medios de pago, como en el cierre). La descarga de Excel de Estadísticas sigue con lo cobrado renglón por renglón.
 - También el «Total vendido» de arriba del Historial. Y en «Anuladas» las facturas de proveedor se cuentan aparte con su valor.
-- Prueba: pruebas/propinas1957.test.js 13/13; anularcompra1955 15/15; anularventas 27/27.
+- Prueba: pruebas/propinas1957.test.js 13/13; anularcompra1955 15/15; anularventas 27/27; equipoactividad 32; historialorden1947 9; y ajustesequipo, cerrarcaja, cobrosimple, confirmapago, facil, finanzas, flujocompleto, guia, impuestoconsumo, inventario5, laya1953, layafinanzas, musicaanuncios, pagosguia, practica, propinas, tablero, v183, v195, v1954 todas bien.
