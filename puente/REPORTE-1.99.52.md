@@ -125,4 +125,5 @@ de $1.400 a distinta hora) siguen sonando los dos.
 ## 1.99.65 — Las ventas de las cuentas guardan qué producto y qué tamaño
 - Error real: al cobrar una CUENTA (mesa o cuenta de persona), la venta guardaba solo el nombre del producto (sin su id ni su tamaño). Por eso el arreglo de la 1.99.58 no aplicaba a esas ventas: anular, corregir o devolver devolvía el inventario al PRIMER producto con ese nombre (Purina 1 kg en vez de Purina 5 kg). Y «lo más vendido» sumaba los tamaños como un solo producto («6 × Purina»).
 - Ahora las ventas de cuentas y de venta rápida guardan el id y el tamaño. «Lo más vendido» (Estadísticas, asistente, Laya, resumen del cierre) separa los tamaños; en ventas viejas con id, el tamaño sale del producto.
-- Prueba: pruebas/tamanosventas1965.test.js 7/7 (con el código de antes: 1 bien 6 mal).
+- Liberar una venta (volver a su cuenta) buscaba el producto por nombre y perdía el tamaño: ahora usa el id.
+- Prueba: pruebas/tamanosventas1965.test.js 8/8 (con el código de antes: 1 bien 6 mal); anularventas, inventariodevuelve1958.

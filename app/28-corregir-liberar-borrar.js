@@ -136,7 +136,8 @@
     if((t.items || []).length){ showToast('⚠️ ' + (typeof tableLabel === 'function' ? tableLabel(h.table) : 'La mesa') + ' tiene una cuenta abierta: cóbrala o vacíala antes de liberar esta venta.', 7000); return; }
     const como = await autorizar('liberar la venta ' + nombreVenta(h)); if(!como) return;
     if(!await showConfirm({ title: '¿Liberar esta venta?', message: nombreVenta(h) + '\nVuelve a ' + (typeof tableLabel === 'function' ? tableLabel(h.table) : 'su mesa') + ' para cobrarla bien. El inventario no cambia.', confirmText: 'Sí, liberar', icon: '🔓' })) return;
-    t.items = (h.items || []).map(it => { const p = (data.products || []).find(x => x.name === it.name); return { productId: p ? p.id : null, name: it.name, price: it.price, size: '', qty: it.qty, personId: null, history: [] }; });
+    // 1.99.65: el mismo producto de la venta (por su id; el nombre solo en ventas viejas) y con su tamaño
+    t.items = (h.items || []).map(it => { const p = (it.productId != null && (data.products || []).find(x => x.id === it.productId)) || (data.products || []).find(x => x.name === it.name); return { productId: p ? p.id : null, name: it.name, price: it.price, size: it.size || (p && p.size) || '', qty: it.qty, personId: null, history: [] }; });
     t.payments = []; if(h.tableName && !t.name) t.name = h.tableName;
     data.history = data.history.filter(x => x !== h);
     try{ window.ventoDian && window.ventoDian.alLiberar(h); }catch(x){}   // 🧾 al cobrarla de nuevo sale otro documento

@@ -28,6 +28,12 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
     await p.evaluate(id => { window.ventoVentaFix('borrar', id); }, r.hid); await p.waitForSelector('#vfMotivo', { timeout: 5000 }); await p.click('#vfSi'); await p.waitForTimeout(300);
     const st = await p.evaluate(() => ({ pa1: data.products.find(x => x.id === 'pa1').stock, pa5: data.products.find(x => x.id === 'pa5').stock }));
     chk('2. Anularla devuelve a la Purina 5 kg (10 → 12), la de 1 kg igual', st.pa5 === 12 && st.pa1 === 10, st);
+    // Liberar una venta de cuenta: vuelve a la cuenta con el MISMO producto y su tamaño
+    const lib = await p.evaluate(async () => { window.showConfirm = async () => true;
+      data.tables[1] = { items: [{ productId: 'pa5', name: 'Purina', price: 35000, size: '5 kg', qty: 1, personId: null, history: [] }], payments: [{ method: 'efectivo', amount: 35000, note: '' }], people: [] };
+      const e = closeTableToHistory(1); await window.ventoVentaFix('liberar', e.id); await new Promise(r2 => setTimeout(r2, 200));
+      const it = (data.tables[1].items || [])[0]; return it ? { id: it.productId, size: it.size } : null; });
+    chk('Liberar: vuelve a la cuenta como Purina 5 kg (su id y tamaño)', lib && lib.id === 'pa5' && lib.size === '5 kg', lib);
     const t = await p.evaluate(async () => {
       const v = (id, pid, n, q, pr) => ({ id, invoiceNo: 'FV-' + id, date: new Date(Date.now() - 600e3).toISOString(), table: 2, total: q * pr, debt: 0, items: [{ productId: pid, name: n, price: pr, qty: q, cost: pid === 'pa1' ? 6000 : 28000 }], payments: [{ method: 'efectivo', amount: q * pr }] });
       data.history = [v('a', 'pa1', 'Purina', 2, 8000), v('b', 'pa5', 'Purina', 3, 35000), { id: 'c', invoiceNo: 'FV-c', date: new Date(Date.now() - 500e3).toISOString(), table: 3, total: 8000, debt: 0, items: [{ name: 'Purina', size: '1 kg', price: 8000, qty: 1 }], payments: [{ method: 'efectivo', amount: 8000 }] }];
