@@ -33,6 +33,20 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
       const pid = await p.evaluate(() => document.getElementById('qsProductId').value);
       chk('Al escoger «Purina 5 kg» queda ese producto', pid === 'pa5', pid);
     }
+    // El mismo error en otras dos ventanas
+    const ex = await p.evaluate(async () => { document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show'));
+      const v = id => { const el = document.getElementById(id); return !!el.getClientRects().length && getComputedStyle(el).display !== 'none'; };
+      exportOverlayShow(); const r = { inicio: [v('exportRangeFields'), v('exportClosureFields')] };
+      document.querySelector('#exportPeriodBtns button[data-per="rango"]').click(); r.rango = [v('exportRangeFields'), v('exportClosureFields')];
+      const bc = document.querySelector('#exportPeriodBtns button[data-per="cierre"]'); if(bc){ bc.click(); r.cierre = [v('exportRangeFields'), v('exportClosureFields')]; }
+      exportOverlayClose();
+      try{ window.ventoReportarProblema(); }catch(e){} await new Promise(r2 => setTimeout(r2, 300));
+      const bx = document.getElementById('vcRepAutoBox'); r.rep = bx ? v('vcRepAutoBox') : 'sin-caja';
+      return r; });
+    chk('Exportar: al abrir no salen los campos de rango ni de cierre', JSON.stringify(ex.inicio) === '[false,false]', ex);
+    chk('Exportar: «Rango» muestra solo las fechas', JSON.stringify(ex.rango) === '[true,false]', ex);
+    if(ex.cierre) chk('Exportar: «Cierre» muestra solo los cierres', JSON.stringify(ex.cierre) === '[false,true]', ex);
+    chk('Reportar un problema: sin captura no sale el recuadro vacío', ex.rep === false || ex.rep === 'sin-caja', ex);
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.stack || e)); }
   chk('Sin errores de página', !errs.length, errs.join(' | '));
   await b.close(); console.log('RESULTADO', ok, 'bien', mal, 'mal'); process.exit(mal ? 1 : 0);

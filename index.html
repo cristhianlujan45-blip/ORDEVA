@@ -216,7 +216,7 @@ body.neg-tienda #quickSaleBtn, body:not(.neg-tienda) #fiadosBtn, body:not(.neg-t
 .fi-dtot{text-align:right;margin:8px 0;font-size:15px}
 .fi-desc{display:flex;flex-direction:column;gap:8px;margin-top:10px}
 .fi-esq-pags{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.fi-esq-pags[hidden]{display:none}
-#qsDomicilioFields[hidden]{display:none!important} /* 1.99.59: en «Venta rápida» (mostrador) los datos del domicilio salían siempre (el display:flex de la etiqueta le ganaba a hidden) */
+#qsDomicilioFields[hidden],#exportRangeFields[hidden],#exportClosureFields[hidden]{display:none!important} /* 1.99.59: en «Venta rápida» (mostrador) los datos del domicilio salían siempre (el display:flex de la etiqueta le ganaba a hidden) */
 .overlay.fi-esq,.overlay.fi-esq.show{z-index:10070;flex-direction:column;align-items:stretch;justify-content:flex-start;padding:0;background:#0b0b0d;color:#fff}.overlay.fi-esq > *{zoom:1;width:100%;box-sizing:border-box}
 .fi-esq-top{padding:calc(10px + env(safe-area-inset-top)) 14px 6px;display:flex;flex-direction:column;gap:2px;text-align:center}.fi-esq-top b{font-size:17px}.fi-esq-top small{font-size:13px;opacity:.75}
 .fi-esq-zona{position:relative;flex:1;min-height:0;touch-action:none}.fi-esq-c{position:absolute;inset:0;touch-action:none}

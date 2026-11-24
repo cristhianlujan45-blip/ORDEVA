@@ -86,3 +86,8 @@ de $1.400 a distinta hora) siguen sonando los dos.
 - Error real (desde la 1.95.0): «⚡ Venta rápida» de mostrador mostraba siempre «Nombre del cliente», «Teléfono», «Dirección de entrega» y el valor del envío en 0. El estilo display:flex de la etiqueta le ganaba a hidden. Ahora solo salen en «🛵 Domicilio».
 - Revisado también: con dos productos del mismo nombre la búsqueda muestra el tamaño de cada uno y se vende el que se escoge.
 - Prueba: pruebas/ventarapida1959.test.js 5/5.
+- El mismo error en otras ventanas (buscado en toda la app: elementos con hidden y display escrito en la etiqueta):
+  - «Exportar ventas a Excel»: los campos de rango de fechas y de cierre salían siempre, aunque se eligiera «Hoy» o «Mes».
+  - «🐞 Reportar un problema»: el recuadro de la captura automática salía vacío (imagen rota) cuando no había captura.
+  - Los demás casos ya se manejaban bien (cambian style.display); no se tocaron.
+- Prueba: ventarapida1959 9/9 (con el código de antes: 4 bien 5 mal). erroresreal 33, ventanas1933 9.
