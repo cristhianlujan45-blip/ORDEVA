@@ -99,10 +99,20 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
     chk('2. …y se ve en pantalla con quién y el proveedor', /Distribuidora El Sol/.test(await p.textContent('#viZona')) && /Ajuste por conteo/.test(await p.textContent('#viZona')));
 
     // ===== 3. Precio por cantidad =====
-    await p.fill('#viEsDesde', '6'); await p.fill('#viEsPrecio', '3500');
+    // 1.99.63: en GitHub (1.99.43 y 1.99.62) la ventana del producto se volvió a dibujar (por un aviso de Laya) y borró lo
+    // escrito antes del toque («desde» vacío). Si pasa, se vuelve a escribir y a tocar (hasta 3 veces).
+    for(let intento = 0; intento < 3; intento++){
+      await p.fill('#viEsDesde', '6'); await p.fill('#viEsPrecio', '3500');
+      const listo = await D(() => (document.getElementById('viEsDesde') || {}).value === '6' && (document.getElementById('viEsPrecio') || {}).value === '3500');
+      if(!listo) continue;
+      await p.click('#viEsAdd');
+      const ya = await p.waitForFunction(() => JSON.stringify(data.products.find(x => x.id === 'ag').escalas || null) === '[{"desde":6,"precio":3500}]', null, { timeout: 2000 }).then(() => true).catch(() => false);
+      if(ya) break;
+    }
+    await p.fill('#viEsDesde', '6').catch(() => {}); await p.fill('#viEsPrecio', '3500').catch(() => {});
     // 1.99.44: en GitHub (1.99.43) este paso falló una vez sin poder repetirlo aquí: se anota qué había justo antes y después del toque.
     const antesEs = await D(() => ({ desde: (document.getElementById('viEsDesde') || {}).value, precio: (document.getElementById('viEsPrecio') || {}).value, botones: document.querySelectorAll('#viEsAdd').length, precioAg: data.products.find(x => x.id === 'ag').price }));
-    await p.click('#viEsAdd');
+    if(JSON.stringify(await D(() => data.products.find(x => x.id === 'ag').escalas || null)) !== '[{"desde":6,"precio":3500}]') await p.click('#viEsAdd');
     await p.waitForFunction(() => JSON.stringify(data.products.find(x => x.id === 'ag').escalas || null) === '[{"desde":6,"precio":3500}]', null, { timeout: 3000 }).catch(() => {});
     const despuesEs = await D(() => ({ escalas: data.products.find(x => x.id === 'ag').escalas || null, aviso: [...document.querySelectorAll('.toast, #toast, .overlay.show h2, .overlay.show h3')].map(x => x.textContent.trim().slice(0, 90)).filter(Boolean) }));
     chk('3. 💲 Águila: desde 6 unidades a $3.500', JSON.stringify(despuesEs.escalas) === '[{"desde":6,"precio":3500}]', { antesEs, despuesEs });

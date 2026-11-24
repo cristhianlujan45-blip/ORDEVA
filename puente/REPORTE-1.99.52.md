@@ -113,3 +113,6 @@ de $1.400 a distinta hora) siguen sonando los dos.
 - Una devolución en efectivo (y la venta de un bono en efectivo) con la caja cerrada ABRÍA una caja sola con base $0 (movimiento() abre una si no hay). Ahora solo con la caja abierta.
 - Error mío de la 1.99.55: con la caja abierta, pagar en efectivo desde la libreta a un proveedor o empleado se contaba DOS veces en Contabilidad (el gasto de la libreta y el de la salida de caja). Ahora la salida de caja de la libreta no crea otro gasto (movimiento(..., { sinContab: true })).
 - Prueba: pruebas/devolucioncaja1963.test.js 7/7 (con el código de antes: 2 bien 5 mal). 46 pruebas relacionadas bien. mejoras paso 4 esperaba la salida de caja de la doble resta: ahora revisa que la caja espere $58.000 (base 50.000 + 13.000 − 5.000).
+- CI de la 1.99.62 falló en dos pruebas por cómo están escritas (aquí pasan):
+  - mejoras paso 3: la ventana del producto se redibujó por un aviso de Laya y borró «desde» antes del toque (ya había pasado en la 1.99.43). Ahora reescribe y reintenta hasta 3 veces.
+  - stocklogpartes paso 3: comparaba dos consumos por día calculados con milisegundos de diferencia con tolerancia 1e-9 (difieren en la 8.ª cifra). Ahora tolerancia relativa de una millonésima.

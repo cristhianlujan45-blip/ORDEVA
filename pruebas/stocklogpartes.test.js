@@ -79,7 +79,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const o = 
       data.stockLog = L.slice().sort((x, y) => x.at - y.at); const viejo = { a: invRate('a'), b: invRate('b') };
       data.stockLog = L; return { nuevo, viejo };
     });
-    chk('3. «Días de inventario»: el consumo por día da lo mismo con la lista nueva que en el orden de antes', Math.abs(r3.nuevo.a - r3.viejo.a) < 1e-9 && Math.abs(r3.nuevo.b - r3.viejo.b) < 1e-9 && r3.nuevo.a > 0, { r3, rateViejo });
+    chk('3. «Días de inventario»: el consumo por día da lo mismo con la lista nueva que en el orden de antes', Math.abs(r3.nuevo.a - r3.viejo.a) < 1e-6 * r3.nuevo.a && Math.abs(r3.nuevo.b - r3.viejo.b) < 1e-6 * r3.nuevo.b && r3.nuevo.a > 0, { r3, rateViejo });
     chk('3. … y antes de convertir la lista vieja daba un valor razonable (no se disparaba)', rateViejo.a > 0 && rateViejo.a < 100, rateViejo);
     // ===== 4. Casos de la revisión =====
     // 4c. Un negocio sin ningún movimiento todavía (data.stockLog no existe): la venta descuenta el inventario y anota el movimiento
