@@ -35,3 +35,8 @@ de $1.400 a distinta hora) siguen sonando los dos.
 - Aviso «el equipo de la música no da señales»: se recuerda en el equipo (antes volvía a salir a los 5 min de abrir ORDEVA).
 - Pruebas: `laya1953` 6/6 (nueva), musicaautoplay 13, layafinanzas 10, vozcomandos 109, guia 47, resumendia 7, agencia 13,
   musicaanuncios 22, pagosguia 29, proveedores 8.
+
+## 1.99.54 — Cuadre de caja (vista sencilla)
+- Problema: la pestaña «Cuadre» solo contaba el efectivo de las ventas. Los fiados que pagaron en efectivo (libreta, «Ya pagó», abonos de crédito) no aparecían en ningún lado, y si no se abre caja con base, esa plata no cuadraba.
+- Arreglo: nueva fila «📒 Fiados que pagaron (efectivo X · otros Y)» y fila resaltada «💵 Efectivo que debe haber»: con caja abierta usa lo esperado del turno (base + ventas + entradas − salidas); sin caja, efectivo de ventas + fiados cobrados en efectivo.
+- Prueba: pruebas/cuadre1954.test.js 5/5. También pasan cajateclado 17, vistasencilla 45, cuadrefiados1946 8, cerrarcaja 27, mejoras 32, cajamas 45.
