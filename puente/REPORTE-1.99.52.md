@@ -169,4 +169,5 @@ de $1.400 a distinta hora) siguen sonando los dos.
 ## 1.99.72 — Buscar en el Historial por tamaño
 - El buscador del Historial miraba el nombre del producto pero no su tamaño: «purina 5 kg» no encontraba esa venta. Ahora sí (ventas desde la 1.99.65, que guardan el tamaño).
 - Diagnóstico (solo conteos): renglones vendidos con y sin id de producto por día, para confirmar con datos reales que desde la 1.99.65 las ventas guardan el producto.
+- Diagnóstico real (conteos de renglones vendidos con/sin id): 21 nov 0/42, 22 nov 0/17, 23 nov 3/1, 24 nov (después de la 1.99.65) 3/0. Las ventas nuevas ya guardan el producto.
 - Prueba: tamanosventas1965 10/10; historialorden1947 9.
