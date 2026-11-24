@@ -840,6 +840,8 @@
   window.libretaAbrir = function(){ lbCrear(); lbPintar(); $l('libretaOverlay').classList.add('show'); };
   window.libretaPintar = lbPintar;
   window.libretaSaldo = p => lbSaldo(p);
+  // 1.99.62: la lista de «Me deben» (cuentas fiadas + lo anotado en la libreta) para el asistente: así dice lo mismo.
+  window.libretaDeudores = () => lbDeudores().map(x => ({ quien: String(x[0]).replace(LB_SIN, ''), debe: x[1] }));
 
   // ---------- Micrófono propio de la libreta ----------
   let rec = null;

@@ -102,3 +102,8 @@ de $1.400 a distinta hora) siguen sonando los dos.
 - Ahora, sin caja abierta, el arqueo (y el cierre automático sin contar) suma «Fiados que pagaron en efectivo» como entrada y resta «Pagos en efectivo de la libreta» como salida, del mismo periodo. Quedan en el resumen del cierre (WhatsApp e imagen). Con la caja abierta no cambia nada (eso ya lo llevan sus entradas y salidas).
 - Una sola cuenta para «Cuadre», Laya y el cierre (window.ventoMovsSinCaja).
 - Prueba: pruebas/cierrefuera1961.test.js 8/8 (con el código de antes: 3 bien 5 mal). Y 22 pruebas de caja y cierre bien (cajagastos, cajamas, cajapro, cajateclado, cerrarcaja, contraste, cuadre1954, cuadrefiados1946, doscierres, laya1953, libretacaja1955, mejoras, pagocuenta1948, propinas, salidas, sincstress, v184, v190, v193, v1954, vistasencilla, cierreauto1947).
+
+## 1.99.62 — «¿Quién me debe?» dice lo mismo que la libreta
+- Error real: el asistente («¿quién me debe?», «¿cuánto me deben?») sumaba solo las cuentas fiadas del Historial. La libreta «Me deben» suma también lo anotado en ella («Rosa me debe 20 mil»). Con los datos reales del negocio: Historial $328.600, libreta $355.125.
+- Ahora el asistente usa la misma lista de la libreta (window.libretaDeudores): total, personas y lo de cada una.
+- Prueba: pruebas/fiadostotal1962.test.js 6/6.

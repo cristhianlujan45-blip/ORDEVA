@@ -843,6 +843,15 @@ function asisLocalMas(raw){
     return 'Tienes ' + ab.length + (ab.length === 1 ? ' mesa abierta' : ' mesas abiertas') + ':\n' + bullets(ab.map(id => tableLabel(id) + ': debe ' + fmt(tableBalance(id)))) + '\nEn total falta cobrar ' + fmt(tot) + '.';
   }
   if(/\b(me deben|quien(es)? (me )?deben?|deudas?|fiados?|fiado|deudores|por cobrar)\b/.test(t)){
+    // 1.99.62: lo mismo que «Me deben» de la libreta (cuentas fiadas + lo anotado en la libreta). Antes solo las cuentas
+    // del Historial: decía menos de lo que de verdad te deben.
+    let L = null; try{ L = window.libretaDeudores ? window.libretaDeudores() : null; }catch(e){ L = null; }
+    if(L){
+      if(!L.length) return 'Nadie te debe. ¡Todo está pagado!';
+      const tl = L.reduce((s, x) => s + x.debe, 0);
+      return 'Te deben ' + fmt(tl) + (L.length === 1 ? '' : ' entre ' + L.length + ' personas') + ':\n' + bullets(L.slice(0, 12).map(x => x.quien + ': ' + fmt(x.debe))) +
+        (L.length > 12 ? '\n…y ' + (L.length - 12) + ' más (míralos en la libreta).' : '') + '\nCuando te paguen, anótalo en la libreta («Juan me pagó 20 mil») o en Historial → «Ya pagó».';
+    }
     const d = asisDeudas();
     if(!d.length) return 'Nadie te debe. ¡Todas las cuentas cerradas están pagadas!';
     const tot = d.reduce((s, x) => s + x.debe, 0);
