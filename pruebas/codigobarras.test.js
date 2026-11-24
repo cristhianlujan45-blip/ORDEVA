@@ -93,7 +93,10 @@ const ARROZ = '7701111111111', LECHE = '7702222222222', NUEVO = '7709999999991',
 
     // ======================= COMPUTADOR con lector USB =======================
     const { p: pc } = await equipo(false);
-    const lector = async (cod, ms) => { await pc.keyboard.type(cod, { delay: 8 }); await pc.keyboard.press('Enter'); await pausa(ms || 500); };
+    // 1.99.68: el lector escribe sin pausa (con la máquina cargada, 8 ms entre teclas a veces parecía alguien escribiendo
+    // a mano y el código se quedaba en el buscador); y se espera hasta 2 s a que la cuenta quede como se espera.
+    const lector = async (cod, ms) => { await pc.keyboard.type(cod, { delay: 0 }); await pc.keyboard.press('Enter'); await pausa(ms || 500); };
+    const esperaCuenta = async (m, esperado) => { for(let i = 0; i < 20; i++){ if(await cuenta(pc, m) === esperado) return esperado; await pausa(100); } return cuenta(pc, m); };
     await pc.evaluate(() => openTableModal(2)); await pausa(500);
     // ===== 5 =====
     await pc.evaluate(() => { document.activeElement && document.activeElement.blur && document.activeElement.blur(); });
@@ -101,11 +104,11 @@ const ARROZ = '7701111111111', LECHE = '7702222222222', NUEVO = '7709999999991',
     chk('5. Lector USB con la mesa abierta: el arroz se suma a la cuenta', await cuenta(pc, 2) === 'a×1', await cuenta(pc, 2));
     chk('5. … y no queda el código escrito en el buscador', (await pc.inputValue('#addProductSearch')) === '', await pc.inputValue('#addProductSearch'));
     await lector(ARROZ);
-    chk('5. Otra vez: 2 arroz (el lector sí repite)', await cuenta(pc, 2) === 'a×2', await cuenta(pc, 2));
+    chk('5. Otra vez: 2 arroz (el lector sí repite)', await esperaCuenta(2, 'a×2') === 'a×2', await cuenta(pc, 2));
     // ===== 6 =====
     await pc.click('#addProductSearch'); await pausa(200);
     await lector(LECHE);
-    v = { cuenta: await cuenta(pc, 2), buscador: await pc.inputValue('#addProductSearch') };
+    v = { cuenta: await esperaCuenta(2, 'a×2,l×1'), buscador: await pc.inputValue('#addProductSearch') };
     chk('6. Con el cursor en el buscador: la leche se suma y el buscador queda limpio', v.cuenta === 'a×2,l×1' && v.buscador === '', v);
     // ===== 7 =====
     await pc.evaluate(() => { document.activeElement && document.activeElement.blur && document.activeElement.blur(); });
