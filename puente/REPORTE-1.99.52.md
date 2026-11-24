@@ -106,4 +106,4 @@ de $1.400 a distinta hora) siguen sonando los dos.
 ## 1.99.62 — «¿Quién me debe?» dice lo mismo que la libreta
 - Error real: el asistente («¿quién me debe?», «¿cuánto me deben?») sumaba solo las cuentas fiadas del Historial. La libreta «Me deben» suma también lo anotado en ella («Rosa me debe 20 mil»). Con los datos reales del negocio: Historial $328.600, libreta $355.125.
 - Ahora el asistente usa la misma lista de la libreta (window.libretaDeudores): total, personas y lo de cada una.
-- Prueba: pruebas/fiadostotal1962.test.js 6/6.
+- Prueba: pruebas/fiadostotal1962.test.js 6/6; cierrefuera1961 8, cuadre1954 5, cuadrefiados1946 8, fiadosnombres 28, laya1953 6, libreta 24, libretacaja1955 17, pagocuenta1948 8.
