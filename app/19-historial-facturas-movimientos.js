@@ -50,6 +50,10 @@
           '<div class="settings-desc">Escaneada como en un escáner: recortada, enderezada, con el texto alineado y en Full HD. El PDF trae el texto de la factura (se puede buscar y copiar) y una hoja con los datos leídos.</div></div>'
         : '<div class="settings-desc">La foto de esta factura no quedó guardada en este equipo (se guarda en el celular donde se escaneó). Igual puedes descargar sus datos.</div><button type="button" class="btn-ghost fi-dl-pdf">📄 Descargar los datos (PDF)</button>'));
     const b = ov.querySelector('.fi-verorig'); if(b) b.onclick = () => window.ctVerRecibo && window.ctVerRecibo(p.archivoId, 'Factura ' + (p.invoiceNumber || p.supplier || ''));
+    // 🚫 1.99.55: anular una factura aplicada por error (repetida o equivocada).
+    { const anb = document.createElement('button'); anb.type = 'button'; anb.className = 'btn-ghost fi-anular'; anb.textContent = '🚫 Anular esta factura';
+      anb.style.cssText = 'width:100%;margin-top:14px;color:var(--brick,#b91c1c)'; anb.onclick = () => pedirAnular(p.id, ov);
+      ov.querySelector('.fi-hist-c').appendChild(anb); }
     const msg = ov.querySelector('.fi-desc-msg'), avisar = t => { if(msg){ msg.textContent = t; msg.hidden = false; } showToast(t, 4000); };
     const boton = (sel, tipo) => { const x = ov.querySelector(sel); if(!x) return; x.onclick = async () => {
       if(x.disabled) return; const lbl = x.textContent; x.disabled = true; x.textContent = '⏳ Preparando…';
@@ -79,6 +83,68 @@
     // Vista previa de la página 1 ya escaneada (las facturas de antes se escanean en HD al abrirlas)
     const im = ov.querySelector('.fi-desc-img');
     if(im) fiEscaneosDe(p, t => { if(msg) msg.textContent = t; }).then(pg => { if(!ov.classList.contains('show')) return; if(pg[0]){ im.src = pg[0].url; if(msg) msg.hidden = true; } else if(msg) msg.textContent = 'La foto no está en este equipo.'; }).catch(() => { if(msg) msg.textContent = 'No pude abrir la foto.'; });
+  }
+  /* 🚫 1.99.55 · Anular una factura de proveedor (aplicada dos veces o por error). Como al anular una venta: pide la
+     autorización, sale de data.purchases (deja de contar como gasto e IVA), lo que sumó al inventario se descuenta (sin
+     bajar de 0), y queda guardada en data.anuladas (tipo 'compra') para que ningún otro equipo la vuelva a subir.
+     El costo de los productos no se toca (no se puede saber cuál era antes con seguridad). */
+  const nProv = t => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+  function prodDe(it){ return (data.products || []).find(x => x.id === it.productId) || (data.products || []).find(x => !x.combo && x.name === it.name) || null; }
+  function faltantes(p){
+    const out = [];
+    (p.items || []).forEach(it => { const q = Number(it.qty) || 0, pr = prodDe(it); if(!(q > 0) || !pr || pr.stock == null || pr.stock === '' || !isFinite(+pr.stock)) return;
+      if(+pr.stock < q) out.push({ name: pr.name, hay: +pr.stock, qty: q }); });
+    return out;
+  }
+  function anular(id, motivo, como){
+    const i = (data.purchases || []).findIndex(x => x.id === id); if(i < 0) return null;
+    const p = data.purchases[i], cortos = faltantes(p);
+    const ini = Number(p.id) || 0, fin = (Date.parse(p.procesadaEn || p.at) || ini) + 5000;
+    (p.items || []).forEach(it => {
+      const q = Number(it.qty) || 0, pr = prodDe(it); if(!(q > 0) || !pr) return;
+      if(pr.stock != null && pr.stock !== '' && isFinite(+pr.stock)) pr.stock = Math.max(0, +pr.stock - q);
+      if(Array.isArray(pr.lotes)){   // el lote con vencimiento que trajo esta factura
+        const k = pr.lotes.findIndex(l => l && (l.compra === id || (!l.compra && Number(l.q) === q && Number(l.t) >= ini && Number(l.t) <= fin)));
+        if(k >= 0) pr.lotes.splice(k, 1);
+      }
+    });
+    if(Array.isArray(data.inventarioMov)) data.inventarioMov = data.inventarioMov.filter(m => !(m && m.compraId === id));
+    // Si estaba enlazada a un pago a proveedor de la libreta, el pago pasa a otra factura igual (la buena, si era repetida);
+    // si no hay otra, el pago vuelve a contar solo (como un pago a proveedor de la libreta).
+    if(p.pagadoMov){
+      const m = ((data.libreta && data.libreta.movs) || []).find(x => x && x.id === p.pagadoMov);
+      if(m){
+        const n = nProv(p.supplier), otra = data.purchases.find(x => x !== p && !x.pagadoMov && nProv(x.supplier) === n && Math.abs((Number(x.total) || 0) - (Number(m.monto) || 0)) <= Math.max(100, (Number(m.monto) || 0) * 0.01));
+        if(otra){ otra.pagadoMov = m.id; m.compra = otra.id; } else delete m.compra;
+      }
+    }
+    if(window.ventoAnotarAnulada) window.ventoAnotarAnulada(p, 'compra', motivo, como);
+    data.purchases.splice(i, 1);
+    try{ window.ventoAuditar && window.ventoAuditar('factura de proveedor anulada', (p.supplier || 'Proveedor') + (p.invoiceNumber ? ' · ' + p.invoiceNumber : '') + ' · ' + fmt(Math.round(p.total || 0)) +
+      ' · ' + (p.items || []).map(x => x.qty + ' ' + x.name).join(', ') + (motivo ? ' · motivo: ' + motivo : '') + ' · por ' + (typeof authUser !== 'undefined' && authUser ? authUser : '—') + (como === 'clave' ? ' (con la clave del dueño)' : '')); }catch(x){}
+    saveData();
+    try{ renderInventario(); }catch(x){} try{ renderProductos(); }catch(x){} try{ typeof renderConta === 'function' && renderConta(); }catch(x){}
+    return { cortos };
+  }
+  window.ventoAnularCompra = anular;   // (para las pruebas)
+  async function pedirAnular(id, ov){
+    const p = (data.purchases || []).find(x => x.id === id); if(!p) return;
+    const nom = (p.supplier || 'Proveedor') + (p.invoiceNumber ? ' · ' + p.invoiceNumber : '') + ' · ' + fmt(Math.round(p.total || 0));
+    const como = window.ventoAutorizarVenta ? await window.ventoAutorizarVenta('anular la factura ' + nom) : 'jefe'; if(!como) return;
+    const cortos = faltantes(p);
+    const msg = nom + '\nSe descuenta del inventario lo que esta factura sumó y deja de contar como gasto. Queda guardada en Historial → «Anuladas».' +
+      (cortos.length ? '\n⚠️ Ya no hay tanto de: ' + cortos.map(c => c.name + ' (hay ' + c.hay + ', la factura sumó ' + c.qty + ')').join(', ') + '. Esos quedan en 0.' : '') +
+      (p.pagadoMov ? '\n📒 Esta factura estaba marcada como pagada en la libreta: el pago se queda anotado en la libreta.' : '') +
+      '\nEl costo de los productos no cambia.';
+    let motivo;
+    if(window.ventoPreguntarMotivo) motivo = await window.ventoPreguntarMotivo('¿Anular esta factura de proveedor?', msg, 'Sí, anular');
+    else motivo = (await showConfirm({ title: '¿Anular esta factura de proveedor?', message: msg, confirmText: 'Sí, anular', icon: '🚫' })) ? '' : null;
+    if(motivo == null) return;
+    const r = anular(id, motivo, como);
+    if(!r){ showToast('Esa factura ya no está (la cambiaron en otro equipo). No se anuló nada.', 6000); return; }
+    if(ov) ov.classList.remove('show');
+    const hl = $h('fiHistOv'); if(hl && hl.classList.contains('show')){ const c = hl.querySelector('.fi-hlista'), q = hl.querySelector('.fi-hbus'); if(c) c.innerHTML = lista(q ? q.value : ''); }
+    showToast('🚫 Factura anulada. Queda en Historial → «Anuladas».', 5000);
   }
   function abrirMov(){
     const ms = (data.inventarioMov || []).slice().reverse().slice(0, 300);

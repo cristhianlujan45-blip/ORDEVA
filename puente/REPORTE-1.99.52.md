@@ -40,3 +40,13 @@ de $1.400 a distinta hora) siguen sonando los dos.
 - Problema: la pestaña «Cuadre» solo contaba el efectivo de las ventas. Los fiados que pagaron en efectivo (libreta, «Ya pagó», abonos de crédito) no aparecían en ningún lado, y si no se abre caja con base, esa plata no cuadraba.
 - Arreglo: nueva fila «📒 Fiados que pagaron (efectivo X · otros Y)» y fila resaltada «💵 Efectivo que debe haber»: con caja abierta usa lo esperado del turno (base + ventas + entradas − salidas); sin caja, efectivo de ventas + fiados cobrados en efectivo.
 - Prueba: pruebas/cuadre1954.test.js 5/5. También pasan cajateclado 17, vistasencilla 45, cuadrefiados1946 8, cerrarcaja 27, mejoras 32, cajamas 45.
+
+## 1.99.55 — Anular una factura de proveedor
+- Problema: una factura de proveedor aplicada por error (por ejemplo dos veces) no se podía quitar: el inventario quedaba inflado y el gasto contado doble en Contabilidad.
+- Arreglo (autorizado por el dueño): en «📚 Facturas anteriores» → la factura → «🚫 Anular esta factura». Pide la autorización (el jefe pasa; el equipo con la clave del dueño) y el motivo, igual que anular una venta.
+  - Sale de las compras (deja de contar como gasto e IVA). Lo que sumó al inventario se descuenta, sin bajar de 0 (avisa cuáles no alcanzan).
+  - Se quitan sus movimientos de inventario y su lote con vencimiento (desde ahora cada lote guarda de qué factura vino).
+  - Si estaba enlazada a un pago a proveedor de la libreta, el pago pasa a otra factura igual del mismo proveedor (la buena); si no hay, el pago cuenta solo.
+  - Queda en data.anuladas (tipo 'compra') y se ve en Historial → «Anuladas». La nube (ventoQuitarAnuladas) la quita si otro equipo todavía la tiene, así no vuelve.
+  - El costo de los productos no se toca.
+- Prueba: pruebas/anularcompra1955.test.js 14/14.

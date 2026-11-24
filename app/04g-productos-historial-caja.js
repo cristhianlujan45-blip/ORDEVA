@@ -1398,6 +1398,15 @@ function histFilaAnulada(a){
     row.innerHTML = '<div class="hist-row-top"><div class="hist-left"><div class="hist-table">🔒 Cierre de caja · <span class="hist-anulada-flag">ANULADO</span></div><div class="hist-date">' + (isNaN(dc) ? '' : histFmtFecha.format(dc) + ' · ' + histFmtHora.format(dc)) + '</div><div class="hist-ref">' + invEsc(pie) + '</div></div><div class="hist-total">' + fmt(Number(c.totalSold) || 0) + '</div></div>';
     return row;
   }
+  if(a.tipo === 'compra'){   // 1.99.55: factura de proveedor anulada
+    const c = a.compra || {}, dc = new Date(c.procesadaEn || c.at || c.date);
+    const its = (c.items || []).map(it => '<div class="hist-detail-line"><span>' + invEsc(it.name) + ' ×' + invEsc(it.qty) + '</span><span>' + fmt(Math.round(it.total != null ? it.total : (Number(it.qty) || 0) * (Number(it.cost) || 0))) + '</span></div>').join('');
+    row.innerHTML = '<div class="hist-row-top"><div class="hist-left"><div class="hist-table">🧾 Factura de ' + invEsc(c.supplier || 'proveedor') + ' · <span class="hist-anulada-flag">ANULADA</span></div>' +
+      '<div class="hist-date">' + (isNaN(dc) ? '' : histFmtFecha.format(dc) + ' · ' + histFmtHora.format(dc)) + '</div>' + (c.invoiceNumber ? '<div class="hist-ref">N.º ' + invEsc(c.invoiceNumber) + '</div>' : '') +
+      '<div class="hist-ref">' + invEsc(pie) + '</div></div><div class="hist-total">' + fmt(Math.round(Number(c.total) || 0)) + '</div></div>' +
+      '<div class="hist-detail"><div class="hist-detail-title">Productos de la factura</div>' + its + '</div>';
+    return row;
+  }
   const h = a.venta || {}, dv = new Date(h.date);
   const items = (h.items || []).map(it => '<div class="hist-detail-line"><span>' + invEsc(it.name) + (it.person ? ' — ' + invEsc(it.person) : '') + ' ×' + invEsc(it.qty) + '</span><span>' + fmt((Number(it.price) || 0) * (Number(it.qty) || 0)) + '</span></div>').join('') || '<div class="hist-detail-line"><span>Sin productos registrados</span><span></span></div>';
   row.innerHTML = '<div class="hist-row-top"><div class="hist-left"><div class="hist-table">' + invEsc(h.tableName || ('Mesa ' + h.table)) + (h.person ? ' — ' + invEsc(h.person) : '') + ' · <span class="hist-anulada-flag">ANULADA</span></div>' +
@@ -1547,7 +1556,7 @@ function renderHistorial(masPagina){
     if(chip){ chip.hidden = sh || !an.length; if(chip.hidden && chip.classList.contains('on')){ chip.classList.remove('on'); const t = document.querySelector('#histFilter [data-f="todos"]'); if(t) t.classList.add('on'); } }
     if(histFiltroActual() === 'anuladas'){
       const q = histConsulta(), selMes = document.getElementById('histMes'), mes = (selMes && selMes.value) || '';
-      const vis = an.filter(a => { if(!a) return false; const ref = a.tipo === 'cierre' ? { date: (a.cierre || {}).date, tableName: 'cierre de caja', total: (a.cierre || {}).totalSold } : (a.venta || {});
+      const vis = an.filter(a => { if(!a) return false; const ref = a.tipo === 'cierre' ? { date: (a.cierre || {}).date, tableName: 'cierre de caja', total: (a.cierre || {}).totalSold } : a.tipo === 'compra' ? { date: (a.compra || {}).procesadaEn || (a.compra || {}).at, tableName: 'factura proveedor ' + ((a.compra || {}).supplier || ''), total: (a.compra || {}).total, items: (a.compra || {}).items } : (a.venta || {});
         if(mes && histMesDe(ref) !== mes) return false; return !q || histCoincide(ref, q) || String(a.motivo || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').indexOf(q) >= 0; });
       window.__histVisibles = []; window.__histAnuladasVisibles = vis;
       const res = document.getElementById('histBuscarRes'); if(res){ res.hidden = false; res.textContent = vis.length + (vis.length === 1 ? ' anulada' : ' anuladas') + ' · ' + fmt(vis.reduce((t, a) => t + (a.tipo === 'venta' ? Number((a.venta || {}).total) || 0 : 0), 0)) + ' que ya no cuentan'; }

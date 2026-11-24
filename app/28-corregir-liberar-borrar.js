@@ -83,10 +83,12 @@
      qué. Los cierres de caja de un día anulado se guardan en la misma lista (tipo 'cierre'). No se recorta. */
   function anotarAnulada(x, tipo, motivo, como){
     if(!Array.isArray(data.anuladas)) data.anuladas = [];
-    const base = (tipo === 'cierre' ? 'an-c-' : 'an-v-') + (x && x.id != null ? String(x.id) : 'sin-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7));
+    const tp = tipo === 'cierre' ? 'cierre' : tipo === 'compra' ? 'compra' : 'venta';   // 1.99.55: + facturas de proveedor
+    const base = (tp === 'cierre' ? 'an-c-' : tp === 'compra' ? 'an-f-' : 'an-v-') + (x && x.id != null ? String(x.id) : 'sin-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7));
     let id = base, n = 1; while(data.anuladas.some(a => a && a.id === id)) id = base + '-' + (++n);
-    const reg = { id, t: Date.now(), por: typeof authUser !== 'undefined' && authUser ? authUser : null, como: como || 'jefe', motivo: String(motivo || '').trim().slice(0, 140), tipo: tipo === 'cierre' ? 'cierre' : 'venta' };
+    const reg = { id, t: Date.now(), por: typeof authUser !== 'undefined' && authUser ? authUser : null, como: como || 'jefe', motivo: String(motivo || '').trim().slice(0, 140), tipo: tp };
     if(reg.tipo === 'venta'){ reg.ventaId = x && x.id != null ? String(x.id) : null; reg.venta = JSON.parse(JSON.stringify(x)); }
+    else if(reg.tipo === 'compra'){ reg.compraId = x && x.id != null ? String(x.id) : null; reg.compra = JSON.parse(JSON.stringify(x)); }
     else reg.cierre = JSON.parse(JSON.stringify(x));
     data.anuladas.unshift(reg);
     return reg;

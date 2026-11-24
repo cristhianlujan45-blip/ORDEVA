@@ -1022,11 +1022,15 @@
   }
   // 🚫 1.99.1: una venta ANULADA (data.anuladas, tipo 'venta') no puede seguir en history: si otro equipo todavía la tenía,
   // se quita. Vive aquí (este archivo carga primero) para existir cuando la app abre sus datos o aplica los de la nube.
+  // 1.99.55: lo mismo con una factura de proveedor anulada (tipo 'compra'): sale de purchases y de los movimientos de inventario.
   function quitarAnuladas(d){
-    if(!d || !Array.isArray(d.anuladas) || !Array.isArray(d.history) || !d.anuladas.length) return 0;
-    var ids = {}; d.anuladas.forEach(function(a){ if(a && a.tipo === 'venta' && a.ventaId != null) ids[String(a.ventaId)] = 1; });
-    var antes = d.history.length; d.history = d.history.filter(function(h){ return !(h && h.id != null && ids[String(h.id)]); });
-    return antes - d.history.length;
+    if(!d || !Array.isArray(d.anuladas) || !d.anuladas.length) return 0;
+    var ids = {}, fids = {}, hayF = false, n = 0, antes;
+    d.anuladas.forEach(function(a){ if(!a) return; if(a.tipo === 'venta' && a.ventaId != null) ids[String(a.ventaId)] = 1; else if(a.tipo === 'compra' && a.compraId != null){ fids[String(a.compraId)] = 1; hayF = true; } });
+    if(Array.isArray(d.history)){ antes = d.history.length; d.history = d.history.filter(function(h){ return !(h && h.id != null && ids[String(h.id)]); }); n += antes - d.history.length; }
+    if(hayF && Array.isArray(d.purchases)){ antes = d.purchases.length; d.purchases = d.purchases.filter(function(p){ return !(p && p.id != null && fids[String(p.id)]); }); n += antes - d.purchases.length; }
+    if(hayF && Array.isArray(d.inventarioMov)) d.inventarioMov = d.inventarioMov.filter(function(m){ return !(m && m.compraId != null && fids[String(m.compraId)]); });
+    return n;
   }
   window.ventoQuitarAnuladas = quitarAnuladas;
   // 1.99.15: productos y categorías de este equipo que la nube no tiene (por id, y sin repetir un producto con el mismo
