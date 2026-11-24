@@ -50,3 +50,9 @@ de $1.400 a distinta hora) siguen sonando los dos.
   - Queda en data.anuladas (tipo 'compra') y se ve en Historial → «Anuladas». La nube (ventoQuitarAnuladas) la quita si otro equipo todavía la tiene, así no vuelve.
   - El costo de los productos no se toca.
 - Prueba: pruebas/anularcompra1955.test.js 14/14.
+
+## 1.99.55 — Libreta y caja
+- Error real: en la libreta por voz, «… por Nequi / por transferencia / con DaviPlata» quedaba como parte del nombre («Pedro Nequi», «Agro Sur Transferencia»), y después «le pagué a Pedro» se iba a «Pedro Nequi». Ahora se quita antes de leer el nombre y el pago queda como transferencia.
+- Con la caja abierta, pagarle en efectivo a un empleado o a un proveedor desde la libreta es una salida de la caja (antes solo entraban los fiados cobrados, y el cuadre decía que debía haber más plata). Por transferencia no sale; «me equivoqué» quita la salida.
+- Sin caja abierta, «Cuadre» resta lo pagado en efectivo desde la libreta en su propio renglón («💸 Pagos en efectivo de la libreta»).
+- Prueba: pruebas/libretacaja1955.test.js 12/12. También pasan cuadre1954, libreta, libretanombres1942, fiadosnombres, pagocuenta1948, cuadrefiados1946, laya1953, mejoras, vistasencilla, cerrarcaja, y para lo de anular facturas: anularventas, esquinas, facturascan, finanzas, girofactura, guia, inventario5, ivaexcel, proveedores, salidas, sincroniza.

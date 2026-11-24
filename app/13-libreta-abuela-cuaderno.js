@@ -350,6 +350,7 @@
   // opc (1.99.48): { solo: id de UNA cuenta que pagó (no se reparte en las demás), metodo: 'transferencia' }
   function lbAgregar(tipo, persona, monto, nota, opc){
     opc = opc || {};
+    if(!opc.metodo && lbEntender.metodo && (tipo === 'abono' || tipo === 'prov' || tipo === 'emp')){ opc.metodo = lbEntender.metodo; lbEntender.usado = true; }   // 1.99.55: dicho por voz
     const m = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5), tipo, persona, monto: Math.round(monto), nota: nota || '', fecha: new Date().toISOString() };
     if(opc.metodo && opc.metodo !== 'efectivo') m.metodo = opc.metodo;
     if(tipo === 'abono'){
@@ -373,6 +374,12 @@
     if(tipo === 'abono' && (m.metodo || 'efectivo') === 'efectivo') try{
       const T = window.ventoTurno;
       if(T && T.turno && T.turno()){ const mv = T.movimiento('entrada', m.monto, 'Fiado cobrado · ' + String(persona).replace(LB_SIN, '').slice(0, 60)); if(mv) m.cajaMov = mv.id; }
+    }catch(e){}
+    // 1.99.55: y lo que se le PAGA en efectivo a un proveedor o a un empleado SALE de la caja abierta (antes solo entraban
+    // los fiados cobrados: el cuadre decía que debía haber más plata de la que había). Se quita con el movimiento.
+    if((tipo === 'prov' || tipo === 'emp') && (m.metodo || 'efectivo') === 'efectivo') try{
+      const T = window.ventoTurno;
+      if(T && T.turno && T.turno()){ const mv = T.movimiento('salida', m.monto, (tipo === 'emp' ? 'Pago a ' : 'Pago al proveedor ') + String(persona).replace(LB_SIN, '').slice(0, 60)); if(mv) m.cajaMov = mv.id; }
     }catch(e){}
     LB().movs.push(m); saveData(); lbPintar();
     try{ typeof renderConta === 'function' && renderConta(); }catch(e){}
@@ -403,7 +410,16 @@
     if(fuerte || (lista && anotar)) return monto >= 50 ? persona + ' me debe ' + monto : null;
     return null;
   }
+  // 1.99.55: «… por Nequi / por transferencia / por DaviPlata»: se quita antes de leer el nombre (antes quedaba «Pedro Nequi»
+  // o «Agro Sur Transferencia» como otra persona) y el pago queda como transferencia (no entra ni sale de la caja).
+  const LB_MET = /\s*,?\s*\b(?:(?:por|con|en|via|vía|desde|por medio de)\s+)?(?:(?:una?|la|el)\s+)?(?:nequi|daviplata|davi ?plata|transferencia|transferencias|consignaci[oó]n)\b/gi;
   function lbEntender(raw, soloSeguro){
+    { const nr = String(raw == null ? '' : raw).replace(LB_MET, ' ').replace(/\s+/g, ' ').trim();
+      if(nr && nr !== String(raw).trim()){
+        lbEntender.metodo = 'transferencia'; lbEntender.usado = false;
+        try{ const r = lbEntender(nr, soloSeguro); if(r && r.texto && lbEntender.usado) r.texto += ' 📱 Por transferencia: no entra ni sale de la caja.'; return r; }
+        finally{ lbEntender.metodo = null; lbEntender.usado = false; }
+      } }
     lbNombre.crudo = raw;
     const t = lbNorm(raw);
     if(!t) return null;
