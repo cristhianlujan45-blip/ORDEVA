@@ -584,7 +584,10 @@ function asisLocal(q){
   }
   if(/\b(vend|ventas?|vendi|hice|facture|caja|hoy)\b/.test(t) && !/\b(margen|costo)\b/.test(t)){
     const s = asisSales();
-    let r = 'Hoy llevas ' + fmt(s.hoy) + ' en ' + s.nHoy + (s.nHoy === 1 ? ' cuenta cobrada' : ' cuentas cobradas') + '.';
+    // 1.99.53: «ventas», no «cuentas cobradas» (lo fiado se vendió pero no se ha cobrado): dice cuánto quedó fiado.
+    const d0 = new Date(); d0.setHours(0, 0, 0, 0);
+    const fiadoHoy = (data.history || []).filter(h => new Date(h.date) >= d0).reduce((a, h) => a + (Number(h.debt) || 0), 0);
+    let r = 'Hoy llevas ' + fmt(s.hoy) + ' en ' + s.nHoy + (s.nHoy === 1 ? ' venta' : ' ventas') + (fiadoHoy > 0 ? ' (de eso ' + fmt(fiadoHoy) + ' quedó fiado)' : '') + '.';
     if(s.ganHoy) r += ' Ganancia aproximada: ' + fmt(s.ganHoy) + (s.hoySinCosto ? ' (faltan costos de algunos productos)' : '') + '.';
     r += ' En los últimos 7 días: ' + fmt(s.sem) + '.';
     return r;

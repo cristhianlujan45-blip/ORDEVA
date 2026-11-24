@@ -232,13 +232,24 @@
     return [...new Set(out)];
   }
   // ---------- Centro de control ----------
+  function cajaHoy(){
+    const d0 = new Date(); d0.setHours(0, 0, 0, 0);
+    let ef = 0, tr = 0, fi = 0, tot = 0;
+    (data.history || []).forEach(h => { if(!(new Date(h.date) >= d0)) return; tot += (Number(h.total) || 0);
+      (h.payments || []).forEach(p => { const v = Number(p.amount) || 0; if(p.method === 'efectivo') ef += v; else if(p.method === 'usd') ef -= Math.max(0, Number(p.vueltasCop) || 0); else if(p.method === 'debe') fi += v; else tr += v; }); });
+    const partes = [plata(ef) + ' en efectivo'].concat(tr ? [plata(tr) + ' por transferencia u otros medios'] : []).concat(fi ? [plata(fi) + ' fiado'] : []);
+    const ventas = 'Hoy vendiste ' + plata(tot) + ': ' + partes.join(', ') + '.';
+    let T = null; try{ T = window.ventoTurno && window.ventoTurno.turno && window.ventoTurno.turno() ? window.ventoTurno.resumen() : null; }catch(e){}
+    if(T) return '💵 En la caja debe haber ' + plata(T.esperado) + ' en efectivo: base ' + plata(T.base) + ' + ventas en efectivo ' + plata(T.ventas) + (T.entradas ? ' + entradas ' + plata(T.entradas) : '') + (T.salidas ? ' − salidas ' + plata(T.salidas) : '') + '.\n' + ventas + ' Lo de transferencias y lo fiado no está en la caja.';
+    return '💵 Hoy entraron ' + plata(ef) + ' en efectivo por ventas (la caja no se abrió con base: abre la caja para saber cuánto debe haber).\n' + ventas;
+  }
   function centro(){
     const a = activos(), g = G() ? G().lista() : [], ocup = Object.keys(data.tables).filter(id => (data.tables[id].items || []).length).length;
     const b = bajos().length, ag = agotados().length, aud = auditoria().length, t = tiempos().act.filter(x => x.lento).length;
     const c = resumenCompras(rango('este mes'));
     return '🧠 ' + [a.length + ' pedido' + (a.length === 1 ? '' : 's') + ' pendiente' + (a.length === 1 ? '' : 's') + (prepOn() ? ' en ' + prepNombre() : ''),
       ocup + ' ' + (ocup === 1 ? U() : UP()).toLowerCase() + ' con cuenta abierta', g.length + ' grupo' + (g.length === 1 ? '' : 's') + ' de ' + UP().toLowerCase() + ' combinad' + (espacio()[3] === 'm' ? 'os' : 'as'),
-      ag + ' agotado' + (ag === 1 ? '' : 's') + ' y ' + b + ' con stock bajo', c.n + ' factura' + (c.n === 1 ? '' : 's') + ' este mes (' + plata(c.total) + ', IVA ' + plata(c.iva) + ')',
+      ag + ' agotado' + (ag === 1 ? '' : 's') + ' y ' + b + ' con stock bajo', c.n + ' factura' + (c.n === 1 ? '' : 's') + ' de proveedor este mes (' + plata(c.total) + ', IVA ' + plata(c.iva) + ')',
       (t ? t + ' pedido' + (t === 1 ? '' : 's') + ' demorado' + (t === 1 ? '' : 's') : 'ningún pedido demorado'), (aud ? aud + ' cosa' + (aud === 1 ? '' : 's') + ' por revisar (di «ORDEVA, audita»)' : 'sin problemas detectados')].join(' · ') + '.';
   }
   // ---------- Búsqueda externa (Open Food Facts: base pública de productos, sin clave) ----------
@@ -353,6 +364,11 @@
     if(!t) return { text: '¡Aquí estoy! Pregúntame por facturas, IVA, costos, proveedores, inventario, pedidos, ' + UP().toLowerCase() + ', ' + prepNombre().toLowerCase() + ' o música.' };
     const r = rango(t), pn = N(prepNombre());
     // 1.69.0: las preguntas de plata van primero (antes «¿cuánto gané?» daba la ganancia sin restar los gastos, y al equipo).
+    // 1.99.53: «¿cuánto hay en caja?» es el EFECTIVO del cajón (antes respondía el total vendido, con lo de transferencias y
+    // lo fiado, que no está en la caja).
+    if(/\b(cuanto|cuanta|que|cual)\b.*\b(hay|debe haber|tengo|llevo|queda|quedo|entro)\b.*\b(caja|cajon|efectivo)\b|\bcuanto efectivo\b|\befectivo (de|en) (la )?caja\b|\bplata (de|en) (la )?caja\b/.test(t)){
+      registrar('consulta', 'Caja: ' + t.slice(0, 60)); return { text: cajaHoy() };
+    }
     const rf = finanzas(t); if(rf){ registrar('consulta', 'Finanzas: ' + t.slice(0, 60)); return rf; }
     const ru = responderUnidades(t, raw); if(ru) return ru;
     // Centro de control, auditoría, estimaciones, tiempos

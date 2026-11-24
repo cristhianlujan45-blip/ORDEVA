@@ -2143,12 +2143,13 @@ const mqHechos={_m:(()=>{try{const o=JSON.parse(localStorage.getItem(MQ_HECHOS_K
 // El equipo de la música lleva 5 min sin dar señales: se AVISA aquí (con la app a la vista y la música encendida, cada
 // 30 min). La música la toma una PERSONA tocando «🎶 Que suene aquí»: tomarla sola podía caer en el equipo equivocado (un
 // celular recién abierto con la cola de ayer, uno de un mesero sin reproductor, o varios a la vez).
-let mqAvisoMudo=0;
+// 1.99.53: se recuerda en el equipo (antes, al volver a abrir ORDEVA, el aviso salía otra vez a los 5 min aunque ya hubiera salido).
+let mqAvisoMudo=(()=>{try{return Number(localStorage.getItem('vito_mq_aviso_mudo'))||0;}catch(e){return 0;}})();
 function mqVigilarEquipo(){
   if(!mqOtro()||Date.now()-mqDesde<5*6e4||document.hidden||window.__ventoAlFrente===false)return;
   if(typeof musicaOn==='function'&&!musicaOn())return;
   const mudo=Date.now()-(mqVisto||mqDesde);   // si nunca dio señales desde que se abrió aquí, se cuenta desde entonces
-  if(mudo>5*6e4&&Date.now()-mqAvisoMudo>30*6e4){mqAvisoMudo=Date.now();try{showToast('🎶 «'+mqNombre()+'» (el equipo de la música) no da señales hace '+Math.round(mudo/6e4)+' min. Si se apagó, en Música toca «🎶 Que suene aquí».',10000);}catch(e){}}
+  if(mudo>5*6e4&&Date.now()-mqAvisoMudo>30*6e4){mqAvisoMudo=Date.now();try{localStorage.setItem('vito_mq_aviso_mudo',String(mqAvisoMudo));}catch(e){}try{showToast('🎶 «'+mqNombre()+'» (el equipo de la música) no da señales hace '+Math.round(mudo/6e4)+' min. Si se apagó, en Música toca «🎶 Que suene aquí».',10000);}catch(e){}}
 }
 function mqEscuchar(){
   const c=mqCfg()?mqCanal():'';

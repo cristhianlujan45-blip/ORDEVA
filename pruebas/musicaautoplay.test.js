@@ -86,6 +86,7 @@ const video = (id, t) => ({ id: { videoId: id }, snippet: { title: t, channelTit
     await p.evaluate(() => { const n0 = Date.now.bind(Date); Date.now = () => n0() + 11 * 6e4; window.__mqVigilar(); });
     await p.waitForTimeout(800);
     chk('3. Sin señales del equipo de la música: se AVISA, pero no se le quita la música sola', await p.evaluate(() => window.__toasts.some(t => /no da señales hace \d+ min/.test(t)) && !window.__toasts.some(t => /ahora la música suena en este equipo/.test(t))), await p.evaluate(() => window.__toasts.slice(-3)));
+    chk('3. 1.99.53: el aviso queda recordado en el equipo (al volver a abrir ORDEVA no sale otra vez antes de 30 min)', await p.evaluate(() => Date.now() - Number(localStorage.getItem('vito_mq_aviso_mudo') || 0) < 60e3));
     await p.click('#ypMqYo');
     await p.waitForTimeout(1200);
     // (la canción se comprueba primero y luego se pone: en un navegador sin otro toque sale «▶ Toca»; en la app de Android suena sola)
