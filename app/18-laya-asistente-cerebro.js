@@ -241,6 +241,14 @@
     const ventas = 'Hoy vendiste ' + plata(tot) + ': ' + partes.join(', ') + '.';
     let T = null; try{ T = window.ventoTurno && window.ventoTurno.turno && window.ventoTurno.turno() ? window.ventoTurno.resumen() : null; }catch(e){}
     if(T) return '💵 En la caja debe haber ' + plata(T.esperado) + ' en efectivo: base ' + plata(T.base) + ' + ventas en efectivo ' + plata(T.ventas) + (T.entradas ? ' + entradas ' + plata(T.entradas) : '') + (T.salidas ? ' − salidas ' + plata(T.salidas) : '') + '.\n' + ventas + ' Lo de transferencias y lo fiado no está en la caja.';
+    // 1.99.60: sin caja abierta, la misma cuenta de «Cuadre» (desde el último cierre: efectivo de ventas + fiados cobrados
+    // en efectivo − pagos en efectivo de la libreta). Antes solo el efectivo de las ventas de hoy: otra cifra que «Cuadre».
+    const C = window.ventoCuentaCaja ? window.ventoCuentaCaja() : null;
+    if(C && C.s){
+      const desde = C.ultimo ? 'Desde el último cierre (' + new Date(C.ultimo.date).toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) + ')' : 'Desde que empezaste';
+      const det = 'ventas en efectivo ' + plata(C.s.totalEfectivo) + (C.fiEf ? ' + fiados que pagaron en efectivo ' + plata(C.fiEf) : '') + (C.salEf ? ' − pagos en efectivo de la libreta ' + plata(C.salEf) : '');
+      return '💵 ' + desde + ' debe haber ' + (C.debeHaber < 0 ? '−' + plata(-C.debeHaber) : plata(C.debeHaber)) + ' en efectivo: ' + det + '. La caja no se abrió con base: si tenías plata para vueltas, súmala (abre la caja para llevar la cuenta exacta).\n' + ventas;
+    }
     return '💵 Hoy entraron ' + plata(ef) + ' en efectivo por ventas (la caja no se abrió con base: abre la caja para saber cuánto debe haber).\n' + ventas;
   }
   function centro(){

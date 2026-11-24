@@ -91,3 +91,8 @@ de $1.400 a distinta hora) siguen sonando los dos.
   - «🐞 Reportar un problema»: el recuadro de la captura automática salía vacío (imagen rota) cuando no había captura.
   - Los demás casos ya se manejaban bien (cambian style.display); no se tocaron.
 - Prueba: ventarapida1959 9/9 (con el código de antes: 4 bien 5 mal). erroresreal 33, ventanas1933 9.
+
+## 1.99.60 — Caja: misma cifra en Cuadre y en Laya, y el negativo se entiende
+- «Efectivo que debe haber» en negativo se veía «$-20.000». Ahora «−$20.000» con la nota «Salió más efectivo del que entró…» (si esos pagos no salieron del cajón, márcalos como transferencia en la libreta).
+- Laya «¿cuánto hay en caja?» sin caja abierta decía solo el efectivo de las ventas de HOY; «Cuadre» decía otra cifra (desde el último cierre, con fiados cobrados y pagos de la libreta). Ahora las dos usan la misma cuenta (window.ventoCuentaCaja) y Laya dice el detalle.
+- Prueba: libretacaja1955 17/17; laya1953 6, propinas1957 13, cuadre1954 5, vistasencilla 45, cuadrefiados1946 8.

@@ -36,7 +36,9 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
       const ov = document.getElementById('vsCajaOv'); const f = [...ov.querySelectorAll('.vs-caja-filas div')].map(d => d.innerText.replace(/\s+/g, ' ').trim()); ov.classList.remove('show'); return f; });
     let f = await leer();
     chk('3. Renglón «Pagos en efectivo de la libreta» −$30.000', f.some(x => /Pagos en efectivo de la libreta .*−\$\s?30\.000/.test(x)), f);
-    chk('3. «Efectivo que debe haber» = $10.000 − $30.000 = −$20.000', f.some(x => /Efectivo que debe haber -?−?\$\s?-?20\.000/.test(x)), f);
+    chk('3. «Efectivo que debe haber» = $10.000 − $30.000 = −$20.000 (con el signo bien puesto y la nota)', f.some(x => /Efectivo que debe haber −\$\s?20\.000/.test(x)) && f.some(x => /Salió más efectivo del que entró/.test(x)), f);
+    const ly = await p.evaluate(() => window.Laya.responder('cuánto hay en caja').text);
+    chk('3. Laya «¿cuánto hay en caja?» dice lo mismo que Cuadre (−$20.000, con el detalle)', /debe haber −\$\s?20\.000 en efectivo/.test(ly) && /pagos en efectivo de la libreta \$\s?30\.000/.test(ly), ly);
     // 2. Con la caja abierta
     await p.evaluate(() => { ventoTurno.ponerTurno({ abierto_en: new Date().toISOString(), base: 100000, por: 'ana', movs: [] }); });
     await p.evaluate(() => window.libretaEntender('le pagué a Pedro 40 mil'));
