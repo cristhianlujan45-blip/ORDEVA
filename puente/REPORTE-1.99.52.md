@@ -81,3 +81,8 @@ de $1.400 a distinta hora) siguen sonando los dos.
 - Prueba: pruebas/inventariodevuelve1958.test.js 7/7 (con el código de antes: 2 bien 5 mal, todo iba a la Purina 1 kg).
 - Además: editar un producto por voz o con el asistente («súbele el precio a Purina», «súmale 4 a Purina») tomaba el PRIMER producto con ese nombre. Ahora usa el tamaño que se dijo; si no se dijo y hay varios, pregunta cuál y no cambia nada. El asistente pasa el id del producto que ya escogió y muestra el tamaño al confirmar («Voy a sumar 4 unidades a Purina 5 kg»).
 - Prueba: inventariodevuelve1958 10/10.
+
+## 1.99.59 — Venta rápida sin los datos del domicilio
+- Error real (desde la 1.95.0): «⚡ Venta rápida» de mostrador mostraba siempre «Nombre del cliente», «Teléfono», «Dirección de entrega» y el valor del envío en 0. El estilo display:flex de la etiqueta le ganaba a hidden. Ahora solo salen en «🛵 Domicilio».
+- Revisado también: con dos productos del mismo nombre la búsqueda muestra el tamaño de cada uno y se vende el que se escoge.
+- Prueba: pruebas/ventarapida1959.test.js 5/5.
