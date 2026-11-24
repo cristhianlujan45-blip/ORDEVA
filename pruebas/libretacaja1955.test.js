@@ -53,6 +53,24 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
     chk('2. «Me equivoqué» quita esa salida', T.salidas === 40000, T.movs);
     f = await leer();
     chk('2. Con caja abierta el Cuadre usa la caja: $100.000 − $40.000 (la venta fue antes de abrirla), sin el renglón aparte', !f.some(x => /Pagos en efectivo de la libreta/.test(x)) && f.some(x => /Efectivo que debe haber \(con la base \$\s?100\.000\) \$\s?60\.000/.test(x)), f);
+    // 4. El formulario de la libreta (botones) también pregunta cómo se pagó
+    const form = (t, quien, n, met) => p.evaluate(async ([t, quien, n, met]) => { window.libretaAbrir(); await new Promise(r => setTimeout(r, 200));
+      document.querySelector('#libretaOverlay .lb-b[data-t="' + t + '"]').click(); const vis = !document.getElementById('lbMet').hidden;
+      document.getElementById('lbPersona').value = quien; document.getElementById('lbMonto').value = n;
+      if(met) document.querySelector('#lbMet [data-met="' + met + '"]').click();
+      document.getElementById('lbFormSi').click(); await new Promise(r => setTimeout(r, 200)); return vis; }, [t, quien, n, met]);
+    let vis = await form('prov', 'Agro Sur', 70000, 'transferencia');
+    m = await ult(); T = await p.evaluate(() => ventoTurno.resumen());
+    chk('4. Formulario «pagué a proveedor» con 📱 Transferencia: queda transferencia y no sale de la caja', vis && m.t === 'prov' && m.met === 'transferencia' && !m.caja && T.salidas === 40000, { m, s: T.salidas });
+    vis = await form('emp', 'Pedro', 10000);
+    m = await ult(); T = await p.evaluate(() => ventoTurno.resumen());
+    chk('4. Formulario «pagué a empleado» sin tocar nada: efectivo y sale de la caja', m.t === 'emp' && m.met === 'efectivo' && m.caja && T.salidas === 50000, { m, s: T.salidas });
+    await p.evaluate(() => window.libretaEntender('Rosa me debe 20 mil'));
+    await form('abono', 'Rosa', 8000, 'transferencia');
+    m = await ult(); T = await p.evaluate(() => ventoTurno.resumen());
+    chk('4. Formulario «me pagaron» con 📱 Transferencia: abono de Rosa sin entrada a la caja', m.t === 'abono' && m.p === 'Rosa' && m.met === 'transferencia' && T.entradas === 0, { m, e: T.entradas });
+    vis = await form('debe', 'Rosa', 1000);
+    chk('4. «Me deben» no muestra efectivo / transferencia', vis === false, vis);
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.stack || e)); }
   chk('Sin errores de página', !errs.length, errs.join(' | '));
   await b.close(); console.log('RESULTADO', ok, 'bien', mal, 'mal'); process.exit(mal ? 1 : 0);

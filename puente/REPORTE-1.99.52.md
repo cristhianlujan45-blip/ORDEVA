@@ -56,3 +56,8 @@ de $1.400 a distinta hora) siguen sonando los dos.
 - Con la caja abierta, pagarle en efectivo a un empleado o a un proveedor desde la libreta es una salida de la caja (antes solo entraban los fiados cobrados, y el cuadre decía que debía haber más plata). Por transferencia no sale; «me equivoqué» quita la salida.
 - Sin caja abierta, «Cuadre» resta lo pagado en efectivo desde la libreta en su propio renglón («💸 Pagos en efectivo de la libreta»).
 - Prueba: pruebas/libretacaja1955.test.js 12/12. También pasan cuadre1954, libreta, libretanombres1942, fiadosnombres, pagocuenta1948, cuadrefiados1946, laya1953, mejoras, vistasencilla, cerrarcaja, y para lo de anular facturas: anularventas, esquinas, facturascan, finanzas, girofactura, guia, inventario5, ivaexcel, proveedores, salidas, sincroniza.
+
+## 1.99.56 — Formulario de la libreta: efectivo o transferencia
+- Los botones «Me pagaron», «Pagué a un empleado» y «Pagué a un proveedor» ahora preguntan cómo fue: 💵 Efectivo (por defecto) o 📱 Transferencia. Con la 1.99.55 el efectivo entra o sale de la caja, así que hacía falta poder decir que fue por transferencia sin hablar.
+- Diagnóstico real (solo conteos): la libreta del negocio no tiene ningún nombre con «nequi/transferencia» pegado (3 apuntes, todos «me debe»). No hay nada que limpiar.
+- Prueba: libretacaja1955 16/16; libreta 24, libretanombres1942 12, fiadosnombres 28, pagocuenta1948 8, cuadrefiados1946 8.

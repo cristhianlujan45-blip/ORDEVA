@@ -625,6 +625,8 @@
       '<div class="lb-form" id="lbForm" hidden><div class="lb-form-t" id="lbFormT"></div>' +
       '<input id="lbPersona" class="mz-in" list="lbPersonasList" placeholder="Nombre" autocomplete="off"><datalist id="lbPersonasList"></datalist>' +
       '<input id="lbMonto" class="mz-in" type="number" inputmode="numeric" placeholder="¿Cuánta plata?" min="0" step="500">' +
+      // 1.99.55: cómo se pagó (el efectivo entra o sale de la caja; la transferencia no)
+      '<div class="lb-met" id="lbMet" hidden><button type="button" data-met="efectivo" class="on">💵 Efectivo</button><button type="button" data-met="transferencia">📱 Transferencia</button></div>' +
       '<div class="lb-form-a"><button type="button" class="btn-close" id="lbFormNo">Cancelar</button><button type="button" class="btn-primary" id="lbFormSi">Guardar</button></div></div>' +
       '<div class="lb-sec"><div class="lb-sec-t">📕 Me deben <b id="lbTotDeben"></b></div>' +
       // 1.99.42 · Con muchos que deben, buscar a uno por su nombre (antes había que bajar toda la lista: «no aparece Camila»).
@@ -643,8 +645,11 @@
       $l('lbFormT').textContent = { debe: '📕 ¿Quién te debe y cuánto?', abono: '✅ ¿Quién te pagó y cuánto?', emp: '👷 ¿A quién le pagaste y cuánto?', prov: '📦 ¿A qué proveedor le pagaste y cuánto?', pdeb: '🧾 ¿A qué proveedor le debes y cuánto?' }[tipoForm];
       $l('lbPersonasList').innerHTML = (tipoForm === 'emp' ? [...new Set(LB().movs.filter(m => m.tipo === 'emp').map(m => m.persona))] : tipoForm === 'abono' ? lbDeudores().map(x => x[0]) : tipoForm === 'prov' || tipoForm === 'pdeb' ? lbProveedores() : lbPersonas()).map(p => '<option value="' + esc2(p) + '">').join('');
       $l('lbPersona').value = ''; $l('lbMonto').value = '';
+      $l('lbMet').hidden = !(tipoForm === 'abono' || tipoForm === 'prov' || tipoForm === 'emp');
+      $l('lbMet').querySelectorAll('button').forEach(x => x.classList.toggle('on', x.dataset.met === 'efectivo'));
       $l('lbForm').hidden = false; $l('lbPersona').focus();
     });
+    $l('lbMet').onclick = e => { const x = e.target.closest('[data-met]'); if(x) $l('lbMet').querySelectorAll('button').forEach(y => y.classList.toggle('on', y === x)); };
     $l('lbFormNo').onclick = () => { $l('lbForm').hidden = true; };
     // ---------- Calculadora de botones (suma, resta, multiplica, divide) ----------
     // Igual que cualquier calculadora de bolsillo: un acumulador, un operador pendiente y lo que
@@ -684,15 +689,16 @@
       if(!(n > 0)) return lbResponder('Escribe cuánta plata.');
       const nombre = (tipoForm === 'prov' || tipoForm === 'pdeb' ? lbProveedores() : lbPersonas()).find(x => lbNorm(x) === lbNorm(p)) || p.charAt(0).toUpperCase() + p.slice(1);
       $l('lbForm').hidden = true;
+      const metEl = $l('lbMet').querySelector('button.on'), met = metEl && !$l('lbMet').hidden ? metEl.dataset.met : 'efectivo';
       // Con los botones se sabe qué es: se anota directo (sin adivinar por las palabras).
       if(tipoForm === 'prov' || tipoForm === 'pdeb' || tipoForm === 'emp'){
-        const debia = lbDeboProv(nombre), m = lbAgregar(tipoForm, nombre, n);
-        lbResponder(tipoForm === 'pdeb' ? '🧾 Anotado: le debes ' + plata(n) + ' a ' + nombre + '. En total le debes ' + plata(lbDeboProv(nombre)) + '.'
+        const debia = lbDeboProv(nombre), m = lbAgregar(tipoForm, nombre, n, '', tipoForm === 'pdeb' ? null : { metodo: met });
+        lbResponder((tipoForm === 'pdeb' ? '🧾 Anotado: le debes ' + plata(n) + ' a ' + nombre + '. En total le debes ' + plata(lbDeboProv(nombre)) + '.'
           : tipoForm === 'prov' ? '📦 Anotado: le pagaste ' + plata(n) + ' a ' + nombre + '.' + (m.enlazada ? ' Es la factura escaneada (no se cuenta dos veces).' : ' Queda como gasto de proveedores en Contabilidad.') + (debia > 0 ? (lbDeboProv(nombre) > 0 ? ' Todavía le debes ' + plata(lbDeboProv(nombre)) + '.' : ' Ya no le debes nada.') : '')
-          : '👷 Anotado: le pagaste ' + plata(n) + ' a ' + nombre + '. Este mes van ' + plata(lbPagadoMes(nombre)) + '.');
+          : '👷 Anotado: le pagaste ' + plata(n) + ' a ' + nombre + '. Este mes van ' + plata(lbPagadoMes(nombre)) + '.') + (tipoForm !== 'pdeb' && met === 'transferencia' ? ' 📱 Por transferencia: no sale de la caja.' : ''));
         return;
       }
-      const frase = tipoForm === 'debe' ? nombre + ' me debe ' + n : nombre + ' me pagó ' + n;
+      const frase = tipoForm === 'debe' ? nombre + ' me debe ' + n : nombre + ' me pagó ' + n + (met === 'transferencia' ? ' por transferencia' : '');
       const r = lbEntender(frase); if(r) lbResponder(r.texto);
     };
     ov.addEventListener('click', e => {
@@ -890,7 +896,7 @@
     '.lb-calc-grid .lb-calc-op{background:var(--amber,#c8a24a);color:var(--on-amber,#1a1410)}' +
     '.lb-calc-grid .lb-calc-ig{background:#27ae60;color:#fff;grid-column:span 2}' +
     '.lb-calc-grid .lb-calc-0{grid-column:span 1}' +
-    '.lb-b{padding:16px 6px;border-radius:14px;border:2px solid var(--line,#555);background:transparent;color:inherit;font:700 16px system-ui;line-height:1.25;cursor:pointer}' +
+    '.lb-met{display:flex;gap:8px}.lb-met[hidden]{display:none!important}.lb-met button{flex:1;min-height:46px;padding:10px 6px;border-radius:12px;border:2px solid var(--line,#555);background:transparent;color:inherit;font:700 16px system-ui;cursor:pointer}.lb-met button.on{border-color:var(--accent,#7c3aed);background:color-mix(in srgb,var(--accent,#7c3aed) 18%,transparent)}.lb-b{padding:16px 6px;border-radius:14px;border:2px solid var(--line,#555);background:transparent;color:inherit;font:700 16px system-ui;line-height:1.25;cursor:pointer}' +
     '.lb-debe{border-color:#c0392b}.lb-abono{border-color:#27ae60}.lb-emp{border-color:#2980b9}.lb-prov{border-color:#8e44ad}.lb-pdeb{border-color:#d35400}' +
     '.lb-form{padding:12px;border-radius:14px;background:rgba(127,127,127,.12);display:flex;flex-direction:column;gap:8px}.lb-form-t{font-weight:700;font-size:17px}' +
     '.lb-form input{font-size:20px!important;padding:12px!important}.lb-form-a{display:flex;gap:8px}.lb-form-a button{flex:1;padding:14px;font-size:18px}' +
