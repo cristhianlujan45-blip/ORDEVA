@@ -668,10 +668,21 @@ function asisMesaNum(t){
   }
   return null;
 }
+// 1.99.69: con productos del mismo nombre y distinto tamaño (Purina 1 kg y 5 kg) el tamaño dicho escoge («la purina de
+// 5 kilos»); si no se dijo, no se escoge ninguno y se pregunta cuál (antes: siempre la primera, también para cambiar el precio).
 function asisFindProduct(t){
-  const words = t.split(' ').filter(w => w && !ASIS_STOP.has(w) && !/^\d+$/.test(w) && NUM_WORDS_VOICE[w] === undefined);
+  window.__asisAmbiguo = null;
+  const tam = typeof vozTamDe === 'function' ? vozTamDe(t) : null;
+  const t2 = tam ? normVoiceText(t).replace(tam.txt, ' ').replace(/\s+/g, ' ').trim() : t;
+  const words = t2.split(' ').filter(w => w && !ASIS_STOP.has(w) && !/^\d+$/.test(w) && NUM_WORDS_VOICE[w] === undefined);
   if(!words.length) return null;
-  return findProductByVoiceAlias(words.join(' '));
+  const p = findProductByVoiceAlias(words.join(' '));
+  if(!p) return null;
+  const herm = (data.products || []).filter(x => x && !x.combo && normVoiceText(x.name) === normVoiceText(p.name));
+  if(herm.length < 2) return p;
+  if(tam){ const c = herm.filter(x => { const z = vozTamDe(x.size); return z && z.u === tam.u && Math.abs(z.n - tam.n) < 1e-9; }); if(c.length === 1) return c[0]; }
+  if(new Set(herm.map(x => normVoiceText(x.size || ''))).size > 1){ window.__asisAmbiguo = herm; return null; }
+  return p;
 }
 function asisDeudas(){
   return (data.history || []).filter(h => (Number(h.debt) || 0) > 0).map(h => {
@@ -905,6 +916,12 @@ function asisLocalMas(raw){
 
 // Sin IA: entiende "sube la Póker a 3500" o "llegaron 24 Águilas" y lo propone.
 function asisLocalAccion(raw){
+  const r = asisLocalAccionBase(raw);
+  if(r || !window.__asisAmbiguo) return r;
+  const h = window.__asisAmbiguo; window.__asisAmbiguo = null;
+  return { text: '¿Cuál ' + h[0].name + '? ' + h.map(x => (x.size || 'sin tamaño') + ' (' + fmt(x.price) + ')').join(' o ') + '. Dilo con el tamaño, por ejemplo: «… ' + h[0].name.toLowerCase() + ' de ' + ((h.find(x => x.size) || {}).size || '') + ' …».' };
+}
+function asisLocalAccionBase(raw){
   const t = normVoiceText(raw);
   const nums = asisRawNumbers(raw);
   /* Comandos que ORDEVA hace AL INSTANTE, sin esperar a la IA (siempre pide confirmar antes).
