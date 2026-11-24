@@ -79,3 +79,5 @@ de $1.400 a distinta hora) siguen sonando los dos.
 - Ahora anular y corregir van por invOnSale (como la venta: por id, combos a sus productos, de vuelta a su lote) y la devolución busca primero por id y reparte los combos.
 - Anular un día entero sigue sin devolver inventario (así lo dice el mensaje; no se cambió).
 - Prueba: pruebas/inventariodevuelve1958.test.js 7/7 (con el código de antes: 2 bien 5 mal, todo iba a la Purina 1 kg).
+- Además: editar un producto por voz o con el asistente («súbele el precio a Purina», «súmale 4 a Purina») tomaba el PRIMER producto con ese nombre. Ahora usa el tamaño que se dijo; si no se dijo y hay varios, pregunta cuál y no cambia nada. El asistente pasa el id del producto que ya escogió y muestra el tamaño al confirmar («Voy a sumar 4 unidades a Purina 5 kg»).
+- Prueba: inventariodevuelve1958 10/10.

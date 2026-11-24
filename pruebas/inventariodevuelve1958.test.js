@@ -42,6 +42,15 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
     chk('5. Devolver 1 de 2 × Purina 5 kg → la de 5 kg +1 (14 → 15), la de 1 kg igual', s.pa5 === 15 && s.pa1 === 12, s);
     const ventas = await p.evaluate(() => data.history.map(h => h.id + ':' + h.items.map(i => i.qty).join(',') + ':' + h.total));
     chk('Las ventas quedan bien (s4 con 1, s5 con 1; s1-s3 anuladas)', JSON.stringify(ventas) === JSON.stringify(['s4:1:35000', 's5:1:35000']), ventas);
+    // 6. Editar por voz / asistente con dos productos del mismo nombre
+    const ed = await p.evaluate(() => { const r = {};
+      r.amb = asisApply([{ tipo: 'editar', producto: 'Purina', precio: 9000 }]).join(' '); r.p1a = data.products.find(x => x.id === 'pa1').price; r.p5a = data.products.find(x => x.id === 'pa5').price;
+      r.tam = asisApply([{ tipo: 'editar', producto: 'Purina', tam: '5 kg', sumarStock: 4 }]).join(' '); r.s5 = data.products.find(x => x.id === 'pa5').stock; r.s1 = data.products.find(x => x.id === 'pa1').stock;
+      r.id = asisApply([{ tipo: 'editar', id: 'pa1', producto: 'Purina', precio: 8500 }]).join(' '); r.p1b = data.products.find(x => x.id === 'pa1').price; r.p5b = data.products.find(x => x.id === 'pa5').price;
+      return r; });
+    chk('6. «Purina» sin tamaño: pregunta cuál y no cambia nada', /Hay 2 productos «Purina» \(1 kg, 5 kg\)/.test(ed.amb) && ed.p1a === 8000 && ed.p5a === 35000, ed);
+    chk('6. «Purina 5 kg»: le suma a la de 5 kg (15 → 19), la de 1 kg igual', ed.s5 === 19 && ed.s1 === 12, ed);
+    chk('6. El asistente que ya sabe cuál (id): cambia esa', ed.p1b === 8500 && ed.p5b === 35000, ed);
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.stack || e)); }
   chk('Sin errores de página', !errs.length, errs.join(' | '));
   await b.close(); console.log('RESULTADO', ok, 'bien', mal, 'mal'); process.exit(mal ? 1 : 0);

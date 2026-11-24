@@ -904,14 +904,14 @@ function asisLocalAccion(raw){
   if(/\b(costo|cuesta|me cuesta|me sale|la compro|lo compro|compro a)\b/.test(t) && !/\b(cuanto|que|cual)\b/.test(t) && nums.length){
     const costo = nums[nums.length - 1];
     const p = asisFindProduct(t.replace(/\b(costo|cuesta|me cuesta|me sale|la compro|lo compro|compro a|el|la|de|es|en|a|por)\b/g, ' '));
-    if(p && costo >= 50) return { text: 'Voy a poner el costo de ' + p.name + ' en ' + fmt(costo) + (p.price ? ' (ganarías ' + fmt(p.price - costo) + ' por unidad)' : '') + '. ¿Lo hago?', actions: [{ tipo: 'editar', producto: p.name, costo }] };
+    if(p && costo >= 50) return { text: 'Voy a poner el costo de ' + p.name + ' en ' + fmt(costo) + (p.price ? ' (ganarías ' + fmt(p.price - costo) + ' por unidad)' : '') + '. ¿Lo hago?', actions: [{ tipo: 'editar', id: p.id, producto: p.name, costo }] };
   }
   // Inventario exacto: "quedan 12 águilas", "hay 30 póker", "stock de club en 24", "inventario club 24"
   const mHay = t.match(/\b(quedan|queda|hay|tengo|stock|inventario|existencias)\b/);
   if(mHay && nums.length && !/\b(mesa|cuanto|cuantos|cuantas|que|cual)\b/.test(t)){
     const n = nums[nums.length - 1];
     const p = asisFindProduct(t.replace(/\b(quedan|queda|hay|tengo|stock|inventario|existencias|de|en|el|la|los|las|unidades|und)\b/g, ' '));
-    if(p && n >= 0 && n < 100000) return { text: 'Voy a dejar ' + p.name + ' con ' + n + ' en inventario' + (p.stock != null ? ' (ahora tiene ' + p.stock + ')' : '') + '. ¿Lo hago?', actions: [{ tipo: 'editar', producto: p.name, stock: n }] };
+    if(p && n >= 0 && n < 100000) return { text: 'Voy a dejar ' + p.name + ' con ' + n + ' en inventario' + (p.stock != null ? ' (ahora tiene ' + p.stock + ')' : '') + '. ¿Lo hago?', actions: [{ tipo: 'editar', id: p.id, producto: p.name, stock: n }] };
   }
   // Producto nuevo: "crea cerveza club a 4500", "nuevo producto empanada 2500", "agrega producto gaseosa 3000"
   const mCrea = t.match(/^(?:por favor )?(?:crea|crear|creame|nuevo producto|nuevo|agrega el producto|agrega producto|anade el producto|anade producto|registra)\s+(.+?)\s+(?:a|en|por|de|vale|precio|a precio de)?\s*\$?\s*(\d[\d.,]*)\s*(?:pesos|mil)?$/);
@@ -935,13 +935,13 @@ function asisLocalAccion(raw){
   if(/\b(precio|sube|subir|subele|baja|bajar|bajale|cambia|cambiar|ponle|actualiza|vale|valga)\b/.test(t) && nums.length){
     const precio = nums[nums.length - 1];
     const p = asisFindProduct(t);
-    if(p && precio >= 50) return { text: 'Voy a cambiar el precio de ' + p.name + ' de ' + fmt(p.price) + ' a ' + fmt(precio) + '. ¿Lo hago?', actions: [{ tipo: 'editar', producto: p.name, precio }] };
+    if(p && precio >= 50) return { text: 'Voy a cambiar el precio de ' + p.name + (p.size ? ' ' + p.size : '') + ' de ' + fmt(p.price) + ' a ' + fmt(precio) + '. ¿Lo hago?', actions: [{ tipo: 'editar', id: p.id, producto: p.name, precio }] };
   }
   const mLlego = t.match(/\b(llegaron|llego|compre|entraron|suma|sumale|sumar|agrega|agregale|agregar)\b\s+(\d+)\b/);
   if(mLlego && !/\bmesa\b/.test(t)){
     const n = Number(mLlego[2]);
     const p = asisFindProduct(t.replace(mLlego[0], ' '));
-    if(p && n > 0) return { text: 'Voy a sumar ' + n + ' unidades a ' + p.name + (p.stock != null ? ' (quedarían ' + ((p.stock || 0) + n) + ')' : '') + '. ¿Lo hago?', actions: [{ tipo: 'editar', producto: p.name, sumarStock: n }] };
+    if(p && n > 0) return { text: 'Voy a sumar ' + n + ' unidades a ' + p.name + (p.size ? ' ' + p.size : '') + (p.stock != null ? ' (quedarían ' + ((p.stock || 0) + n) + ')' : '') + '. ¿Lo hago?', actions: [{ tipo: 'editar', id: p.id, producto: p.name, sumarStock: n }] };
   }
   return null;
 }
@@ -959,7 +959,17 @@ function asisApply(actions){
         size: String(a.tam || '').trim(), specifications: '', stock: invNum(a.stock), cost: invNum(a.costo) });
       done.push('Creé "' + nombre + '" a ' + fmt(Math.round(precio)) + '.');
     } else if(a.tipo === 'editar'){
-      const p = data.products.find(x => x.name === a.producto) || data.products.find(x => normVoiceText(x.name) === normVoiceText(a.producto || '')) || findProductByVoiceAlias(a.producto || '');
+      // 1.99.58: con varios productos del MISMO nombre (Purina 1 kg y Purina 5 kg) no se cambia el primero a ciegas: se usa
+      // el tamaño que se dijo y, si no se dijo, se pregunta cuál.
+      const nv = t => normVoiceText(String(t || '')), dicho = nv(a.producto), tamD = nv(a.tam);
+      const mismos = data.products.filter(x => !x.combo && (x.name === a.producto || nv(x.name) === dicho));
+      let p = a.id != null ? data.products.find(x => x.id === a.id) || null : null;   // el asistente ya sabe cuál
+      if(!p && mismos.length > 1){
+        const porTam = mismos.filter(x => x.size && (tamD ? nv(x.size) === tamD : false));
+        if(porTam.length === 1) p = porTam[0];
+        else { done.push('Hay ' + mismos.length + ' productos «' + mismos[0].name + '» (' + mismos.map(x => x.size || 'sin tamaño').join(', ') + '). Dime cuál, por ejemplo «' + mismos[0].name + ' ' + (mismos.find(x => x.size) || {}).size + '». No cambié nada.'); return; }
+      }
+      if(!p) p = mismos[0] || findProductByVoiceAlias(a.producto || '');
       if(!p){ done.push('No encontré "' + a.producto + '".'); return; }
       const c = [];
       if(Number(a.precio) > 0){ p.price = Math.round(a.precio); c.push('precio ' + fmt(p.price)); const nm = sincronizarProductoEnMesas(p); if(nm) c.push('actualizado en ' + nm + (nm === 1 ? ' mesa abierta' : ' mesas abiertas')); }
