@@ -1521,7 +1521,7 @@ function renderHistorial(masPagina){
   const list = document.getElementById('histList');
   const summary = document.getElementById('histSummary');
   let totalSum = 0, debtSum = 0;
-  for(const h of data.history){ totalSum += h.total; debtSum += (h.debt || 0); }
+  for(const h of data.history){ totalSum += (Number(h.total) || 0) - propinaDe(h); debtSum += (h.debt || 0); }   // 1.99.57: «Total vendido» sin propinas (como el cierre)
   summary.innerHTML = `
     <div class="hist-stat"><div class="n">${data.history.length}</div><div class="l">Cuentas cerradas</div></div>
     <div class="hist-stat"><div class="n">${fmt(totalSum)}</div><div class="l">Total vendido</div></div>

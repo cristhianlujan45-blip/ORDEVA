@@ -70,4 +70,5 @@ de $1.400 a distinta hora) siguen sonando los dos.
   - Laya «¿cuánto hay en caja?» («Hoy vendiste…»), el asistente («¿cuánto vendí?», ventas de hoy/semana) y el total por voz.
   - El Corte X (total y por cajero) y la pantalla «Hoy» del punto de venta.
 - Ahora todas usan la venta sin propina. El Corte X muestra «🤝 Propinas» en su renglón (ya van dentro de los medios de pago, como en el cierre). La descarga de Excel de Estadísticas sigue con lo cobrado renglón por renglón.
-- Prueba: pruebas/propinas1957.test.js 12/12.
+- También el «Total vendido» de arriba del Historial. Y en «Anuladas» las facturas de proveedor se cuentan aparte con su valor.
+- Prueba: pruebas/propinas1957.test.js 13/13; anularcompra1955 15/15; anularventas 27/27.
