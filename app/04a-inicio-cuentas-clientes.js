@@ -1146,7 +1146,9 @@ function closeTableToHistory(tableId){
     total,
     payments: paymentsDetail,
     debt,
-    items: t.items.map(it=>comisionDe(it, {name:it.name, qty:it.qty, price:it.price, cost: (data.products.find(p=>p.id===it.productId)||{}).cost ?? null, person: personLookupName(t, it.personId)})),   // ✂️ 1.84.0: quién lo hizo y su comisión
+    // 1.99.65: con el id del producto y su tamaño (antes solo el nombre: anular, corregir o devolver una venta de una cuenta
+    // devolvía el inventario al PRIMER producto con ese nombre, y «lo más vendido» juntaba los tamaños).
+    items: t.items.map(it=>comisionDe(it, Object.assign({name:it.name, qty:it.qty, price:it.price, cost: (data.products.find(p=>p.id===it.productId)||{}).cost ?? null, person: personLookupName(t, it.personId)}, it.productId ? { productId: it.productId } : {}, it.size ? { size: it.size } : {}))),   // ✂️ 1.84.0: quién lo hizo y su comisión
     date: new Date().toISOString(),
     by: (typeof authUser !== 'undefined' && authUser) ? authUser : null   // quién cerró/cobró esta mesa, para el turno de caja
   };

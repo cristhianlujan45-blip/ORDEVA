@@ -121,3 +121,8 @@ de $1.400 a distinta hora) siguen sonando los dos.
 - «¿Eliminar producto?» decía solo el nombre («Purina»): con dos del mismo nombre no se sabía cuál. Ahora dice el tamaño («Purina 5 kg») y avisa si está dentro de un combo (al venderlo ya no se descontaría) y si está en cuentas abiertas.
 - Unir productos repetidos (Productos → duplicados, y Laya «fusionar»): los combos que traían el producto que se va quedaban apuntando a un producto que ya no existe (dejaban de descontarlo). Ahora pasan al que se queda, igual que su kárdex y sus lotes con vencimiento.
 - Prueba: pruebas/productosborrar1964.test.js 8/8 (con el código de antes: 2 bien 6 mal). diseno199 50, inventariodevuelve1958 10, memoria1940 10, productosorden1942 12, recetas 21, sincroniza 27.
+
+## 1.99.65 — Las ventas de las cuentas guardan qué producto y qué tamaño
+- Error real: al cobrar una CUENTA (mesa o cuenta de persona), la venta guardaba solo el nombre del producto (sin su id ni su tamaño). Por eso el arreglo de la 1.99.58 no aplicaba a esas ventas: anular, corregir o devolver devolvía el inventario al PRIMER producto con ese nombre (Purina 1 kg en vez de Purina 5 kg). Y «lo más vendido» sumaba los tamaños como un solo producto («6 × Purina»).
+- Ahora las ventas de cuentas y de venta rápida guardan el id y el tamaño. «Lo más vendido» (Estadísticas, asistente, Laya, resumen del cierre) separa los tamaños; en ventas viejas con id, el tamaño sale del producto.
+- Prueba: pruebas/tamanosventas1965.test.js 7/7 (con el código de antes: 1 bien 6 mal).

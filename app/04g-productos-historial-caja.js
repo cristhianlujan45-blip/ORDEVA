@@ -1651,6 +1651,16 @@ function propinaDe(h){
   return Math.max(0, (h.items || []).filter(it => it && !it.productId && /^🙏\s*Propina/i.test(String(it.name || ''))).reduce((s, it) => s + (Number(it.price) || 0) * (Number(it.qty) || 1), 0));
 }
 window.propinaDe = propinaDe;
+/* 1.99.65 · Nombre de un producto vendido CON su tamaño («Purina 5 kg»), para «lo más vendido»: dos productos del mismo
+   nombre y distinto tamaño ya no se suman como uno. El tamaño sale del producto (si la venta trae su id) o de la venta. */
+function nombreConTamano(it){
+  if(!it) return '';
+  const p = it.productId != null ? (data.products || []).find(x => x.id === it.productId) : null;
+  const sz = String(p ? (p.size || '') : String(it.size || '').split(' · ')[0]).trim();
+  const n = typeof nombreVigente === 'function' ? nombreVigente(it.name) : String(it.name || '');
+  return n + (sz && !n.toLowerCase().endsWith(sz.toLowerCase()) ? ' ' + sz : '');
+}
+window.nombreConTamano = nombreConTamano;
 window.ventaSinPropina = h => (Number(h && h.total) || 0) - propinaDe(h);
 
 /* ---------- Cierre de caja del día ---------- */

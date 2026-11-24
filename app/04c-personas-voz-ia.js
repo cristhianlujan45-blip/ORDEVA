@@ -1163,7 +1163,7 @@ document.getElementById('personChargeBtn').addEventListener('click', async ()=>{
     total,
     payments: paymentsDetail,
     debt,
-    items: items.map(it=>comisionDe(it, {name:it.name, qty:it.qty, price:it.price, cost: (data.products.find(p=>p.id===it.productId)||{}).cost ?? null})),   // ✂️ 1.84.0
+    items: items.map(it=>comisionDe(it, Object.assign({name:it.name, qty:it.qty, price:it.price, cost: (data.products.find(p=>p.id===it.productId)||{}).cost ?? null}, it.productId ? { productId: it.productId } : {}, it.size ? { size: it.size } : {}))),   // 1.99.65: con id y tamaño   // ✂️ 1.84.0
     date: new Date().toISOString()
   });
   try{ window.ventoDian && window.ventoDian.alVender(data.history[0]); }catch(x){}   // 🧾 a la DIAN (si está prendida)

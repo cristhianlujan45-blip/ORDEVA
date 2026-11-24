@@ -419,8 +419,8 @@ function renderStats(){
     const mk = h.tableName || (h.table != null ? i18nPut(espacioN()) + ' ' + h.table : '—'); mesas[mk] = (mesas[mk] || 0) + hv;
     if(h.by){ const ek = h.by; emps[ek] = emps[ek] || { v: 0, n: 0 }; emps[ek].v += hv; emps[ek].n++; }
     (h.payments || []).forEach(p => { meth[p.method] = (meth[p.method] || 0) + (p.amount || 0); });
-    (h.items || []).forEach(it => { if(esPropina(it)) return; const v = it.qty * it.price; units += it.qty; const nv = nombreVigente(it.name); const P = prod[nv] = prod[nv] || { q: 0, v: 0 }; P.q += it.qty; P.v += v; const c = catOf[cartaNrm(nv)] || 'Otros'; cats[c] = (cats[c] || 0) + v;
-      if(it.cost != null){ hasCostData = true; const g = v - it.qty * it.cost; knownRevenue += v; margin += g; const G = profit[nombreVigente(it.name)] = profit[nombreVigente(it.name)] || { q: 0, g: 0 }; G.q += it.qty; G.g += g; }
+    (h.items || []).forEach(it => { if(esPropina(it)) return; const v = it.qty * it.price; units += it.qty; const nv = nombreVigente(it.name), nvt = window.nombreConTamano ? window.nombreConTamano(it) : nv; const P = prod[nvt] = prod[nvt] || { q: 0, v: 0 }; P.q += it.qty; P.v += v; const c = catOf[cartaNrm(nv)] || 'Otros'; cats[c] = (cats[c] || 0) + v;
+      if(it.cost != null){ hasCostData = true; const g = v - it.qty * it.cost; knownRevenue += v; margin += g; const G = profit[nvt] = profit[nvt] || { q: 0, g: 0 }; G.q += it.qty; G.g += g; }
     });
   });
   let prevTotal = null;                          // ventas del período anterior de igual duración (para comparar)

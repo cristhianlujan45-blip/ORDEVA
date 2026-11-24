@@ -43,7 +43,7 @@
       total += ve; const hr = new Date(Date.parse(e.date)).getHours(); horas[hr] = (horas[hr] || 0) + ve;
       (e.items || []).forEach(i => {
         const q = Number(i.qty) || 0, v = q * (Number(i.price) || 0); unidades += q;
-        const k = String(i.name || '').replace(/^🛵 /, ''); if(!/domicilio|propina/i.test(k)){ prod[k] = prod[k] || { q: 0, v: 0 }; prod[k].q += q; prod[k].v += v; }
+        const k = String(i.name || '').replace(/^🛵 /, ''); if(!/domicilio|propina/i.test(k)){ const kt = window.nombreConTamano ? window.nombreConTamano(Object.assign({}, i, { name: k })) : k; prod[kt] = prod[kt] || { q: 0, v: 0 }; prod[kt].q += q; prod[kt].v += v; }   // 1.99.65: con tamaño
         if(i.cost != null && i.cost !== '') costo += q * Number(i.cost); else if(!/domicilio|propina/i.test(k)) sinCosto += v;
       });
     });

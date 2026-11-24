@@ -70,7 +70,7 @@ function qsRegistrarVenta(cart, opts){
     qty: it.qty,
     price: it.price,
     cost: (data.products.find(p=>p.id===it.productId)||{}).cost ?? null
-  }, it.unidad ? { unidad: it.unidad } : {}, it.productId ? { productId: it.productId } : {}, it.precioLista != null && it.precioLista !== it.price ? { precioLista: it.precioLista } : {}, it.variante ? { variante: String(it.variante).slice(0, 30) } : {}));      // ⚖️ por kilo/libra · 🏷️ precio antes del descuento
+  }, it.unidad ? { unidad: it.unidad } : {}, it.productId ? { productId: it.productId } : {}, (() => { const pp = it.productId && data.products.find(p => p.id === it.productId); return pp && pp.size ? { size: pp.size } : {}; })(), it.precioLista != null && it.precioLista !== it.price ? { precioLista: it.precioLista } : {}, it.variante ? { variante: String(it.variante).slice(0, 30) } : {}));      // ⚖️ por kilo/libra · 🏷️ precio antes del descuento
   // El valor del domicilio se suma como una línea más (igual que la propina),
   // así el total del recibo y de las estadísticas ya lo incluyen sin tener
   // que tocar nada más en la app.
@@ -497,7 +497,7 @@ function asisSales(){
       const q = Number(it.qty) || 0, pr = Number(it.price) || 0, c = Number(it.cost);
       if(esHoy){ if(c > 0) ganHoy += q * (pr - c); else hoySinCosto = true; }
       if(t < d30) return;
-      const s = stats[nombreVigente(it.name)] || (stats[nombreVigente(it.name)] = { u: 0, v: 0, g: 0, sc: false });
+      const kn = window.nombreConTamano ? window.nombreConTamano(it) : nombreVigente(it.name), s = stats[kn] || (stats[kn] = { u: 0, v: 0, g: 0, sc: false });   // 1.99.65: con tamaño
       s.u += q; s.v += q * pr;
       if(c > 0) s.g += q * (pr - c); else s.sc = true;
     });
@@ -519,7 +519,7 @@ function asisProductosRelevantes(q, top){
   const score = p => {
     const n = normVoiceText(p.name + ' ' + (p.size || '') + ' ' + (p.categoryId ? categoryName(p.categoryId) : ''));
     let sc = roots.filter(r => n.includes(r)).length * 10;
-    if(topNames.has(p.name)) sc += 3;
+    if(topNames.has(p.name) || topNames.has(p.name + (p.size ? ' ' + p.size : ''))) sc += 3;
     const st = invStatus(p);
     if(st === 'out' || st === 'low') sc += 2;
     if(!(p.cost > 0)) sc += 1;
