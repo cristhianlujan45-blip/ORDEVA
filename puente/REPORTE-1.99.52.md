@@ -171,3 +171,8 @@ de $1.400 a distinta hora) siguen sonando los dos.
 - Diagnóstico (solo conteos): renglones vendidos con y sin id de producto por día, para confirmar con datos reales que desde la 1.99.65 las ventas guardan el producto.
 - Diagnóstico real (conteos de renglones vendidos con/sin id): 21 nov 0/42, 22 nov 0/17, 23 nov 3/1, 24 nov (después de la 1.99.65) 3/0. Las ventas nuevas ya guardan el producto.
 - Prueba: tamanosventas1965 10/10; historialorden1947 9.
+
+## 1.99.73 — Preguntas por un producto al asistente
+- Error real: «¿cuánto vendí de purina esta semana?» respondía el TOTAL de todas las ventas (otra cifra que la pedida). «¿Cuánto gano con la purina?» daba la de 1 kg sin decirlo. «¿A cómo está la purina?» no respondía sin internet.
+- Ahora: si la pregunta nombra un producto, responde las unidades y la plata de ESE producto en el periodo (hoy, ayer, semana, mes; si no se dice, 30 días), por tamaño; las ventas viejas sin tamaño salen aparte («sin tamaño registrado»). Precio, existencias y ganancia: cada tamaño. Sin nombrar producto sigue dando el total.
+- Prueba: pruebas/asisproducto1973.test.js 9/9.

@@ -598,7 +598,10 @@ function asisLocal(q){
   }
   if(/\b(margen|gano|ganancia|gana|utilidad|cuesta|costo|deja)\b/.test(t)){
     const qn = t.replace(/\b(cual|cuanto|cuanta|es|el|la|los|las|de|del|mi|me|con|que|margen|gano|ganancia|gana|utilidad|cuesta|costo|deja|por|unidad|producto|dime|y)\b/g, ' ').replace(/\s+/g, ' ').trim();
-    const p = qn ? findProductByVoiceAlias(qn) : null;
+    let p = qn ? asisFindProduct(qn) : null;
+    if(!p && window.__asisAmbiguo){ const h = window.__asisAmbiguo; window.__asisAmbiguo = null;   // 1.99.73: varios tamaños: el margen de cada uno
+      return h[0].name + ':\n' + bullets(h.map(x => { const m = asisMargin(x); return (x.size || 'sin tamaño') + ': ' + (m ? 'te cuesta ' + fmt(x.cost) + ', lo vendes a ' + fmt(x.price) + ' → ' + (m.gan >= 0 ? 'ganas ' + fmt(m.gan) : 'pierdes ' + fmt(-m.gan)) + ' (' + m.pct + '%)' : 'se vende a ' + fmt(x.price) + ', sin costo registrado'); })); }
+    if(!p && qn) p = findProductByVoiceAlias(qn);
     if(p){
       const m = asisMargin(p);
       if(!m) return p.name + ' se vende a ' + fmt(p.price) + ', pero no tiene costo registrado. Ponlo en Productos → tocar "' + p.name + '" → Costo, y te digo cuánto ganas.';
@@ -824,9 +827,47 @@ function asisGoView(view){
 // Consultas del negocio sin IA (se suman a las de asisLocal).
 // "mesa de Juan" si la mesa tiene nombre, "Mesa 3" si no (para que la frase suene bien).
 function asisMesaTxt(id){ const n = data.tables[id] && data.tables[id].name && String(data.tables[id].name).trim(); return n ? 'mesa de ' + n : tableLabel(id); }
+/* 1.99.73 · Productos nombrados en la pregunta («¿cuánto vendí de purina?»): todos los del mismo nombre (los tamaños). */
+function asisProductosNombrados(t){
+  const sing = w => w.replace(/(es|s)$/, '');
+  const pal = new Set(normVoiceText(t).split(' ').map(sing));
+  const hits = (data.products || []).filter(p => { if(!p || p.combo) return false; const ws = normVoiceText(p.name).split(' ').filter(w => w.length > 2).map(sing); return ws.length > 0 && ws.every(w => pal.has(w)); });
+  if(!hits.length) return [];
+  const largo = p => normVoiceText(p.name).split(' ').length, max = Math.max(...hits.map(largo)), best = hits.filter(p => largo(p) === max), nom = normVoiceText(best[0].name);
+  return best.filter(p => normVoiceText(p.name) === nom);
+}
+// Unidades y plata vendidas de esos productos (por tamaño) en un periodo. Ventas viejas sin id: por nombre (y tamaño si lo traen).
+function asisVentasDeProducto(ps, ini, fin){
+  const nom = normVoiceText(ps[0].name), ids = new Set(ps.map(p => p.id)), out = new Map(ps.map(p => [p.id, { p, q: 0, v: 0 }])), sinTam = { q: 0, v: 0 };
+  (data.history || []).forEach(h => { const tt = new Date(h.date).getTime(); if(!(tt >= ini && tt < fin)) return;
+    (h.items || []).forEach(it => {
+      const q = Number(it.qty) || 0, v = q * (Number(it.price) || 0); if(!q) return;
+      let pid = it.productId != null && ids.has(it.productId) ? it.productId : null;
+      if(pid == null && it.productId == null && normVoiceText(it.name) === nom){
+        if(ps.length === 1) pid = ps[0].id;
+        else { const z = String(it.size || '').split(' · ')[0].trim(); const m = z && ps.find(p => normVoiceText(p.size || '') === normVoiceText(z)); if(m) pid = m.id; else { sinTam.q += q; sinTam.v += v; return; } }
+      }
+      if(pid == null) return;
+      const o = out.get(pid); o.q += q; o.v += v;
+    }); });
+  return { filas: [...out.values()], sinTam };
+}
 function asisLocalMas(raw){
   const t = normVoiceText(raw);
   const bullets = arr => arr.map(x => '• ' + x).join('\n');
+  // 1.99.73: «¿cuánto vendí de purina esta semana?» → lo de ESE producto (antes: el total de todas las ventas), por tamaño.
+  { const ps = /\b(vend\w*|venta\w*)\b/.test(t) ? asisProductosNombrados(t) : [];
+    if(ps.length){
+      const d0 = new Date(); d0.setHours(0, 0, 0, 0); const hoy0 = d0.getTime(), m0 = new Date(d0); m0.setDate(1);
+      const per = /\bhoy\b/.test(t) ? [hoy0, Date.now() + 1, 'hoy'] : /\bayer\b/.test(t) ? [hoy0 - 864e5, hoy0, 'ayer'] : /\bsemana\b/.test(t) ? [Date.now() - 7 * 864e5, Date.now() + 1, 'en los últimos 7 días']
+        : /\bmes\b/.test(t) ? [m0.getTime(), Date.now() + 1, 'en lo que va del mes'] : [Date.now() - 30 * 864e5, Date.now() + 1, 'en los últimos 30 días'];
+      const r = asisVentasDeProducto(ps, per[0], per[1]), nombre = ps[0].name;
+      const tq = r.filas.reduce((a, x) => a + x.q, 0) + r.sinTam.q, tv = r.filas.reduce((a, x) => a + x.v, 0) + r.sinTam.v;
+      if(!tq) return 'No vendiste ' + nombre + ' ' + per[2] + '.';
+      if(ps.length === 1) return 'De ' + nombre + (ps[0].size ? ' ' + ps[0].size : '') + ' vendiste ' + tq + (tq === 1 ? ' unidad' : ' unidades') + ' (' + fmt(Math.round(tv)) + ') ' + per[2] + '.';
+      return nombre + ', ' + per[2] + ':\n' + bullets(r.filas.filter(x => x.q).map(x => (x.p.size || 'sin tamaño') + ': ' + x.q + (x.q === 1 ? ' unidad' : ' unidades') + ' (' + fmt(Math.round(x.v)) + ')')
+        .concat(r.sinTam.q ? [r.sinTam.q + ' sin tamaño registrado (ventas de antes) (' + fmt(Math.round(r.sinTam.v)) + ')'] : [])) + '\nTotal: ' + tq + ' (' + fmt(Math.round(tv)) + ').';
+    } }
   const mesaN = asisMesaNum(t);
   if(mesaN && /\b(que (lleva|tiene|pidio|pidieron|ha pedido|han pedido|consumio|consumieron|hay en)|pedido de|detalle|lista de)\b/.test(t)){
     const id = mesaN;
@@ -903,6 +944,8 @@ function asisLocalMas(raw){
   const quiereStock = /\b(cuant[oa]s?\b.*\b(hay|quedan?|tengo)|stock|existencias|unidades)\b/.test(t);
   if(quierePrecio || quiereStock){
     const p = asisFindProduct(t);
+    if(!p && window.__asisAmbiguo){ const h = window.__asisAmbiguo; window.__asisAmbiguo = null;   // 1.99.73: varios tamaños: todos
+      return h[0].name + ':\n' + bullets(h.map(x => (x.size || 'sin tamaño') + ': ' + fmt(x.price) + (x.stock != null ? ' · quedan ' + x.stock : ''))); }
     if(p){
       if(quiereStock && !quierePrecio){
         if(p.stock == null) return p.name + ' no tiene control de stock. Actívalo en Inventario para saber cuántas te quedan.';
