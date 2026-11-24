@@ -72,10 +72,16 @@
   const venta = id => (data.history || []).find(h => String(h.id) === String(id));
   const nombreVenta = h => (h.tableName || (h.table != null ? ((typeof espacioN === 'function' ? espacioN() : 'Mesa') + ' ' + h.table) : 'Venta')) + ' · ' + fmt(h.total);
   const quien = como => (typeof authUser !== 'undefined' && authUser ? authUser : '—') + (como === 'clave' ? ' (autorizado con la clave del dueño)' : '');
-  function stock(nombre, d){
-    if(!d) return;
-    const p = (data.products || []).find(x => x.name === nombre);
-    if(p && p.stock != null && p.stock !== '' && isFinite(+p.stock)) p.stock = +p.stock + d;
+  /* 1.99.58: el inventario vuelve al MISMO producto que se vendió (por su id; el nombre solo si no tiene id). Antes se
+     buscaba por nombre: con dos productos del mismo nombre (distinto tamaño) volvía al primero, y si se le cambió el
+     nombre no volvía a ninguno. Va por invOnSale, como la venta: un combo devuelve sus productos y vuelve a su lote. */
+  function stock(it, d){
+    if(!d || !it) return;
+    const P = data.products || [];
+    const p = (it.productId != null && P.find(x => x.id === it.productId)) || P.find(x => x.name === it.name);
+    if(!p) return;
+    if(typeof invOnSale === 'function'){ invOnSale({ productId: p.id }, -d); return; }
+    if(p.stock != null && p.stock !== '' && isFinite(+p.stock)) p.stock = +p.stock + d;
   }
   function refrescar(){ try{ renderHistorial(); }catch(x){} try{ typeof renderTables === 'function' && renderTables(); }catch(x){} }
   /* 🚫 1.99.1 · Anular en vez de borrar (plan: puente/egm/PLAN-ANULAR-VENTAS.md). La venta SALE de data.history (por eso
@@ -120,7 +126,7 @@
     anotarAnulada(h, 'venta', motivo, como);
     data.history = data.history.filter(x => x !== h);
     try{ window.ventoDian && window.ventoDian.alBorrar(h); }catch(x){}   // 🧾 nota crédito si ya estaba en la DIAN
-    (h.items || []).forEach(it => stock(it.name, +it.qty || 0));
+    (h.items || []).forEach(it => stock(it, +it.qty || 0));
     try{ window.ventoAuditar && window.ventoAuditar('venta borrada a mano', nombreVenta(h) + ' · ' + (h.items || []).map(i => i.qty + ' ' + i.name).join(', ') + (motivo ? ' · motivo: ' + motivo : '') + ' · por ' + quien(como)); }catch(x){ saveData(); }
     refrescar(); showToast('🚫 Venta anulada. Queda en Facturas → «Anuladas».');
   }
@@ -163,7 +169,7 @@
         // 📒 1.99.24: lo que ya se pagó de esa deuda por fuera de los pagos (abonos de la libreta, «pagó después» en Historial)
         // sigue pagado. Antes la deuda se volvía a sacar solo de los pagos «debe» y lo ya abonado volvía a deberse.
         const debeAntes = (h.payments || []).filter(p => p.method === 'debe').reduce((s, p) => s + (+p.amount || 0), 0), yaPagado = Math.max(0, debeAntes - (+h.debt || 0));
-        its.forEach((it, i) => stock(it.name, (+it.qty || 0) - q[i]));
+        its.forEach((it, i) => stock(it, (+it.qty || 0) - q[i]));
         h.items = its.map((it, i) => Object.assign(it, { qty: q[i] })).filter(it => it.qty > 0);
         h.total = nuevo;
         if(unPago){ pagos[0].amount = nuevo; pagos[0].method = metodo; }

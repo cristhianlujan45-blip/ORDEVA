@@ -72,3 +72,10 @@ de $1.400 a distinta hora) siguen sonando los dos.
 - Ahora todas usan la venta sin propina. El Corte X muestra «🤝 Propinas» en su renglón (ya van dentro de los medios de pago, como en el cierre). La descarga de Excel de Estadísticas sigue con lo cobrado renglón por renglón.
 - También el «Total vendido» de arriba del Historial. Y en «Anuladas» las facturas de proveedor se cuentan aparte con su valor.
 - Prueba: pruebas/propinas1957.test.js 13/13; anularcompra1955 15/15; anularventas 27/27; equipoactividad 32; historialorden1947 9; y ajustesequipo, cerrarcaja, cobrosimple, confirmapago, facil, finanzas, flujocompleto, guia, impuestoconsumo, inventario5, laya1953, layafinanzas, musicaanuncios, pagosguia, practica, propinas, tablero, v183, v195, v1954 todas bien.
+
+## 1.99.58 — El inventario vuelve al producto que se vendió
+- Error real (el negocio tiene 4 productos con el mismo nombre y distinto tamaño): al anular o corregir una venta, el inventario volvía buscando el producto por NOMBRE → iba al primero con ese nombre (Purina 1 kg en vez de Purina 5 kg). Si el producto se había renombrado, no volvía a ninguno. Un combo no devolvía sus productos.
+- La devolución buscaba «mismo id O mismo nombre» y se quedaba con el primero de la lista: el mismo problema.
+- Ahora anular y corregir van por invOnSale (como la venta: por id, combos a sus productos, de vuelta a su lote) y la devolución busca primero por id y reparte los combos.
+- Anular un día entero sigue sin devolver inventario (así lo dice el mensaje; no se cambió).
+- Prueba: pruebas/inventariodevuelve1958.test.js 7/7 (con el código de antes: 2 bien 5 mal, todo iba a la Purina 1 kg).
