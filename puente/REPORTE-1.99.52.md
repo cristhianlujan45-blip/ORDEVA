@@ -149,4 +149,5 @@ de $1.400 a distinta hora) siguen sonando los dos.
 ## 1.99.68 — Pedidos por voz con productos de distinto tamaño
 - Error real: por voz, TODAS las frases con «purina» agregaban la Purina 1 kg, aunque se dijera «purina de 5 kilos». Además el lector partía «dos purinas de 5 kilos» en dos productos («purinas» × 2 y «kilos» × 5).
 - Ahora el tamaño dicho después del nombre de un producto que tiene ese tamaño se pega al producto antes de partir la frase, y escoge el producto («dos purinas de 5 kilos a la mesa 3» → 2 × Purina 5 kg, y lo dice con el tamaño). Sin tamaño y con varios, no agrega nada y pregunta cuál («¿Cuál? Hay varios tamaños…»). «5 kilos de maíz» (por kilo) no cambia.
-- Prueba: pruebas/voztamano1968.test.js 5/5.
+- Prueba: pruebas/voztamano1968.test.js 5/5; cajavoz 59, comanda 12, escanercaja 15, microfono 68, pasos 14, suscripnube 67, vozundo sin errores, comandaimpresa 14, facil 47, modos 55, sonidos 38, vozcomandos 109, codigobarras 25.
+- codigobarras era intermitente (también sin este cambio): el lector escribía con 8 ms entre teclas y, con la máquina cargada, parecía alguien escribiendo a mano. Ahora escribe sin pausa y espera a que la cuenta se actualice.
