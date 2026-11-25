@@ -181,3 +181,12 @@ de $1.400 a distinta hora) siguen sonando los dos.
 - El detalle de cada venta («Productos vendidos») no decía el tamaño: «Purina ×2». Ahora «Purina 5 kg ×2» (ventas desde la 1.99.65). También en «Anuladas».
 - Seguridad: el nombre de cada producto en ese detalle y el motivo de un descuento se ponían en la página sin escapar. Un nombre con código (p. ej. leído de una factura escaneada) se pintaba como imagen o etiqueta. Ahora se muestran como texto.
 - Prueba: tamanosventas1965 12/12 (con el código de antes: 10 bien 2 mal); historialorden1947 9, anularventas 27, equipoactividad 32, propinas1957 13, anularcompra1955 15, dian 29.
+
+## 1.99.75 — Mandar la factura, la cuenta y el cierre por WhatsApp (imagen)
+- Pedido del dueño: «me crea la imagen pero no me da la opción de mandarla directamente por WhatsApp».
+- Causa: para compartir la imagen se usaba «Compartir» del navegador (navigator.share), que dentro de la app de Android (WebView) NO existe. Siempre caía al respaldo: una descarga que en la app no hace nada.
+- Arreglo:
+  - App de Android (APK nuevo): VentoAndroid.compartirArchivo(nombre, tipo, base64, texto, teléfono) guarda la imagen en la caché («compartir/», FileProvider de siempre) y abre WhatsApp (o WhatsApp Business) con la imagen y el texto; con el celular del cliente (domicilios), en su chat. Sin WhatsApp: el menú «Enviar». Manifiesto: <queries> para com.whatsapp y com.whatsapp.w4b.
+  - Página: ventoCompartirImagen() para la factura/cuenta y el cierre: en la app → compartirArchivo; en el navegador → «Compartir»; app vieja (sin compartirArchivo) → se guarda en Descargas/Vento y avisa que actualice la app; si nada → descarga como antes. Celular de 10 dígitos que empieza en 3 → se le pone 57.
+- Compilado: javac del paquete Android con android-all.jar (solo faltan las librerías externas de siempre: androidx, BuildConfig, Cast). El APK lo compila GitHub al publicar.
+- Prueba: pruebas/whatsappimagen1975.test.js 6/6; cerrarcaja 27, doscierres 7, cajapos 27, dian 29 (una vez intermitente, luego 29/29 dos veces), tamanosventas1965 12, mejoras 32.

@@ -1282,6 +1282,36 @@ function buildReceiptHTML({businessName, tableLabel, dateStr, items, payments, t
   `;
 }
 
+/* 1.99.75 · Mandar una imagen (factura, cuenta, cierre) por WhatsApp. Dentro de la app de Android, «Compartir» del
+   navegador no existe: la imagen se creaba pero no había cómo mandarla. Ahora: en la app → VentoAndroid.compartirArchivo
+   abre WhatsApp con la imagen (en el chat del cliente si se sabe su celular); en el navegador → «Compartir»; si nada de eso
+   existe → se guarda (Descargas/Vento en la app vieja) y se avisa. */
+async function ventoCompartirImagen(blob, nombre, texto, telefono){
+  const A = window.VentoAndroid;
+  if(A && typeof A.compartirArchivo === 'function'){
+    const b64 = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result || '').split(',')[1] || ''); r.onerror = () => rej(r.error); r.readAsDataURL(blob); });
+    let tel = String(telefono || '').replace(/\D/g, ''); if(tel.length === 10 && tel[0] === '3') tel = '57' + tel;   // celular de Colombia sin el 57
+    A.compartirArchivo(nombre, blob.type || 'image/png', b64, texto || '', tel);
+    return 'app';
+  }
+  const file = new File([blob], nombre, { type: blob.type || 'image/png' });
+  if(navigator.canShare && navigator.canShare({ files: [file] })){
+    try{ await navigator.share({ files: [file], title: texto || nombre, text: texto || '' }); return 'compartir'; }
+    catch(e){ if(e && e.name === 'AbortError') return 'cancelado'; }
+  }
+  if(A && typeof A.guardarArchivo === 'function'){   // app vieja (sin compartirArchivo): queda en Descargas
+    const b64 = await new Promise(res => { const r = new FileReader(); r.onload = () => res(String(r.result || '').split(',')[1] || ''); r.readAsDataURL(blob); });
+    A.guardarArchivo(nombre, blob.type || 'image/png', b64);
+    showToast('📥 Se guardó en Descargas/Vento. Actualiza la app ORDEVA para mandarla directo por WhatsApp.', 7000);
+    return 'guardado';
+  }
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = nombre; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  showToast('Se descargó la imagen. Ábrela y envíala por WhatsApp.');
+  return 'descarga';
+}
+window.ventoCompartirImagen = ventoCompartirImagen;
 async function shareReceiptImage(receiptData){
   const el = document.getElementById('receiptTemplate');
   el.innerHTML = buildReceiptHTML(receiptData);
@@ -1289,22 +1319,8 @@ async function shareReceiptImage(receiptData){
     const canvas = await html2canvas(el, { backgroundColor: '#ffffff', scale: 2 });
     canvas.toBlob(async (blob)=>{
       if(!blob){ showToast('No se pudo generar la imagen.'); return; }
-      const file = new File([blob], 'factura.png', { type: 'image/png' });
-      if(navigator.canShare && navigator.canShare({ files: [file] })){
-        try{
-          await navigator.share({ files: [file], title: 'Factura', text: receiptData.tableLabel });
-          return;
-        }catch(e){ /* cancelado, sigue al respaldo de descarga */ }
-      }
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'factura-' + Date.now() + '.png';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      showToast('Se descargó la imagen. Ábrela y envíala por WhatsApp.');
+      try{ await ventoCompartirImagen(blob, 'factura-' + Date.now() + '.png', (receiptData.businessName ? receiptData.businessName + ' · ' : '') + (receiptData.tableLabel || 'Factura'), receiptData.telefono || ''); }
+      catch(e){ showToast('No se pudo enviar la imagen.'); }
     }, 'image/png');
   }catch(e){
     showToast('No se pudo generar la captura.');
@@ -1520,7 +1536,8 @@ function histReceiptData(h){
     ivaRate: h.ivaRate || 19,
     inc: Number(h.inc) || 0,
     dianResolucionText: h.dianResolucionText || '',
-    dian: h.dian || null
+    dian: h.dian || null,
+    telefono: (h.delivery && h.delivery.telefono) || (h.dianCliente && (h.dianCliente.telefono || h.dianCliente.tel)) || ''   // 1.99.75: para abrir su chat de WhatsApp
   };
 }
 function renderHistorial(masPagina){
@@ -1954,22 +1971,8 @@ async function shareClosureImage(closure){
     const canvas = await html2canvas(el, { backgroundColor: '#ffffff', scale: 2 });
     canvas.toBlob(async (blob)=>{
       if(!blob){ showToast('No se pudo generar la imagen.'); return; }
-      const file = new File([blob], 'cierre-caja.png', { type: 'image/png' });
-      if(navigator.canShare && navigator.canShare({ files: [file] })){
-        try{
-          await navigator.share({ files: [file], title: 'Cierre de caja', text: closure.businessName || data.businessName });
-          return;
-        }catch(e){ /* cancelado, sigue al respaldo de descarga */ }
-      }
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'cierre-caja-' + Date.now() + '.png';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      showToast('Se descargó la imagen. Ábrela y envíala por WhatsApp.');
+      try{ await ventoCompartirImagen(blob, 'cierre-caja-' + Date.now() + '.png', 'Cierre de caja · ' + (closure.businessName || data.businessName || ''), ''); }
+      catch(e){ showToast('No se pudo enviar la imagen.'); }
     }, 'image/png');
   }catch(e){
     showToast('No se pudo generar la captura.');

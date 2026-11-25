@@ -44,6 +44,9 @@
         <!-- Las apps de los bancos: para ver si tienen ahorro de batería (retrasa sus avisos de pago) y abrir su ajuste -->
         <package android:name="com.davivienda.daviplataapp" />
         <package android:name="com.nequi.MobileApp" />
+        <!-- 1.99.75: WhatsApp y WhatsApp Business, para mandar la imagen de la factura / cuenta / cierre directo -->
+        <package android:name="com.whatsapp" />
+        <package android:name="com.whatsapp.w4b" />
         <package android:name="com.todo1.mobile" />
         <package android:name="com.davivienda.daviviendaapp" />
         <intent><action android:name="android.speech.RecognitionService" /></intent>

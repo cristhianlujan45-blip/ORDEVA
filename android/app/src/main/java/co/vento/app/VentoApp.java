@@ -1754,6 +1754,59 @@ public class VentoApp extends Application {
             }).start();
         }
 
+        /**
+         * 1.99.75 · Compartir un archivo (la imagen de la factura, de la cuenta o del cierre) DIRECTO a WhatsApp. Antes la
+         * página usaba «Compartir» del navegador, que dentro de la app (WebView) no existe: la imagen se creaba pero no había
+         * cómo mandarla. Se guarda en la caché («compartir/», por el FileProvider de siempre) y se abre WhatsApp (o WhatsApp
+         * Business) con la imagen; con un celular (57…), en el chat de ese número. Si no hay WhatsApp: el menú «Compartir».
+         */
+        @JavascriptInterface
+        public void compartirArchivo(final String nombre, final String tipo, final String base64, final String texto, final String telefono) {
+            new Thread(() -> {
+                try {
+                    byte[] datos = Base64.decode(base64, Base64.DEFAULT);
+                    File dir = new File(getCacheDir(), "compartir");
+                    if (!dir.exists() && !dir.mkdirs()) throw new Exception("sin carpeta");
+                    File[] viejos = dir.listFiles();
+                    if (viejos != null) for (File v : viejos) if (System.currentTimeMillis() - v.lastModified() > 3600000L) v.delete();
+                    String n = (nombre == null || nombre.isEmpty()) ? ("vento-" + System.currentTimeMillis() + ".png") : nombre.replaceAll("[\\\\/:*?\"<>|]", "_");
+                    File f = new File(dir, n);
+                    try (FileOutputStream o = new FileOutputStream(f)) { o.write(datos); }
+                    final Uri u = androidx.core.content.FileProvider.getUriForFile(VentoApp.this, getPackageName() + ".archivos", f);
+                    ui.post(() -> abrirCompartir(u, tipo, texto, telefono));
+                } catch (Exception e) {
+                    aviso("No pude preparar la imagen para compartir.");
+                }
+            }).start();
+        }
+
+        private void abrirCompartir(Uri u, String tipo, String texto, String telefono) {
+            Context x = ventana != null ? ventana : VentoApp.this;
+            Intent base = new Intent(Intent.ACTION_SEND);
+            base.setType(tipo == null || tipo.isEmpty() ? "image/png" : tipo);
+            base.putExtra(Intent.EXTRA_STREAM, u);
+            if (texto != null && !texto.isEmpty()) base.putExtra(Intent.EXTRA_TEXT, texto);
+            base.setClipData(android.content.ClipData.newRawUri("", u));
+            base.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            if (ventana == null) base.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            String tel = telefono == null ? "" : telefono.replaceAll("\\D", "");
+            for (String pkg : new String[]{ "com.whatsapp", "com.whatsapp.w4b" }) {
+                try {
+                    Intent w = new Intent(base).setPackage(pkg);
+                    if (tel.length() >= 10) w.putExtra("jid", tel + "@s.whatsapp.net");
+                    x.startActivity(w);
+                    return;
+                } catch (Exception ignorado) { }
+            }
+            try {
+                Intent c = Intent.createChooser(base, "Enviar");
+                if (ventana == null) c.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                x.startActivity(c);
+            } catch (Exception e) {
+                aviso("No encontré una app para enviar la imagen.");
+            }
+        }
+
         // ---------------------------------------------------------------- 🔵 Lector de códigos Bluetooth (TecladoBT)
         /** {soportado, bluetooth, permiso, prendido, registrado, conectado, computador, error} */
         @JavascriptInterface
