@@ -268,6 +268,47 @@ public class EscuchaPrueba {
             VentoApp.ui.correr();
             chk("1.99.52: dos pagos iguales de verdad (dos SMS de $1.400, a distinta hora) siguen sonando los dos", VentoApp.dichos.stream().filter(x -> x.contains("1400")).count() == 2, VentoApp.dichos);
         }
+        // 1.99.78 · El caso real (25/11, Samsung, SMS de Nequi 890806): cada SMS nuevo hacía sonar OTRA VEZ el anterior unos
+        // 3 s después (5.600 → 4.600 → 5.600 otra vez; 6.000 → 7.100 → 6.000…). La app de mensajes vuelve a mostrar el SMS
+        // de antes con OTRA hora (la del celular, no la del banco) o con el texto cortado en el primer aviso: la marca por
+        // «hora + texto» no lo reconocía y la del lector directo ya se había gastado. Ahora un SMS viejo de la conversación
+        // que ya se tomó (por el lector directo o por el aviso) no vuelve a sonar.
+        {
+            long t = System.currentTimeMillis();
+            String sa = "Nequi: Recibiste $5.600 de LUIS PEREZ en tu cuenta. Codigo de transaccion M123", sb = "Nequi: Recibiste $4.600 de ANA RUIZ en tu cuenta. Codigo de transaccion M456", sc = "Nequi: Recibiste $6.000 de MARIA LOPEZ en tu cuenta. Codigo de transaccion M789";
+            // a) La hora del SMS de antes cambia (13:43:23 → 13:43:26)
+            Preferencias s8 = nuevo();
+            SmsBanco.recibir(s8, "890806", sa, t - 146_000L);
+            VentoEscucha.leerSms(s8, "890806", sa, conv(new Object[]{sa, t - 146_000L}), "e1:", false);
+            SmsBanco.recibir(s8, "890806", sb, t - 3000);
+            VentoEscucha.leerSms(s8, "890806", sb, conv(new Object[]{sa, t - 143_000L}, new Object[]{sb, t - 2000}), "e2:", false);
+            VentoApp.ui.correr();
+            chk("1.99.78 a) el SMS de antes vuelve con otra hora: $5.600 suena UNA vez y $4.600 UNA vez", VentoApp.dichos.stream().filter(x -> x.contains("5600")).count() == 1 && VentoApp.dichos.stream().filter(x -> x.contains("4600")).count() == 1, VentoApp.dichos);
+            // b) El primer aviso traía el texto cortado; el siguiente lo trae completo
+            Preferencias s9 = nuevo();
+            SmsBanco.recibir(s9, "890806", sa, t - 146_000L);
+            VentoEscucha.leerSms(s9, "890806", "Nequi: Recibiste $5.600 de LUIS PEREZ…", conv(new Object[]{"Nequi: Recibiste $5.600 de LUIS PEREZ…", t - 146_000L}), "f1:", false);
+            SmsBanco.recibir(s9, "890806", sb, t - 3000);
+            VentoEscucha.leerSms(s9, "890806", sb, conv(new Object[]{sa, t - 146_000L}, new Object[]{sb, t - 2000}), "f2:", false);
+            SmsBanco.recibir(s9, "890806", sc, t - 1000);
+            VentoEscucha.leerSms(s9, "890806", sc, conv(new Object[]{sa, t - 145_000L}, new Object[]{sb, t - 1500}, new Object[]{sc, t - 500}), "f3:", false);
+            VentoApp.ui.correr();
+            chk("1.99.78 b) texto cortado en el primer aviso y tres SMS seguidos: cada pago suena UNA vez", VentoApp.dichos.stream().filter(x -> x.contains("5600")).count() == 1 && VentoApp.dichos.stream().filter(x -> x.contains("4600")).count() == 1 && VentoApp.dichos.stream().filter(x -> x.contains("6000")).count() == 1, VentoApp.dichos);
+            // c) Sin el lector directo (celulares donde no llega): el SMS de antes que sí sonó por el aviso tampoco se repite
+            Preferencias s10 = nuevo();
+            VentoEscucha.leerSms(s10, "890806", sa, conv(new Object[]{sa, t - 146_000L}), "g1:", false);
+            VentoEscucha.leerSms(s10, "890806", sb, conv(new Object[]{sa, t - 143_000L}, new Object[]{sb, t - 2000}), "g2:", false);
+            VentoApp.ui.correr();
+            chk("1.99.78 c) solo por el aviso de mensajes, con la hora corrida: cada pago UNA vez", VentoApp.dichos.stream().filter(x -> x.contains("5600")).count() == 1 && VentoApp.dichos.stream().filter(x -> x.contains("4600")).count() == 1, VentoApp.dichos);
+            // d) Dos pagos IGUALES de verdad (el mismo texto, 1 min después) siguen sonando los dos
+            Preferencias s11 = nuevo();
+            SmsBanco.recibir(s11, "890806", sa, t - 60_000L);
+            VentoEscucha.leerSms(s11, "890806", sa, conv(new Object[]{sa, t - 60_000L}), "h1:", false);
+            SmsBanco.recibir(s11, "890806", sa, t - 2000);
+            VentoEscucha.leerSms(s11, "890806", sa, conv(new Object[]{sa, t - 57_000L}, new Object[]{sa, t - 1000}), "h2:", false);
+            VentoApp.ui.correr();
+            chk("1.99.78 d) dos pagos iguales de verdad siguen sonando los dos", VentoApp.dichos.stream().filter(x -> x.contains("5600")).count() == 2, VentoApp.dichos);
+        }
         // 1.99.49 · «Me sonó uno de 3.500 y después otro de 1.400 que habían puesto antes» (Xiaomi, 23/11: Android le pasó
         // el aviso a ORDEVA 595 s tarde). El pago de AHORA suena normal; el que llegó tarde dice de cuándo es.
         {

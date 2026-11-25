@@ -203,3 +203,11 @@ de $1.400 a distinta hora) siguen sonando los dos.
 - Revisión de todos los enlaces wa.me: los demás ya agregaban el 57.
 - Errores reales en producción (48 h): ningún error de JavaScript; solo avisos de pagos (no se tocan) y cierres de Android por memoria.
 - Pruebas nuevas: `whatsappnumero1977` (4), `csvseguro1977` (6). Probadas también 31 relacionadas (QR, pedidos, facturas, inventario, caja): todas bien.
+
+## 1.99.78 — Un pago ya no suena dos veces (SMS de Nequi)
+- **Qué pasaba (datos reales del 25/11, negocio adc9bb00, Samsung, SMS de Nequi 890806):** cada SMS nuevo hacía sonar OTRA VEZ el anterior unos 3 s después (5.600 → 4.600 → 5.600 otra vez; 6.000 → 7.100 → 6.000…). En el servidor quedaban dos pagos «revisar» del mismo valor. 23 parejas así en los últimos días.
+- **Por qué:** cuando llega un SMS nuevo, la app de mensajes vuelve a mostrar la conversación con el SMS de antes, pero con otra hora (la del celular y no la del banco) o con el texto completo cuando antes venía cortado. La marca «hora + texto» de la 1.99.52 no lo reconocía y la marca del lector directo de SMS ya se había gastado: el SMS viejo se tomaba como pago nuevo, sonaba en este celular y, por el servidor, también en los demás.
+- **Arreglo (app Android, VentoEscucha):** cada SMS tomado (por el lector directo o por el aviso de mensajes) queda marcado por su texto durante 30 min. Un SMS de ANTES en la conversación que ya se tomó no vuelve a sonar. El más nuevo sigue su camino de siempre: dos pagos iguales de verdad siguen sonando los dos.
+- No cambia nada más de los pagos (ni la lectura de Nequi/DaviPlata por la app, ni Bre-B, ni el servidor, ni el latido del servicio).
+- Pruebas: 4 casos nuevos en la simulación de Android (`EscuchaPrueba`): fallaban antes del arreglo (daban 5.600 dos veces) y ahora pasan. Toda la simulación: 384 bien, 0 mal.
+- **Hay que actualizar la app ORDEVA en el Samsung** (y en el Xiaomi) para que tome el arreglo.
