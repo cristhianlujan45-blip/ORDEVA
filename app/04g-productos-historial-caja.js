@@ -1246,8 +1246,10 @@ function buildReceiptText({businessName, tableLabel, dateStr, items, payments, t
   return lines.join('\n');
 }
 
-function whatsappShareText(text){
-  window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+// 1.99.76: con el celular del cliente (domicilios) se abre SU chat; sin él, WhatsApp pregunta a quién.
+function whatsappShareText(text, telefono){
+  let tel = String(telefono || '').replace(/\D/g, ''); if(tel.length === 10 && tel[0] === '3') tel = '57' + tel;
+  window.open('https://wa.me/' + (tel.length >= 11 ? tel : '') + '?text=' + encodeURIComponent(text), '_blank');
 }
 
 // QR de pago del negocio (un solo QR, ej. Bre-B) en la factura cuando todavía falta plata.
@@ -1560,7 +1562,7 @@ function renderHistorial(masPagina){
         e.stopPropagation();
         const h = data.history[parseInt(btn.dataset.idx,10)];
         if(!h) return;
-        if(btn.classList.contains('hist-share-text')) whatsappShareText(buildReceiptText(histReceiptData(h)));
+        if(btn.classList.contains('hist-share-text')){ const rdh = histReceiptData(h); whatsappShareText(buildReceiptText(rdh), rdh.telefono); }
         else shareReceiptImage(histReceiptData(h));
         return;
       }

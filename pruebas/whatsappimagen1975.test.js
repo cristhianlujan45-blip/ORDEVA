@@ -41,6 +41,11 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
     chk('1. Factura: va a la app con la imagen PNG (no se descarga)', L[0] && L[0].f === 'compartir' && L[0].t === 'image/png' && L[0].png === 'iVBORw0K' && L[0].len > 1000 && /^factura-\d+\.png$/.test(L[0].n), L[0]);
     chk('1. … con el texto (negocio · domicilio) y el celular del cliente con 57', L[0] && /Agro Prueba · 🛵 Domicilio: Ana/.test(L[0].tx) && L[0].tel === '573001234567', L[0]);
     chk('2. Cierre de caja: también va a la app', L[1] && L[1].f === 'compartir' && /^cierre-caja-\d+\.png$/.test(L[1].n) && /Cierre de caja · Agro Prueba/.test(L[1].tx) && L[1].tel === '', L[1]);
+    // 1.99.76: la factura en TEXTO de un domicilio abre el chat del cliente; el cierre (sin cliente) deja escoger
+    const urls = await p.evaluate(() => { const u = []; const o = window.open; window.open = x => { u.push(x); return null; };
+      const rd = histReceiptData(data.history[0]); whatsappShareText(buildReceiptText(rd), rd.telefono); whatsappShareText(buildClosureText(data.closures[0])); window.open = o; return u; });
+    chk('1. Texto de la factura del domicilio: abre el chat de Ana (wa.me/573001234567)', /^https:\/\/wa\.me\/573001234567\?text=/.test(urls[0] || ''), urls);
+    chk('2. Texto del cierre: WhatsApp pregunta a quién (wa.me/?text=)', /^https:\/\/wa\.me\/\?text=/.test(urls[1] || ''), urls);
     await ctx.close();
     // 3: app vieja
     ({ ctx, p } = await abrir('viejo'));

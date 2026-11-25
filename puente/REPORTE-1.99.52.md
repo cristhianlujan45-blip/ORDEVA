@@ -190,3 +190,8 @@ de $1.400 a distinta hora) siguen sonando los dos.
   - Página: ventoCompartirImagen() para la factura/cuenta y el cierre: en la app → compartirArchivo; en el navegador → «Compartir»; app vieja (sin compartirArchivo) → se guarda en Descargas/Vento y avisa que actualice la app; si nada → descarga como antes. Celular de 10 dígitos que empieza en 3 → se le pone 57.
 - Compilado: javac del paquete Android con android-all.jar (solo faltan las librerías externas de siempre: androidx, BuildConfig, Cast). El APK lo compila GitHub al publicar.
 - Prueba: pruebas/whatsappimagen1975.test.js 6/6; cerrarcaja 27, doscierres 7, cajapos 27, dian 29 (una vez intermitente, luego 29/29 dos veces), tamanosventas1965 12, mejoras 32.
+
+## 1.99.76 — Factura en texto por WhatsApp al chat del cliente
+- El texto de la factura por WhatsApp (Historial «WhatsApp», recibo de la caja POS) abría siempre «¿a quién?». Si la venta es un domicilio con el celular del cliente, ahora abre SU chat (wa.me/57…). El cierre y lo demás siguen igual (WhatsApp pregunta a quién).
+- Revisado: el texto por WhatsApp sí funciona dentro de la app (window.open → la app de Android lo abre con WhatsApp).
+- Prueba: whatsappimagen1975 8/8; cajapos 27, cerrarcaja 27, agencia 13.
