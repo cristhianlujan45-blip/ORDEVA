@@ -52,6 +52,15 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
     chk('3. Asistente: 3 de Purina 5 kg y 3 de Purina 1 kg (una venta vieja sin id pero con tamaño)', t.top.includes('Purina 5 kg=3') && t.top.includes('Purina 1 kg=3'), t.top);
     chk('3. Laya «lo más vendido»: separa los tamaños', /Purina 5 kg/.test(t.laya) && /Purina 1 kg/.test(t.laya), t.laya);
     if(t.rd) chk('3. Resumen del cierre: separa los tamaños', /Purina 5 kg/.test(t.rd) && /Purina 1 kg/.test(t.rd), t.rd);
+    // 1.99.74: el detalle de la venta en el Historial dice el tamaño, y un nombre raro se muestra como texto (no como código)
+    const hd = await p.evaluate(async () => { window.__xss = 0;
+      data.history = [{ id: 'x1', invoiceNo: 'FV-x1', date: new Date().toISOString(), table: 2, total: 70000, debt: 0, items: [{ productId: 'pa5', name: 'Purina', size: '5 kg', price: 35000, qty: 2 }, { name: '<img src=x onerror="window.__xss=1">', price: 0, qty: 1 }], payments: [{ method: 'efectivo', amount: 70000 }],
+        descuento: { valor: 1000, tipo: '$', v: 1000, por: '<b>jefe</b>' } }];
+      document.querySelectorAll('#histFilter button').forEach(x => x.classList.toggle('on', x.dataset.f === 'todos'));
+      renderHistorial(); await new Promise(r2 => setTimeout(r2, 300));
+      const row = document.querySelector('#histList .hist-row'); return { txt: row ? row.textContent.replace(/\s+/g, ' ') : '', xss: window.__xss, imgs: row ? row.querySelectorAll('img[src="x"]').length : -1, b: row ? row.querySelectorAll('.hist-detail b').length : -1 }; });
+    chk('Historial: el detalle dice «Purina 5 kg ×2»', /Purina 5 kg ×2/.test(hd.txt), hd.txt.slice(0, 300));
+    chk('Historial: un nombre con código se muestra como texto (no se ejecuta ni pinta)', hd.xss === 0 && hd.imgs === 0 && /<img src=x/.test(hd.txt) && /<b>jefe<\/b>/.test(hd.txt), hd);
   }catch(e){ mal++; console.log('❌ La prueba se cayó: ' + (e && e.stack || e)); }
   chk('Sin errores de página', !errs.length, errs.join(' | '));
   await b.close(); console.log('RESULTADO', ok, 'bien', mal, 'mal'); process.exit(mal ? 1 : 0);

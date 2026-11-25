@@ -176,3 +176,8 @@ de $1.400 a distinta hora) siguen sonando los dos.
 - Error real: «¿cuánto vendí de purina esta semana?» respondía el TOTAL de todas las ventas (otra cifra que la pedida). «¿Cuánto gano con la purina?» daba la de 1 kg sin decirlo. «¿A cómo está la purina?» no respondía sin internet.
 - Ahora: si la pregunta nombra un producto, responde las unidades y la plata de ESE producto en el periodo (hoy, ayer, semana, mes; si no se dice, 30 días), por tamaño; las ventas viejas sin tamaño salen aparte («sin tamaño registrado»). Precio, existencias y ganancia: cada tamaño. Sin nombrar producto sigue dando el total.
 - Prueba: pruebas/asisproducto1973.test.js 9/9; asistamano1969 9, fiadostotal1962 6, laya1953 6, layafinanzas 10, libretacaja1955 17, musicaanuncios 22, pagosguia 29, propinas1957 13, tamanosventas1965 10.
+
+## 1.99.74 — Detalle de la venta en el Historial
+- El detalle de cada venta («Productos vendidos») no decía el tamaño: «Purina ×2». Ahora «Purina 5 kg ×2» (ventas desde la 1.99.65). También en «Anuladas».
+- Seguridad: el nombre de cada producto en ese detalle y el motivo de un descuento se ponían en la página sin escapar. Un nombre con código (p. ej. leído de una factura escaneada) se pintaba como imagen o etiqueta. Ahora se muestran como texto.
+- Prueba: tamanosventas1965 12/12 (con el código de antes: 10 bien 2 mal); historialorden1947 9, anularventas 27, equipoactividad 32, propinas1957 13, anularcompra1955 15, dian 29.

@@ -1415,7 +1415,7 @@ function histFilaAnulada(a){
     return row;
   }
   const h = a.venta || {}, dv = new Date(h.date);
-  const items = (h.items || []).map(it => '<div class="hist-detail-line"><span>' + invEsc(it.name) + (it.person ? ' — ' + invEsc(it.person) : '') + ' ×' + invEsc(it.qty) + '</span><span>' + fmt((Number(it.price) || 0) * (Number(it.qty) || 0)) + '</span></div>').join('') || '<div class="hist-detail-line"><span>Sin productos registrados</span><span></span></div>';
+  const items = (h.items || []).map(it => '<div class="hist-detail-line"><span>' + invEsc(it.name) + (it.size ? ' ' + invEsc(String(it.size).split(' · ')[0]) : '') + (it.person ? ' — ' + invEsc(it.person) : '') + ' ×' + invEsc(it.qty) + '</span><span>' + fmt((Number(it.price) || 0) * (Number(it.qty) || 0)) + '</span></div>').join('') || '<div class="hist-detail-line"><span>Sin productos registrados</span><span></span></div>';
   row.innerHTML = '<div class="hist-row-top"><div class="hist-left"><div class="hist-table">' + invEsc(h.tableName || ('Mesa ' + h.table)) + (h.person ? ' — ' + invEsc(h.person) : '') + ' · <span class="hist-anulada-flag">ANULADA</span></div>' +
     '<div class="hist-date">' + (isNaN(dv) ? '' : histFmtFecha.format(dv) + ' · ' + histFmtHora.format(dv)) + '</div>' + (histRef(h) ? '<div class="hist-ref">' + invEsc(histRef(h)) + '</div>' : '') + '<div class="hist-ref">' + invEsc(pie) + '</div></div><div class="hist-total">' + fmt(h.total) + '</div></div>' +
     '<div class="hist-detail"><div class="hist-detail-title">Productos vendidos</div>' + items + histCorrecciones(h) + '</div>';
@@ -1454,7 +1454,7 @@ function histFila(h, idx){
   const payments = h.payments || [];
   const debt = h.debt || 0;
   const itemsHtml = items.map(it=>`
-      <div class="hist-detail-line"><span>${it.name}${it.person ? ' — ' + histEsc(it.person) : ''} ×${it.qty}</span><span>${fmt(it.price*it.qty)}</span></div>
+      <div class="hist-detail-line"><span>${histEsc(it.name)}${it.size ? ' ' + histEsc(String(it.size).split(' · ')[0]) : ''}${it.person ? ' — ' + histEsc(it.person) : ''} ×${histEsc(it.qty)}</span><span>${fmt(it.price*it.qty)}</span></div>
     `).join('') || '<div class="hist-detail-line"><span>Sin productos registrados</span><span></span></div>';
   const paymentsHtml = payments.map(p=>`
       <div class="hist-detail-line"><span>${p.note ? histEsc(p.note) : 'Pago'} <span class="pay-method ${p.method}">${methodLabelHist[p.method] || p.method}</span>${payItemsHtml(p)}</span><span>${fmt(p.amount)}</span></div>
@@ -1484,7 +1484,7 @@ function histFila(h, idx){
         <div class="hist-detail-title">Pagos</div>
         ${paymentsHtml}
         ${debtHtml}
-        ${h.descuento && h.descuento.valor > 0 ? `<div class="hist-detail-line"><span>🏷️ Descuento${h.descuento.tipo === '%' ? ' ' + h.descuento.v + ' %' : ''}${h.descuento.por ? ' (' + h.descuento.por + ')' : ''} · antes ${fmt(h.descuento.bruto)}</span><span>−${fmt(h.descuento.valor)}</span></div>` : ''}
+        ${h.descuento && h.descuento.valor > 0 ? `<div class="hist-detail-line"><span>🏷️ Descuento${h.descuento.tipo === '%' ? ' ' + h.descuento.v + ' %' : ''}${h.descuento.por ? ' (' + histEsc(h.descuento.por) + ')' : ''} · antes ${fmt(h.descuento.bruto)}</span><span>−${fmt(h.descuento.valor)}</span></div>` : ''}
         ${(payments.find(p => p.vueltas > 0) || null) ? `<div class="hist-detail-line"><span>💵 Recibió ${fmt(payments.find(p => p.vueltas > 0).recibido)} · cambio</span><span>${fmt(payments.find(p => p.vueltas > 0).vueltas)}</span></div>` : ''}
         ${h.observacion ? `<div class="hist-detail-line"><span>📝 ${invEsc(h.observacion)}</span><span></span></div>` : ''}
         ${histCorrecciones(h)}
