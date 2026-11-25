@@ -309,6 +309,8 @@ function calendarComparisonCard(){
    período elegido — mesas, mostrador y domicilios — más el total al final.
    No hace falta ninguna librería extra: Excel abre un .csv sin problema. */
 function csvEscape(v){
+  // Un nombre (de un pedido por QR, por ejemplo) que empiece por = + - @ Excel lo ejecutaría como fórmula: va con ' delante.
+  if(typeof v !== 'number' && /^[=+\-@\t\r]/.test(String(v)) && !/^-?\d+(?:[.,]\d+)?$/.test(String(v))) v = "'" + v;
   v = v == null ? '' : String(v);
   if(/[;"\n]/.test(v)) return '"' + v.replace(/"/g, '""') + '"';
   return v;
@@ -326,7 +328,7 @@ function exportSalesRange(from, to, label){
     const quien = (h.delivery && h.delivery.cliente) ? h.delivery.cliente : (h.tableName || (h.table != null ? (i18nPut(espacioN()) + ' ' + h.table) : ''));
     const metodo = (h.payments || []).map(p => p.method).join(' + ') || '';
     (h.items || []).forEach(it => {
-      lines.push([fecha, hora, tipo, quien, it.name, it.qty, it.price, it.qty * it.price, metodo, h.by || '']);
+      lines.push([fecha, hora, tipo, quien, (typeof nombreConTamano === 'function' ? nombreConTamano(it) : it.name), it.qty, it.price, it.qty * it.price, metodo, h.by || '']);
     });
     totalPeriodo += h.total || 0;
   });

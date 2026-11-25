@@ -2235,7 +2235,8 @@ function domWaUrl(){
   const c = window.vitoQCfg ? window.vitoQCfg() : {}, l = domLinkUrl();
   if(!c.wa) return '';
   const msg = 'Hola! Quiero pedir a domicilio de ' + (data.businessName || 'tu negocio') + (l ? '. Aquí está la carta: ' + l : '');
-  return 'https://wa.me/' + c.wa + '?text=' + encodeURIComponent(msg);
+  let w = String(c.wa).replace(/\D/g, ''); if(w.length === 10 && w[0] === '3') w = '57' + w;   // celular sin el 57: wa.me no abriría el chat
+  return 'https://wa.me/' + w + '?text=' + encodeURIComponent(msg);
 }
 function domQrPintar(boxId, texto){
   const box = document.getElementById(boxId); if(!box) return;

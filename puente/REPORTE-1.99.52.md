@@ -195,3 +195,11 @@ de $1.400 a distinta hora) siguen sonando los dos.
 - El texto de la factura por WhatsApp (Historial «WhatsApp», recibo de la caja POS) abría siempre «¿a quién?». Si la venta es un domicilio con el celular del cliente, ahora abre SU chat (wa.me/57…). El cierre y lo demás siguen igual (WhatsApp pregunta a quién).
 - Revisado: el texto por WhatsApp sí funciona dentro de la app (window.open → la app de Android lo abre con WhatsApp).
 - Prueba: whatsappimagen1975 8/8; cajapos 27, cerrarcaja 27, agencia 13.
+
+## 1.99.77 — WhatsApp de respaldo con 57 y descargas a Excel seguras
+- **WhatsApp de respaldo de los pedidos por QR / domicilio web**: si el número se guardó sin el 57 (3001234567), wa.me no abría el chat del negocio. Ahora `pedido.html` y el botón de domicilio por WhatsApp le agregan el 57 a un celular de 10 dígitos (si ya lo trae, no lo repite).
+- **Descargas a Excel (.csv)**: un nombre que llegue de afuera (p. ej. un pedido por QR) como `=HYPERLINK(...)` Excel lo ejecutaba como fórmula. Ahora todas las descargas (ventas, libro de facturas, contabilidad, cierres, inventario) le ponen `'` delante a un texto que empiece por `= + - @`. Los números (también negativos) no cambian.
+- Ventas a Excel, libro de facturas e inventario muestran el **tamaño** del producto (Purina 1 kg / Purina 5 kg).
+- Revisión de todos los enlaces wa.me: los demás ya agregaban el 57.
+- Errores reales en producción (48 h): ningún error de JavaScript; solo avisos de pagos (no se tocan) y cierres de Android por memoria.
+- Pruebas nuevas: `whatsappnumero1977` (4), `csvseguro1977` (6). Probadas también 31 relacionadas (QR, pedidos, facturas, inventario, caja): todas bien.

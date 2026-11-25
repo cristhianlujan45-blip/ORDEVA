@@ -1458,10 +1458,10 @@ function histCoincide(h, q){
 function histMesDe(h){ const d = new Date(h.date); return isNaN(d) ? '' : d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
 function histConsulta(){ const i = document.getElementById('histBuscar'); return String((i && i.value) || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
 function histLibroCsv(lista){
-  const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  const q = v => '"' + ((typeof v !== 'number' && /^[=+\-@\t\r]/.test(String(v)) && !/^-?\d+(?:[.,]\d+)?$/.test(String(v)) ? "'" : '') + String(v == null ? '' : v)).replace(/"/g, '""') + '"';   // un nombre que empiece por = + - @ en Excel sería una fórmula: va con ' delante
   const filas = [['Fecha', 'Hora', 'Número', 'Mesa o cliente', 'Productos', 'Forma de pago', 'Total', 'Propina', 'Descuento', 'Queda debiendo', 'Atendió', 'Estado']].concat(lista.map(h => { const d = new Date(h.date); return [
     isNaN(d) ? '' : d.toLocaleDateString('es-CO'), isNaN(d) ? '' : histFmtHora.format(d), histNumero(h), (h.tableName || ('Mesa ' + h.table)) + (h.person ? ' — ' + h.person : ''),
-    (h.items || []).map(it => it.name + ' ×' + it.qty).join(', '), histMedios(h), Math.round(Number(h.total) || 0), Math.round(propinaDe(h)), Math.round((h.descuento && Number(h.descuento.valor)) || 0), Math.round(Number(h.debt) || 0), h.by || '', h.__anulada ? 'ANULADA' : h.corregida ? 'Corregida' : '']; }));
+    (h.items || []).map(it => nombreConTamano(it) + ' ×' + it.qty).join(', '), histMedios(h), Math.round(Number(h.total) || 0), Math.round(propinaDe(h)), Math.round((h.descuento && Number(h.descuento.valor)) || 0), Math.round(Number(h.debt) || 0), h.by || '', h.__anulada ? 'ANULADA' : h.corregida ? 'Corregida' : '']; }));
   return '\ufeff' + filas.map(f => f.map(q).join(';')).join('\r\n');
 }
 window.histLibroCsv = histLibroCsv;

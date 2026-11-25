@@ -569,7 +569,7 @@ img,video,iframe{max-width:100%}
 <script>
 const P=new URLSearchParams(location.search),
   mesa=(P.get('mesa')||'').replace(/\D/g,''),
-  wa=(P.get('w')||'').replace(/\D/g,''),
+  wa=(w=>(w.length===10&&w[0]==='3')?'57'+w:w)((P.get('w')||'').replace(/\D/g,'')),   // 10 dígitos de celular colombiano → con 57, si no wa.me no abre el chat
   c=(P.get('c')||'').replace(/[^\w]/g,''),
   v=(P.get('v')||'').replace(/[^\w]/g,''),
   nq=(P.get('nq')||'').replace(/\D/g,'').slice(0,10),
@@ -1294,8 +1294,8 @@ let playCargado=null;
 function cargarPlay(){
   if(playCargado)return playCargado;
   playCargado=new Promise((res,rej)=>{
-    const l=document.createElement('link');l.rel='stylesheet';l.href='play/play.css?v=1.99.76';document.head.appendChild(l);
-    const sc=document.createElement('script');sc.src='play/ordeva-play.js?v=1.99.76';sc.onload=()=>res(window.ordevaPlay);sc.onerror=()=>{playCargado=null;rej(new Error('play'))};document.head.appendChild(sc);
+    const l=document.createElement('link');l.rel='stylesheet';l.href='play/play.css?v=1.99.77';document.head.appendChild(l);
+    const sc=document.createElement('script');sc.src='play/ordeva-play.js?v=1.99.77';sc.onload=()=>res(window.ordevaPlay);sc.onerror=()=>{playCargado=null;rej(new Error('play'))};document.head.appendChild(sc);
   });
   return playCargado;
 }

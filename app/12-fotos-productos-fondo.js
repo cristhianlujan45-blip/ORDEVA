@@ -427,7 +427,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-11-25 · v1.99.76';
+const MESORA_VERSION = '2026-11-25 · v1.99.77';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve){   // «ORDEVA 1.99.2 · 14 nov 2026» (antes «versión v1.99.2 (2026-11-14)», con la «v» repetida y la fecha en formato técnico)
   const pz = MESORA_VERSION.split('·'), num = pz.pop().trim().replace(/^v/i, ''), f = (pz[0] || '').trim().split('-');
@@ -3105,7 +3105,7 @@ function iniConta(){
   };
   document.getElementById('ctCsv').onclick = () => {
     if(!ctCsvData || !ctCsvData.filas.length){ showToast('No hay movimientos para descargar.'); return; }
-    const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+    const q = v => '"' + ((typeof v !== 'number' && /^[=+\-@\t\r]/.test(String(v)) && !/^-?\d+(?:[.,]\d+)?$/.test(String(v)) ? "'" : '') + String(v == null ? '' : v)).replace(/"/g, '""') + '"';   // = + - @ al inicio: Excel lo tomaría como fórmula
     const filas = [['Fecha', 'Tipo', 'Categoría', 'Detalle', 'Medio de pago', 'Entrada', 'Salida']].concat(ctCsvData.filas.slice().reverse().map(m => [
       new Date(m.fecha).toLocaleString('es-CO'), m.tipo === 'venta' ? 'Venta' : m.tipo === 'propina' ? 'Propina (de los empleados)' : m.tipo === 'ingreso' ? 'Otro ingreso' : m.tipo === 'traslado' ? 'Traslado (retiro)' : 'Gasto',
       m.tipo === 'venta' ? 'Ventas' : m.tipo === 'propina' ? 'Propinas' : ctCatNombre(m.tipo, m.cat).replace(/^\S+\s/, ''), m.desc, (CT_METODOS[m.metodo] || '').replace(/^\S+\s/, ''),
