@@ -2,6 +2,9 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; connect-src 'self' data: blob: https://*.supabase.co wss://*.supabase.co https://www.googleapis.com https://open.er-api.com; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+<script>/* 1.99.84: lista blanca (CSP) de la página pública de pedidos: solo carga código de ORDEVA y solo habla con el servidor de ORDEVA, YouTube (búsquedas) y el cambio de moneda. Si algo queda bloqueado, se anota en el registro de errores para revisarlo. */window.__cspBloqueos=[];document.addEventListener('securitypolicyviolation',function(e){try{var d=(e.effectiveDirective||e.violatedDirective||'')+' '+String(e.blockedURI||'').slice(0,80);if(window.__cspBloqueos.indexOf(d)>=0)return;window.__cspBloqueos.push(d);setTimeout(function(){try{window.ventoError&&window.ventoError('otro','Bloqueado por la lista blanca (CSP) en pedidos: '+d,{motivo:d})}catch(x){}},3000)}catch(x){}});</script>
+
 <script src="lib/vento-errores.js"></script><!-- errores de este equipo → ORDEVA Admin (🐞 Errores) -->
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content"><script src="lib/vento-igual.js?v=1.95.3"></script><!-- 📱 1.88.0: igual en todos los celulares (zoom de pantalla) -->
 <script>
