@@ -211,3 +211,9 @@ de $1.400 a distinta hora) siguen sonando los dos.
 - No cambia nada más de los pagos (ni la lectura de Nequi/DaviPlata por la app, ni Bre-B, ni el servidor, ni el latido del servicio).
 - Pruebas: 4 casos nuevos en la simulación de Android (`EscuchaPrueba`): fallaban antes del arreglo (daban 5.600 dos veces) y ahora pasan. Toda la simulación: 384 bien, 0 mal.
 - **Hay que actualizar la app ORDEVA en el Samsung** (y en el Xiaomi) para que tome el arreglo.
+
+## 1.99.79 — La cuenta de la mesa con los tamaños
+- El **resumen de la cuenta** y **«Pagar por productos»** mostraban «Purina» dos veces cuando la mesa tenía Purina 1 kg y Purina 5 kg. Ahora sale cada uno con su tamaño (también en la línea «Paga: …»).
+- Esos dos lugares ya no meten el nombre del producto como HTML: un nombre raro (de una foto de factura o un texto pegado) sale como texto.
+- Diagnóstico de pagos (25/11 tarde): los SMS repetidos siguieron porque el Samsung sigue con la app vieja (reporta 1.99.73). El arreglo de la 1.99.78 empieza a funcionar cuando se instale la app nueva.
+- Prueba nueva: `cuentatamano1979` (4). Probadas también 10 relacionadas (cuentas, mesas, pagos por partes, QR): todas bien.

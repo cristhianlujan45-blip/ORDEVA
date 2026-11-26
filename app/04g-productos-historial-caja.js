@@ -2630,7 +2630,7 @@ function updatePayPickInfo(scope){
   if(!el) return;
   if(!sel && !rc){ el.style.display = 'none'; el.textContent = ''; return; }
   const bits = [];
-  if(sel) bits.push('Paga: ' + sel.map(x => x.qty + ' ' + x.name).join(', ') + ' · ' + fmt(sel.reduce((a, x) => a + x.price * x.qty, 0)));
+  if(sel) bits.push('Paga: ' + sel.map(x => x.qty + ' ' + nombreConTamano(x)).join(', ') + ' · ' + fmt(sel.reduce((a, x) => a + x.price * x.qty, 0)));
   if(rc) bits.push('📎 Comprobante adjunto');
   el.style.display = 'block';
   el.textContent = bits.join(' · ');
@@ -2655,7 +2655,7 @@ function renderPaySel(){
     total += l.sel * l.it.price;
     const row = document.createElement('div');
     row.className = 'line-item';
-    row.innerHTML = `<div><span class="li-name">${l.it.name}</span><div class="li-paystatus">${fmt(l.it.price)} · pendientes ${l.rem}</div></div>` +
+    row.innerHTML = `<div><span class="li-name">${histEsc(nombreConTamano(l.it))}</span><div class="li-paystatus">${fmt(l.it.price)} · pendientes ${l.rem}</div></div>` +
       `<div class="qty-stepper"><button type="button" data-i="${i}" data-d="-1">−</button><input type="number" value="${l.sel}" readonly><button type="button" data-i="${i}" data-d="1">+</button></div>`;
     box.appendChild(row);
   });

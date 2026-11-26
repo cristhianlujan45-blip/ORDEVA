@@ -1004,7 +1004,7 @@ function openBillSummary(tableId){
     t.items.forEach(it=>{
       const row = document.createElement('div');
       row.className = 'bill-summary-item-row';
-      row.innerHTML = `<span>${it.name} ×${it.qty}</span><span>${fmt(it.price*it.qty)}</span>`;
+      row.innerHTML = `<span>${(typeof histEsc === 'function' ? histEsc : String)(typeof nombreConTamano === 'function' ? nombreConTamano(it) : it.name)} ×${it.qty}</span><span>${fmt(it.price*it.qty)}</span>`;   // con su tamaño (Purina 1 kg / 5 kg) y sin HTML
       itemsEl.appendChild(row);
     });
   } else {
