@@ -246,3 +246,10 @@ de $1.400 a distinta hora) siguen sonando los dos.
 - Prueba nueva `PlanActualizarPrueba` (9 casos: de día, de madrugada, bar abierto a la 1-2 a. m., 5 a. m., la tocaron hace 10 min, pago hace 20 min). Toda la simulación de Android: 393 bien.
 - **Pruebas automáticas:** la batería completa de la noche va en su propia fila y ya no la cancela cada publicación (de 21 noches casi ninguna había terminado). Las acciones de GitHub pasan a las versiones con Node 24 (checkout v5, setup-node v5, cache v5, setup-java v5, upload-artifact v6, setup-gradle v5): GitHub avisaba que las de Node 20 dejan de funcionar.
 - Esta actualización de la app Android hay que instalarla UNA vez más con «Actualizar ahora» (Ajustes) en el Samsung: desde esta versión, las siguientes llegan solas de madrugada.
+
+## 1.99.84 — Lista blanca (CSP) en la página pública de pedidos
+- `pedido.html` (la que abren los clientes con el QR) ahora trae su **Content-Security-Policy**: solo carga código de ORDEVA (nada de otros sitios), solo se conecta con el servidor de ORDEVA (Supabase), las búsquedas de YouTube y el cambio de moneda; sin `<object>`, sin cambiar la base de la página ni mandar formularios a otro lado. Imágenes de cualquier sitio seguro (las fotos de las canciones vienen de YouTube).
+- Como la página tiene código dentro de ella misma (3 bloques y 29 botones con `onclick`), se deja `'unsafe-inline'`: la lista no frena un texto que se cuele como código, pero sí que ese código traiga más código de afuera o se lleve datos a otro servidor (lo más dañino).
+- Si algo queda bloqueado, se anota en el registro de errores («Bloqueado por la lista blanca (CSP) en pedidos: …») para revisarlo.
+- Prueba nueva `cspedido1984` (5). Probadas las 29 pruebas que usan la página de pedidos (QR, música, PLAY, tienda, cuentas, WhatsApp…): todas bien.
+- Pendiente para más adelante (más grande): pasar el código de los botones a archivos aparte para quitar `'unsafe-inline'`, y luego hacer lo mismo en la app (index.html).
