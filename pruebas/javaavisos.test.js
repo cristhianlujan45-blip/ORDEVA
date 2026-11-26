@@ -32,6 +32,12 @@ else {
   contar(correr('java', ['-Dstdout.encoding=UTF-8', '-cp', path.join(tmp, 'a'), 'co.vento.app.PlanVozPrueba']).stdout, 'Voz del pago en todo tipo de celular y tablet (PlanVozPrueba)');
   contar(correr('java', ['-Dstdout.encoding=UTF-8', '-cp', path.join(tmp, 'a'), 'co.vento.app.ReservaAvisoPrueba']).stdout, 'Avisos de las apps de reservas (ReservaAvisoPrueba)');
 }
+// 1.99.83: cuándo se actualiza sola la app (PlanActualizar): de madrugada aunque ORDEVA esté en pantalla.
+r = correr('javac', ['-encoding', 'UTF-8', '-d', path.join(tmp, 'u'), path.join(src, 'PlanActualizar.java'), path.join(__dirname, 'java/PlanActualizarPrueba.java')]);
+if(r.status !== 0){ mal++; console.log('❌ No compila PlanActualizar: ' + r.stderr.slice(0, 800)); }
+else {
+  contar(correr('java', ['-Dstdout.encoding=UTF-8', '-cp', path.join(tmp, 'u'), 'co.vento.app.PlanActualizarPrueba']).stdout, 'Cuándo se actualiza sola la app (PlanActualizarPrueba)');
+}
 const jar = process.env.VENTO_ANDROID_ALL;   // ej.: android-all de Robolectric (org.robolectric:android-all 14), solo para compilar
 if(jar && fs.existsSync(jar)){
   const sim = path.join(__dirname, 'java/simulado');

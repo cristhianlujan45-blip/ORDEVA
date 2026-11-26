@@ -50,6 +50,7 @@ public class VentoApp extends Application {
     static WebView web;                         // la página de Vento (una sola, para que nada se duplique)
     static MutableContextWrapper envoltura;     // la página usa la ventana cuando hay, o la app cuando no
     static volatile boolean alFrente = false;   // la ventana de Vento se está viendo ahora
+    static volatile long ultimoToque = 0;       // 1.99.83: cuándo tocaron la pantalla de Vento por última vez (la actualización de madrugada)
     static volatile long ultimoPago = 0;         // cuándo se dijo el último pago (la actualización automática no lo interrumpe)
     static int avisoN = 100;
     static MainActivity ventana;                // la ventana abierta (null si está cerrada)

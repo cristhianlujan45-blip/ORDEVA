@@ -31,9 +31,11 @@ on:
 permissions:
   contents: read
 
+# 1.99.83: la batería de la noche va en su propia fila y no se cancela: antes cada publicación la cortaba (de 21 noches,
+# casi ninguna terminó). Las de cada publicación siguen cancelando la anterior de su misma fila.
 concurrency:
-  group: pruebas-app-${{ github.ref }}
-  cancel-in-progress: true
+  group: pruebas-app-${{ github.ref }}-${{ github.event_name == 'schedule' && 'noche' || 'publicacion' }}
+  cancel-in-progress: ${{ github.event_name != 'schedule' }}
 
 jobs:
   pruebas:
@@ -48,8 +50,8 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
       - name: Instalar Playwright (Chromium) y el cliente de PostgreSQL
@@ -66,7 +68,7 @@ jobs:
       # Antes solo corrían en el equipo del desarrollador.
       - name: Librería de Android para las pruebas de Java (caché)
         id: aall
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/android-all
           key: android-all-14-robolectric-10818077

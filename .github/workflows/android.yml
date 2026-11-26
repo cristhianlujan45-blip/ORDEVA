@@ -26,12 +26,12 @@ jobs:
       VENTO_VERSION_CODE: ${{ github.run_number }}
       VENTO_VERSION_NAME: 1.0.${{ github.run_number }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v5
         with:
           gradle-version: '8.9'
       - name: Llave de firma
@@ -85,7 +85,7 @@ jobs:
             echo "::error title=Firma del APK::El APK no quedó firmado con la llave de las versiones instaladas. No se publica."
             exit 1
           fi
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: vento-apk
           path: |

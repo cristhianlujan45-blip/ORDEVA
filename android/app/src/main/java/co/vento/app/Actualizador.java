@@ -38,6 +38,7 @@ final class Actualizador {
     // La persona tocó «Actualizar ahora» mientras ya se estaba bajando de fondo: al terminar se abre el instalador.
     private static volatile boolean pidioAhora = false;
     static final String ARCHIVO = "vento-nueva.apk";
+    static final String P_REABRIR = "actReabrir";   // 1.99.83: se actualizó de madrugada con ORDEVA en pantalla → se vuelve a abrir
 
     private static SharedPreferences sp(Context c) { return c.getSharedPreferences("vento", Context.MODE_PRIVATE); }
     static int actual() { return BuildConfig.VERSION_CODE; }
@@ -75,7 +76,13 @@ final class Actualizador {
                 if (!ahora && !auto(c)) { estado(c, "hay una nueva (automática apagada)"); return; }
                 if (!permiso(c)) { estado(c, "falta el permiso"); return; }
                 // Buen momento: Vento no se está usando y no acaba de llegar un pago (instalar cierra la app un momento).
-                if (!ahora && (VentoApp.alFrente || System.currentTimeMillis() - VentoApp.ultimoPago < 60_000L)) { estado(c, "esperando a que no estés usando Vento"); return; }
+                // 1.99.83: ORDEVA deja la pantalla prendida (FLAG_KEEP_SCREEN_ON): en un negocio con el celular siempre en ORDEVA
+                // nunca era «buen momento» y la app se quedaba vieja (25/11: el Samsung seguía sin la 1.99.78). De madrugada
+                // (3 a 5 a. m.) se instala aunque esté en pantalla, si nadie la tocó ni llegó un pago en los últimos 30 min.
+                long t0 = System.currentTimeMillis();
+                int mo = ahora ? PlanActualizar.NO_ESTA : PlanActualizar.momento(t0, java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY), VentoApp.alFrente, VentoApp.ultimoToque, VentoApp.ultimoPago);
+                if (mo == PlanActualizar.ESPERAR) { estado(c, "esperando a que no estés usando Vento (o de 3 a 5 a. m.)"); return; }
+                if (mo == PlanActualizar.MADRUGADA) p.edit().putLong(P_REABRIR, t0).apply();   // al terminar se vuelve a abrir ORDEVA
                 // Máximo 3 intentos por versión (si algo falla, no baja el archivo una y otra vez).
                 String clave = "v" + nueva;
                 JSONObject in = new JSONObject(p.getString(P_INTENTOS, "{}"));

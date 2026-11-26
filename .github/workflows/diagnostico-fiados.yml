@@ -219,11 +219,11 @@ jobs:
 
       # 1.99.42: abrir la libreta REAL de ORDEVA con los datos del negocio y decir qué ve el dueño para el nombre pedido
       # (los datos quedan en el equipo de GitHub mientras corre; no se imprimen).
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         if: ${{ github.event.inputs.nombre != '' }}
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         if: ${{ github.event.inputs.nombre != '' }}
         with:
           node-version: '22'

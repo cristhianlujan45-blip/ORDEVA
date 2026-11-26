@@ -239,3 +239,10 @@ de $1.400 a distinta hora) siguen sonando los dos.
 - `diagnostico-pagos` (solo lectura) muestra `apps_android`: versión de la app, modelo del celular y versión de la página de cada equipo con app (sin nombres).
 - No toca los pagos ni el registro de los celulares autorizados (no cambia su token).
 - Probadas 12 pruebas relacionadas (errores, admin, equipos, pagos) y las del servidor de errores: todas bien.
+
+## 1.99.83 — La app Android se actualiza de madrugada · pruebas automáticas al día
+- **Por qué el Samsung no se actualizaba:** ORDEVA deja la pantalla prendida (`FLAG_KEEP_SCREEN_ON`) y el actualizador solo instalaba cuando ORDEVA NO estaba en pantalla. En un negocio con el celular siempre en ORDEVA, nunca era «buen momento»: el Samsung se quedó sin la 1.99.78 (la de los SMS repetidos).
+- **Arreglo (`PlanActualizar`, `Actualizador`, `Arranque`, `MainActivity`):** de **3:00 a 4:59 a. m.** se instala aunque ORDEVA esté en pantalla, si nadie la tocó ni llegó un pago en los últimos 30 min (de 1 a 3 a. m. no, por los bares). Al terminar, ORDEVA se vuelve a abrir sola. De día sigue igual: se instala cuando no está en pantalla, o con «Actualizar ahora».
+- Prueba nueva `PlanActualizarPrueba` (9 casos: de día, de madrugada, bar abierto a la 1-2 a. m., 5 a. m., la tocaron hace 10 min, pago hace 20 min). Toda la simulación de Android: 393 bien.
+- **Pruebas automáticas:** la batería completa de la noche va en su propia fila y ya no la cancela cada publicación (de 21 noches casi ninguna había terminado). Las acciones de GitHub pasan a las versiones con Node 24 (checkout v5, setup-node v5, cache v5, setup-java v5, upload-artifact v6, setup-gradle v5): GitHub avisaba que las de Node 20 dejan de funcionar.
+- Esta actualización de la app Android hay que instalarla UNA vez más con «Actualizar ahora» (Ajustes) en el Samsung: desde esta versión, las siguientes llegan solas de madrugada.

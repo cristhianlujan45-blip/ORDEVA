@@ -123,6 +123,10 @@ public class MainActivity extends Activity {
         } catch (Exception ignorado) { }
     }
 
+    // 1.99.83: la última vez que alguien tocó ORDEVA (la actualización de madrugada solo instala si nadie la está usando).
+    @Override
+    public void onUserInteraction() { super.onUserInteraction(); VentoApp.ultimoToque = System.currentTimeMillis(); }
+
     @Override
     protected void onResume() {
         super.onResume();
