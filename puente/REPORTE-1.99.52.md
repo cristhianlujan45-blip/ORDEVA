@@ -253,3 +253,9 @@ de $1.400 a distinta hora) siguen sonando los dos.
 - Si algo queda bloqueado, se anota en el registro de errores («Bloqueado por la lista blanca (CSP) en pedidos: …») para revisarlo.
 - Prueba nueva `cspedido1984` (5). Probadas las 29 pruebas que usan la página de pedidos (QR, música, PLAY, tienda, cuentas, WhatsApp…): todas bien.
 - Pendiente para más adelante (más grande): pasar el código de los botones a archivos aparte para quitar `'unsafe-inline'`, y luego hacer lo mismo en la app (index.html).
+
+## 1.99.85 — La plata escrita con puntos de miles («8.000») ya no queda en $8
+- **Qué pasaba (probado en el navegador):** en los campos de número, el punto es el decimal. Escribir **«8.000»** en el valor de un pago dejaba **8** (y «1.500.000» quedaba en 1,5). Igual en el precio y el costo del producto, el gasto de contabilidad, el envío, la libreta, la caja, las reservas…
+- **Arreglo (app/01):** en los campos de PLATA el punto y la coma de miles se ignoran al escribir (computador y celular) y al pegar: «8.000» → 8000, «1.500.000» → 1500000, pegar «12.500» → 12500. Se reconocen por su nombre (precio, costo, monto, valor, pago, abono, envío…) o por su paso (de a 50, 100, 500…), también los que se crean después.
+- Los de **porcentaje, retención, IVA, cantidad, peso, días** y el costo por kg de las recetas no se tocan (ahí sí hay decimales: «2.5» sigue 2.5).
+- Prueba nueva `plata1985` (10): fallaba antes del arreglo. Probadas también 20 relacionadas (cobrar, mesas, libreta, caja, contabilidad, reservas, IVA, venta rápida, propinas): todas bien.
