@@ -263,3 +263,9 @@ de $1.400 a distinta hora) siguen sonando los dos.
 ## 1.99.86 — Lo mismo en ORDEVA Admin
 - El arreglo de la 1.99.85 pasa a su propio archivo (`lib/vento-plata.js`) y se carga también en **ORDEVA Admin** (precio del plan, valor de un pago, precio de la licencia: «120.000» → 120000). Los días, sedes y cantidades del admin no se tocan.
 - Probadas: plata1985, modulos, adminreal, adminmasdatos, appoweb, v196, cobrosimple: todas bien.
+
+## 1.99.87 — Asistencia sin horas infladas · tasa del dólar con decimales
+- **Asistencia:** si alguien marcaba la entrada y se olvidaba de la salida, el turno seguía sumando hasta hoy (entró ayer a las 8 a. m. = 30 o 40 h) y el resumen de horas para la nómina salía inflado. Ahora un turno sin salida cuenta **máximo 16 h** y sale «⚠️ no marcó la salida»; si la salida se marca al día siguiente, también cuenta 16 h y sale «⚠️ … revisa». A la persona le aparece «entraste el … y no marcaste la salida: márcala ahora». También en «📋 Copiar el resumen».
+- **Dólares:** la tasa se escribía en un campo que quitaba todo lo que no fuera cifra: «4152.35» o «4.152,35» (como la dan las noticias o el banco) quedaba en **415.235** pesos por dólar (100 veces más) y el total en dólares salía 100 veces más bajo. Ahora se leen bien: 4152. Si la tasa queda fuera de lo normal (menos de $1.000 o más de $10.000) avisa «revisa la tasa».
+- Revisados sin cambios: comisiones (el % se calcula sobre el precio completo aunque la venta tenga descuento: es una decisión del negocio, queda igual) y domicilios.
+- Prueba nueva `asistenciadolar1987` (6): fallaba antes del arreglo. `v192` (asistencia) sigue bien.
