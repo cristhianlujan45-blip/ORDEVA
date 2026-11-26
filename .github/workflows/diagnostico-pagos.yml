@@ -95,6 +95,7 @@ jobs:
                 where p.creado_en > now() - interval '48 hours' and p.proveedor = 'dispositivo' order by p.creado_en desc limit 40) x),
             'equipos_con_modelo', (select coalesce(json_agg(x), '[]') from (
                 select left(d.negocio_id::text, 8) neg, coalesce(m.rol, '?') rol, d.suena, d.nombre, left(coalesce(d.plataforma, ''), 120) plataforma,
+                       substring(coalesce(d.plataforma, '') from 'VentoAndroid/([0-9.]+)') app_android,
                        (d.ultimo_visto at time zone 'America/Bogota')::text ultimo_visto
                 from dispositivos d left join miembros m on m.negocio_id = d.negocio_id and m.usuario_id = d.usuario_id
                 where d.revocado_en is null and d.ultimo_visto > now() - interval '3 days' order by d.ultimo_visto desc limit 25) x),
@@ -110,6 +111,11 @@ jobs:
                   and q.creado_en <= p.creado_en and q.creado_en > p.creado_en - interval '10 minutes'
                 where p.creado_en > now() - interval '7 days' and p.estado <> 'anulado' and q.estado <> 'anulado'
                 order by p.creado_en desc limit 40) x),
+            'apps_android', (select coalesce(json_agg(x), '[]') from (
+                -- 1.99.82: qué versión de la app Android tiene cada equipo (sin nombres: solo el modelo del celular).
+                select left(negocio_id::text, 8) neg, substring(modelo from 'VentoAndroid/([0-9.]+)') app_android,
+                       substring(modelo from 'Android [0-9]+; ([^;)]+)') celular, version pagina, (ultima at time zone 'America/Bogota')::text ultima
+                from instalaciones where plataforma = 'apk' and ultima > now() - interval '7 days' order by ultima desc limit 20) x),
             'versiones_en_uso', (select coalesce(json_agg(x), '[]') from (
                 select version, plataforma, count(distinct equipo) equipos, (max(ultimo) at time zone 'America/Bogota')::text ultimo
                 from app_errores where ultimo > now() - interval '72 hours' group by 1, 2 order by max(ultimo) desc limit 20) x)

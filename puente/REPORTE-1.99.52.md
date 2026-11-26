@@ -232,3 +232,10 @@ de $1.400 a distinta hora) siguen sonando los dos.
   - **Copias automáticas del día:** el punto del día cambiaba a las 7 p. m.; ahora a la medianoche.
   - **Modo fácil (entrada de inventario):** la fecha del movimiento salía de mañana después de las 7 p. m.
 - Prueba nueva: `fechacolombia1981` (3), con el reloj a las 8:30 p. m. de Colombia: fallaba antes del arreglo y ahora pasa. Probadas también 9 relacionadas: todas bien.
+
+## 1.99.82 — Saber qué versión de la app Android tiene cada celular
+- El servidor no sabía qué app Android tenía cada equipo: la versión va al final de la descripción del navegador y se cortaba a los 120 caracteres. Por eso no se podía confirmar si el Samsung ya tenía la 1.99.78 (la de los SMS repetidos).
+- Ahora el aviso de instalación y el de errores mandan «VentoAndroid/1.99.xx · …» al PRINCIPIO, y la instalación se vuelve a avisar cuando cambia la app Android (no solo la página).
+- `diagnostico-pagos` (solo lectura) muestra `apps_android`: versión de la app, modelo del celular y versión de la página de cada equipo con app (sin nombres).
+- No toca los pagos ni el registro de los celulares autorizados (no cambia su token).
+- Probadas 12 pruebas relacionadas (errores, admin, equipos, pagos) y las del servidor de errores: todas bien.
