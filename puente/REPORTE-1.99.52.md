@@ -269,3 +269,9 @@ de $1.400 a distinta hora) siguen sonando los dos.
 - **Dólares:** la tasa se escribía en un campo que quitaba todo lo que no fuera cifra: «4152.35» o «4.152,35» (como la dan las noticias o el banco) quedaba en **415.235** pesos por dólar (100 veces más) y el total en dólares salía 100 veces más bajo. Ahora se leen bien: 4152. Si la tasa queda fuera de lo normal (menos de $1.000 o más de $10.000) avisa «revisa la tasa».
 - Revisados sin cambios: comisiones (el % se calcula sobre el precio completo aunque la venta tenga descuento: es una decisión del negocio, queda igual) y domicilios.
 - Prueba nueva `asistenciadolar1987` (6): fallaba antes del arreglo. `v192` (asistencia) sigue bien.
+
+## 1.99.88 — La plata pegada con centavos («$ 8.000,00») ya no sale 100 veces más
+- Varios campos de texto para plata quitaban todo lo que no fuera cifra: «8.000» quedaba bien (8000), pero «**$ 8.000,00**» (como lo copia la app del banco) quedaba en **800000**, 100 veces más. Pasaba en: movimientos y arqueo de la caja (`vento-turno`), caja ampliada (`vento-caja-mas`), precio en esta venta / valor libre de la caja POS, consumo mínimo de las mesas, bonos de regalo y pagos de comisión.
+- Ahora todos usan `ventoLeerPlata` (lib/vento-plata.js): «8.000», «$ 8.000», «8000», «8.000,00», «8000.50», «1.500.000», «1,500,000.00» → pesos enteros (los centavos del final no cuentan).
+- Prueba nueva `leerplata1988` (4). Probadas también 20 relacionadas (caja, cuadre, gastos, salidas, devoluciones, propinas, libreta, Laya, mínimo, bonos…): todas bien.
+- Diagnóstico de hoy: el Xiaomi ya tiene la app Android 1.0.94; el Samsung sigue con la vieja (4 SMS repetidos hoy). Sin bloqueos de la CSP en pedidos.
