@@ -224,3 +224,11 @@ de $1.400 a distinta hora) siguen sonando los dos.
 - **Arreglo (servidor `vento-pagos`):** `/aviso` responde con las mismas cabeceras CORS que las demás rutas (solo para los orígenes de ORDEVA; un sitio ajeno no). No cambia cómo se leen ni se cuentan los pagos.
 - Prueba: `pruebas/servidor/avisos.test.js` 2b/2c (fallaba antes del arreglo; ahora 36 bien). Probadas también las del servidor de pagos privados, canal, permisos, aislamiento y errores: todas bien.
 - Sobre los SMS repetidos: a las 9:32 p. m. del 25/11 volvió a pasar (4.000 sonó otra vez al llegar 3.500): el Samsung todavía no tiene la app Android 1.99.78.
+
+## 1.99.81 — Fechas con la hora de Colombia (no la de UTC)
+- Varias partes sacaban «hoy» con la hora de UTC: después de las **7 p. m.** de Colombia ya era «mañana».
+  - **Vitrina (página de pedidos):** una promo «hasta hoy» dejaba de publicarse a las 7 p. m. de su último día. Ahora dura hasta la medianoche.
+  - **Ventas a Excel → Rango:** después de las 7 p. m. proponía la fecha de mañana (y salía «No hay ventas»). Ahora propone hoy. Los nombres de los archivos (hoy-, ayer-, mes-, cierre-) también salen con la fecha de Colombia.
+  - **Copias automáticas del día:** el punto del día cambiaba a las 7 p. m.; ahora a la medianoche.
+  - **Modo fácil (entrada de inventario):** la fecha del movimiento salía de mañana después de las 7 p. m.
+- Prueba nueva: `fechacolombia1981` (3), con el reloj a las 8:30 p. m. de Colombia: fallaba antes del arreglo y ahora pasa. Probadas también 9 relacionadas: todas bien.

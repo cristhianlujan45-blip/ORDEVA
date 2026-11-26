@@ -447,7 +447,7 @@ window.ventoAplicarDatosNube = async (obj, respaldarLocal) => {
   try{
     if(respaldarLocal && typeof data !== 'undefined' && data){
       // Antes de cambiar este celular a los datos de la nube, se deja un punto de restauración local.
-      await autoBackupAgregar({ day: new Date().toISOString().slice(0, 10) + ' (antes de la nube)', at: Date.now(), data: JSON.stringify(data) }, 8, false);
+      await autoBackupAgregar({ day: (d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'))(new Date()) + ' (antes de la nube)', at: Date.now(), data: JSON.stringify(data) }, 8, false);
     }
     try{ window.ventoQuitarAnuladas && window.ventoQuitarAnuladas(obj); }catch(e){}   // 🚫 1.99.1: lo que se GUARDA ya va sin las anuladas
     const txt = JSON.stringify(obj);
@@ -566,7 +566,7 @@ function autoBackupAgregar(punto, max, unoPorDia){
   return autoBkCola;
 }
 function autoBackupTick(json){
-  const today = new Date().toISOString().slice(0, 10);
+  const today = (d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'))(new Date());   // el día de Colombia (en UTC cambiaba a las 7 p. m.)
   if(autoBkDia === today) return;          // ya hay punto de hoy (no se lee el almacén en cada guardado)
   autoBackupAgregar({ day: today, at: Date.now(), data: json }, 7, true);
 }

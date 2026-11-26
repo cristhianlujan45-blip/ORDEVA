@@ -15,7 +15,7 @@
     if(typeof data === 'undefined' || !data || !window.vitoQCfg) return;
     if(!data.vitrina && !forzar) return;   // nunca configurada: no gastar mensajes de más
     const c = window.vitoQCfg(); if(!c || !c.topic) return;
-    const v = V(), hoy = new Date().toISOString().slice(0, 10);
+    const v = V(), hoy = (d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'))(new Date());   // la promo «hasta hoy» dura hasta la noche (en UTC se vencía a las 7 p. m.)
     const pr = (v.promos || []).filter(x => !x.hasta || x.hasta >= hoy).slice(0, 6).map(x => [x.e || '', String(x.t || '').slice(0, 40), String(x.d || '').slice(0, 90), Math.round(+x.p || 0), String(x.prod || '').slice(0, 60)]);
     const m = { v: 1, oc: v.ocasion || '', nom: String(v.nombre || '').slice(0, 30), msg: String(v.mensaje || '').slice(0, 140), sal: v.saludo !== false ? 1 : 0, pr };
     const s = JSON.stringify(m);
@@ -69,7 +69,7 @@
     const g = document.getElementById('vitGrupo'); if(!g || typeof data === 'undefined' || !data) return; const v = data.vitrina || { ocasion: '', nombre: '', mensaje: '', saludo: true, promos: [] };
     g.querySelector('#vitOc').value = v.ocasion || ''; g.querySelector('#vitNom').value = v.nombre || ''; g.querySelector('#vitMsg').value = v.mensaje || ''; g.querySelector('#vitSal').checked = v.saludo !== false;
     g.querySelector('#vitNom').hidden = !['cumple', 'aniversario', 'madre', 'padre'].includes(v.ocasion);
-    const hoy = new Date().toISOString().slice(0, 10);
+    const hoy = (d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'))(new Date());
     g.querySelector('#vitPromos').innerHTML = (v.promos || []).length ? v.promos.map((x, i) => '<div class="vit-li' + (x.hasta && x.hasta < hoy ? ' vit-venc' : '') + '"><span class="vit-e">' + esc(x.e || '📣') + '</span><span class="vit-tx"><b>' + esc(x.t) + '</b>' + (x.p ? ' · ' + esc(fmt(x.p)) : '') + '<small>' + esc(x.d || '') + (x.prod ? ' · pide: ' + esc(x.prod) : '') + (x.hasta ? ' · hasta ' + esc(x.hasta) + (x.hasta < hoy ? ' (vencida)' : '') : '') + '</small></span>' +
       (i ? '<button type="button" class="btn-ghost" data-pr="' + x.id + '" data-a="up" title="Subir">↑</button>' : '') + '<button type="button" class="btn-ghost" data-pr="' + x.id + '" data-a="ed">✏️</button><button type="button" class="btn-ghost" data-pr="' + x.id + '" data-a="del">🗑</button></div>').join('') : '<div class="settings-desc">Todavía no hay promociones.</div>';
     g.querySelector('#vitAdd').disabled = (v.promos || []).length >= 6;

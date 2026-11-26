@@ -367,17 +367,17 @@ document.getElementById('exportPeriodBtns').addEventListener('click', e => {
   if(per === 'hoy'){
     const from = new Date(now); from.setHours(0,0,0,0);
     const to = new Date(now); to.setHours(23,59,59,999);
-    exportSalesRange(from, to, 'hoy-' + now.toISOString().slice(0,10));
+    exportSalesRange(from, to, 'hoy-' + (d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'))(now));
   } else if(per === 'ayer'){
     const from = new Date(now); from.setDate(from.getDate() - 1); from.setHours(0,0,0,0);
     const to = new Date(from); to.setHours(23,59,59,999);
-    exportSalesRange(from, to, 'ayer-' + from.toISOString().slice(0,10));
+    exportSalesRange(from, to, 'ayer-' + (d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'))(from));
   } else if(per === 'mes'){
     const from = new Date(now.getFullYear(), now.getMonth(), 1);
     const to = new Date(now); to.setHours(23,59,59,999);
-    exportSalesRange(from, to, 'mes-' + now.toISOString().slice(0,7));
+    exportSalesRange(from, to, 'mes-' + (d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'))(now).slice(0, 7));
   } else if(per === 'rango'){
-    const today = now.toISOString().slice(0,10);
+    const today = (d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'))(now);   // hoy en Colombia: en UTC, después de las 7 p. m. salía la fecha de mañana
     document.getElementById('exportFrom').value = today;
     document.getElementById('exportTo').value = today;
   }
@@ -396,7 +396,7 @@ document.getElementById('exportClosureBtn').addEventListener('click', () => {
   if(!c){ showToast('Elige un cierre de la lista.'); return; }
   const to = new Date(c.date);
   const from = c.from ? new Date(c.from) : new Date(0);
-  exportSalesRange(from, to, 'cierre-' + to.toISOString().slice(0,10));
+  exportSalesRange(from, to, 'cierre-' + (d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'))(to));
 });
 
 function renderStats(){
