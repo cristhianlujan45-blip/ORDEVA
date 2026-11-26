@@ -810,7 +810,10 @@ export async function manejar(req: Request, env: Env): Promise<Response> {
         dian: { listo: F.configurado(env), ambiente: F.esPruebas(env) ? "pruebas" : "produccion" }, repasos }, cors);
     }
     if (r0 === "webhook" && ruta[1] === "wompi" && ruta[2] && req.method === "POST") return await webhookWompi(req, env, ruta[2]);
-    if (r0 === "aviso" && req.method === "POST") return await aviso(req, env, ruta[1] || null);
+    // 1.99.80: con su CORS. La página de ORDEVA (en el navegador o dentro de la app Android) manda el aviso desde otro
+    // origen: sin «Access-Control-Allow-Origin» el aviso SÍ se guardaba, pero la página creía que había fallado y lo volvía
+    // a mandar en cada vuelta durante 30 min (cientos de «duplicado» por aviso en pago_eventos).
+    if (r0 === "aviso" && req.method === "POST") { const r = await aviso(req, env, ruta[1] || null); for (const [k, v] of Object.entries(cors)) r.headers.set(k, v); return r; }
     // Canal en vivo para quien publica desde afuera (MacroDroid con los avisos de pagos, el puente de WhatsApp):
     // POST /canal/<canal> con el texto en el cuerpo, igual que antes con ntfy.
     if (r0 === "canal" && ruta[1] && req.method === "POST") {

@@ -217,3 +217,10 @@ de $1.400 a distinta hora) siguen sonando los dos.
 - Esos dos lugares ya no meten el nombre del producto como HTML: un nombre raro (de una foto de factura o un texto pegado) sale como texto.
 - Diagnóstico de pagos (25/11 tarde): los SMS repetidos siguieron porque el Samsung sigue con la app vieja (reporta 1.99.73). El arreglo de la 1.99.78 empieza a funcionar cuando se instale la app nueva.
 - Prueba nueva: `cuentatamano1979` (4). Probadas también 10 relacionadas (cuentas, mesas, pagos por partes, QR): todas bien.
+
+## 1.99.80 — El servidor ya no recibe el mismo aviso de pago cientos de veces
+- **Qué se vio (diagnóstico de pagos, 25/11 noche):** en `pago_eventos` cada aviso del Samsung tenía cientos de «· duplicado»: el mismo aviso llegaba otra vez cada pocos segundos durante 30 min. El servidor lo contaba UNA vez (no había pagos de más por esto), pero era tráfico y batería gastados, y la fila de la página quedaba trabada en el primer aviso.
+- **Por qué:** la ruta `/aviso` del servidor de pagos respondía sin `Access-Control-Allow-Origin`. La página de ORDEVA (también dentro de la app Android) manda desde `cristhianlujan45-blip.github.io`: el aviso SÍ se guardaba, pero el navegador no dejaba leer la respuesta, la página creía que había fallado y lo volvía a mandar.
+- **Arreglo (servidor `vento-pagos`):** `/aviso` responde con las mismas cabeceras CORS que las demás rutas (solo para los orígenes de ORDEVA; un sitio ajeno no). No cambia cómo se leen ni se cuentan los pagos.
+- Prueba: `pruebas/servidor/avisos.test.js` 2b/2c (fallaba antes del arreglo; ahora 36 bien). Probadas también las del servidor de pagos privados, canal, permisos, aislamiento y errores: todas bien.
+- Sobre los SMS repetidos: a las 9:32 p. m. del 25/11 volvió a pasar (4.000 sonó otra vez al llegar 3.500): el Samsung todavía no tiene la app Android 1.99.78.

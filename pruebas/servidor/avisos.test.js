@@ -31,6 +31,12 @@ async function pruebas(sb) {
   // 2. El mismo aviso reenviado (mismo ID) → uno solo
   const r3 = await aviso(dev.token, JSON.stringify({ text: TXT, id: 'and-k1:2000:55' }));
   chk('2. El mismo aviso otra vez (mismo ID) → duplicado, no cuenta', r3.st === 200 && r3.j.duplicado === true, r3.j);
+  // 2b. 1.99.80: la respuesta trae su CORS (la página la puede leer): antes no, la página creía que había fallado y lo
+  // mandaba otra vez cada pocos segundos durante 30 min.
+  { const rc = await fetch(F + '/aviso/' + dev.token, { method: 'POST', headers: { 'Content-Type': 'text/plain', Origin: 'http://localhost:8765' }, body: JSON.stringify({ text: TXT, id: 'and-k1:2000:55' }) });
+    chk('2b. /aviso responde con Access-Control-Allow-Origin para la página de ORDEVA', rc.headers.get('access-control-allow-origin') === 'http://localhost:8765', [...rc.headers.entries()]);
+    const ro = await fetch(F + '/aviso/' + dev.token, { method: 'POST', headers: { 'Content-Type': 'text/plain', Origin: 'https://otro-sitio.example' }, body: JSON.stringify({ text: TXT, id: 'and-k1:2000:55' }) });
+    chk('2c. … y no para un sitio ajeno', !ro.headers.get('access-control-allow-origin'), [...ro.headers.entries()]); }
   let l = await pagos(NEG);
   chk('2. Quedan exactamente 2 pagos de $200 aprobados por DaviPlata', l.length === 2 && l.every((x) => x.monto === 200 && x.estado === 'aprobado' && /DAVIPLATA/i.test(x.metodo)), l);
 
