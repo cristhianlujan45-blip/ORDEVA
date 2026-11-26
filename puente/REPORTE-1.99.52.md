@@ -259,3 +259,7 @@ de $1.400 a distinta hora) siguen sonando los dos.
 - **Arreglo (app/01):** en los campos de PLATA el punto y la coma de miles se ignoran al escribir (computador y celular) y al pegar: «8.000» → 8000, «1.500.000» → 1500000, pegar «12.500» → 12500. Se reconocen por su nombre (precio, costo, monto, valor, pago, abono, envío…) o por su paso (de a 50, 100, 500…), también los que se crean después.
 - Los de **porcentaje, retención, IVA, cantidad, peso, días** y el costo por kg de las recetas no se tocan (ahí sí hay decimales: «2.5» sigue 2.5).
 - Prueba nueva `plata1985` (10): fallaba antes del arreglo. Probadas también 20 relacionadas (cobrar, mesas, libreta, caja, contabilidad, reservas, IVA, venta rápida, propinas): todas bien.
+
+## 1.99.86 — Lo mismo en ORDEVA Admin
+- El arreglo de la 1.99.85 pasa a su propio archivo (`lib/vento-plata.js`) y se carga también en **ORDEVA Admin** (precio del plan, valor de un pago, precio de la licencia: «120.000» → 120000). Los días, sedes y cantidades del admin no se tocan.
+- Probadas: plata1985, modulos, adminreal, adminmasdatos, appoweb, v196, cobrosimple: todas bien.

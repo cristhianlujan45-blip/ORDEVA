@@ -202,7 +202,7 @@
   @media (max-width:520px){ .stats b{ font-size:15px; } .sxc{ padding:12px; } .sx-head .b{ padding:8px 10px; } }
 </style>
 <script src="nube/config.js"></script>
-<script src="lib/vento-errores.js"></script><!-- los errores del propio panel también llegan a 🐞 Errores -->
+<script src="lib/vento-errores.js"></script><script src="lib/vento-plata.js?v=1.99.85"></script><!-- los errores del propio panel también llegan a 🐞 Errores -->
 <script src="lib/vento-colormix.js" defer></script><!-- iPhone con iOS 15/16.0: colores mezclados (no hace nada en los demás) -->
 <!-- ORDEVA 2.0 (1.66.3): el panel con el diseño de la marca (blanco, negro y grises; color solo para estados) y, en el
      computador, el menú a la izquierda como en la app. Solo apariencia: no cambia ninguna función del panel. -->
@@ -992,7 +992,7 @@
    Si después de recargar el servidor todavía entrega la versión vieja, no se queda recargando: deja el aviso. */
 (function(){
   'use strict';
-  var ADMIN_VERSION = '2026-11-26 · v1.99.85';
+  var ADMIN_VERSION = '2026-11-26 · v1.99.86';
   var ultima = 0, oculto = 0, inicio = Date.now();
   function corta(v){ return String(v).split('·').pop().trim(); }
   function libre(){
