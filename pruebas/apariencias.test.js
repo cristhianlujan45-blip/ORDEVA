@@ -81,7 +81,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     chk('4. En «Día de las Velitas» (acento dorado claro) los botones se leen: letra oscura sobre el dorado', cr(rgb(btn.color), rgb(btn.bg)) >= 4.5, btn);
 
     // ===== 5. pedido.html =====
-    const ped = fs.readFileSync(__dirname + '/../pedido.html', 'utf8');
+    const ped = fs.readFileSync(__dirname + '/../pedido.html', 'utf8') + fs.readdirSync(__dirname + '/../pedido').filter(f => /\.js$/.test(f)).map(f => fs.readFileSync(__dirname + '/../pedido/' + f, 'utf8')).join('\n');   // 1.99.92: el código vive en pedido/*.js
     const i = ped.indexOf('const TH = {'), th = ped.slice(i, ped.indexOf('\n};', i));
     const faltan = Object.keys(P).filter(k => !['noche', 'matrix'].includes(k)).filter(k => !new RegExp('(^|[\\s{,])' + k + '\\s*:').test(th));
     chk('5. La página de pedidos conoce todas las apariencias (con el color del texto sobre el acento)', i > 0 && !faltan.length && /--on-gold/.test(th), faltan);
