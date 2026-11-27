@@ -68,7 +68,7 @@
     let box = document.getElementById('permisosEquipo');
     if(!esJefe()){ if(box) box.remove(); return; }
     if(!box){ box = document.createElement('div'); box.id = 'permisosEquipo'; box.className = 'settings-row'; box.style.cssText = 'flex-direction:column;align-items:stretch;gap:8px'; g.appendChild(box); }
-    const P = permisos(), e = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const P = permisos(), e = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     box.innerHTML = '<div class="settings-row-text"><strong>👥 Permisos del equipo</strong><span>Tu equipo (' + e(rolNombre('cajero', true).toLowerCase()) + ', ' + e(rolNombre('empleado', true).toLowerCase()) + ' y ' +
       e(rolNombre('mesero', true).toLowerCase()) + ') vende y atiende y ve las ventas de HOY (sin totales), pero NO ve las estadísticas, la contabilidad, el historial completo ni los ajustes, ni cambia productos o inventario. Aquí decides qué más puede hacer cada uno. Para corregir, liberar o borrar una venta necesita tu <b>clave de autorización</b>. Todo lo que hagan queda en la actividad del equipo.</span></div>' +
       '<div id="claveAutBox" style="display:flex;flex-direction:column;gap:6px;padding:8px 0"><b>🔑 Clave de autorización</b><small style="opacity:.8">' + (P.clave && P.clave.h ? '✅ Activa. Tu equipo la necesita para corregir, liberar o borrar una venta.' : 'Sin clave: tu equipo no puede corregir ni borrar ventas.') + '</small>' +

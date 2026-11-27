@@ -316,3 +316,10 @@ de $1.400 a distinta hora) siguen sonando los dos.
 ## 1.99.93 — Arreglo del publicador (versión de ORDEVA PLAY en la página de pedidos)
 - Al mover el código de pedido.html a pedido/app.js, el publicador dejó de subir la versión de los archivos de ORDEVA PLAY (quedaban en 1.99.91 y el CI lo detectó). Ahora `subir-version.sh` también los actualiza dentro de `pedido/*.js`.
 - Prueba `modulosnegocio`: espera a que se pinte la tarjeta de «Insumos y recetas» antes de abrirla (en el CI lento a veces no había aparecido todavía). No era una falla de la app.
+
+## 1.99.94 — Ordenar el código: proteger textos y la fecha de hoy
+- Revisé los 79 «protectores de texto» (los que evitan que un nombre con < > o comillas rompa la pantalla o meta código). 16 no protegían la comilla simple (un nombre como «O'Brien»): ahora todos la protegen. El de las cuentas/mesas además ya no muestra «null» si falta un dato.
+- Fecha de hoy: todos los lugares ya usaban la fecha de Colombia, menos el número del voucher de la agencia de viajes, que después de las 7 p. m. salía con la fecha de mañana. Arreglado.
+- Decisión: NO junté las 79 copias en un solo archivo. Habría que tocar casi todos los archivos y cambiar el orden de carga, con riesgo de dañar algo, a cambio de muy poco. Las copias son idénticas y la prueba nueva vigila que ninguna se quede débil.
+- Leer la plata ya estaba unido en `ventoLeerPlata` (1.99.88).
+- Prueba nueva: `textoseguro1993` (falla con el voucher viejo y pasa con el nuevo).

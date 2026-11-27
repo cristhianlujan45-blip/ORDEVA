@@ -10,7 +10,7 @@
    Todo queda en la actividad del equipo (quién, qué y que fue autorizado con la clave). */
 (function(){
   'use strict';
-  const e = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const e = t => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const jefe = () => { try{ return !window.ventoRoles || window.ventoRoles.esJefe(); }catch(x){ return true; } };
   const P = () => (window.ventoRoles && window.ventoRoles.permisos) ? window.ventoRoles.permisos() : {};
   const hex = b => [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join('');

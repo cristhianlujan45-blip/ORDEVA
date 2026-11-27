@@ -105,7 +105,7 @@
 
   // ---------- Vista del dueño: «📜 Actividad del equipo» ----------
   const esDueno = () => { try{ return !!neg() && neg().rol === 'dueno'; }catch(e){ return false; } };
-  const e = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const e = t => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const ICON = { venta: '💰', 'venta borrada': '🗑️', 'venta cambiada': '✏️', 'producto creado': '🆕', 'producto borrado': '❌', 'precio cambiado': '🏷️', 'costo cambiado': '🏷️', 'producto renombrado': '✏️', inventario: '📦', pedido: '🧾', 'quitado de la cuenta': '➖' };
   function boton(){
     const g = document.querySelector('#view-ajustes .settings-group[data-cat="negocio"]'); if(!g) return;

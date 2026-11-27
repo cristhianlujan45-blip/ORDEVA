@@ -995,7 +995,7 @@ function tvDiagPintar(ov, diag){
     try{ lngLog('🔍 búsqueda de TV · ' + tvDiagTexto(diag).replace(/\n/g, ' | ')); }catch(e){}
   }catch(e){}
 }
-const tvEsc = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const tvEsc = t => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const tvIcono = t => ({ lg: '📺', samsung: '📺', tv: '📺', chromecast: '📡', androidtv: '🤖', firetv: '🔥', roku: '🟣', tvbox: '📦' }[t] || '📺');
 function tvApkLista(){
   let ov = document.getElementById('tvApkOv');
@@ -1508,7 +1508,7 @@ function ventoAnuncioPintar(){
     bar.addEventListener('click', e => { if(e.target.closest('[data-x]')){ try{ localStorage.setItem('vento-anuncio-visto', bar.dataset.txt || ''); }catch(x){} bar.hidden = true; } });
   }
   bar.dataset.txt = txt; bar.hidden = false;
-  bar.innerHTML = '<span>📣 ' + txt.replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch])) + '</span><i data-x title="Entendido">✕</i>';
+  bar.innerHTML = '<span>📣 ' + txt.replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch])) + '</span><i data-x title="Entendido">✕</i>';
 }
 setTimeout(() => { ventoCfgAplicar(); ventoCfgCargar(); }, 2500);
 setInterval(ventoCfgCargar, 60 * 60000);
@@ -1594,7 +1594,7 @@ let subPlanElegido = '';
 function subPlanesPintar(box){
   if(!box) return;
   const c = ventoCfg || {}, planes = Array.isArray(c.planes) ? c.planes : [], pg = c.pagos || {};
-  const e = t => String(t == null ? '' : t).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+  const e = t => String(t == null ? '' : t).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
   let h = '';
   if(planes.length){
     h += '<div class="sp-tit">Elige tu plan</div><div class="sp-planes">' + planes.map(p =>

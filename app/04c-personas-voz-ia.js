@@ -43,7 +43,7 @@ function renderPeople(){
     chip.className = 'chip';
     chip.title = 'Ver cuenta aparte de ' + p.name;
     const ini = String(p.name || '?').trim().charAt(0).toUpperCase().replace(/[<>&"]/g, '');
-    chip.innerHTML = `<i class="pc-av">${ini}</i>${String(p.name).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))}${pagado ? ' <small class="chip-ok">✅ pagó</small>' : bal > 0 ? ' <small>debe ' + fmt(bal) + '</small>' : ''}<span class="chip-del" data-id="${invEsc(p.id)}" title="Quitar persona">✕</span>`;
+    chip.innerHTML = `<i class="pc-av">${ini}</i>${String(p.name).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))}${pagado ? ' <small class="chip-ok">✅ pagó</small>' : bal > 0 ? ' <small>debe ' + fmt(bal) + '</small>' : ''}<span class="chip-del" data-id="${invEsc(p.id)}" title="Quitar persona">✕</span>`;
     chip.addEventListener('click', (e)=>{
       if(e.target.classList.contains('chip-del')) return;
       openPersonModal(p.id);
@@ -2371,7 +2371,7 @@ cameraInput.addEventListener('change', async (e)=>{
 /* ---------- Inventario: stock, alertas y "cuándo se agota" ---------- */
 const INV_DEF_MIN = 5, INV_DAY = 864e5;
 const invNum = v => (v === '' || v == null || isNaN(v)) ? null : Math.max(0, Math.floor(+v));
-const invEsc = t => String(t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const invEsc = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 function invRate(pid){                       // unidades por día, promedio de los últimos 14 días
   const L = data.stockLog || [], since = Date.now() - 14 * INV_DAY;
   if(!L.length) return 0;

@@ -556,7 +556,7 @@
   };
 
   // ---------- Panel de ORDEVA en Ajustes ----------
-  const e2 = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const e2 = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   function crearPanel(){
     const cats = document.getElementById('ajustesCats'); if(!cats || document.getElementById('layaGrupo')) return;
     const b = document.createElement('button'); b.type = 'button'; b.className = 'ajustes-cat'; b.dataset.cat = 'laya';

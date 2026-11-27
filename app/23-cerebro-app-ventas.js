@@ -95,7 +95,7 @@
     let ov = document.getElementById('layaListaOv');
     if(!ov){ ov = document.createElement('div'); ov.id = 'layaListaOv'; ov.className = 'overlay'; document.body.appendChild(ov);
       ov.addEventListener('click', e => { if(e.target === ov || e.target.closest('[data-ll="cerrar"]')) ov.classList.remove('show'); }); }
-    const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const fecha = t => new Date(t).toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' });
     const grupos = {}; l.forEach((x, i) => { (grupos[x.prov] = grupos[x.prov] || []).push([x, i]); });
     const pend = pendientesProv();
@@ -377,7 +377,7 @@
         const r = ejecutarNuevo(Object.assign({ tipo: 'laya' }, ac)); if(r && !['listaCompra', 'abrirMesa', 'pago', 'calculadora'].includes(ac.op)) showToast(r);
       });
     }
-    const esc = x => String(x).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const esc = x => String(x).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     box.hidden = false;
     box.innerHTML = '<div class="lh-h"><b>🧠 ORDEVA</b><button type="button" class="lh-mas" onclick="try{asisOpen();setTimeout(()=>asisAsk(\'ORDEVA, ¿qué me recomiendas?\'),250)}catch(e){}">Ver todo ›</button></div>' +
       s.map(x => '<div class="lh-it"><span class="lh-ic">' + x.icono + '</span><div class="lh-tx">' + esc(x.texto) + '<div class="lh-bt">' + x.acciones.map((a, i) => '<button type="button" class="btn-ghost" data-s="' + esc(x.id) + '" data-a="' + i + '">' + esc(a.label) + '</button>').join('') + '</div></div><button type="button" class="lh-x" data-s="' + esc(x.id) + '" data-a="x" aria-label="Ocultar por hoy">✕</button></div>').join('');

@@ -5,7 +5,7 @@
 const $=id=>document.getElementById(id);
 const LS=(k,d)=>{try{return JSON.parse(localStorage.getItem(window.ventoClave(k)))||d}catch(e){return d}};
 const SS=(k,v)=>{try{localStorage.setItem(window.ventoClave(k),JSON.stringify(v))}catch(e){}};
-const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const dkey=(d=new Date())=>d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
 const btn=(t,f)=>{const e=document.createElement('button');e.className='btn-ghost';e.type='button';e.textContent=t;e.onclick=f;return e;};
 

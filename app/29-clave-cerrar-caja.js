@@ -9,7 +9,7 @@
    5 claves malas seguidas → espera 5 minutos. Cada clave mala y cada cambio quedan en la actividad del equipo. */
 (function(){
   'use strict';
-  const e = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const e = t => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const R = () => window.ventoRoles;
   const P = () => (R() && R().permisos) ? R().permisos() : {};
   const jefe = () => { try{ return !R() || R().esJefe(); }catch(x){ return true; } };

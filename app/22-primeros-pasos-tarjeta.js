@@ -6,7 +6,7 @@
 (function(){
   const K_OCULTA = 'vento-pp-oculta', K_HECHO = 'vento-pp-';
   const ls = { get: k => { try{ return localStorage.getItem(k); }catch(e){ return null; } }, set: (k, v) => { try{ localStorage.setItem(k, v); }catch(e){} } };
-  const esc = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const esc = t => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const marcar = k => { if(ls.get(K_HECHO + k) !== '1'){ ls.set(K_HECHO + k, '1'); pintar(); } };
   const sg = () => { try{ return espacio()[0].toLowerCase(); }catch(e){ return 'cuenta'; } };
   const fem = () => { try{ return espacio()[3] !== 'm'; }catch(e){ return true; } };

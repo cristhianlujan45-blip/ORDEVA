@@ -12,7 +12,7 @@
    (no se registra como venta, cobro ni devolución).
    AUDITORÍA: data.auditoria guarda quién, cuándo, qué acción y qué unidades. */
 (function(){
-  const esc4 = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const esc4 = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const listo = () => typeof data !== 'undefined' && data && data.tables;
   const U = () => getServiceUnitName(), UP = () => getServiceUnitNamePlural();
   const art = () => espacio()[3] === 'm' ? 'el' : 'la', arts = () => espacio()[3] === 'm' ? 'los' : 'las';
