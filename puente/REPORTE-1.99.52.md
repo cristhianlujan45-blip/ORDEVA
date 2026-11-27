@@ -275,3 +275,7 @@ de $1.400 a distinta hora) siguen sonando los dos.
 - Ahora todos usan `ventoLeerPlata` (lib/vento-plata.js): «8.000», «$ 8.000», «8000», «8.000,00», «8000.50», «1.500.000», «1,500,000.00» → pesos enteros (los centavos del final no cuentan).
 - Prueba nueva `leerplata1988` (4). Probadas también 20 relacionadas (caja, cuadre, gastos, salidas, devoluciones, propinas, libreta, Laya, mínimo, bonos…): todas bien.
 - Diagnóstico de hoy: el Xiaomi ya tiene la app Android 1.0.94; el Samsung sigue con la vieja (4 SMS repetidos hoy). Sin bloqueos de la CSP en pedidos.
+
+## Pruebas automáticas con la hora de Colombia (después de la 1.99.88)
+- El CI de la 1.99.88 salió en rojo en `propinas1957`, `tamanosventas1965` y `asisproducto1973`: la corrida pasó la medianoche UTC (7 p. m. de Colombia) y esas pruebas crean ventas «de hace 20-50 minutos», que en UTC quedaban como de ayer. Reproducido aquí a las 00:21 UTC: en UTC fallan (6/13, 5/9); con la hora de Colombia pasan (13/13, 9/9, 12/12). No era un error de la app.
+- `pruebas-app.yml` corre ahora con `TZ: America/Bogota` (la hora donde se usa ORDEVA).

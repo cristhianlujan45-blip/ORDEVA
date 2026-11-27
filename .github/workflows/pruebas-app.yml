@@ -41,6 +41,11 @@ jobs:
   pruebas:
     runs-on: ubuntu-latest
     timeout-minutes: 150
+    # 1.99.88: con la hora de Colombia (donde se usa ORDEVA). En UTC, una corrida que pasaba la medianoche UTC (7 p. m. de
+    # Colombia) tomaba las ventas «de hace 20 min» como de ayer y fallaban las pruebas de «hoy» (propinas1957,
+    # asisproducto1973, tamanosventas1965) sin que la app tuviera nada malo.
+    env:
+      TZ: America/Bogota
     services:
       postgres:
         image: postgres:16
