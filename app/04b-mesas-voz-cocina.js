@@ -2152,15 +2152,29 @@ function saveTableRename(){
 }
 
 // Nombre del cliente dentro de la cuenta (negocios de órdenes, vehículos, mascotas, pacientes).
-function guardarCliente(){
-  const cli = document.getElementById('clienteNombre'), t = data.tables[currentTable];
+// 1.99.95: si el nombre llega solo al salir de la casilla (sin tocar «Guardar» ni Enter) y parece una frase (más de
+// 4 palabras) o un pedazo (menos de 3 letras), se pregunta antes de guardarlo: el dictado por voz del teclado del
+// celular a veces oye la radio o el televisor y escribe ahí («p una buscamos un abogado que se mueve l», «ño»).
+function clienteNombreRaro(n){
+  const letras = String(n || '').replace(/[^\p{L}\p{N}]/gu, '').length;
+  return letras < 3 || String(n).trim().split(/\s+/).length > 4;
+}
+async function guardarCliente(e){
+  const cli = document.getElementById('clienteNombre'), id = currentTable, t = data.tables[id];
   if(!cli || !t) return;
   const n = cli.value.trim();
   if((t.name || '') === n) return;
+  if(n && e && e.type === 'change' && Date.now() - (cli.__tocoGuardar || 0) > 1500 && clienteNombreRaro(n)){   // (al tocar «Guardar», la casilla se suelta primero: eso no cuenta como «solo»)
+    if(cli.__preguntando) return;
+    cli.__preguntando = true;
+    let ok = false;
+    try{ ok = await showConfirm({ title: '¿Poner este nombre a la cuenta?', message: '«' + n + '» quedaría como el nombre de ' + tableLabel(id) + '. Si no lo escribiste tú (a veces el dictado por voz del teclado oye la radio o el televisor), toca «No».', confirmText: 'Sí, ponerlo', cancelText: 'No', icon: '✏️' }); }
+    finally{ cli.__preguntando = false; }
+    if(!ok || data.tables[id] !== t){ if(currentTable === id) cli.value = (t.name || '').trim(); return; }
+  }
   t.name = n || null;
   saveData();
-  document.getElementById('modalTitle').textContent = tableLabel(currentTable);
-  pintarClienteN();
+  if(currentTable === id){ document.getElementById('modalTitle').textContent = tableLabel(id); pintarClienteN(); }   // (la cuenta pudo cerrarse mientras se preguntaba)
   renderMesas();
   if(n) showToast('✅ ' + i18nPut(espacioN()) + ' a nombre de ' + n + '.');
 }
@@ -2194,6 +2208,7 @@ document.getElementById('clienteToggle').addEventListener('click', () => {
   if(mesaPleg('clienteToggle', 'clienteRow')) setTimeout(() => { try{ const i = document.getElementById('clienteNombre'); i.focus(); i.select(); }catch(e){} }, 30);
 });
 document.getElementById('clienteGuardar').addEventListener('click', guardarCliente);
+['pointerdown', 'mousedown', 'touchstart'].forEach(ev => document.getElementById('clienteGuardar').addEventListener(ev, () => { const c = document.getElementById('clienteNombre'); if(c) c.__tocoGuardar = Date.now(); }, { passive: true }));
 document.getElementById('clienteNombre').addEventListener('change', guardarCliente);
 document.getElementById('clienteNombre').addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); guardarCliente(); } });
 document.getElementById('renameTableBtn').addEventListener('click', openRenameModal);

@@ -323,3 +323,11 @@ de $1.400 a distinta hora) siguen sonando los dos.
 - Decisión: NO junté las 79 copias en un solo archivo. Habría que tocar casi todos los archivos y cambiar el orden de carga, con riesgo de dañar algo, a cambio de muy poco. Las copias son idénticas y la prueba nueva vigila que ninguna se quede débil.
 - Leer la plata ya estaba unido en `ventoLeerPlata` (1.99.88).
 - Prueba nueva: `textoseguro1993` (falla con el voucher viejo y pasa con el nuevo).
+
+## 1.99.95 — Nombres que «aparecen solos» en las cuentas (caso real del Xiaomi)
+- El dueño vio la cuenta 4 llamándose «P una buscamos un abogado que se mueve l» y la 5 «Ño», y no sabía de dónde salían.
+- Diagnóstico (nuevo `diagnostico-mesas.yml`, solo lectura, sin nombres): en la nube no se perdió nada (233 productos, 236 ventas, la misma libreta en todos los respaldos de 3 días). Los dos nombres se guardaron desde el Xiaomi, con el usuario del dueño, a las 12:05 p. m. («Ño») y a las 12:08 p. m. (primero 3 letras y 46 s después las 40). Fueron cambios solo del nombre, sin productos.
+- De dónde salieron: la casilla «¿A nombre de quién?» admite 40 letras y el nombre tiene exactamente 40 (quedó cortado en «…se mueve l»). Renombrar admite 24 y el micrófono de ORDEVA no escribe en casillas. Lo más probable es el dictado por voz del teclado del celular, que oyó la radio o el televisor y lo escribió ahí. Al salir de la casilla se guardaba solo. No lo causó ninguna actualización.
+- Arreglo: si el nombre llega solo al salir de la casilla y parece una frase (más de 4 palabras) o un pedazo (menos de 3 letras), ahora pregunta «¿Poner este nombre a la cuenta?». Con «Guardar» o Enter se guarda directo, como siempre. Los nombres normales («Ana Pérez») tampoco preguntan.
+- Prueba nueva: `nombreraro1995` (falla con el código viejo y pasa con el nuevo).
+- No toqué los datos del dueño. Para quitar esos nombres: abrir la cuenta, tocar el lápiz (Renombrar), borrar el nombre y guardar.
