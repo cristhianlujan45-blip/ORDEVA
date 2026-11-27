@@ -15,6 +15,7 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
     await ctx.route('**/*', r => new URL(r.request().url()).hostname === 'localhost' ? r.continue() : r.abort());
     await ctx.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento-guia-tour', '1'); }catch(e){} });
     const p = await ctx.newPage(); p.on('pageerror', e => errs.push(e.message));
+    { const m = new Date(2026, 10, 25, 12, 0, 0); await p.clock.install({ time: m }); await p.clock.resume(); }   // miércoles a mediodía: los turnos de la prueba caen en «Semana» sin importar la hora real
     await p.goto(BASE); await p.waitForTimeout(900);
     await p.evaluate(async () => { await enterApp('test', null); document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')); });
     const r = await p.evaluate(() => { const A = window.ventoAsistencia, h = 36e5, now = Date.now();
@@ -22,7 +23,7 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
         { id: 'a1', persona: 'Ana', tipo: 'entrada', at: now - 10 * h }, { id: 'a2', persona: 'Ana', tipo: 'salida', at: now - 2 * h },
         { id: 'b1', persona: 'Beto', tipo: 'entrada', at: now - 30 * h },
         { id: 'c1', persona: 'Caro', tipo: 'entrada', at: now - 31 * h }, { id: 'c2', persona: 'Caro', tipo: 'salida', at: now - 1 * h } ];
-      const x = A.horas(now - 48 * h, now + h); A.abrir(); const txt = document.querySelector('.as-ov').textContent; document.querySelector('.as-ov').remove();
+      const x = A.horas(now - 48 * h, now + h); A.abrir(); const sem = document.querySelector('.as-ov [data-per="semana"]'); if(sem) sem.click(); const txt = document.querySelector('.as-ov').textContent; document.querySelector('.as-ov').remove();
       return { ana: x.Ana, beto: x.Beto, caro: x.Caro, txt }; });
     chk('1. turno normal: 8 h sin aviso', Math.round(r.ana.ms / 36e5) === 8 && !r.ana.olvido && !r.ana.largo, r.ana);
     chk('2. sin salida hace 30 h: cuenta 16 h, «no marcó la salida», no «trabajando»', Math.round(r.beto.ms / 36e5) === 16 && r.beto.olvido && !r.beto.dentro && /no marcó la salida/.test(r.txt), { beto: r.beto });
