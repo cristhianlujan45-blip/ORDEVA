@@ -2420,10 +2420,26 @@ function invLogConId(){
   data.stockLog = invLogOrden(out);
   return data.stockLog;
 }
+// 1.99.90: lo que faltó al descontar, por renglón de la cuenta (sin guardarlo: es de este momento). Devuelve cuánto se
+// mueve de verdad: al vender, todo (la existencia no baja de 0 y lo que faltó se anota); al quitar, se descuenta primero
+// lo que había faltado.
+function invFaltaAjustar(item, p, q){
+  if(!item || typeof item !== 'object') return q;
+  let m = item.__invFalta;
+  if(!m){ m = {}; try{ Object.defineProperty(item, '__invFalta', { value: m, enumerable: false, writable: true }); }catch(e){ return q; } }
+  const k = String(p.id);
+  if(q > 0){ const f = Math.max(0, q - Math.max(0, Number(p.stock) || 0)); if(f > 0) m[k] = Math.round(((m[k] || 0) + f) * 1000) / 1000; return q; }
+  const f = Math.min(m[k] || 0, -q); if(f > 0){ m[k] = Math.round((m[k] - f) * 1000) / 1000; q = Math.round((q + f) * 1000) / 1000; }
+  return q;
+}
 function invOnSale(item, q){                 // se llama solo, cada vez que cambia la cantidad de un ítem en una cuenta
   const p = data.products.find(x => x.id === item.productId);
   if(!p || !q) return;
   if(p.combo){ p.combo.forEach(c => invOnSale({ productId: c.id }, q * c.qty)); return; }   // un combo descuenta sus productos
+  // 1.99.90: lo que NO se pudo descontar (se vendió más de lo que había: la existencia queda en 0) no vuelve al quitarlo
+  // de la cuenta. Antes: había 1, se agregaron 3 (quedó 0) y al quitar 2 quedaban 2 que nunca existieron.
+  if(p.stock != null) q = invFaltaAjustar(item, p, q);
+  if(!q) return;
   const before = invStatus(p);
   // 📶 1.99.26: cada movimiento con su id y lo nuevo al COMIENZO (como el historial). Así la nube sube solo el movimiento
   // nuevo; antes, con cada producto vendido subía la lista entera (hasta 3.000 renglones) a la nube y a los otros equipos.
