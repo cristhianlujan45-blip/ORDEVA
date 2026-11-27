@@ -312,3 +312,7 @@ de $1.400 a distinta hora) siguen sonando los dos.
 - La lista blanca (CSP) ya no permite código pegado en la página (`script-src 'self'` sin `'unsafe-inline'`): si un texto dañino lograra meterse en la página como código, no correría y quedaría anotado en el registro de errores. Los botones no tenían código escrito en el HTML (sus 27 `onclick` son de JavaScript, que la lista sí permite).
 - Prueba `cspedido1984` ampliada (7): un código pegado no corre; la página sigue funcionando sin `unsafe-inline`.
 - Probadas las 30 pruebas que usan la página de pedidos (QR, música, PLAY, tienda, cuentas, dos equipos, WhatsApp…): todas bien. `modulos` y `apariencias` leían el texto de pedido.html y ahora leen también pedido/*.js; `modulos` revisa además que los 4 archivos lleven la versión de la app.
+
+## 1.99.93 — Arreglo del publicador (versión de ORDEVA PLAY en la página de pedidos)
+- Al mover el código de pedido.html a pedido/app.js, el publicador dejó de subir la versión de los archivos de ORDEVA PLAY (quedaban en 1.99.91 y el CI lo detectó). Ahora `subir-version.sh` también los actualiza dentro de `pedido/*.js`.
+- Prueba `modulosnegocio`: espera a que se pinte la tarjeta de «Insumos y recetas» antes de abrirla (en el CI lento a veces no había aparecido todavía). No era una falla de la app.

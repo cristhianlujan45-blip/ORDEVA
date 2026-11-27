@@ -149,7 +149,9 @@ const PERFILES = [
     }
     {
       const { ctx, p } = await abrir('restaurante', 'Restaurante Oculta');
-      await p.evaluate(() => { document.querySelector('nav button[data-view="inventario"]').click(); const d = document.getElementById('insumosPanel'); d.open = true; });
+      await p.evaluate(() => document.querySelector('nav button[data-view="inventario"]').click());
+      await p.waitForFunction(() => !!document.getElementById('insumosPanel'), null, { timeout: 8000 }).catch(() => {});   // 1.99.93: en el CI lento la tarjeta tarda en pintarse
+      await p.evaluate(() => { const d = document.getElementById('insumosPanel'); if (d) d.open = true; });
       await p.waitForTimeout(300);
       await p.evaluate(() => document.querySelector('#insumosPanel [data-ins="ocultar"]').click());
       await p.waitForTimeout(500);
