@@ -69,6 +69,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
 
     // ===== 2 =====
     await A.click('#ptHoja [data-pt="ok"]');
+    await A.waitForTimeout(1500);   // 1.99.90: al aceptar se reclama el pedido en el servidor y luego entra a la cuenta
     let v = await A.evaluate(() => ({ est: data.pedidos.map(p => p.estado), items: (data.tables[2].items || []).map(i => i.name + '×' + i.qty), hoja: !!document.getElementById('ptHoja') }));
     chk('2. «✅ Aceptar»: entra a la Cuenta 2 (2 × Arroz) y queda «Aceptado: lo estamos alistando» (listo), sin cocina; el aviso se va', v.est.join() === 'listo' && v.items.join() === 'Arroz Diana 500 g×2' && !v.hoja, v);
     chk('2. El cliente ve «Aceptado: lo estamos alistando»', await esperar(C, () => /Aceptado: lo estamos alistando/.test((document.getElementById('estPed') || {}).innerText || ''), null, 20000), await estCli());
@@ -100,6 +101,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     await A.evaluate(() => window.ventoPedidosTienda.panel()); await A.waitForTimeout(300);
     chk('5. En «🛍️ Pedidos» sale en «Por aceptar (1)»', /Por aceptar \(1\)/.test(await A.evaluate(() => document.getElementById('ptOv').innerText)));
     await A.click('#ptOv [data-pt="ok"]');
+    await A.waitForTimeout(1500);   // 1.99.90: al aceptar se reclama el pedido en el servidor y luego entra a la cuenta
     v = await A.evaluate(() => ({ est: data.pedidos[2].estado, items: data.tables[2].items.map(i => i.name) }));
     chk('5. … y se acepta desde ahí: los huevos entran a la cuenta', v.est === 'listo' && v.items.includes('Huevos x 12'), v);
     await A.evaluate(() => document.getElementById('ptOv').classList.remove('show'));
@@ -114,6 +116,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     await A.evaluate(() => document.querySelectorAll('.vito-campana-menu').forEach(m => { m.style.display = 'none'; }));
     await esperar(A, () => !!document.querySelector('#ptHoja [data-pt="ok"]'), null, 10000);
     await A.click('#ptHoja [data-pt="ok"]');
+    await A.waitForTimeout(1500);   // 1.99.90: al aceptar se reclama el pedido en el servidor y luego entra a la cuenta
     v = await A.evaluate(() => data.tables[2].items.filter(i => /Aceite/.test(i.name)).reduce((s, i) => s + i.qty, 0));
     chk('6a. (aceptado: 1 aceite en la cuenta)', v === 1, v);
     await A.evaluate(() => window.ventoPedidosTienda.panel()); await A.waitForTimeout(300);
@@ -131,6 +134,7 @@ if(!process.env.VENTO_LOGS) for(const k of ['log', 'warn', 'error']){ const orig
     v = await A.evaluate(() => { const o = document.getElementById('ptOv'), r = o.getBoundingClientRect(), el = document.elementFromPoint(r.left + r.width / 2, Math.min(r.bottom - 5, innerHeight / 2)); return { z: getComputedStyle(o).zIndex, encima: !!(el && el.closest('#ptOv')) }; });
     chk('6b. … y «Ver» abre «🛍️ Pedidos» ENCIMA de la Caja', v.encima && Number(v.z) > 8500, v);
     await A.click('#ptOv .pt-card [data-pt="ok"]');
+    await A.waitForTimeout(1500);   // 1.99.90: al aceptar se reclama el pedido en el servidor y luego entra a la cuenta
     await A.evaluate(() => { document.getElementById('ptOv').classList.remove('show'); document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')); document.querySelectorAll('.pz-caja-ov').forEach(o => o.remove()); });
     // 6c. Al cobrar la cuenta, sus pedidos aceptados quedan «Entregado» solos
     v = await A.evaluate(async () => { const e = await window.ventoPOS.cobrarMesa(2, { pago: { method: 'efectivo', metodo: 'efectivo', nota: 'Efectivo' } }); return { e: !!e, est: data.pedidos.filter(p => p.mesa === 2).map(p => p.estado), porEntregar: window.ventoPedidosTienda.aceptados().length }; });

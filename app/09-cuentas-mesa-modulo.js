@@ -995,11 +995,33 @@ function pedidoCambiar(id,estado){
     if(its.length)try{sinSonidoPos(()=>applyVoiceItems(p.mesa,its,'subtract'));}catch(e){}
     p.aplicado=false;try{renderMesas();}catch(e){}
   }
+  // 1.99.90: aceptar un pedido que esperaba («nuevo»): si hay nube, se reclama primero en el servidor. Solo el primer equipo
+  // lo suma a la cuenta; si otro ya lo aceptó, aquí solo queda aceptado (lo sumado llega con los datos del negocio). Sin
+  // internet o si el servidor no responde, se suma aquí como siempre.
+  if(estado!=='cancelado'&&!p.aplicado&&p.estado==='nuevo'&&typeof window.vitoPedidoReclamar==='function'){
+    p.estado=estado;p.hist.push({e:estado,at:Date.now()});pedidosGuardar();pedidoPublicar(p);
+    window.vitoPedidoReclamar(p).then(primero=>{
+      if(p.aplicado)return;
+      if(primero===false){p.aplicado=true;p.aplicadoOtro=true;}else pedidoAplicar(p);
+      pedidosGuardar();try{renderMesas();}catch(e){}
+    });
+    return p;
+  }
   if(estado!=='cancelado'&&!p.aplicado)pedidoAplicar(p);
   p.estado=estado;p.hist.push({e:estado,at:Date.now()});
   pedidosGuardar();pedidoPublicar(p);
   return p;
 }
+// 1.99.90: ¿este equipo es el primero en aceptar el pedido? true / false; null = sin nube o sin respuesta (se suma aquí).
+window.vitoPedidoReclamar=async p=>{
+  try{
+    const N=window.ventoNube,n=N&&N.negocio&&N.negocio();if(!n||!n.id||typeof N.cliente!=='function')return null;
+    const c=await N.cliente();if(!c||typeof c.rpc!=='function')return null;
+    const r=await Promise.race([c.rpc('pedido_reclamar',{p_negocio:n.id,p_pedido:String(p.id).slice(0,60)}),new Promise(ok=>setTimeout(()=>ok({tiempo:true}),4000))]);
+    if(!r||r.tiempo||r.error)return null;
+    return r.data===true;
+  }catch(e){return null;}
+};
 // Pedidos que ya se sumaron a la cuenta por otro camino (app de meseros): también van a preparación.
 function pedidoRegistrarAplicado(mesa,added,origen){
   const items=(added||[]).filter(a=>a.qty>0).map(a=>{const pr=pedidoProducto(a.name);const it={productId:pr?pr.id:null,name:a.name,qty:a.qty,price:pr?Number(pr.price)||0:0,ok:true};if(a.k)it.k=a.k;return it;});
