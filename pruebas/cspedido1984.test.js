@@ -27,6 +27,12 @@ const B = process.env.VENTO_BASE || 'http://localhost:8765';
     await p.waitForTimeout(300);
     const bl2 = await p.evaluate(() => window.__cspBloqueos.slice());
     chk('3. mandar datos a un servidor ajeno se bloquea', r3 === 'bloqueado' && bl2.some(x => /connect-src/.test(x)) && !pidioAjeno, { r3, bl2 });
+    // 1.99.92: el código de la página vive en pedido/*.js: un código PEGADO en la página (como el que metería un texto
+    // dañino) ya no corre.
+    const r5 = await p.evaluate(async () => { const s = document.createElement('script'); s.textContent = 'window.__pegado = 1'; document.body.appendChild(s); await new Promise(r => setTimeout(r, 300)); return { corrio: window.__pegado === 1, bloqueos: window.__cspBloqueos.slice() }; });
+    chk('5. un código pegado en la página no corre (y queda anotado)', !r5.corrio && r5.bloqueos.some(x => /script-src/.test(x)), r5);
+    const r6 = await p.evaluate(() => ({ app: typeof window.pedirAhora !== 'undefined' || !!document.getElementById('cq') || !!document.querySelector('#carta, .pcard, #catX'), csp: document.querySelector('meta[http-equiv="Content-Security-Policy"]').content }));
+    chk('6. la página sigue funcionando con su código en pedido/*.js (sin «unsafe-inline» para el código)', r6.app && !/script-src[^;]*unsafe-inline/.test(r6.csp), r6);
     chk('4. sin errores de página', errs.length === 0, errs);
   }catch(e){ mal++; console.log('❌ excepción: ' + e.message); }
   await b.close(); console.log('RESULTADO', ok, 'bien', mal, 'mal'); process.exit(mal ? 1 : 0);

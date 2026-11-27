@@ -21,6 +21,8 @@ sed -i -E "s#src=\"nube/config\.js\?v=[0-9.]+\"#src=\"nube/config.js\"#" index.h
 # 🎮 ORDEVA PLAY: pedido.html carga play/play.css y play/ordeva-play.js solo al tocar la pestaña, con ?v=. Si no sube con la
 # versión, el celular del cliente sigue usando el archivo viejo que tiene guardado.
 sed -i -E "s#(play/(play\.css|ordeva-play\.js))\?v=[0-9.]+#\1?v=$NUEVA#g" pedido.html
+# 1.99.92: el código de pedido.html vive en pedido/*.js (la lista blanca CSP ya no deja código pegado en la página).
+sed -i -E "s#(pedido/[a-z]+\.js)\?v=[0-9.]+#\1?v=$NUEVA#g" pedido.html
 sed -i "s/var ADMIN_VERSION = '[^']*'/var ADMIN_VERSION = '$TXT'/" admin.html
 printf '%s\n' "$TXT" > version.txt
 echo "Listo: $TXT"

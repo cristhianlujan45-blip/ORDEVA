@@ -306,3 +306,8 @@ de $1.400 a distinta hora) siguen sonando los dos.
 - Con «Luego» el aviso azul «Hay una versión nueva de ORDEVA» se escondía 3 días. Si esa versión nueva lleva más de **un día** esperando, ahora vuelve a salir aunque se haya tocado «Luego» (el Samsung pasó días con la app vieja y los SMS de pago sonando dos veces). Un «Luego» reciente se sigue respetando.
 - Prueba nueva `appvieja1991` (3). `pagosaviso` (95) sigue bien.
 - CI de la 1.99.91: falló `autoactualiza` (corrió a las 3 a. m. de Colombia: de 3 a 5 a. m. la versión nueva ya no espera por una ventana abierta, a propósito desde la 1.99.89, y la prueba suponía «de día»). La prueba ahora pone el reloj a mediodía. Reproducido con la hora a las 3:09 a. m.: antes 7/11; después 11/11 (y autoactualiza1989 5/5).
+
+## 1.99.92 — Página de pedidos blindada: ya no corre código pegado en la página
+- El código de `pedido.html` (4 bloques que estaban dentro de la página: la lista blanca, el ajuste de pantalla, la app de pedidos y la vitrina) pasa a `pedido/csp.js`, `pedido/inicio.js`, `pedido/app.js` y `pedido/vitrina.js`, en el mismo orden y con su `?v=` (los sube `puente/subir-version.sh`).
+- La lista blanca (CSP) ya no permite código pegado en la página (`script-src 'self'` sin `'unsafe-inline'`): si un texto dañino lograra meterse en la página como código, no correría y quedaría anotado en el registro de errores. Los botones no tenían código escrito en el HTML (sus 27 `onclick` son de JavaScript, que la lista sí permite).
+- Prueba `cspedido1984` ampliada (7): un código pegado no corre; la página sigue funcionando sin `unsafe-inline`.
