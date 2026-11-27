@@ -11,6 +11,7 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
     await ctx.route('**/*', r => new URL(r.request().url()).hostname === 'localhost' ? r.continue() : r.abort());
     await ctx.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento-guia-tour', '1'); }catch(e){} });
     const p = await ctx.newPage(); p.on('pageerror', e => errs.push(e.message));
+    { const m = new Date(); m.setHours(12, 0, 0, 0); await p.clock.install({ time: m }); await p.clock.resume(); }   // las ventas «de hace un rato» siempre de hoy, corra a la hora que corra la prueba
     await p.goto(BASE); await p.waitForTimeout(1000);
     const r = await p.evaluate(async () => { await enterApp('test', null);
       data.products = [{ id: 'pa1', name: 'Purina', size: '1 kg', price: 8000, cost: 6000, stock: 10 }, { id: 'pa5', name: 'Purina', size: '5 kg', price: 35000, cost: 28000, stock: 4 }, { id: 'v', name: 'Vasija', price: 5000, cost: 3000, stock: 7 }];

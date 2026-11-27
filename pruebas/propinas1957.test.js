@@ -13,6 +13,7 @@ const BASE = (process.env.VENTO_BASE || 'http://localhost:8765') + '/index.html'
     await ctx.route('**/*', r => new URL(r.request().url()).hostname === 'localhost' ? r.continue() : r.abort());
     await ctx.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento-guia-tour', '1'); }catch(e){} });
     const p = await ctx.newPage(); p.on('pageerror', e => errs.push(e.message));
+    { const m = new Date(); m.setHours(12, 0, 0, 0); await p.clock.install({ time: m }); await p.clock.resume(); }   // las ventas «de hace un rato» siempre de hoy, corra a la hora que corra la prueba
     await p.goto(BASE); await p.waitForTimeout(1000);
     const r = await p.evaluate(async () => { await enterApp('test', null); document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')); window.speakVoice = () => {};
       const t = m => new Date(Date.now() - m * 60e3).toISOString();
