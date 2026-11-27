@@ -1,0 +1,74 @@
+# ORDEVA · 🪑 Diagnóstico de las cuentas abiertas de UN negocio (SOLO LECTURA, se corre a mano).
+# Para cuando el dueño dice «me salen cuentas con nombres o productos que yo no puse». Responde, SIN mostrar nombres:
+#   • cada cuenta abierta hoy: cuántas palabras/letras tiene su nombre, qué campos tiene (de dónde vino), cuántos productos
+#     y qué campos tienen esos productos (ej. si llegaron por el QR, por voz, por pedido), y desde cuándo;
+#   • los cambios guardados de las últimas horas que tocaron cuentas: cuándo, con qué rol, qué cuenta y si le cambió el nombre.
+# El negocio se pasa por los primeros 8 caracteres de su id. No cambia nada (una sola consulta select).
+name: Diagnóstico de cuentas abiertas
+
+on:
+  workflow_dispatch:
+    inputs:
+      negocio:
+        description: 'primeros 8 caracteres del id del negocio'
+        required: true
+      horas:
+        description: 'cuántas horas hacia atrás mirar los cambios (1 a 72)'
+        required: false
+        default: '24'
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostico:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Consultar (solo lectura)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          NEGOCIO: ${{ github.event.inputs.negocio }}
+          HORAS: ${{ github.event.inputs.horas }}
+        run: |
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ] || [ -z "$PROJECT_REF" ]; then echo "Faltan los secretos"; exit 1; fi
+          printf '%s' "$NEGOCIO" | grep -Eq '^[0-9a-f]{8}$' || { echo "negocio: 8 letras/números del id"; exit 1; }
+          printf '%s' "$HORAS" | grep -Eq '^[0-9]{1,2}$' || { echo "horas: un número"; exit 1; }
+          cat > /tmp/q.sql <<'SQL'
+          with neg as (select id from negocios where left(id::text, 8) = '__NEG__' limit 1),
+          rol_de as (select negocio_id, usuario_id, rol from miembros)
+          select json_build_object(
+            'ahora_bogota', (now() at time zone 'America/Bogota')::text,
+            'existe', (select count(*) from neg),
+            'cuentas_hoy', (select coalesce(json_agg(x order by x.cuenta), '[]') from (
+              select t.key::int cuenta,
+                     length(coalesce(t.value->>'name', '')) letras_nombre,
+                     coalesce(array_length(regexp_split_to_array(trim(coalesce(t.value->>'name', '')), '\s+'), 1), 0) * (case when coalesce(t.value->>'name', '') = '' then 0 else 1 end) palabras_nombre,
+                     (select json_agg(k order by k) from jsonb_object_keys(t.value) k) campos,
+                     jsonb_array_length(coalesce(t.value->'items', '[]'::jsonb)) productos,
+                     (select json_agg(distinct k) from jsonb_array_elements(coalesce(t.value->'items', '[]'::jsonb)) i, jsonb_object_keys(i) k) campos_productos,
+                     (select coalesce(sum(coalesce((i->>'price')::numeric, 0) * coalesce((i->>'qty')::numeric, 0)), 0) from jsonb_array_elements(coalesce(t.value->'items', '[]'::jsonb)) i) total,
+                     (select min(h->>'at') from jsonb_array_elements(coalesce(t.value->'items', '[]'::jsonb)) i, jsonb_array_elements(coalesce(i->'history', '[]'::jsonb)) h) primer_producto,
+                     (select json_agg(distinct coalesce(h->>'by', h->>'origen', h->>'via', '-')) from jsonb_array_elements(coalesce(t.value->'items', '[]'::jsonb)) i, jsonb_array_elements(coalesce(i->'history', '[]'::jsonb)) h) como_llegaron
+              from datos_negocio d, jsonb_each(case when jsonb_typeof(d.datos->'tables') = 'object' then d.datos->'tables' else '{}'::jsonb end) t
+              where d.negocio_id = (select id from neg) and (coalesce(t.value->>'name', '') <> '' or jsonb_array_length(coalesce(t.value->'items', '[]'::jsonb)) > 0)) x),
+            'cambios_a_cuentas', (select coalesce(json_agg(x order by x.version), '[]') from (
+              select c.version, (c.creado_en at time zone 'America/Bogota')::text cuando,
+                     coalesce((select r.rol from rol_de r where r.negocio_id = c.negocio_id and r.usuario_id = c.creado_por), case when c.creado_por is null then 'sin usuario' else 'otro' end) por_rol,
+                     case when c.cambios->'tables' ? 'v' then 'todas las cuentas reemplazadas' else 'por cuenta' end como,
+                     (select json_agg(json_build_object('cuenta', e.key,
+                         'quitada', (e.value ? 'x'),
+                         'letras_nombre', length(coalesce(e.value->'v'->>'name', '')),
+                         'productos', jsonb_array_length(coalesce(e.value->'v'->'items', '[]'::jsonb)),
+                         'campos', (select json_agg(k order by k) from jsonb_object_keys(coalesce(e.value->'v', '{}'::jsonb)) k)))
+                      from jsonb_each(coalesce(c.cambios->'tables'->'o', '{}'::jsonb)) e) cuentas,
+                     (select json_agg(k order by k) from jsonb_object_keys(c.cambios) k) partes
+              from datos_cambios c
+              where c.negocio_id = (select id from neg) and c.creado_en > now() - make_interval(hours => __HORAS__) and c.cambios ? 'tables') x)
+          ) resultado;
+          SQL
+          sed -i "s/__NEG__/$NEGOCIO/; s/__HORAS__/$HORAS/" /tmp/q.sql
+          jq -n --rawfile q /tmp/q.sql '{query: $q}' > /tmp/q.json
+          curl -sS -X POST "https://api.supabase.com/v1/projects/$PROJECT_REF/database/query" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" -H 'Content-Type: application/json' --data @/tmp/q.json > /tmp/r.json
+          jq '.[0].resultado // .' /tmp/r.json
