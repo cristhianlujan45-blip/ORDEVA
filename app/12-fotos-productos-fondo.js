@@ -427,7 +427,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-11-27 · v1.99.90';
+const MESORA_VERSION = '2026-11-27 · v1.99.91';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve){   // «ORDEVA 1.99.2 · 14 nov 2026» (antes «versión v1.99.2 (2026-11-14)», con la «v» repetida y la fecha en formato técnico)
   const pz = MESORA_VERSION.split('·'), num = pz.pop().trim().replace(/^v/i, ''), f = (pz[0] || '').trim().split('-');
@@ -459,6 +459,10 @@ try{ const ve = document.getElementById('appVersionEl'); if(ve){   // «ORDEVA 1
         : '✅ se actualiza sola') + /* 1.66.6: un error viejo de un intento anterior no se muestra si ya está al día */ (e.estado && (hay || !e.permiso) && /error|no se pudo|confirmes/.test(e.estado) ? '<br><small>' + String(e.estado).replace(/[<>&]/g, '') + '</small>' : '');
     }
     let luego = 0; try{ luego = Number(localStorage.getItem(LUEGO)) || 0; }catch(x){}
+    // 1.99.91: si la versión nueva de la app lleva más de un día esperando, el aviso vuelve aunque se haya tocado «Luego»
+    // (el Samsung del negocio pasó días con la app vieja y los SMS de pago sonando dos veces).
+    if(hay){ let desde = 0; const kd = 'vento-act-desde-' + e.nueva; try{ desde = Number(localStorage.getItem(kd)) || 0; if(!desde){ desde = Date.now(); localStorage.setItem(kd, String(desde)); } }catch(x){}
+      if(desde && Date.now() - desde > 864e5) luego = 0; }
     // Hay una versión nueva esperando (p. ej. Android pide confirmar «Actualizar» la primera vez): un toque la instala.
     banner(!e.permiso && Date.now() > luego ? 'permiso' : hay && Date.now() > luego ? 'nueva' : '');
     return e;
