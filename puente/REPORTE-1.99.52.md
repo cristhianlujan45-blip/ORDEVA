@@ -279,3 +279,12 @@ de $1.400 a distinta hora) siguen sonando los dos.
 ## Pruebas automáticas con la hora de Colombia (después de la 1.99.88)
 - El CI de la 1.99.88 salió en rojo en `propinas1957`, `tamanosventas1965` y `asisproducto1973`: la corrida pasó la medianoche UTC (7 p. m. de Colombia) y esas pruebas crean ventas «de hace 20-50 minutos», que en UTC quedaban como de ayer. Reproducido aquí a las 00:21 UTC: en UTC fallan (6/13, 5/9); con la hora de Colombia pasan (13/13, 9/9, 12/12). No era un error de la app.
 - `pruebas-app.yml` corre ahora con `TZ: America/Bogota` (la hora donde se usa ORDEVA).
+
+## 1.99.89 — La página de ORDEVA ya no se queda sin actualizar en el celular del negocio
+- **Qué se vio:** el Samsung sigue con la página 1.99.80 desde el 25/11 a las 10:16 p. m., aunque se publicaron 9 versiones después (por eso tampoco le llega el aviso de actualizar la app Android).
+- **Dos trampas (app/12):**
+  1. Si al recargar la versión nueva todavía no había llegado a todos los servidores (pasa al publicar varias seguidas), el aviso quedaba en «Toca Actualizar ahora» **para siempre**: no se volvía a intentar solo. Ahora, pasados los 10 min, se vuelve a intentar solo.
+  2. Con una ventana abierta (cobro, cuenta, ajustes…) espera, y en un celular que queda toda la noche en ORDEVA con una ventana abierta no se actualizaba nunca. Ahora de **3 a 5 a. m.**, sin tocar ORDEVA 30 min, una ventana abierta no lo frena — salvo que tenga algo escrito (no se pierde nada).
+- De día sigue igual: espera 2 min sin tocar, sin escribir y sin ventanas abiertas.
+- Prueba nueva `autoactualiza1989` (5): fallaba antes del arreglo (2 de 5). `autoactualiza` (11) y `adminversion` (7) siguen bien.
+- Nota: el Samsung necesita UNA recarga para tomar este arreglo (cerrar y abrir ORDEVA); desde ahí se pone al día solo.

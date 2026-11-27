@@ -427,7 +427,7 @@ function castBuscarYTransmitir(){ transmitirTV(); }
 /* Entorno y estado de la transmisión. Chromecast / Google TV / Android TV se manejan más abajo
    (ccTransmitir): abren la app de YouTube del TV. Los Smart TV LG/Samsung sin Chromecast se
    conectan con «Vincular con código de TV» (sección YouTube del TV). */
-const MESORA_VERSION = '2026-11-26 · v1.99.88';
+const MESORA_VERSION = '2026-11-27 · v1.99.89';
 // Visible en Ajustes: así se puede confirmar de un vistazo si la app ya tomó la última versión.
 try{ const ve = document.getElementById('appVersionEl'); if(ve){   // «ORDEVA 1.99.2 · 14 nov 2026» (antes «versión v1.99.2 (2026-11-14)», con la «v» repetida y la fecha en formato técnico)
   const pz = MESORA_VERSION.split('·'), num = pz.pop().trim().replace(/^v/i, ''), f = (pz[0] || '').trim().split('-');
@@ -531,6 +531,14 @@ function mesoraOcupado(){
   if(Date.now() - mesoraUltimoUso < 120000) return true;
   const a = document.activeElement;
   if(a && (/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) || a.isContentEditable) && a.offsetParent !== null) return true;
+  // 1.99.89: de madrugada (3 a 5 a. m.) y sin tocar ORDEVA en 30 min, una ventana que quedó abierta no frena la versión
+  // nueva (el celular del negocio queda prendido toda la noche en ORDEVA y, con una ventana abierta, no se actualizaba
+  // nunca). Si en esa ventana hay algo escrito, igual espera: no se pierde nada.
+  const h = new Date().getHours();
+  if(h >= 3 && h < 5 && Date.now() - mesoraUltimoUso > 30 * 60000){
+    const escrito = [...document.querySelectorAll('.overlay.show input:not([type=checkbox]):not([type=radio]):not([type=hidden]), .overlay.show textarea')].some(x => String(x.value || '').trim() && x.defaultValue !== x.value);
+    return escrito;
+  }
   return !!document.querySelector('.overlay.show, #pgVentana, #lcelOv, .vs-sheet.show');
 }
 async function mesoraRecargarYa(nueva){
@@ -546,13 +554,17 @@ function mesoraYaIntentada(nueva){
 }
 function mesoraAvisoVersionNueva(nueva){
   if(document.hidden && !mesoraYaIntentada(nueva)){ mesoraRecargarYa(nueva); return; }
-  if(document.getElementById('mesoraNuevaVersion')) return;
+  // 1.99.89: si el aviso quedó en «Toca Actualizar ahora» (el intento anterior llegó antes que la versión nueva) y ya pasaron
+  // los 10 min, se quita y se vuelve a intentar solo. Antes quedaba así para siempre y el celular no se actualizaba más.
+  const viejo = document.getElementById('mesoraNuevaVersion');
+  if(viejo){ if(viejo.dataset.auto === '0' && !mesoraYaIntentada(nueva)) viejo.remove(); else return; }
   const b = document.createElement('div');
   b.id = 'mesoraNuevaVersion';
   // Arriba, no abajo: abajo es donde vive el botón flotante del micrófono (que además se
   // puede arrastrar a cualquier lado), así este aviso nunca lo tapa ni se le monta encima.
   b.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:99999;background:#2d7d46;color:#fff;padding:12px 16px;display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;font:600 14px system-ui;box-shadow:0 4px 16px rgba(0,0,0,.3)';
   const auto = !mesoraYaIntentada(nueva);
+  b.dataset.auto = auto ? '1' : '0';
   b.innerHTML = '<span>🔄 Versión nueva de ORDEVA (' + String(nueva).split('·').pop().trim() + '). <span id="mesoraNuevaCuenta"></span></span>' +
     '<button type="button" style="background:#fff;color:#2d7d46;border:0;border-radius:8px;padding:8px 16px;font:700 14px system-ui;cursor:pointer">Actualizar ahora</button>';
   b.querySelector('button').onclick = () => { try{ sessionStorage.removeItem(MESORA_AUTO_KEY); }catch(e){} mesoraRecargarYa(nueva); };
