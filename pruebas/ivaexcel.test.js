@@ -46,8 +46,8 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
       const hoy = new Date();
       data.history = [{ id: 'v1', date: hoy.toISOString(), total: 43300, items: [{ productId: 'g', name: 'Gaseosa', price: 11900, cost: 5000, qty: 2 }, { productId: 'p', name: 'Pan', price: 10500, qty: 1 }, { productId: 'l', name: 'Leche', price: 4000, qty: 1 }, { productId: 'a', name: 'Arroz', price: 5000, qty: 1 }],
         payments: [{ method: 'efectivo', amount: 43300, note: 'Efectivo' }] }];
-      data.purchases = [{ id: 'c1', supplier: 'Postobón', date: hoy.toISOString().slice(0, 10), at: hoy.toISOString(), total: 11900, items: [{ productId: 'g', name: 'Gaseosa', qty: 2, cost: 5950, taxRate: 19, lineTotal: 11900 }] }];
-      data.contab = [{ id: 'x', tipo: 'gasto', cat: 'servicios', monto: 50000, fecha: hoy.toISOString().slice(0, 10) }];
+      data.purchases = [{ id: 'c1', supplier: 'Postobón', date: hoy.toLocaleDateString('en-CA'), at: hoy.toISOString(), total: 11900, items: [{ productId: 'g', name: 'Gaseosa', qty: 2, cost: 5950, taxRate: 19, lineTotal: 11900 }] }];
+      data.contab = [{ id: 'x', tipo: 'gasto', cat: 'servicios', monto: 50000, fecha: hoy.toLocaleDateString('en-CA') }];
       data.retenciones = { retefuente: 2.5, reteica: 4.14 };
       saveData();
       const bt = document.querySelector('nav button[data-view="contabilidad"]'); if(bt) bt.click(); ctPeriodo = 'mes'; renderConta();

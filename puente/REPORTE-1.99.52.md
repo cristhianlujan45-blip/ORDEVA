@@ -288,3 +288,4 @@ de $1.400 a distinta hora) siguen sonando los dos.
 - De día sigue igual: espera 2 min sin tocar, sin escribir y sin ventanas abiertas.
 - Prueba nueva `autoactualiza1989` (5): fallaba antes del arreglo (2 de 5). `autoactualiza` (11) y `adminversion` (7) siguen bien.
 - Nota: el Samsung necesita UNA recarga para tomar este arreglo (cerrar y abrir ORDEVA); desde ahí se pone al día solo.
+- La batería completa con la hora de Colombia (corrió de 7:22 a 9:05 p. m.) mostró otras dos pruebas frágiles por la hora: `inventario5` y `ivaexcel` armaban «ayer», «en 5 días» y «hoy» con la fecha UTC (`toISOString`), que después de las 7 p. m. ya es mañana. Ahora usan la fecha de Colombia (`toLocaleDateString('en-CA')`). Reproducido a las 9:15 p. m.: antes 12/15 y 16/18; después 15/15 y 18/18, en hora de Colombia y en UTC. Las otras 252 pruebas pasaron en esa franja.

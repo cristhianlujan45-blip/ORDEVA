@@ -29,7 +29,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     let v = await p.evaluate(() => { const F = window.ventoFinanzas, t = Date.now(), dia = 864e5;
       const compras = [{ supplier: 'Postobón', at: new Date(t - 20 * dia).toISOString(), total: 20000, items: [{ productId: 'g', cost: 2000 }] }, { supplier: 'Distribuidora Sol', at: new Date(t - 5 * dia).toISOString(), total: 22000, items: [{ productId: 'g', cost: 2200 }] }, { supplier: 'Postobón', at: new Date(t - 1 * dia).toISOString(), total: 25000, items: [{ productId: 'g', cost: 2500 }] }];
       const PV = F.proveedores(compras, []);
-      const ymd = d => new Date(t + d * dia).toISOString().slice(0, 10);
+      const ymd = d => new Date(t + d * dia).toLocaleDateString('en-CA');
       const V = F.vencimientos([{ id: 'l', name: 'Leche', lotes: [{ q: 3, vence: ymd(-2) }, { q: 4, vence: ymd(5) }, { q: 9, vence: ymd(60) }, { q: 0, vence: ymd(-9) }] }]);
       return { prom: F.costoTrasCompra(10, 2000, 10, 2600, 'promedio'), ult: F.costoTrasCompra(10, 2000, 10, 2600, 'ultimo'), vacio: F.costoTrasCompra(0, 2000, 10, 2600, 'promedio'),
         prov: PV.lista.map(x => [x.nombre, x.compras, x.total]), comp: PV.comparar('g').map(x => [x.proveedor, x.costo]), varia: F.variacionCosto(compras, 'g'),
@@ -49,14 +49,14 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
 
     // ===== 3. Factura =====
     const factura = async (costo, qty, vence) => {
-      await p.evaluate(x => { document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')); invoiceOpen({ supplier: 'Postobón', date: new Date().toISOString().slice(0, 10), items: [{ name: 'Gaseosa', qty: x.qty, unit_cost: x.costo, line_total: x.qty * x.costo }] }); }, { costo, qty });
+      await p.evaluate(x => { document.querySelectorAll('.overlay.show').forEach(o => o.classList.remove('show')); invoiceOpen({ supplier: 'Postobón', date: new Date().toLocaleDateString('en-CA'), items: [{ name: 'Gaseosa', qty: x.qty, unit_cost: x.costo, line_total: x.qty * x.costo }] }); }, { costo, qty });
       await p.waitForTimeout(400);
       if(vence) await p.evaluate(ve => { const i = document.querySelector('#invoiceOverlay .iv-vence'); i.value = ve; i.dispatchEvent(new Event('input', { bubbles: true })); i.dispatchEvent(new Event('change', { bubbles: true })); }, vence);
       await p.click('#invoiceApplyBtn'); await p.waitForTimeout(400);
       for(let k = 0; k < 4; k++){ await p.evaluate(() => { const o = document.getElementById('confirmOverlay'); if(o && o.classList.contains('show')) document.getElementById('confirmOkBtn').click(); const a = document.getElementById('promptOverlay'); if(a && a.classList.contains('show')) document.getElementById('promptOkBtn').click(); }); await p.waitForTimeout(300); }   // 1.99.5: también el aviso «el proveedor subió el precio» (ventana propia)
     };
     await p.evaluate(() => { data.products = [{ id: 'g', name: 'Gaseosa', price: 3500, cost: 2000, stock: 10 }]; data.purchases = []; saveData(); });
-    const hoy = new Date(), ymd = d => new Date(hoy.getTime() + d * 864e5).toISOString().slice(0, 10);
+    const hoy = new Date(), ymd = d => new Date(hoy.getTime() + d * 864e5).toLocaleDateString('en-CA');
     await factura(2600, 10, ymd(4));
     v = await p.evaluate(() => { const g = data.products.find(x => x.id === 'g'); return { cost: g.cost, ult: g.costoUltimo, stock: g.stock, lotes: g.lotes, compras: (data.purchases || []).length }; });
     chk('3. Promedio ponderado: la factura de 10 u a $2.600 deja el costo en $2.300 (último $2.600) y 20 en bodega', v.cost === 2300 && v.ult === 2600 && v.stock === 20 && v.compras === 1, v);
@@ -86,7 +86,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     chk('6. Inicio: «1 lote vencido con unidades» (Leche, 3 u) y lotes por vencer', /lote vencido/.test(v) && /Leche entera \(3 u\)/.test(v) && /por vencer/.test(v), v);
 
     // ===== 7. Ficha del producto =====
-    await p.evaluate(() => { data.purchases.push({ id: 'z', supplier: 'Distribuidora Sol', at: new Date().toISOString(), date: new Date().toISOString().slice(0, 10), total: 12000, items: [{ productId: 'g', qty: 5, cost: 2400 }] }); saveData(); openEditProductModal('g'); });
+    await p.evaluate(() => { data.purchases.push({ id: 'z', supplier: 'Distribuidora Sol', at: new Date().toISOString(), date: new Date().toLocaleDateString('en-CA'), total: 12000, items: [{ productId: 'g', qty: 5, cost: 2400 }] }); saveData(); openEditProductModal('g'); });
     await p.waitForTimeout(400);
     v = await p.evaluate(() => (document.getElementById('editProdHistory') || {}).innerText || '');
     chk('7. Ficha: variación % entre compras y «Comparar proveedores» con el más barato (Distribuidora Sol $2.400)', /▼ 14 %|▲ 8 %|▼ 7 %|%/.test(v) && /Comparar proveedores/.test(v) && /✅ Distribuidora Sol/.test(v) && /más barato/.test(v), v);
