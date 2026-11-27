@@ -21,6 +21,7 @@ const BASE = process.env.VENTO_BASE || 'http://localhost:8765';
     await ctx.addInitScript(() => { try{ localStorage.setItem('vento-hola', '0'); localStorage.setItem('cm-tutorial-seen', '1'); localStorage.setItem('vento_nube_cfg', JSON.stringify({ url: '', key: '', off: true })); }catch(e){} });
     const p = await ctx.newPage(); p.on('pageerror', e => errs.push(e.message));
     let cargas = 0; p.on('load', () => cargas++);
+    { const m = new Date(); m.setHours(12, 0, 0, 0); await p.clock.install({ time: m }); await p.clock.resume(); }   // 1.99.91: de día (de 3 a 5 a. m. la versión nueva no espera por una ventana abierta, a propósito)
     await p.goto(BASE + '/index.html'); await p.waitForTimeout(1200);
     await p.fill('#authBiz', 'Bar Nuevo'); await p.fill('#authUser', 'ana'); await p.fill('#authPass', 'clave123'); await p.click('#authBtn'); await p.waitForTimeout(1500);
     await p.click('#onbSaltar', { timeout: 3000 }).catch(() => {});

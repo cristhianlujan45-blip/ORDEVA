@@ -305,3 +305,4 @@ de $1.400 a distinta hora) siguen sonando los dos.
 ## 1.99.91 — El aviso de «app Android nueva» no se queda escondido
 - Con «Luego» el aviso azul «Hay una versión nueva de ORDEVA» se escondía 3 días. Si esa versión nueva lleva más de **un día** esperando, ahora vuelve a salir aunque se haya tocado «Luego» (el Samsung pasó días con la app vieja y los SMS de pago sonando dos veces). Un «Luego» reciente se sigue respetando.
 - Prueba nueva `appvieja1991` (3). `pagosaviso` (95) sigue bien.
+- CI de la 1.99.91: falló `autoactualiza` (corrió a las 3 a. m. de Colombia: de 3 a 5 a. m. la versión nueva ya no espera por una ventana abierta, a propósito desde la 1.99.89, y la prueba suponía «de día»). La prueba ahora pone el reloj a mediodía. Reproducido con la hora a las 3:09 a. m.: antes 7/11; después 11/11 (y autoactualiza1989 5/5).
